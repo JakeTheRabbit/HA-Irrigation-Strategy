@@ -1,5 +1,5 @@
 import type { DosingConfig, DosingDocument, DosingPump } from "./dosing";
-import { monthName } from "./time";
+import { dayMonth, monthName } from "./time";
 
 /** Equipment › Pump calibration (G3): prime a dosing pump's line while held, run it 30 s into a
  * measuring jug, and turn the mL measured into its flow (dosing_api.py `pump_*`). The integration
@@ -93,10 +93,26 @@ export function wearNote(history: { at: number; mlMin: number }[], tz = "UTC"): 
 export function runState(session: { ran_s?: number | null } | null): "waiting" | "ran" {
   return typeof session?.ran_s === "number" ? "ran" : "waiting";
 }
-/** Whether Run is offered: no run open (none asked for yet, or it ended unreported), or the last
- * one was reported at 0 s. A new run replaces the old session (the backend's pump_open closes it). */
-export function canStartRun(sessionId: string | null | undefined, session: { ran_s?: number | null } | null): boolean {
-  return !sessionId || (typeof session?.ran_s === "number" && session.ran_s <= 0);
+/** Whether Run is offered: no run open (none asked for yet, or it ended unreported), the last one
+ * was reported at 0 s, or it was reported and the grower came back to run again. A new run
+ * replaces the old session (the backend's pump_open closes it). */
+export function canStartRun(
+  sessionId: string | null | undefined,
+  session: { ran_s?: number | null } | null,
+  cameBack = false,
+): boolean {
+  if (!sessionId) return true;
+  if (typeof session?.ran_s !== "number") return false;
+  return session.ran_s <= 0 || cameBack;
+}
+/** Whether step 3 moves on to the measurement: our run has just been reported with time run, and
+ * it is not the run already moved on for (`advancedFor`), so Back from step 4 stays on step 3. */
+export function advanceOnReport(
+  step: number,
+  session: { session_id: string; ran_s?: number | null } | null,
+  advancedFor: string | null,
+): boolean {
+  return step === 3 && !!session && typeof session.ran_s === "number" && session.ran_s > 0 && session.session_id !== advancedFor;
 }
 
 /** Whether the run we asked for is gone: a dosing_get read after the run opened shows no session
@@ -165,6 +181,14 @@ export function pumpHistory(pump: Pick<CalibrationPump, "calibrations">): { at: 
 export function lastCalibration(pump: Pick<CalibrationPump, "calibrations">): { at: number; mlMin: number } | null {
   const history = pumpHistory(pump);
   return history.length ? history[history.length - 1] : null;
+}
+
+/** A pump card's calibration line: the newest calibration's date and flow; a stored flow with no
+ * history says its date was not recorded. */
+export function calibrationLine(pump: Pick<CalibrationPump, "calibrations" | "calibrated_ml_min">, tz: string): string {
+  const last = lastCalibration(pump);
+  if (last) return `Calibrated ${dayMonth(last.at, tz)} · ${last.mlMin} mL/min`;
+  return typeof pump.calibrated_ml_min === "number" ? `Calibrated · ${pump.calibrated_ml_min} mL/min, date not recorded` : "Not calibrated yet";
 }
 
 /** mL measured over the seconds the controller reported → mL/min, the integration's sum to 2

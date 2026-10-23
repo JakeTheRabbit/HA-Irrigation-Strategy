@@ -7,7 +7,8 @@ import type { States } from "./types";
 /** The demo integration's pump prime and calibration (dosing_api.py `pump_*`), in memory: a prime
  * is a request a stop ends; a calibration run is reported 3 s after it is asked for (demo time, on
  * the timer so a pinned clock does not stall it), or when stopped; a stop within 1.5 s, before the
- * controller took it, closes the session instead (no report comes); a commit stores the flow and
+ * controller took it, closes the session instead (no report comes); a prime or run asked for within
+ * 1.5 s of a stop, which the controller has not taken yet, is refused busy; a commit stores the flow and
  * sets the pump's flow number. Each pump's newest calibration is the flow its flow number holds. */
 
 /** The catalogue as dosing_get serves it (dosing.py PUMP_CATALOG). */
@@ -36,6 +37,8 @@ const PICKUP_MS = 1500;
 const DAY = 86_400_000;
 const round = (value: number, digits: number) => Math.round(value * 10 ** digits) / 10 ** digits;
 const iso = (ms: number) => new Date(ms).toISOString();
+/** dosing_api.py BUSY: a timed request while the last one still waits for the controller. */
+const BUSY = "Another dosing request is still waiting for the controller";
 const BLOCKER = { code: "pump_calibrating", message: "Another pump's calibration is still open" };
 
 interface Session {
@@ -60,6 +63,8 @@ export class PumpDemo {
   private sessions = new Map<string, Session>();
   private calibrations = new Map<string, PumpCalibrationRecord[]>();
   private count = 0;
+  /** When the last stop was asked for (performance.now), by room and pump. */
+  private stops = new Map<string, number>();
   constructor(
     private getStates: () => States,
     private updateStates: (states: States) => void,
@@ -119,6 +124,10 @@ export class PumpDemo {
       data: { ...extra, outcome: "refused", blockers },
     });
     const invalid = (message: string) => ({ api: 2, ok: false, error: { code: "invalid", message } });
+    const busy = () => {
+      const at = this.stops.get(`${room}|${pump}`);
+      return at !== undefined && performance.now() - at < PICKUP_MS ? { api: 2, ok: false, error: { code: "guard_refused", message: BUSY } } : null;
+    };
     const blockers = () => ([...this.sessions.values()].some((s) => s.room === room && s.pump !== pump) ? [BLOCKER] : []);
     switch (action) {
       case "pump_precheck": {
@@ -131,10 +140,13 @@ export class PumpDemo {
           return invalid("value must be between 1 and 30 for dictionary value @ data['seconds']");
         const found = blockers();
         if (found.length) return refused(found, { request_id: null });
+        const waiting = busy();
+        if (waiting) return waiting;
         return envelope({ request_id: id("prime"), outcome: "requested", blockers: [] });
       }
       case "pump_stop": {
         const key = `${room}|${pump}`;
+        this.stops.set(key, performance.now());
         const session = this.sessions.get(key);
         if (session && session.ran_s === null) {
           clearTimeout(session.timer);
@@ -152,6 +164,8 @@ export class PumpDemo {
       case "pump_calibrate": {
         const found = blockers();
         if (found.length) return refused(found, { session_id: null, request_id: null });
+        const waiting = busy();
+        if (waiting) return waiting;
         const seconds = Number(data.seconds);
         if (!(seconds >= 5 && seconds <= 120)) return invalid("a calibrate runs for 5 to 120 s");
         const key = `${room}|${pump}`;

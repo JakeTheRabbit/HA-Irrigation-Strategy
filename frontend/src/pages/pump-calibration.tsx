@@ -18,7 +18,9 @@ import {
   PRIME_SECONDS,
   RUN_SECONDS,
   SOLUTION_LABELS,
+  advanceOnReport,
   calibrationDue,
+  calibrationLine,
   canStartRun,
   estimateRate,
   headWords,
@@ -37,7 +39,7 @@ import {
   type CalibrationPump,
   type PumpDosingDocument,
 } from "@/lib/pump-calibration";
-import { clock, dayMonth } from "@/lib/time";
+import { clock } from "@/lib/time";
 import { useNarrow } from "@/lib/use-narrow";
 import { useWakeLock } from "@/lib/wake-lock";
 import type { PageProps } from "./placeholder";
@@ -83,6 +85,8 @@ export function PumpCalibration({ controller, navigate, onDirtyChange }: PagePro
   );
   const [measured, setMeasured] = useState("");
   const [saved, setSaved] = useState<{ result: PumpCalibrationResult; receipt: ApplyReceipt; before: number | null } | null>(null);
+  /** The reported run step 3 already moved on for: Back from step 4 stays on step 3 to run again. */
+  const [advancedFor, setAdvancedFor] = useState<string | null>(null);
   /** When the current hold began, and how long the last one lasted (s). */
   const heldFrom = useRef<number | null>(null);
   const lastHeld = useRef<number | null>(null);
@@ -188,10 +192,12 @@ export function PumpCalibration({ controller, navigate, onDirtyChange }: PagePro
       from: run.from,
     });
   }, [run, session, loadSeq]);
-  // A run that ran moves on to the measurement.
+  // A run that ran moves on to the measurement, once: Back from step 4 stays on step 3.
   useEffect(() => {
-    if (step === 3 && ran && ranS !== null && ranS > 0) setStep(4);
-  }, [step, ran, ranS]);
+    if (!advanceOnReport(step, ours, advancedFor)) return;
+    setAdvancedFor(ours!.session_id);
+    setStep(4);
+  }, [step, ours, advancedFor]);
 
   const send = useCallback(
     async (action: "pump_prime" | "pump_stop", data: Record<string, unknown>) => {
@@ -224,6 +230,8 @@ export function PumpCalibration({ controller, navigate, onDirtyChange }: PagePro
 
   const startRun = async () => {
     if (!pump) return;
+    // A new run replaces the last one: its measurement goes with it.
+    setMeasured("");
     setRun({ sessionId: null, message: null, blockers: [], stopping: false, from: readSeq.current });
     const outcome = await callV2<PumpCalibrateStart>(latest.current, "pump_calibrate", { room_id: roomId, pump: pump.id, seconds: RUN_SECONDS });
     if (outcome.kind === "ok" && outcome.data.session_id) {
@@ -295,14 +303,23 @@ export function PumpCalibration({ controller, navigate, onDirtyChange }: PagePro
     return receipt;
   };
 
-  const restart = () => {
-    setStep(1);
+  /** Forget one pump's prime, run, measurement and precheck: they never carry to another pump. */
+  const clearPump = () => {
     setPrime(null);
     setRun(null);
     setMeasured("");
-    setSaved(null);
     setPrecheck(null);
     setPrecheckError(null);
+  };
+  const pickPump = (id: string) => {
+    if (id === pump?.id) return;
+    setPumpId(id);
+    clearPump();
+  };
+  const restart = () => {
+    setStep(1);
+    clearPump();
+    setSaved(null);
   };
 
   const room = controller.room.room.name;
@@ -407,7 +424,7 @@ export function PumpCalibration({ controller, navigate, onDirtyChange }: PagePro
                   if (!delta) return;
                   e.preventDefault();
                   const index = (pumps.findIndex((p) => p.id === pump.id) + delta + pumps.length) % pumps.length;
-                  setPumpId(pumps[index].id);
+                  pickPump(pumps[index].id);
                   e.currentTarget.querySelectorAll<HTMLButtonElement>('[role="radio"]')[index]?.focus();
                 }}
               >
@@ -424,12 +441,12 @@ export function PumpCalibration({ controller, navigate, onDirtyChange }: PagePro
                       tabIndex={on ? 0 : -1}
                       className="pump-cal-card"
                       data-due={due.due ? "" : undefined}
-                      onClick={() => setPumpId(p.id)}
+                      onClick={() => pickPump(p.id)}
                     >
                       <span className="pump-cal-card-name">
                         <b>{p.name}</b> <small>pump {i + 1}</small>
                       </span>
-                      <span>{lastOf ? `Calibrated ${dayMonth(lastOf.at, tz)} · ${lastOf.mlMin} mL/min` : "Not calibrated yet"}</span>
+                      <span>{calibrationLine(p, tz)}</span>
                       <span className="pump-cal-due">
                         {due.days === null
                           ? `Due: calibrate it every ${CALIBRATE_EVERY_DAYS} days`
@@ -517,7 +534,12 @@ export function PumpCalibration({ controller, navigate, onDirtyChange }: PagePro
           {step === 3 && (
             <>
               <p>Put the suction line in a measuring jug with at least 250 mL.</p>
-              {canStartRun(run?.sessionId, ours) && (
+              {ran && ranS !== null && ranS > 0 && (
+                <p>
+                  The last run ran {ranS} s. Hold Run to run it again; the new run replaces it.
+                </p>
+              )}
+              {canStartRun(run?.sessionId, ours, ours?.session_id === advancedFor) && (
                 <HoldButton
                   mode="hold-to-confirm"
                   label={`Run ${RUN_SECONDS} s`}
@@ -694,7 +716,7 @@ function PumpVisual({
     <aside className="pump-cal-visual" aria-label={`${pump.name} pump`}>
       <div className="pump-cal-rig">
         {tank && <StockBottle tank={tank} state={stockState(tank)} label={`${tank.name} stock`} />}
-        <PeristalticPump state="idle" label={`${pump.name} idle`} />
+        <PeristalticPump state="idle" label={`${pump.name} pump`} />
       </div>
       <p>{motion}</p>
     </aside>

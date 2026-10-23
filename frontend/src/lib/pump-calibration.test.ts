@@ -1,7 +1,9 @@
 import { describe, expect, test, vi } from "vitest";
 import { holdController } from "@/components/primitives/hold-button";
 import {
+  advanceOnReport,
   calibrationDue,
+  calibrationLine,
   canStartRun,
   estimateRate,
   nominalOf,
@@ -106,6 +108,40 @@ describe("canStartRun", () => {
     expect(canStartRun("s1", { ran_s: 0 })).toBe(true);
     expect(canStartRun("s1", { ran_s: 30 })).toBe(false);
   });
+  test("offers Run again over a reported run once the grower came back to step 3", () => {
+    expect(canStartRun("s1", { ran_s: 30 }, true)).toBe(true);
+    expect(canStartRun("s1", { ran_s: null }, true)).toBe(false);
+  });
+});
+
+describe("advanceOnReport", () => {
+  const reported = { session_id: "s1", ran_s: 30 };
+  test("moves on once, when our run is first reported", () => {
+    expect(advanceOnReport(3, reported, null)).toBe(true);
+    expect(advanceOnReport(3, { session_id: "s1", ran_s: null }, null)).toBe(false);
+    expect(advanceOnReport(3, { session_id: "s1", ran_s: 0 }, null)).toBe(false);
+    expect(advanceOnReport(4, reported, null)).toBe(false);
+    expect(advanceOnReport(3, null, null)).toBe(false);
+  });
+  test("Back from step 4 stays on step 3 for the same run, a new run moves on again", () => {
+    expect(advanceOnReport(3, reported, "s1")).toBe(false);
+    expect(advanceOnReport(3, { session_id: "s2", ran_s: 30 }, "s1")).toBe(true);
+  });
+});
+
+describe("calibrationLine", () => {
+  test("a stored flow without history is calibrated, with no date", () => {
+    expect(calibrationLine({ calibrations: [], calibrated_ml_min: 280 }, "UTC")).toBe("Calibrated · 280 mL/min, date not recorded");
+    expect(calibrationLine({ calibrated_ml_min: 280 }, "UTC")).toBe("Calibrated · 280 mL/min, date not recorded");
+  });
+  test("no flow and no history is not calibrated", () => {
+    expect(calibrationLine({ calibrations: [], calibrated_ml_min: null }, "UTC")).toBe("Not calibrated yet");
+  });
+  test("the newest calibration gives its date and flow", () => {
+    const at = new Date(NOW).toISOString();
+    const rec = { id: "c", pump: "p", run_s: 30, measured_ml: 150, ml_min: 300, previous_ml_min: null, at, by: null };
+    expect(calibrationLine({ calibrations: [rec], calibrated_ml_min: 300 }, "UTC")).toMatch(/^Calibrated .+ · 300 mL\/min$/);
+  });
 });
 
 describe("prime and run wording", () => {
@@ -150,5 +186,14 @@ describe("demo pump_stop", () => {
     const stop = demo.call("pump_stop", { room_id: "room:", pump: "part_b" }) as { data: { replaced: unknown } };
     expect(stop.data.replaced).toMatchObject({ action: "calibrate", pump: "part_b" });
     expect(demo.decorate(doc()).config?.pumps[0].calibration_session).toBeUndefined();
+  });
+  test("a prime or run asked for while the stop still waits for the controller is refused busy", () => {
+    const demo = new PumpDemo(() => states, () => {});
+    demo.call("pump_stop", { room_id: "room:", pump: "part_b" });
+    const run = demo.call("pump_calibrate", { room_id: "room:", pump: "part_b", seconds: 30 }) as { ok: boolean; error: { code: string; message: string } };
+    expect(run.ok).toBe(false);
+    expect(run.error).toEqual({ code: "guard_refused", message: "Another dosing request is still waiting for the controller" });
+    const prime = demo.call("pump_prime", { room_id: "room:", pump: "part_b", seconds: 30 }) as { ok: boolean };
+    expect(prime.ok).toBe(false);
   });
 });
