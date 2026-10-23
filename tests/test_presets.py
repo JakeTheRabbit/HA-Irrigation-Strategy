@@ -461,13 +461,24 @@ def test_a_source_setting_that_cannot_be_read_is_named_as_skipped():
 
 def test_given_values_keep_only_what_the_scope_holds_and_refuse_the_rest():
     """preset_save with `values` (a grow plan imported from a browser): each value is checked as a
-    capture would hold it; nothing outside the scope's sections, no unknown key, no timers."""
+    capture would hold it; nothing outside the scope's sections, no unknown key, no timers.
+    """
     given = presets.given_values(
-        {"targets": {"p2_shot_size": 6.5, "vegetative_dryback_target": 12, "p2_mode": "vwc"}},
+        {
+            "targets": {
+                "p2_shot_size": 6.5,
+                "vegetative_dryback_target": 12,
+                "p2_mode": "vwc",
+            }
+        },
         ("targets",),
     )
     assert given == {
-        "targets": {"p2_shot_size": 6.5, "vegetative_dryback_target": 12.0, "p2_mode": "vwc"}
+        "targets": {
+            "p2_shot_size": 6.5,
+            "vegetative_dryback_target": 12.0,
+            "p2_mode": "vwc",
+        }
     }
     for bad in (
         {},

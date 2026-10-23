@@ -91,7 +91,8 @@ def capture(values: dict, sections) -> dict:
 def given_values(values, sections) -> dict:
     """{section: {key: value}} a caller gives preset_save instead of reading a room (a grow plan
     imported from a browser), checked as capture() would hold it: only the scope's sections, only
-    their keys, finite numbers (p2_mode a text). Timer programs are never given. Raises ValueError."""
+    their keys, finite numbers (p2_mode a text). Timer programs are never given. Raises ValueError.
+    """
     if not isinstance(values, dict) or not values:
         raise ValueError("values must name at least one section")
     out = {}

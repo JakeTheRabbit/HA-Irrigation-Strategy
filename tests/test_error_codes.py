@@ -292,7 +292,12 @@ def test_the_guard_catches_a_second_definition_and_an_unreserved_code():
         'codes:[{code:`CS-101`,title:`A`,source:`repairs`},{"code":"CS-101","title":"A","source":"x"}]'
     ) == {"CS-101": 2}
     # An event or alert that carries a code (the demo's Journal) is not a definition.
-    assert _bundled_codes("{zone:2,code:`CS-102`,outcome:`partial`},{code:`CS-102`,title:`Back sensor`,zone:2}") == {}
+    assert (
+        _bundled_codes(
+            "{zone:2,code:`CS-102`,outcome:`partial`},{code:`CS-102`,title:`Back sensor`,zone:2}"
+        )
+        == {}
+    )
     assert _unreserved(["CS-105", "CS-320", "CS-609", "CS-901", "CS-207"]) == {
         "CS-105",
         "CS-320",
