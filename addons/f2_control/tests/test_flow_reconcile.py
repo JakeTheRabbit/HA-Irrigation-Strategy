@@ -330,3 +330,61 @@ def test_a_rooms_pending_flow_rows_keep_only_each_zones_latest(rig):
     c._flow_reconciled(room, 2, "z2", 2.0, 2.0)
     rows = list(room.__dict__["_flow_pending"].values())
     assert [(r["zone"], r["intent_id"]) for r in rows] == [(1, "id4"), (2, "z2")]
+
+
+# --------------------------------------------------------------------------------------------- P1 M1: a slow meter
+def test_a_meter_that_reports_late_is_judged_when_it_reports_not_before(rig, fire, monkeypatch):
+    c, fake = rig
+    fire.discard(2)
+    fake.set_state(METER, "100.0", {"unit_of_measurement": "L"})  # stamped before the shot, and not again
+    _supply(fake, zone_meters={"1": METER})
+    _pass(c)
+    done, = _events(c, "shot.completed")
+    assert done["outcome"] == "ok" and done["data"]["metered_l"] is None
+    assert _events(c, "flow.reconciled") == [] and not _written(fake, RATIO_1)
+    assert _alerts(fake, "CS-318") == []  # its 0 L was the meter not yet reporting, not a dry zone
+    fire.clear()
+    _pass(c)  # still not reported: still not judged
+    assert _events(c, "flow.reconciled") == [] and _alerts(fake, "CS-318") == []
+    commanded = done["data"]["commanded_l"]
+    fake.set_state(METER, str(100.0 + commanded), {"unit_of_measurement": "L"})  # the 60 s report
+    _pass(c)
+    flow, = _events(c, "flow.reconciled")
+    assert flow["correlation"]["intent_id"] == done["correlation"]["intent_id"]
+    assert flow["data"]["verdict"] == "ok" and flow["data"]["ratio"] == pytest.approx(1.0)
+    assert _written(fake, RATIO_1)[-1][0] == pytest.approx(1.0)
+    assert _alerts(fake, "CS-318") == []
+
+
+def test_a_meter_that_never_reports_is_given_up_without_a_verdict(rig, fire, monkeypatch):
+    c, fake = rig
+    fire.discard(2)
+    fake.set_state(METER, "100.0", {"unit_of_measurement": "L"})
+    _supply(fake, zone_meters={"1": METER})
+    lines = []
+    monkeypatch.setattr(controller, "log", lambda *a: lines.append(" ".join(map(str, a))))
+    _pass(c)
+    fire.clear()
+    for _ in range(4):  # 8 minutes: past the 5 the meter has to report
+        _pass(c)
+    gave_up = [line for line in lines if "meter did not report" in line]
+    assert len(gave_up) == 1 and METER in gave_up[0]
+    fake.set_state(METER, "100.05", {"unit_of_measurement": "L"})  # a report after the wait is not judged
+    _pass(c)
+    assert _events(c, "flow.reconciled") == [] and not _written(fake, RATIO_1)
+    assert _alerts(fake, "CS-318") == []
+
+
+def test_a_later_shot_through_the_meter_drops_the_unjudged_one(rig, fire, monkeypatch):
+    c, fake = rig
+    fire.discard(2)
+    fake.set_state(METER, "100.0", {"unit_of_measurement": "L"})
+    _supply(fake, zone_meters={"1": METER})
+    _pass(c)  # not reported
+    fake.set_state(METER, "100.0", {"unit_of_measurement": "L"}, last_updated=None)  # a meter with no stamp
+    _pass(c)  # the next shot reads the meter again: the first one's water and its own can no longer be told apart
+    fire.clear()
+    fake.set_state(METER, "100.5", {"unit_of_measurement": "L"})  # a report, after both shots
+    _pass(c)
+    assert [e["correlation"]["intent_id"] for e in _events(c, "flow.reconciled")] == [
+        _events(c, "shot.completed")[1]["correlation"]["intent_id"]]

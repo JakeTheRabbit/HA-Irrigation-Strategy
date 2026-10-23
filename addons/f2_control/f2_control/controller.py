@@ -198,13 +198,15 @@ _GATE = _AuthGate()
 class HAState(tuple):
     """What ha_get returns: (state, attributes, last_updated), unpacked exactly as it always was, plus
     `last_changed`: when the state VALUE last changed, as Home Assistant reports it (None if unknown).
+    `last_reported`: when the entity last reported, changed or not (Home Assistant 2024.3+; None if unknown).
     `served_at` (ha_get_status only): Home Assistant's own time of the answer, from its Date header."""
 
     served_at = None
 
-    def __new__(cls, state=None, attributes=None, last_updated=None, last_changed=None):
+    def __new__(cls, state=None, attributes=None, last_updated=None, last_changed=None, last_reported=None):
         obj = super().__new__(cls, (state, {} if attributes is None else attributes, last_updated))
         obj.last_changed = last_changed
+        obj.last_reported = last_reported
         return obj
 
 
@@ -218,7 +220,8 @@ def ha_get(entity, timeout=8):
         if r.status_code != 200:
             return HAState()
         d = r.json()
-        return HAState(d.get("state"), d.get("attributes", {}), d.get("last_updated"), d.get("last_changed"))
+        return HAState(d.get("state"), d.get("attributes", {}), d.get("last_updated"), d.get("last_changed"),
+                       d.get("last_reported"))
     except Exception:
         return HAState()
 
@@ -234,7 +237,8 @@ def ha_get_status(entity, timeout=8):
         if r.status_code != 200:
             return r.status_code, HAState()
         d = r.json()
-        found = HAState(d.get("state"), d.get("attributes", {}), d.get("last_updated"), d.get("last_changed"))
+        found = HAState(d.get("state"), d.get("attributes", {}), d.get("last_updated"), d.get("last_changed"),
+                       d.get("last_reported"))
         try:
             found.served_at = parsedate_to_datetime(r.headers.get("Date"))
         except (TypeError, ValueError):
@@ -759,6 +763,7 @@ LINE_SET_TIMEOUT_S = 2  # the queue and pump load are written between shots: a s
 # G4, flow reconciliation (_flow_meter): a zone's flow meter in the supply, read before its pump opens and after its
 # close reads back; one that does not answer in this long reconciles nothing, and the shot runs as before.
 METER_READ_TIMEOUT_S = 2
+FLOW_LATE_S = 300  # a meter that has not reported this long after a shot's close: the shot is not reconciled (M1)
 METER_IDLE_L = 0.5  # CS-319: a meter that rises more than this between shots, with no shot in flight
 GROW_DAY_PROBE_S = 600  # how often the probes behind each zone are read for its grow-day summary (day_summary)
 # A Test Shot press older than this when the controller sees it is not acted on: the person testing is
@@ -6226,6 +6231,9 @@ class Controller:
                     FALLBACK["main_line_lead_time"], MAIN_LINE_LEAD_MAX_S)
             meter = self._flow_meter(room, zone)  # None with no supply or no meter: no read, as before
             if meter:
+                if self.__dict__.get("_flow_late", {}).pop(meter, None):  # a dict, no Home Assistant call (R5)
+                    log(f"[{room.slug}] flow meter {meter}: the last shot through it is not reconciled, the meter "
+                        "did not report before this one")
                 meter_before = self._meter_litres(meter, METER_READ_TIMEOUT_S)
             # WRITE-AHEAD: what this shot is about to open, and when, saved BEFORE anything opens. If the
             # controller dies, is killed or loses Home Assistant mid-shot, the next loop closes exactly what
@@ -6313,6 +6321,7 @@ class Controller:
             # pump-relay-default-off / independent watchdog) can. So check EVERY turn_off + the
             # read-back and ALERT loudly on any non-close (the old code ignored turn_off failures
             # and a dead-HA read-back masked a stuck-open valve as "closed" — silent danger).
+            closing_at = datetime.now(timezone.utc)  # a meter reading is this shot's whole water from here (M1)
             refused = [] if hw_call(valve, False) else [valve]
             # Delivery is estimated, not flow-metered. Include the acknowledgement
             # interval conservatively because the exact physical close time is unknown.
@@ -6355,9 +6364,12 @@ class Controller:
             journaled["end"] = ("aborted", None if aborted[0] == "refused" else "CS-305") if aborted else "completed"
             if meter_before is not None and not aborted and "close" not in journaled:
                 # closed and read back OFF: what the meter saw of this shot (_journal_shot_end reconciles it)
-                after = self._meter_litres(meter, METER_READ_TIMEOUT_S)
+                after, reported = self._meter_reading(meter, METER_READ_TIMEOUT_S)
                 if after is not None and after >= meter_before:
-                    journaled["metered_l"] = after - meter_before
+                    if reported is None or reported >= closing_at:
+                        journaled["metered_l"] = after - meter_before
+                    else:  # not reported since the close: judged once it has (_flow_late_check), never on part of it
+                        journaled["meter_late"] = (meter, meter_before, closing_at)
                     # CS-319 moves past this shot's water, not past what leaked before it: what the meter saw, or
                     # what the shot counted when the meter has yet to report all of it (_meters_rebase)
                     journaled["meter_moved"] = (meter, max(after - meter_before, nominal_l * min(
@@ -6520,6 +6532,11 @@ class Controller:
             )
             if metered_l is not None:
                 self._flow_reconciled(room, zone, journaled["intent_id"], commanded_l, metered_l)
+            elif completed and journaled.get("meter_late"):
+                meter, before, closed = journaled["meter_late"]
+                self.__dict__.setdefault("_flow_late", {})[meter] = {
+                    "room": room.prefix, "zone": zone, "intent_id": journaled["intent_id"],
+                    "commanded_l": commanded_l, "before": before, "closed": closed}
         except Exception as e:
             log("journal shot end error", room.slug, zone, e)
 
@@ -6539,7 +6556,9 @@ class Controller:
 
     def _flow_done(self, room):
         """The end of the room's pass: each reconciled shot's sensor.crop_steering_<px>zone_N_flow_ratio, and CS-318
-        raised for a zone that got under flow.LOW of its water, taken down by a shot that got enough. Only tells."""
+        raised for a zone that got under flow.LOW of its water, taken down by a shot that got enough. Only tells.
+        A shot whose meter had not reported since its close is reconciled here once it has (M1)."""
+        self._flow_late_check(room)
         for row in room.__dict__.pop("_flow_pending", {}).values():
             try:
                 zone, key = row["zone"], f"flow_low_{room.slug}_z{row['zone']}"
@@ -6563,6 +6582,25 @@ class Controller:
                     zone=zone,
                     entity_id=meter,
                 )
+            except Exception as e:
+                log("flow reconcile error", room.slug, row.get("zone"), e)
+
+    def _flow_late_check(self, room):
+        """The room's shots whose meter had not reported since their close: each is reconciled once its meter reports
+        after that close, or given up, unjudged, FLOW_LATE_S after it."""
+        late = self.__dict__.get("_flow_late") or {}
+        for meter, row in [(m, r) for m, r in late.items() if r["room"] == room.prefix]:
+            try:
+                after, reported = self._meter_reading(meter, METER_READ_TIMEOUT_S)
+                if after is not None and reported is not None and reported >= row["closed"]:
+                    del late[meter]
+                    if after >= row["before"]:
+                        self._flow_reconciled(room, row["zone"], row["intent_id"], row["commanded_l"],
+                                              round(after - row["before"], 3))
+                elif (datetime.now(timezone.utc) - row["closed"]).total_seconds() > FLOW_LATE_S:
+                    del late[meter]
+                    log(f"[{room.slug}] Z{row['zone']} flow meter {meter} did not report in {FLOW_LATE_S // 60} min "
+                        "after the shot closed: the shot is not reconciled (meter did not report)")
             except Exception as e:
                 log("flow reconcile error", room.slug, row.get("zone"), e)
 
@@ -6597,16 +6635,24 @@ class Controller:
     def _meter_litres(self, entity, timeout=8):
         """A flow meter's total in litres (flow.to_litres), or None: unreadable, or a unit it does not know, which is
         logged once for the meter (no guess at what a pulse is worth)."""
+        return self._meter_reading(entity, timeout)[0]
+
+    def _meter_reading(self, entity, timeout=8):
+        """(_meter_litres, when the meter last reported: the later of its last_updated and last_reported, aware, or
+        None when Home Assistant gives neither)."""
         try:
-            state, attrs, _ = ha_get(entity, timeout=timeout)
+            read = ha_get(entity, timeout=timeout)
+            state, attrs, updated = read
             value = float(state)
         except (TypeError, ValueError):
-            return None
+            return None, None
         except Exception as e:
             log("flow meter read error", entity, e)
-            return None
+            return None, None
         if not math.isfinite(value):
-            return None
+            return None, None
+        stamps = [t for t in (_aware(updated), _aware(getattr(read, "last_reported", None))) if t is not None]
+        reported = max(stamps) if stamps else None
         unit = (attrs or {}).get("unit_of_measurement")
         litres = to_litres(value, unit)
         if litres is None:
@@ -6614,7 +6660,7 @@ class Controller:
             if entity not in warned:
                 warned.add(entity)
                 log(f"flow meter {entity} reports in {unit!r}, not L, m³ or gal: it is not read")
-        return litres
+        return litres, reported
 
     def _meters_rebase(self, room, moved=None):
         """A shot of this room ran. The meter it read before and after (`moved`: (entity, litres)) keeps its baseline,
