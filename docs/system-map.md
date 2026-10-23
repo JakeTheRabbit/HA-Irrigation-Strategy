@@ -343,6 +343,6 @@ Open PRs into `testing` (all by JakeTheRabbit, none merged yet, 2026-10-23). Mer
 | [#226](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/pull/226) | `docs/features-story` | docs: README and feature matrix tell one story | README and feature matrix (pairs with site #5) |
 | [#227](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/pull/227) | `fix/p0-waits-for-transpiration` | fix: P0 waits for transpiration; only the rescue floor bypasses it (#195) | issue #195 |
 
-Website (`cropsteering-site`, into `main`): [#4](https://github.com/JakeTheRabbit/cropsteering-site/pull/4) builds and describes 3.17.0 (WEB-001, 003 to 008, 010, 012 to 014, 016); [#5](https://github.com/JakeTheRabbit/cropsteering-site/pull/5) tells the features page as one story. Both wait on Ben's approval to merge and deploy.
+Website (`cropsteering-site`, into `main`): cropsteering-site#4 builds and describes 3.17.0 (WEB-001, 003 to 008, 010, 012 to 014, 016); cropsteering-site#5 tells the features page as one story. Both wait on Ben's approval to merge and deploy.
 
 Parity plans live on `feat/parity-system` (frontend) and `feat/parity-backend` (backend) in `docs/superpowers/plans/2026-10-22-parity-*.md`: a Journal store, GuardChain refactor, pump queue, timer programs, feed calibration, API v2 envelope, MCP read/preview tools, tree menu and eight new pages. They rebase onto the fixes above.
