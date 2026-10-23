@@ -51,9 +51,12 @@ export interface ProbeOffset {
   curve: string | null;
 }
 /** Each probe's stored offset (absent: none), from calibration_get; null from an integration that keeps
- * none (older than 3.18). */
+ * none (older than 3.18), or one that cannot read its store (`offsets_error`): the probes then read
+ * without the offsets it still lists. */
 export function readOffsets(document: unknown): Record<string, ProbeOffset> | null {
-  const section = (document as { probe_user_offsets?: unknown } | null)?.probe_user_offsets;
+  const read = document as { probe_user_offsets?: unknown; offsets_error?: unknown } | null;
+  if (read?.offsets_error) return null;
+  const section = read?.probe_user_offsets;
   if (!section || typeof section !== "object" || Array.isArray(section)) return null;
   return Object.fromEntries(
     Object.entries(section as Record<string, { offset?: unknown; curve?: unknown }>).map(([id, entry]) => [
@@ -61,6 +64,14 @@ export function readOffsets(document: unknown): Record<string, ProbeOffset> | nu
       { offset: Number(entry?.offset) || 0, curve: typeof entry?.curve === "string" ? entry.curve : null },
     ]),
   );
+}
+
+/** Why the integration refuses to set an offset now, in its own words (calibration.py: the offsets or
+ * the calibration history cannot be read); null when it can. */
+export function offsetsBlocked(document: unknown): string | null {
+  const read = document as { error?: unknown; offsets_error?: unknown } | null;
+  const reason = read?.offsets_error || read?.error;
+  return typeof reason === "string" && reason ? reason : null;
 }
 
 /** What probe_offset_set answers (calibration.py), with or without `preview`. */
@@ -105,7 +116,8 @@ export async function applyOffset(
     room: string;
     zone: string;
     probe: string;
-    before?: number;
+    /** The offset it replaces; null when it is not known. */
+    before?: number | null;
     now?: () => number;
   },
 ): Promise<ApplyReceipt | Refusal> {
@@ -127,7 +139,7 @@ export async function applyOffset(
       : {
           id: request.entityId,
           label: `${request.probe} offset`,
-          before: signedPoints(request.before ?? 0),
+          before: request.before == null ? "—" : signedPoints(request.before),
           after: signedPoints(offset),
         };
   if (holds === null || Math.abs(holds - offset) > 1e-9)

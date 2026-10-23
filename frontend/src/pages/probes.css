@@ -333,6 +333,13 @@
 .probes-zone-value [data-tone="warn"] {
   color: var(--warning);
 }
+.probes-room-blocked > td {
+  color: var(--warning);
+  font-size: var(--text-sm);
+}
+.probes-room-blocked svg {
+  vertical-align: -2px;
+}
 .probes-zone-value {
   vertical-align: top !important;
   min-width: 96px;

@@ -417,22 +417,40 @@ try {
       // An older integration names no probes: each zone's combined reading stands in for them. Zone 1's
       // moisture has gone quiet (amber) and its pore EC reads nothing (red); zone 2's are fine.
       const health = (id) =>
-        page.locator(`.probes-table tr[data-probe="${id}"] [data-probe-health]`);
+        page.locator(`.probes-table tr[data-probe="${id}"] td[data-label="Health"] [data-probe-health]`);
       await visible(health(probe));
       assert.equal(await health(probe).getAttribute("data-probe-health"), "stale");
       assert.equal(await health(probe).getAttribute("data-tone"), "warn");
       // Pore EC sits beside the moisture on its row: zone 1's reads nothing, zone 2's is fine.
-      const ec = (id) => page.locator(`.probes-table [data-probe-ec="${id}"]`);
+      const ec = "sensor.crop_steering_room_b_ec_zone_1";
+      const ecCell = (id) => page.locator(`.probes-table [data-probe-ec="${id}"]`);
       assert.equal(
-        await ec("sensor.crop_steering_room_b_ec_zone_1").locator("[data-probe-health]").getAttribute("data-probe-health"),
+        await ecCell("sensor.crop_steering_room_b_ec_zone_1").locator("[data-probe-health]").getAttribute("data-probe-health"),
         "no-reading",
       );
-      assert.match(await ec("sensor.crop_steering_room_b_ec_zone_1").innerText(), /No reading/);
-      assert.equal(await ec("sensor.crop_steering_room_b_ec_zone_2").locator("[data-probe-health]").count(), 0);
+      assert.match(await ecCell("sensor.crop_steering_room_b_ec_zone_1").innerText(), /No reading/);
+      assert.equal(await ecCell("sensor.crop_steering_room_b_ec_zone_2").locator("[data-probe-health]").count(), 0);
       assert.equal(
         (await page.locator('tbody[data-probes-room="room:room_b_"] .probes-room-health').innerText()).trim(),
-        "1 of 2 probes healthy",
+        "2 of 4 probes healthy",
       );
+      // A moisture probe reading out of range: "Check placement" on its row focuses the placement card,
+      // which says what is wrong with that probe.
+      const misplaced = "sensor.crop_steering_room_b_vwc_zone_2";
+      const kept = states[misplaced].state;
+      states[misplaced].state = "130";
+      await page.getByRole("button", { name: "Refresh controller data" }).click();
+      const placementButton = page.locator(`[data-check-placement="${misplaced}"]`);
+      await visible(placementButton);
+      await placementButton.click();
+      assert.equal(
+        await page.evaluate(() => document.activeElement?.hasAttribute("data-placement-card")),
+        true,
+      );
+      await visible(page.locator(`[data-placement-warning="${misplaced}"]`));
+      states[misplaced].state = kept;
+      await page.getByRole("button", { name: "Refresh controller data" }).click();
+      await page.locator(`[data-check-placement="${misplaced}"]`).waitFor({ state: "detached" });
       // The controller's own sensors, one tap down: stale is amber, reporting green, down red.
       const internals = page.locator("details.probes-more", {
         hasText: "All sensors of this room",

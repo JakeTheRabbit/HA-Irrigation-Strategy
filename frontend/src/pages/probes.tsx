@@ -22,6 +22,7 @@ import {
   curveDisabledReason,
   handheldOffset,
   moisturePct,
+  offsetsBlocked,
   previewOffset,
   readOffsets,
   signedPoints,
@@ -34,6 +35,7 @@ import {
   healthChip,
   placementProblem,
   probeChoicePayload,
+  probeCounts,
   probeChoices,
   probeRows,
   zoneProbes,
@@ -63,6 +65,7 @@ function useOffsets(controller: Controller, roomIds: string[]) {
     key: string;
     missing: boolean;
     rooms: Record<string, Record<string, ProbeOffset> | null>;
+    blocked: Record<string, string | null>;
   } | null>(null);
   const [tick, setTick] = useState(0);
   const key = roomIds.join("|");
@@ -82,13 +85,23 @@ function useOffsets(controller: Controller, roomIds: string[]) {
             return [id, outcome.kind === "ok" ? readOffsets(outcome.data) : null];
           }),
         ),
+        blocked: Object.fromEntries(
+          key.split("|").map((id, index) => {
+            const outcome = outcomes[index];
+            return [id, outcome.kind === "ok" ? offsetsBlocked(outcome.data) : null];
+          }),
+        ),
       });
     });
     return () => {
       current = false;
     };
   }, [key, controller.connection, tick]);
-  const fallback: { missing: boolean; rooms: Record<string, Record<string, ProbeOffset> | null> } = { missing: false, rooms: {} };
+  const fallback: {
+    missing: boolean;
+    rooms: Record<string, Record<string, ProbeOffset> | null>;
+    blocked: Record<string, string | null>;
+  } = { missing: false, rooms: {}, blocked: {} };
   return { ...(read && read.key === key ? read : fallback), reload: () => setTick((n) => n + 1) };
 }
 
@@ -145,7 +158,7 @@ export function Probes({
   );
   const status = states[`sensor.crop_steering_${room.room.prefix}app_status`]?.state;
   const jev = readJev(states, room.room.prefix).room;
-  const used = rows.filter((row) => row.vwc.used !== false && row.vwc.health !== "not-counted").length;
+  const counts = probeCounts(rows);
   const hardware = [
     ["Pump", asId(config.pump)],
     ["Main-line valve", asId(config.mainline)],
@@ -171,7 +184,7 @@ export function Probes({
     <>
       <Heading
         title="Probes & offsets"
-        description={`${rows.length} ${rows.length === 1 ? "probe" : "probes"} · ${used} in zone values · raw readings always kept`}
+        description={`${counts.total} ${counts.total === 1 ? "probe" : "probes"} · ${counts.used} in zone values · raw readings always kept`}
         action={<UiTip copyKey="probes" />}
       />
       <CanonicalControls controller={controller} owner="probes" onDirtyChange={onDirtyChange} />
@@ -254,6 +267,7 @@ export function Probes({
                     group={group}
                     offsets={offsets.missing ? null : (offsets.rooms[group.view.room.id] ?? null)}
                     v2={!offsets.missing}
+                    blocked={offsets.missing ? null : (offsets.blocked[group.view.room.id] ?? null)}
                     history={history}
                     now={now}
                     open={open}
@@ -348,6 +362,7 @@ function RoomRows({
   group,
   offsets,
   v2,
+  blocked,
   history,
   now,
   open,
@@ -360,6 +375,8 @@ function RoomRows({
   /** The room's stored offsets; null where they are not known. */
   offsets: Record<string, ProbeOffset> | null;
   v2: boolean;
+  /** Why the integration cannot set an offset in this room now, in its words; null when it can. */
+  blocked: string | null;
   history: { entityId: string; points: { time: string; value: number }[] }[] | null;
   now: number;
   open: string | null;
@@ -369,7 +386,7 @@ function RoomRows({
 }) {
   const { view, zones } = group;
   const rows = zones.flatMap((zone) => zone.rows);
-  const healthy = rows.filter((row) => row.vwc.health === "ok").length;
+  const { healthy, total } = probeCounts(rows);
   const counts = new Set(zones.map((zone) => zone.rows.length));
   const sides = rows.every((row) => row.side === "Front" || row.side === "Back");
   const layout =
@@ -388,19 +405,29 @@ function RoomRows({
             {view.room.name}
           </span>
           <span className="muted">{layout}</span>
-          <span className="probes-room-health" data-tone={healthy < rows.length ? "warn" : "ok"}>
-            {healthy} of {rows.length} {rows.length === 1 ? "probe" : "probes"} healthy
+          <span className="probes-room-health" data-tone={healthy < total ? "warn" : "ok"}>
+            {healthy} of {total} {total === 1 ? "probe" : "probes"} healthy
           </span>
         </th>
       </tr>
+      {blocked && (
+        <tr className="probes-room-blocked">
+          <td colSpan={8} role="status" data-offsets-blocked={view.room.id}>
+            <TriangleAlert size={15} aria-hidden="true" /> {blocked}
+          </td>
+        </tr>
+      )}
       {zones.map(({ zone, rows }) => {
         const usedRows = rows.filter((row) => row.vwc.used !== false && row.vwc.value !== null);
-        const values = usedRows.map((row) => row.vwc.value!);
+        // Raw readings in %, before any offset: what each probe itself reads around the zone's value.
+        const values = usedRows
+          .map((row) => moisturePct(row.vwc.value, row.vwc.unit))
+          .filter((value): value is number => value !== null);
         const spread = values.length > 1 ? Math.max(...values) - Math.min(...values) : null;
         const stuck = rows.some((row) => row.vwc.health === "stuck");
         const sub =
           spread !== null
-            ? `spread ${spread.toFixed(1)} points`
+            ? `raw spread ${spread.toFixed(1)} points`
             : rows.length > 1
               ? `${usedRows.length} of ${rows.length} probes used`
               : `1 probe${stuck ? " · stuck" : ""}`;
@@ -424,12 +451,12 @@ function RoomRows({
               </Button>
             ) : row.vwc.health === "stale" || row.vwc.health === "no-reading" ? (
               <span className="muted small">Check cable</span>
-            ) : v2 && raw !== null && row.vwc.used !== null ? (
+            ) : v2 && !blocked && raw !== null && row.vwc.used !== null ? (
               <Button
                 variant="outline"
                 size="sm"
                 aria-expanded={open === row.vwc.id}
-                aria-label={`Match ${zone.name} ${row.side} to a handheld reading`}
+                aria-label={`Match handheld: ${zone.name} ${row.side}`}
                 onClick={() => onOpen(open === row.vwc.id ? null : row.vwc.id)}
                 data-match-handheld={row.vwc.id}
               >
@@ -445,7 +472,7 @@ function RoomRows({
                   <td rowSpan={rows.length + (editing ? 1 : 0)} className="probes-zone-value" data-zone-value={`${view.room.id}:${zone.id}`}>
                     <span className="muted">{zone.name}</span>
                     <strong>{pct(zone.vwc.value)}</strong>
-                    <SpreadBar values={values} value={zone.vwc.value} label={`${zone.name} probes from ${values.length ? Math.min(...values).toFixed(1) : "—"} to ${values.length ? Math.max(...values).toFixed(1) : "—"}%`} />
+                    <SpreadBar values={values} value={zone.vwc.value} label={`${zone.name} probes read raw from ${values.length ? Math.min(...values).toFixed(1) : "—"} to ${values.length ? Math.max(...values).toFixed(1) : "—"}%`} />
                     <span className="small" data-tone={stuck ? "warn" : undefined}>{sub}</span>
                   </td>
                 )}
@@ -465,6 +492,11 @@ function RoomRows({
                 </td>
                 <td data-label="Probe">
                   <strong title={row.vwc.id}>{row.side}</strong>
+                  {row.vwc.primary && (
+                    <Pill tone="phase" data-probe-primary>
+                      Primary
+                    </Pill>
+                  )}
                 </td>
                 <td data-sensor-trend={row.vwc.id} data-label="Last 24 h">
                   {points(row.vwc.id) && (
@@ -497,7 +529,7 @@ function RoomRows({
                       zone={zone.name}
                       row={row}
                       raw={raw!}
-                      current={offset ?? 0}
+                      current={offset}
                       onClose={() => onOpen(null)}
                       onChanged={onChanged}
                       onCheckPlacement={onCheckPlacement}
@@ -560,7 +592,8 @@ function MatchHandheld({
   zone: string;
   row: ProbeRow;
   raw: number;
-  current: number;
+  /** The probe's stored offset; null when it is not known. */
+  current: number | null;
   onClose: () => void;
   onChanged: () => void;
   onCheckPlacement: () => void;
@@ -583,7 +616,7 @@ function MatchHandheld({
       current = false;
       clearTimeout(timer);
     };
-  }, [text, tick, roomId, row.vwc.id]);
+  }, [text, tick, roomId, row.vwc.id, raw]);
   const shown = preview && preview.text === text && valid ? preview.outcome : null;
   const answer = shown?.kind === "ok" ? shown.data : null;
   const name = `${zone} ${row.side}`;
@@ -591,7 +624,12 @@ function MatchHandheld({
     ? [
         answer.fused_before !== null && answer.fused_after !== null
           ? { id: row.vwc.id, label: `${room} ${zone} value`, before: pct(answer.fused_before), after: pct(answer.fused_after) }
-          : { id: row.vwc.id, label: `${name} offset`, before: signedPoints(current), after: signedPoints(answer.offset) },
+          : {
+              id: row.vwc.id,
+              label: `${name} offset`,
+              before: current === null ? "—" : signedPoints(current),
+              after: signedPoints(answer.offset),
+            },
       ]
     : [];
   const checks =
@@ -698,15 +736,16 @@ function SubstrateCurve({
     <section className="panel probe-curve" aria-labelledby="probe-curve-title" data-substrate-curve>
       <h2 id="probe-curve-title">Substrate curve · {room.room.name}</h2>
       <p className="muted">
-        Turns a probe’s raw reading into VWC. Applies to all {moisture.length} {room.room.name} moisture{" "}
-        {moisture.length === 1 ? "probe" : "probes"}.
+        Turns a probe’s raw reading into VWC.
+        {curves.length > 0 &&
+          ` Applies to all ${moisture.length} ${room.room.name} moisture ${moisture.length === 1 ? "probe" : "probes"}.`}
       </p>
       {missing ? (
         <NeedsIntegration feature="Probe curves" compact />
       ) : (
         <>
           <p data-curve-in-use>
-            <strong>In use:</strong> {curves.length ? curves.join(", ").replaceAll("_", " ") : "none"}
+            <strong>In use:</strong> {offsets === null ? "—" : curves.length ? curves.join(", ").replaceAll("_", " ") : "none"}
           </p>
           {reasons.map((reason) => (
             <p className="probe-curve-reason" key={reason ?? "none"} data-curve-reason>

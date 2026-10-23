@@ -82,9 +82,11 @@ test("pagedQuery passes missing through", async () => {
   expect(await pagedQuery(fakeController({ operator: op }), { room_id: "room:", since: "x" })).toEqual({ kind: "missing" });
 });
 
+// One demo per call is slow (about 1.3 s for the whole list alone), so these get room under a loaded full run.
 test("demo with backend=3.17 answers every parity action as missing", async () => {
-  for (const a of PARITY_ACTIONS) expect((await callV2(demoController("?demo=1&backend=3.17"), a, {})).kind).toBe("missing");
-});
+  const controller = demoController("?demo=1&backend=3.17");
+  for (const a of PARITY_ACTIONS) expect((await callV2(controller, a, {})).kind).toBe("missing");
+}, 20_000);
 // The timer writes and preview need a program the demo can check, as the integration does.
 const DAY_TIMER = { id: DEMO_TIMER_PROGRAM_ID, name: "Zone 3 day timer", type: "recycle", zones: [3], duration_s: 60, interval_min: 45, window: { kind: "lights_on" } };
 const ASKED: Partial<Record<string, Record<string, unknown>>> = {
@@ -99,7 +101,7 @@ const ASKED: Partial<Record<string, Record<string, unknown>>> = {
 };
 test("demo 3.18 answers every parity action ok", async () => {
   for (const a of PARITY_ACTIONS) expect([a, (await callV2(demoController("?demo=1"), a, ASKED[a] ?? {})).kind]).toEqual([a, "ok"]);
-});
+}, 20_000);
 test("demo 3.18 wraps an existing service in the envelope; 3.17 answers it v1", async () => {
   expect((await callV2(demoController("?demo=1"), "display_get", {})).kind).toBe("ok");
   expect((await callV2(demoController("?demo=1&backend=3.17"), "display_get", {})).kind).toBe("missing");

@@ -9,6 +9,7 @@ import {
   curveDisabledReason,
   handheldOffset,
   previewOffset,
+  offsetsBlocked,
   readOffsets,
   signedPoints,
 } from "./probe-offset";
@@ -86,6 +87,19 @@ describe("readOffsets", () => {
     });
     expect(readOffsets({ revision: 1 })).toBeNull();
   });
+  it("treats the offsets as unknown when the integration cannot read its store, and says why", () => {
+    const message =
+      "The stored probe offsets could not be read; they have not been overwritten and the probes read without them: bad";
+    const document = { probe_user_offsets: { "sensor.a": { offset: 3, curve: null } }, error: null, offsets_error: message };
+    expect(readOffsets(document)).toBeNull();
+    expect(offsetsBlocked(document)).toBe(message);
+    expect(offsetsBlocked({ probe_user_offsets: {}, error: null, offsets_error: null })).toBeNull();
+  });
+  it("blocks matching while the calibration history cannot be read: the integration refuses the write", () => {
+    const document = { probe_user_offsets: { "sensor.a": { offset: 3, curve: null } }, error: "Stored calibration history could not be loaded", offsets_error: null };
+    expect(readOffsets(document)).toEqual({ "sensor.a": { offset: 3, curve: null } });
+    expect(offsetsBlocked(document)).toBe("Stored calibration history could not be loaded");
+  });
 });
 
 describe("applyOffset", () => {
@@ -105,8 +119,12 @@ describe("applyOffset", () => {
     expect(receipt).toMatchObject({ ok: false, unconfirmed: true, summary: "" });
   });
   it("names the offset when the zone has no value to show", async () => {
-    const receipt = await applyOffset(fakeController(3, { fused_before: null, fused_after: null }), request);
+    const receipt = await applyOffset(fakeController(3, { fused_before: null, fused_after: null }), { ...request, before: 0 });
     expect(receipt).toMatchObject({ ok: true, summary: "Zone 1 Back offset 0.0 → +3.0" });
+  });
+  it("does not invent the offset it replaced when the store could not be read before", async () => {
+    const receipt = await applyOffset(fakeController(3, { fused_before: null, fused_after: null }), { ...request, before: null });
+    expect(receipt).toMatchObject({ ok: true, summary: "Zone 1 Back offset — → +3.0" });
   });
   it("says Undo is not available here when no Journal event came back", async () => {
     const controller = fakeController(3);

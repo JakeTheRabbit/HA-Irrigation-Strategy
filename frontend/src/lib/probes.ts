@@ -300,3 +300,14 @@ export function probeRows(probes: readonly Probe[]): ProbeRow[] {
     };
   });
 }
+
+/** Every probe on Probes & offsets, moisture and the pore EC beside it, each once: how many, how many
+ * are healthy, and how many the zone values use. */
+export function probeCounts(rows: readonly ProbeRow[]) {
+  const probes = [...new Map(rows.flatMap((row) => [row.vwc, ...(row.ec ? [row.ec] : [])]).map((probe) => [probe.id, probe])).values()];
+  return {
+    total: probes.length,
+    healthy: probes.filter((probe) => probe.health === "ok").length,
+    used: probes.filter((probe) => probe.used !== false && probe.health !== "not-counted").length,
+  };
+}

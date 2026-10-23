@@ -8,6 +8,7 @@ import {
   fusionMethod,
   healthChip,
   placementProblem,
+  probeCounts,
   probeRows,
   probeChoicePayload,
   probeChoices,
@@ -235,6 +236,11 @@ describe("Probes & offsets rows", () => {
       ["Front", "sensor.demo_z3_front_vwc", "sensor.demo_z3_front_ec"],
       ["Back", "sensor.demo_z3_back_vwc", "sensor.demo_z3_back_ec"],
     ]);
+  });
+  it("counts every probe on the page, moisture and pore EC, in health and in zone values", () => {
+    const rows = probeRows(zoneProbes(room.zones[2], states, now));
+    expect(probeCounts(rows)).toEqual({ total: 4, healthy: 3, used: 3 });
+    expect(probeCounts([rows[0], { ...rows[1], ec: rows[0].ec }])).toMatchObject({ total: 3 });
   });
   it("says each probe's health in a word or two, and whether the zone leaves it out", () => {
     const probes = zoneProbes(room.zones[2], states, now);

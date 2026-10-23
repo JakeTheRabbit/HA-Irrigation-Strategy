@@ -78,7 +78,8 @@ await runParity({
     // Match handheld on Room A Zone 1 Back.
     const row = page.locator(`tr[data-probe="${PROBE}"]`);
     const raw = Number.parseFloat(await row.locator(".probes-vwc").innerText());
-    await row.locator("[data-match-handheld]").click();
+    // Its accessible name holds the visible words (WCAG 2.5.3).
+    await row.getByRole("button", { name: "Match handheld: Zone 1 Back", exact: true }).click();
     const editor = page.locator(`[data-offset-editor="${PROBE}"]`);
     await editor.getByRole("textbox", { name: "Handheld reading, same spot, %" }).fill((raw + 3).toFixed(1));
     assert.equal((await editor.locator("[data-offset-preview]").innerText()).trim(), "+3.0", `${label}: offset preview`);

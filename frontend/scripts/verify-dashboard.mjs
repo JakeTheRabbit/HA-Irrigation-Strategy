@@ -300,8 +300,9 @@ try {
     await check(`${route}: render, desktop layout and accessibility`, async () => {
       await go(route);
       await expectVisible(page.getByRole("heading", { name: heading, exact: true, level: 1 }));
-      // A heading carries a sentence only for a behaviour someone could get wrong.
-      if (!route.startsWith("plan/") && !["all-zones", "settings/features"].includes(route))
+      // A heading carries a sentence only for a behaviour someone could get wrong. Probes & offsets
+      // carries its counts instead (mockup 13), checked with the probes below.
+      if (!route.startsWith("plan/") && !["all-zones", "settings/features", "equipment/probes"].includes(route))
         assert.equal(
           await page.locator(".page-heading > div > p").count(),
           0,
@@ -1338,7 +1339,12 @@ try {
       assert.equal(await page.locator('tbody[data-probes-room="room:"]').count(), 1);
       assert.equal(
         (await page.locator(".page-heading p").innerText()).trim(),
-        "6 probes · 6 in zone values · raw readings always kept",
+        "12 probes · 11 in zone values · raw readings always kept",
+      );
+      // Every probe counts, moisture and pore EC: zone 3's silent back EC probe is the one not healthy.
+      assert.equal(
+        (await page.locator('tbody[data-probes-room="room:"] .probes-room-health').innerText()).trim(),
+        "11 of 12 probes healthy",
       );
       // The probe's side, its entity id on hover.
       const first = rows.first().locator('td[data-label="Probe"] strong');
@@ -1415,7 +1421,12 @@ try {
       "Does not count",
     );
     await expectVisible(row("sensor.demo_z1_front_vwc").locator("[data-probe-primary]"));
-    assert.match(await page.locator(".probes-status").innerText(), /Probes\s+11 of 12 OK/);
+    // The room's health counts every probe, moisture and pore EC: the one left out and zone 3's silent
+    // back EC are not healthy.
+    assert.equal(
+      (await page.locator('tbody[data-probes-room="room:"] .probes-room-health').innerText()).trim(),
+      "10 of 12 probes healthy",
+    );
     await page.setViewportSize({ width: 1440, height: 1000 });
   });
   await check(
