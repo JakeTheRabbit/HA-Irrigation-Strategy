@@ -77,6 +77,9 @@ import { SystemStatus } from "@/pages/system";
 
 /** The page this address opens; an old or short form of it is rewritten in place (no new history
  * entry), keeping a Help link's `?code=`. */
+/** Pages whose address query outlives a room pick (openRoomPage). */
+const KEEPS_QUERY: Page[] = ["plan/watering"];
+
 function readRoute(): Route {
   const next = canonicalHash(window.location.hash, window.location.search);
   if (next !== null) window.history.replaceState(null, "", next);
@@ -192,12 +195,15 @@ export default function App() {
   function openRoomPage(id: string, next: Page, zone?: number) {
     confirmNavigation(() => {
       const target: Route = next === "zone" ? { page: next, zone: zone ?? null } : { page: next };
+      // The watering timeline shows every room: its choices (span, date, filters) stay in the address.
+      const hash = window.location.hash;
+      const kept = next === page && KEEPS_QUERY.includes(next) && hash.includes("?") ? hash.slice(hash.indexOf("?")) : "";
       dropDrafts();
       setWorkspaceDirty(false);
       setFocusZone(zone);
       controller.changeRoom(id);
       setRoute(target);
-      window.history.pushState(null, "", routeHash(target));
+      window.history.pushState(null, "", routeHash(target) + kept);
       setMobile(false);
       window.scrollTo({ top: 0 });
     });

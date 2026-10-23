@@ -43,12 +43,10 @@ import {
 } from "@/lib/watering";
 import "./watering.css";
 
-/** The page's choices outlive a pick in the room tree, which remounts the page in the picked room
- * and drops the address's query: the last query and collapsed rooms stand in then, and only then
- * (any other way in starts clean). `treeAt` is when the room tree was last clicked; a header room
- * switch keeps the address and is not a pick. (Task 31: openRoomPage should keep the query.) */
-const memory: { query: WateringQuery | null; room: string | null; collapsed: Set<string>; treeAt: number } = {
-  query: null,
+/** A pick in the room tree remounts the page in the picked room; the address keeps the query
+ * (openRoomPage), and the collapsed rooms stand in from here then, and only then (any other way in
+ * starts clean). `treeAt` is when the room tree was last clicked; a header room switch is not a pick. */
+const memory: { room: string | null; collapsed: Set<string>; treeAt: number } = {
   room: null,
   collapsed: new Set(),
   treeAt: 0,
@@ -87,8 +85,7 @@ function roomMeta(controller: Controller, room: Room) {
   };
 }
 
-function initialQuery(hash: string, width: number, picked: boolean): WateringQuery {
-  if (picked && !hash.includes("?") && memory.query) return memory.query;
+function initialQuery(hash: string, width: number): WateringQuery {
   const q = wateringQuery(hash);
   return /[?&]span=/.test(hash) ? q : { ...q, span: defaultSpan(width) };
 }
@@ -108,15 +105,11 @@ export function Watering({
     initialQuery(
       typeof window === "undefined" ? "" : window.location.hash,
       typeof window === "undefined" ? 1440 : window.innerWidth,
-      picked,
     ),
   );
   // Any way in but a tree pick starts clean.
   useEffect(() => {
-    if (!picked) {
-      memory.query = null;
-      memory.collapsed = new Set();
-    }
+    if (!picked) memory.collapsed = new Set();
     memory.treeAt = 0;
   }, []);
   useEffect(() => {
@@ -125,7 +118,6 @@ export function Watering({
   }, []);
   const change = (next: Partial<WateringQuery>) => {
     const merged = { ...q, ...next };
-    memory.query = merged;
     setQ(merged);
     window.history.replaceState(window.history.state, "", `${window.location.pathname}${window.location.search}${wateringHash(merged)}`);
   };

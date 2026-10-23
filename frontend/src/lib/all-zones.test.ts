@@ -5,6 +5,7 @@ import { setDisplayUnits } from "./display-units";
 import { drinkLine, facilityView, zoneHref } from "./facility-view";
 import { discoverRooms } from "./model";
 import { fakeController } from "./test-helpers";
+import type { CsEvent } from "./parity-types";
 import type { States, Zone } from "./types";
 
 const zone = (id: number, enabled: boolean | null, entity = true) =>
@@ -59,9 +60,9 @@ const put = (id: string, state: string, attributes: Record<string, unknown> = {}
   [id]: { entity_id: id, state, attributes },
 });
 const fmt = { clock: () => "", number: (v: number) => String(v), perPlant: (ml: number) => `${ml} mL` };
-function facility(extra: States) {
+function facility(extra: States, recentEvents: CsEvent[] = []) {
   const states = { ...createDemo(Date.now()), ...extra };
-  const controller = fakeController({ states, rooms: discoverRooms(states), roomId: "room:", lastUpdated: 1_000 });
+  const controller = fakeController({ states, rooms: discoverRooms(states), roomId: "room:", lastUpdated: 1_000, recentEvents });
   const rooms = facilityView(controller, fmt);
   return { a: rooms.find((r) => r.room.id === "room:")!, b: rooms.find((r) => r.room.id === "room:room_b_")! };
 }
@@ -97,14 +98,29 @@ describe("all rooms: queue, flow, grow day and problems in place", () => {
     expect(a.growDay).toEqual({ day: 37, of: 56, daysLeft: 19, stage: "flower bulk" });
     expect(b.growDay).toBeNull();
   });
-  it("queued position comes from the room queue attribute", () => {
+  it("queued place falls back to the room queue attribute: position counts the zones ahead", () => {
     const { a, b } = facility(
       put("binary_sensor.crop_steering_shot_queued", "on", {
-        queue: [{ zone: 2, position: 2, requested_at: "2026-10-22T10:00:00+13:00", priority: "steering" }],
+        queue: [{ zone: 2, position: 1, requested_at: "2026-10-22T10:00:00+13:00", priority: "steering" }],
       }),
     );
-    expect(a.zones.map((z) => z.queued)).toEqual([null, { position: 2 }, null]);
+    expect(a.zones.map((z) => z.queued)).toEqual([null, { place: 2 }, null]);
     expect(b.zones.every((z) => z.queued === null)).toBe(true);
+  });
+  it("queued place comes from the Journal's intent.queued until that zone's shot starts", () => {
+    const ev = (id: string, ts: string, zone: number, kind: string, data: Record<string, unknown> = {}, room_id = "room:"): CsEvent => ({
+      v: 1, id, ts, room_id, zone, kind, outcome: kind === "intent.queued" ? "queued" : "ok", code: null,
+      source: { actor: "engine" }, data,
+    });
+    const { a, b } = facility({}, [
+      ev("1", "2026-10-22T10:00:00Z", 1, "intent.queued", { position: 1 }),
+      ev("2", "2026-10-22T10:00:01Z", 1, "shot.started"),
+      ev("3", "2026-10-22T10:02:00Z", 3, "intent.queued", { position: 2 }),
+      ev("4", "2026-10-22T10:02:00Z", 1, "intent.queued", { position: 0 }, "room:room_b_"),
+    ]);
+    // zone 1 waited, then its shot started: no longer waiting. Zone 3 had two zones ahead: third.
+    expect(a.zones.map((z) => z.queued)).toEqual([null, null, { place: 3 }]);
+    expect(b.zones.map((z) => z.queued)).toEqual([{ place: 1 }, null, null]);
   });
   it("flow ratio 0.79 marks last shot hollow and builds the arrived sentence", () => {
     setDisplayUnits({ volume: "L" });

@@ -159,8 +159,9 @@ await runParity({
       await spans.getByRole("button", { name: "48 h" }).click();
       await treeRoom("room:room_b_").click();
       await main.getByRole("heading", { level: 1, name: "Timeline", exact: true }).waitFor();
-      // The pick keeps the page's choices (the address loses its query there).
+      // The pick keeps the page's choices: the address keeps its query.
       assert.equal(await spans.getByRole("button", { name: "48 h" }).getAttribute("aria-pressed"), "true", `${label}: 48 h kept`);
+      assert.match(new URL(page.url()).hash, /^#\/plan\/watering\?(.*&)?span=48(&|$)/, `${label}: the address keeps span=48`);
       const toggle = main.getByRole("button", { name: /^(Collapse|Expand) Room B$/ });
       await toggle.waitFor();
       assert.equal(await toggle.getAttribute("aria-expanded"), "true", `${label}: Room B open`);
@@ -168,4 +169,4 @@ await runParity({
     }
   },
 });
-console.log("PASS: I1 watering timeline (day strip, span hash, arrow keys, failed chip, phone failed count opens 24 h, skip + undo, room tree keeps choices, 3.17 note; clock pinned 14:10)");
+console.log("PASS: I1 watering timeline (day strip, span hash, arrow keys, failed chip, phone failed count opens 24 h, skip + undo, room tree keeps choices and the address query, 3.17 note; clock pinned 14:10)");

@@ -153,7 +153,7 @@ try {
   assert.ok((await page.locator("[data-facility-zone]").count()) >= 6);
   const room = page.locator("[data-facility-room]").nth(1);
   const id = await room.getAttribute("data-facility-room");
-  await room.locator(".facility-zone-head button").first().click();
+  await room.locator(".facility-zone-head a").first().click();
   await page.locator("[data-zone-page]").waitFor();
   assert.equal(new URL(page.url()).searchParams.get("room"), id);
   await open("#/settings");
@@ -162,9 +162,11 @@ try {
   await page.getByRole("heading", { name: "Water use", exact: true }).waitFor();
   await open("#/history/timeline?zone=2");
   await page.waitForURL((url) => url.hash === "#/history/explorer?zone=2");
-  await page.getByLabel("Timeline zone").selectOption("room");
-  await page.waitForTimeout(100);
-  assert.equal(await page.getByLabel("Timeline zone").inputValue(), "room");
+  // The old timeline link opens the Explorer on zone 2's detail; the room list is the zone picker.
+  await page.locator('[data-zone-detail="2"]').waitFor();
+  await open("#/history/explorer");
+  await page.locator(".explorer-zone-hint").waitFor();
+  assert.equal(await page.locator("[data-zone-detail]").count(), 0);
   await open("#/zone/1");
   await page.locator("#config-manual_override input").first().click();
   await page.evaluate(() => {
@@ -172,8 +174,7 @@ try {
   });
   await page.getByRole("dialog").waitFor();
   await page.getByRole("dialog").getByRole("button", { name: "Discard and continue" }).click();
-  await page.getByLabel("Timeline zone").waitFor();
-  assert.equal(await page.getByLabel("Timeline zone").inputValue(), "2");
+  await page.locator('[data-zone-detail="2"]').waitFor();
   await open("#/settings");
   await page.locator("#landing-view").selectOption("all-zones");
   await open();
@@ -194,7 +195,7 @@ try {
   await page.screenshot({ path: file("nav-tree-390.png"), animations: "disabled" });
   assert.deepEqual(errors, []);
   console.log(
-    "PASS: tree menu (5 sections, 21 pages), Changes aria-current + address, only the current and grower-opened sections expand (left sections close; opened ones survive navigation and reload), keyboard, tabs hidden at 1440 and shown at 390, 5-button bottom bar, axe clean, all rooms, correct-room details, default preference, direct and old links, history room filter, protected zone drafts, mobile width, zero browser errors",
+    "PASS: tree menu (5 sections, 21 pages), Changes aria-current + address, only the current and grower-opened sections expand (left sections close; opened ones survive navigation and reload), keyboard, tabs hidden at 1440 and shown at 390, 5-button bottom bar, axe clean, all rooms, correct-room details, default preference, direct and old links, explorer zone pick, protected zone drafts, mobile width, zero browser errors",
   );
 } finally {
   await browser.close();

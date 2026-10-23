@@ -39,7 +39,7 @@ const ordinal = (n: number) => {
   const tail = n % 100 >= 11 && n % 100 <= 13 ? "th" : (["th", "st", "nd", "rd"][n % 10] ?? "th");
   return `${n}${tail}`;
 };
-const queuedText = (position: number) => `Waiting for the pump — ${ordinal(position)} in line`;
+const queuedText = (place: number) => `Waiting for the pump — ${ordinal(place)} in line`;
 /** The root zone's comfortable range; outside it the value is marked, never coloured alone. */
 const ROOT_BAND: [number, number] = [19, 23];
 
@@ -390,7 +390,7 @@ function ZoneCard({
       </div>
       {z.queued && (
         <p className="facility-line" data-facility-queued>
-          <Clock size={14} aria-hidden="true" /> {queuedText(z.queued.position)}
+          <Clock size={14} aria-hidden="true" /> {queuedText(z.queued.place)}
         </p>
       )}
       {z.lastShotText && (
@@ -607,7 +607,7 @@ function PhoneRoom({ r, offline, open }: { r: FacilityRoom; offline: boolean; op
                 </span>
                 {z.queued && (
                   <span className="facility-tile-line" data-facility-queued>
-                    {queuedText(z.queued.position)}
+                    {queuedText(z.queued.place)}
                   </span>
                 )}
                 {z.lastShotText && (

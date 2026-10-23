@@ -9,6 +9,7 @@ import { buildSetpointPreview } from "./setpoint-preview";
 import { stockTanks, stockState, type StockState, type StockTankReading } from "./dosing";
 import { tankTelemetry } from "./tank-telemetry";
 import { eventTimes } from "./timeline";
+import type { CsEvent } from "./parity-types";
 import type { Controller, EntityState, LogEvent, Metric, States, Zone } from "./types";
 import { dailyWater } from "./water-delivery";
 import { roomPlants } from "./water-view";
@@ -127,8 +128,10 @@ export interface FacilityZone {
   mode: ZoneMode;
   sensors: ZoneSensor[];
   attention: AttentionReason[];
-  /** Waiting for the pump: its place in the room's queue (binary_sensor shot_queued, attr `queue`). */
-  queued: { position: number } | null;
+  /** Waiting for the pump: its place in line, 1 = next (`position` counts the zones ahead). From the
+   * zone's newest Journal intent.queued while no shot.started follows it, else binary_sensor
+   * shot_queued's `queue` (the controller writes that only at a pass's end, so it rarely reads on). */
+  queued: { place: number } | null;
   /** The last shot's metered over commanded water (zone_N_flow_ratio, 0–1); null without a meter. */
   flowRatio: number | null;
   /** Under 0.8 of the water arrived: the last shot's dot is drawn hollow. */
@@ -207,6 +210,18 @@ function lastShot(entity: EntityState | undefined) {
   return { flowRatio: ratio, lastShotHollow: hollow, lastShotText: text };
 }
 
+/** Each zone of the room whose newest intent.queued has no shot.started after it: the zones ahead of
+ * it (`data.position`), null when the event does not say. A zone whose shot started is not waiting. */
+function journalWaits(events: readonly CsEvent[], roomId: string): Map<number, number | null> {
+  const waits = new Map<number, number | null>();
+  for (const e of events) {
+    if (e.room_id !== roomId || e.zone === null) continue;
+    if (e.kind === "intent.queued") waits.set(e.zone, finite(e.data.position));
+    else if (e.kind === "shot.started") waits.delete(e.zone);
+  }
+  return waits;
+}
+
 /** Every room read from the one live snapshot, for any room (not only the selected one): nothing
  * here fetches history or calls the controller. The not-watered rule needs today's readings and so
  * stays on the room's own page. */
@@ -227,6 +242,7 @@ export function facilityView(
     let plantL = 0;
     let plantCount = 0;
     const queue = states[`binary_sensor.crop_steering_${prefix}shot_queued`]?.attributes.queue;
+    const waits = journalWaits(controller.recentEvents, room.id);
     const zones = view.zones.map((zone) => {
       const saved = buildSetpointPreview(view, states, zone.id, {}).saved.parameters;
       const water = dailyWater(zone, plants[zone.id] ?? null);
@@ -245,7 +261,7 @@ export function facilityView(
       const inQueue = Array.isArray(queue)
         ? (queue as { zone?: unknown; position?: unknown }[]).find((entry) => entry?.zone === zone.id)
         : undefined;
-      const position = finite(inQueue?.position);
+      const ahead = waits.has(zone.id) ? waits.get(zone.id)! : finite(inQueue?.position);
       const stopped =
         !view.roomActive || zone.stale || view.engine.enabled === false || zone.enabled === false;
       const facts: ZoneFacts = {
@@ -294,7 +310,7 @@ export function facilityView(
                     : "automated") as ZoneMode,
           sensors: zoneSensors(zoneProbes(zone, states, now)),
           attention: [] as AttentionReason[],
-          queued: position === null ? null : { position },
+          queued: ahead === null || ahead < 0 ? null : { place: ahead + 1 },
           ...lastShot(states[`sensor.crop_steering_${prefix}zone_${zone.id}_flow_ratio`]),
           // Worded as the attention rule words a probe, so the card says it once.
           problem:

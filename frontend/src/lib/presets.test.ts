@@ -26,7 +26,7 @@ const WORDS: PresetWords = {
       p1_target_vwc: "Peak moisture",
       p2_vwc_threshold: "Re-water point",
       timers: "Timer programs",
-    })[key] ?? key,
+    })[key] ?? presetWords({}, []).label(key), // else the panel's own words (setting-words)
   value: (_key, value) =>
     typeof value === "number" ? `${value}%` : value == null ? "none" : String(value),
   target: (t) => (t.zone ? `F1 zone ${t.zone}` : "F1"),
@@ -266,7 +266,7 @@ describe("words", () => {
         WORDS,
       ),
     ).toEqual([
-      "p2_dilute_ratio (F1 has no such setting)",
+      "P2 dilute ratio (F1 has no such setting)",
       "Timer programs (source room has no timer programs)",
     ]);
     expect(skippedLine(["p1_target_vwc", "timers"], WORDS)).toBe(
@@ -496,9 +496,9 @@ describe("fix round 1: a copy never claims more than it did", () => {
     ) as ApplyReceipt;
     expect(r.ok).toBe(false);
     expect(r.unconfirmed).toBe(true);
-    expect(r.alsoWritten).toEqual(["maximum_ec (not read back)"]);
+    expect(r.alsoWritten).toEqual(["Maximum pore EC (not read back)"]);
     const html = view(r);
-    expect(html).toContain("Also written: maximum_ec (not read back).");
+    expect(html).toContain("Also written: Maximum pore EC (not read back).");
     expect(html).not.toContain("Written and read back");
   });
 
@@ -518,10 +518,10 @@ describe("fix round 1: a copy never claims more than it did", () => {
     ) as ApplyReceipt;
     expect(r.ok).toBe(false);
     expect(r.unconfirmed).toBe(true);
-    expect(r.alsoWritten).toEqual(["maximum_ec"]);
+    expect(r.alsoWritten).toEqual(["Maximum pore EC"]);
     const html = view(r);
     expect(html).toContain("The copy changed more than the preview showed. Check History.");
-    expect(html).toContain("Also written: maximum_ec.");
+    expect(html).toContain("Also written: Maximum pore EC.");
     expect(html).toContain('href="#/history/changes"');
     expect(html).not.toContain("Written and read back");
   });

@@ -352,7 +352,7 @@ jobs:
   frontend:
     name: Dashboard build and browser workflows
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -395,6 +395,18 @@ jobs:
           node frontend/scripts/verify-tank-status.mjs
           node frontend/scripts/verify-calibration.mjs
           node frontend/scripts/verify-ha-shell.mjs
+          node frontend/scripts/verify-navigation.mjs
+      - name: Verify parity pages against their mockups
+        # Each serves frontend/dist itself: 1440x1000 and 390x844, demo on the current and the 3.17
+        # integration; the compare files land in output/playwright/parity/.
+        run: |
+          node frontend/scripts/verify-parity-harness.mjs
+          for script in frontend/scripts/verify-parity-*.mjs; do
+            [ "$script" = frontend/scripts/verify-parity-harness.mjs ] && continue
+            echo "::group::$script"
+            node "$script"
+            echo "::endgroup::"
+          done
       - uses: actions/upload-artifact@v4
         if: always()
         with:

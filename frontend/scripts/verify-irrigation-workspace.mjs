@@ -105,7 +105,7 @@ try {
   assert.equal(await page.locator("#irrigation-zone").inputValue(), "2");
   checks.push("Shared zone survives switches and follows both editors");
   await fresh("schedule");
-  await page.getByRole("button", { name: "Arm plan", exact: true }).click();
+  await page.getByRole("button", { name: /^Arm at (next )?lights-on/ }).click();
   await page.getByRole("button", { name: "Arm for next lights-on", exact: true }).click();
   await page.getByRole("button", { name: "Disarm plan", exact: true }).waitFor();
   assert.equal(await page.locator("#steering-balance").isDisabled(), true);

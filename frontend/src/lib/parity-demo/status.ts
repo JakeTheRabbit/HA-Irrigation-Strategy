@@ -31,7 +31,7 @@ export function demoParityStatus(states: States, now: number): States {
     put(`sensor.crop_steering_${prefix}stage`, stage, { friendly_name: "Stage", room_id });
     const queue = prefix
       ? []
-      : [{ zone: 2, position: 2, requested_at: new Date(now - 40_000).toISOString(), priority: "steering" }];
+      : [{ zone: 2, position: 1, requested_at: new Date(now - 40_000).toISOString(), priority: "steering" }];
     put(`binary_sensor.crop_steering_${prefix}shot_queued`, queue.length ? "on" : "off", { room_id, queue });
     const alerts = prefix
       ? [
