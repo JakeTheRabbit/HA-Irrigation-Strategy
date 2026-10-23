@@ -391,9 +391,11 @@ def decide(s: ZoneSnapshot, p: ZoneParams):
         # Timed P2 end (opt-in): the day's watering ends this long before lights-off, whatever moisture reads.
         phase, treason = "P3", f"timed P2 end {s.hours_to_lights_off:.1f}h<={p.p2_end_h_before_off:g}h to lights-off"
     elif phase == "P0":
-        # The bypass first: a zone already at its re-water point never waits out the minimum wait.
-        if s.vwc <= p.p2_threshold:
-            phase, treason = "P1", f"P0 bypass VWC {s.vwc:.0f}<=rewater {p.p2_threshold:.0f}"
+        # The bypass first: a zone already at its rescue floor never waits out the minimum wait. Not the re-water
+        # point: the overnight dryback leaves every slab under it at lights-on, and P0 is the plants' time to
+        # start drinking before the first shot (#195).
+        if s.vwc <= p.p3_emergency_floor:
+            phase, treason = "P1", f"P0 emergency bypass VWC {s.vwc:.0f}<=floor {p.p3_emergency_floor:.0f}"
         elif s.phase_minutes < p.p0_min_wait_min:
             pass  # the minimum wait (opt-in): nothing else ends P0 before it
         elif s.dryback_pct >= p0_dryback(p):
@@ -651,7 +653,7 @@ def waiting_for(s: ZoneSnapshot, p: ZoneParams) -> list:
 
     if s.phase == "P0":
         add("p0_timeout", to="P1", in_min=max(p.p0_max_wait_min, p.p0_min_wait_min) - s.phase_minutes)
-        add("p0_bypass", to="P1", metric="vwc", op="<=", value=p.p2_threshold, now=s.vwc)
+        add("p0_bypass", to="P1", metric="vwc", op="<=", value=p.p3_emergency_floor, now=s.vwc)
         if s.peak_vwc > 0:
             wait = p.p0_min_wait_min - s.phase_minutes
             add("p0_dryback", to="P1", metric="vwc", op="<=",

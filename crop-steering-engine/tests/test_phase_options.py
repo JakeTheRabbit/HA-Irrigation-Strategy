@@ -41,7 +41,7 @@ def test_the_minimum_wait_holds_the_dryback_exit_until_it_has_passed():
 
 def test_the_minimum_wait_never_holds_the_bypass():
     p = P(p0_min_wait_min=60)
-    assert decide(_p0(1, vwc=44), p)[0] == "P1"
+    assert decide(_p0(1, vwc=40), p)[0] == "P1"
 
 
 def test_the_minimum_wait_holds_the_timeout_too():

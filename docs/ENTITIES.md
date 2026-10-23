@@ -30,7 +30,7 @@ entities scale with your zone count, `N` = 1…zones).
 | Entity | Range | Default | Unit | What it does |
 |---|---|---|---|---|
 | `p0_dryback_drop_percent` | 2-40 | 15 | % | An old setting that stays for older rooms and recipes. The controller does not read this setting. The P0 dryback comes from the P0 extra dryback of each zone (`zone_N_p0_additional_dryback`, section 2). |
-| `p0_minimum_wait` | 0-240 | 0 | min | Morning dryback minimum wait (default 0, off). Nothing but the re-water bypass ends P0 before this time after lights-on: not the dryback target, the stall exit, the maximum wait or the AI assistant. |
+| `p0_minimum_wait` | 0-240 | 0 | min | Morning dryback minimum wait (default 0, off). Nothing but the rescue-floor bypass ends P0 before this time after lights-on: not the dryback target, the stall exit, the maximum wait or the AI assistant. |
 | `p0_maximum_wait_time` | 30-600 | 120 | min | The longest time that the morning dryback (P0) lasts after lights-on. At this time, the zone goes to P1, also when the dryback is not complete. |
 
 ### P1: ramp
@@ -48,7 +48,7 @@ entities scale with your zone count, `N` = 1…zones).
 ### P2: maintenance
 | Entity | Range | Default | Unit | What it does |
 |---|---|---|---|---|
-| `p2_vwc_threshold` | 10-100 | 60 | % | Re-water point: the VWC that starts a maintenance shot in P2. Each time the controller checks in P2, it gives a shot when VWC is below this value. In P0, VWC at or below this value ends the morning dryback. |
+| `p2_vwc_threshold` | 10-100 | 60 | % | Re-water point: the VWC that starts a maintenance shot in P2. Each time the controller checks in P2, it gives a shot when VWC is below this value. |
 | `p2_shot_size` | 0.5-30 | 5 | % | The size of each maintenance shot, as a percentage of the substrate volume. Watchdog shots and daily minimum shots use this size. EC flushes and dilution shots use 1.5 times this size or more. |
 | `p2_time_between_shots` | 0-60 | 0 | min | The minimum time from the last shot before a maintenance shot can start. It gives the water time to reach the probe before the controller reads VWC again. EC corrections use the EC correction interval. `0` stops this wait. |
 | `p2_timed_interval_min` | 5-720 | 60 | min | Timed P2 (read only while the zone's `zone_N_p2_mode` is Timed or Timed with guards): the time from the last shot to the next timed P2 shot. Missed slots never stack. Timed shots count toward the daily water limit and stop under a held grow plan. |
@@ -64,7 +64,7 @@ entities scale with your zone count, `N` = 1…zones).
 ### P3: pre-lights-off / overnight
 | Entity | Range | Default | Unit | What it does |
 |---|---|---|---|---|
-| `p3_emergency_vwc_threshold` | 10-65 | 40 | % | Rescue floor: the overnight safety level of VWC. In P3, the controller gives a rescue shot each time VWC is below this level. Rescue shots can go past the daily water limit. |
+| `p3_emergency_vwc_threshold` | 10-65 | 40 | % | Rescue floor: the overnight safety level of VWC. In P3, the controller gives a rescue shot each time VWC is below this level. Rescue shots can go past the daily water limit. In P0, VWC at or below this level ends the morning dryback at once. |
 | `p3_emergency_shot_size` | 0.1-15 | 2 | % | The size of each rescue shot, as a percentage of the substrate volume. Rescue shots can go past the daily water limit. With the P3 dryback hold on, hold shots also use this size. |
 | `p3_time_between_shots` | 0-60 | 10 | min | The minimum time from the last shot before a rescue shot can start. It gives the water time to reach the probe before the controller reads VWC again. The time counts from the last shot of any type. `0` stops this wait. |
 

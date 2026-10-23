@@ -179,7 +179,7 @@
     },
     {
       "id": "PH-4",
-      "text": "P0 ends on VWC at or below re-water, the drop since lights-on at p0_additional_dryback when positive (otherwise dryback_target), or its maximum wait. A positive additional setting replaces the target; it is not summed.",
+      "text": "P0 ends on VWC at or below the rescue floor (p3_emergency_floor), the drop since lights-on at p0_additional_dryback when positive (otherwise dryback_target), or its maximum wait. Under the re-water threshold alone it keeps waiting. A positive additional setting replaces the target; it is not summed.",
       "verified": true
     },
     {

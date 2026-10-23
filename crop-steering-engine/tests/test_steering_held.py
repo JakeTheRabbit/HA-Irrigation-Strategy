@@ -68,7 +68,7 @@ def test_the_overnight_emergency_fires():
 def test_phases_still_move_while_held():
     assert decide(held(phase="P2", vwc=55, lights_on=False), P())[0] == "P3"
     assert decide(held(phase="P3", vwc=55, lights_just_on=True), P())[0] == "P0"
-    assert decide(held(phase="P0", vwc=44), P())[0] == "P1"
+    assert decide(held(phase="P0", vwc=40), P())[0] == "P1"
 
 
 def test_high_ec_with_water_that_cannot_dilute_still_blocks_every_shot():

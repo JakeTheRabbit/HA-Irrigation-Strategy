@@ -230,7 +230,7 @@ export const SETTING_COPY: Record<string, SteCopy> = {
     "tooltip": "Adds the next step of each zone to the vitals report that the controller sends. The dashboard shows the same step as `Next:`."
   },
   "p0_additional_dryback": {
-    "guidance": "A new room starts at 3%, and a room updated in place starts at 0 (off). The controller uses values from 0% to 40%. P0 also ends at the maximum wait time, or when VWC falls to the re-water point. Examine the time of the first shot on the day chart for two grow-days after a change.",
+    "guidance": "A new room starts at 3%, and a room updated in place starts at 0 (off). The controller uses values from 0% to 40%. P0 also ends at the maximum wait time, or when VWC falls to the rescue floor. Examine the time of the first shot on the day chart for two grow-days after a change.",
     "impact": "Increase: The first shot comes later, and the morning dryback is deeper, which steers generative. Decrease: The ramp starts sooner after lights-on.",
     "tooltip": "The dryback after lights-on before the first shot, as a percentage of the highest VWC since lights-on. At 3% and a highest VWC of 60%, P0 ends at 58.2% VWC. At 0, P0 uses the dryback target of the steering mode."
   },
@@ -240,7 +240,7 @@ export const SETTING_COPY: Record<string, SteCopy> = {
     "tooltip": "An old setting that stays for older rooms and recipes. The controller does not read it. The P0 dryback comes from the P0 extra dryback of each zone."
   },
   "p0_maximum_wait_time": {
-    "guidance": "The default is 120 min for a new room. If the controller cannot read a value, it uses 45 min as the wait. The controller uses values from 5 min to 240 min, and it sends a CS-401 alert for a value outside this range. P0 also ends when VWC falls to the re-water point, or when the zone completes its P0 dryback. Examine the time of the first shot on the day chart after a change. The controller reads the zone value first, so the zone value overrides the room value for that zone only.",
+    "guidance": "The default is 120 min for a new room. If the controller cannot read a value, it uses 45 min as the wait. The controller uses values from 5 min to 240 min, and it sends a CS-401 alert for a value outside this range. P0 also ends when VWC falls to the rescue floor, or when the zone completes its P0 dryback. Examine the time of the first shot on the day chart after a change. The controller reads the zone value first, so the zone value overrides the room value for that zone only.",
     "impact": "Increase: The first shot can come later, so the morning dryback can be deeper, which steers generative. Decrease: The ramp starts sooner after lights-on, and the morning dryback is smaller.",
     "tooltip": "The longest time that the morning dryback (P0) lasts after lights-on. At this time, the zone goes to P1, also when the dryback is not complete."
   },

@@ -25,11 +25,11 @@ EFFECTS = {
                       "P0 dryback is measured from the peak it produces"),
     "field_capacity": ("P1", "caps the ramp's ceiling (min(P1 target, field capacity)); the saturation labels read "
                        "against it; under Auto setpoints it follows the zone's highest readings unless the AI owns it"),
-    "p2_vwc_threshold": ("P0, P2", "a maintenance shot fires under it (plus the EC steer's offset); raising it waters "
-                         "more often with a shallower dryback, lowering it fewer shots and a deeper dryback; P0 jumps "
-                         "to P1 when moisture falls to it"),
-    "p3_emergency_vwc_threshold": ("P3", "the rescue floor: a rescue shot fires under it at night; it sits at least 3 "
-                                   "points under the re-water point (Home Assistant refuses an order that breaks it)"),
+    "p2_vwc_threshold": ("P2", "a maintenance shot fires under it (plus the EC steer's offset); raising it waters "
+                         "more often with a shallower dryback, lowering it fewer shots and a deeper dryback"),
+    "p3_emergency_vwc_threshold": ("P0, P3", "the rescue floor: a rescue shot fires under it at night, and P0 jumps to "
+                                   "P1 when moisture falls to it; it sits at least 3 points under the re-water point "
+                                   "(Home Assistant refuses an order that breaks it)"),
     "vegetative_dryback_target": ("P0, P3", "the relative dryback (peak - VWC) / peak x 100 P0 waits for when the zone "
                                   "is steered vegetative; larger means a later first shot"),
     "generative_dryback_target": ("P0, P3", "the same for a zone steered generative"),
@@ -47,7 +47,7 @@ PHASE_MACHINE = """\
   lights_off_hour) ends it. The daily water and shot counters reset at the P3 -> P0 change at lights-on.
 - Lights-off forces any zone not in P3 to P3. P3 -> P0 at lights-on (or on a new grow-day when a light edge was
   missed); a zone in P1 or P2 on a new grow-day also restarts at P0 with its own budget.
-- P0 -> P1 when the first of these holds: moisture at or under the re-water point (p2_vwc_threshold); the dryback
+- P0 -> P1 when the first of these holds: moisture at or under the rescue floor (p3_emergency_vwc_threshold); the dryback
   reaches p0_additional_dryback when positive, otherwise vegetative_dryback_target or generative_dryback_target
   by steering mode; P0 has lasted p0_maximum_wait_time minutes. The additional setting REPLACES the target,
   it is not added. Dryback is relative to the peak since lights-on:

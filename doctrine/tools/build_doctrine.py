@@ -247,8 +247,9 @@ def engine_facts(doc, paths):
          phase(phase="P3", lights_just_on=True) == "P0" and phase(phase="P3", new_grow_day=True) == "P0"),
         ("PH-3", "A zone still in P1 or P2 when a new grow-day begins resets to P0 with fresh counters and budget.",
          phase(phase="P2", new_grow_day=True) == "P0" and phase(phase="P1", new_grow_day=True) == "P0"),
-        ("PH-4", "P0 ends on VWC at or below re-water, the drop since lights-on at p0_additional_dryback when positive (otherwise dryback_target), or its maximum wait. A positive additional setting replaces the target; it is not summed.",
-         phase(phase="P0", vwc=45) == "P1" and phase(phase="P0", vwc=50, dryback_pct=20) == "P1"
+        ("PH-4", "P0 ends on VWC at or below the rescue floor (p3_emergency_floor), the drop since lights-on at p0_additional_dryback when positive (otherwise dryback_target), or its maximum wait. Under the re-water threshold alone it keeps waiting. A positive additional setting replaces the target; it is not summed.",
+         phase(phase="P0", vwc=40) == "P1" and phase(phase="P0", vwc=45) == "P0"
+         and phase(phase="P0", vwc=50, dryback_pct=20) == "P1"
          and phase(phase="P0", vwc=50, phase_minutes=45) == "P1" and phase(phase="P0", vwc=50) == "P0"),
         ("PH-5", "P1 ends on maximum shots, a trusted below-target stall after minimum shots and the interval, the extra-shot cap at target, budget spent at target, or the settled-rise test after an extra shot. The needed rise is p1_rise_pts or 30% of learned expected gain, whichever is greater. A stalled day re-waters below its achieved reading.",
          phase(phase="P1", vwc=50, shot_count=12) == "P2"
