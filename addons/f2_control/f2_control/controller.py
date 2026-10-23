@@ -362,7 +362,8 @@ def ha_fire(event, data, timeout=4):
 
 
 def ha_set(entity, state, attributes=None, timeout=8):
-    """Write a state -> Home Assistant's HTTP status, or None when it was not sent or not answered."""
+    """Write a state -> Home Assistant's HTTP status, or None when it was not sent or not answered. A write
+    sent that failed is counted (the heartbeat's `write_failures`) and logged once an hour per entity."""
     if not _GATE.allows("write"):
         return None
     try:
@@ -372,10 +373,26 @@ def ha_set(entity, state, attributes=None, timeout=8):
             json={"state": state, "attributes": attributes or {}},
             timeout=timeout,
         )
-    except Exception:
+    except Exception as e:
+        _set_failed(entity, e)
         return None
     _GATE.saw("write", r.status_code, f"POST {SHOWN_BASE}/states/{entity}")
+    if r.status_code >= 300:
+        _set_failed(entity, f"HTTP {r.status_code}")
     return r.status_code
+
+
+# State writes that failed since the start, and when each entity's last failure was logged (time.monotonic()).
+_SET_FAILED = {"count": 0, "logged": {}}
+SET_FAILED_LOG_S = 3600.0
+
+
+def _set_failed(entity, why):
+    _SET_FAILED["count"] += 1
+    now, last = time.monotonic(), _SET_FAILED["logged"].get(entity)
+    if last is None or now - last >= SET_FAILED_LOG_S:
+        _SET_FAILED["logged"][entity] = now
+        log(f"state write failed: {entity} ({why}); {_SET_FAILED['count']} failed since the controller started")
 
 
 # ---------------------------------------------------------------- config (defaults; override via options.json or F2_OPT_*)
@@ -2065,23 +2082,52 @@ class Controller:
         )
         if override is not None:
             return float(override)
-        per = f"number.crop_steering_{room.prefix}zone_{zone}_{suffix}"
-        v, _, _ = ha_get(per)
         seen = self.__dict__.setdefault("_settings_seen", {})  # entity -> the last value read since start
-        if v not in (None, "unknown", "unavailable", ""):
-            seen[per] = self._num(per, default)
-            return seen[per]
+        per = f"number.crop_steering_{room.prefix}zone_{zone}_{suffix}"
         glob = f"number.crop_steering_{room.prefix}{suffix}"
-        gv, _, _ = ha_get(glob)
-        if gv not in (None, "unknown", "unavailable", ""):
-            seen[glob] = self._num(glob, default)
-            return seen[glob]
+
+        def number(state):
+            try:
+                return float(state)
+            except (TypeError, ValueError):
+                return None  # missing, unknown, unavailable or not a number: not read
+
+        # One read each, its own state parsed: a second read that failed gave the built-in value as read.
+        sizing = suffix in WATER_SIZING
+        if sizing:  # whether Home Assistant has the zone's number at all: only a 404 means it has none
+            status, (v, attributes, _) = ha_get_status(per)
+        else:
+            v, attributes, _ = ha_get(per)
+        value = number(v)
+        if value is not None:
+            self._note_setting(per, value, attributes)
+            seen[per] = value
+            return value
+        # The zone has its own number and it reads no number: not the room's value unseen. A setting that sizes
+        # the zone's water is unread unless Home Assistant answers it has no such number (the settings wait, then
+        # CS-402); any other, answering unavailable or unknown or read earlier in this run, takes the room's
+        # value, and CS-402 names the zone's number.
+        unread = status != 404 if sizing else v is not None or per in seen
+        if unread:
+            self._defaulted_this_loop.add(per)
+        if not (unread and sizing):
+            v, attributes, _ = ha_get(glob)
+            value = number(v)
+            if value is not None:
+                self._note_setting(glob, value, attributes)
+                seen[glob] = value
+                return value
         # Neither the per-zone NOR the global setpoint entity exists → the engine is silently
         # running its built-in default. On a healthy install the integration creates the global,
         # so this only trips on a real misconfig (renamed/removed entity). Record it so
         # _check_defaulted_setpoints can surface it — EXCEPT engine-only knobs the integration
         # deliberately doesn't create (optional=True): those default by design, never alert.
-        if not optional:
+        if unread and sizing:
+            room.__dict__.setdefault("_settings_missing", set()).add(per)
+            last = seen.get(per)
+            if last is not None:  # the zone's own value, read earlier in this run
+                return last
+        elif not optional:
             self._defaulted_this_loop.add(glob)
             room.__dict__.setdefault("_settings_missing", set()).add(glob)
             last = seen.get(per, seen.get(glob))
@@ -2217,14 +2263,11 @@ class Controller:
         consecutive fused VWC sensors that exist under EITHER naming convention —
         sensor.crop_steering_<prefix>vwc_zone_N (current) or the registry-sticky legacy
         sensor.crop_steering_<prefix>zone_N_vwc — or `fallback` if none do (e.g. HA not
-        reachable yet at startup)."""
+        reachable yet at startup). One read of every state: a read that failed part-way counted too few."""
+        have = {s.get("entity_id") for s in ha_get_all() if isinstance(s, dict)}
         n = 0
-        for z in range(1, 25):
-            new, _, _ = ha_get(f"sensor.crop_steering_{prefix}vwc_zone_{z}")
-            if new is None:
-                old, _, _ = ha_get(f"sensor.crop_steering_{prefix}zone_{z}_vwc")
-                if old is None:
-                    break
+        while n < 24 and {f"sensor.crop_steering_{prefix}vwc_zone_{n + 1}",
+                          f"sensor.crop_steering_{prefix}zone_{n + 1}_vwc"} & have:
             n += 1
         return n or fallback
 
@@ -3452,6 +3495,7 @@ class Controller:
                 "setup_pending": getattr(room, "_setup_pending", None),
                 "room_active": room_active,
                 "max_run": self._max_run_report(room),
+                "write_failures": _SET_FAILED["count"],  # state writes that failed since the start (ha_set)
             },
             **({"timeout": timeout} if timeout else {}),
         )
@@ -6469,7 +6513,9 @@ class Controller:
             self._zone_num(room, zone, suffix, None)  # a read is remembered; a miss is noted for CS-402
             per = f"number.crop_steering_{room.prefix}zone_{zone}_{suffix}"
             glob = f"number.crop_steering_{room.prefix}{suffix}"
-            if per not in seen and glob not in seen:
+            if per in getattr(room, "_settings_missing", ()) and per not in seen:
+                unread.append(per)  # the zone's own number reads no number: never the room's value instead
+            elif per not in seen and glob not in seen:
                 unread.append(glob)
         waiting = sorted(
             e for e in getattr(room, "_settings_missing", ())
@@ -6508,7 +6554,7 @@ class Controller:
                 "CS-402",
                 "settings missing, the controller uses built-in values",
                 "The controller cannot read these settings in Home Assistant. It uses the last value that "
-                "it read since it started, or its built-in value"
+                "it read since it started, else, for a zone's own setting, the room's value, else its built-in value"
                 + (f". {' and '.join(key).capitalize()} set the water of a zone. A zone that has not read "
                    "one of them since the controller started gets no shots, including rescue shots, until "
                    "the setting is back"
@@ -7682,14 +7728,17 @@ class Controller:
         """All phase logic runs on container-local `datetime.now()`. If the Supervisor's TZ
         injection or tzdata is missing, the container is UTC and every lights/dryback/daily-reset
         window silently shifts by the site's offset. Log the effective offset at startup and
-        alert if it disagrees with Home Assistant's configured zone."""
+        alert if it disagrees with Home Assistant's configured zone. -> False while Home Assistant has not
+        answered with its zone, or a mismatch's card is not up: run() asks again each loop until then."""
         now_local = datetime.now().astimezone()
         off = now_local.utcoffset()
         off_h = off.total_seconds() / 3600.0 if off else 0.0
-        log(
-            f"timezone: container local {now_local:%Y-%m-%d %H:%M} "
-            f"(UTC{off_h:+.1f}h) TZ={os.environ.get('TZ', 'unset')}"
-        )
+        if not getattr(self, "_tz_logged", False):
+            self._tz_logged = True
+            log(
+                f"timezone: container local {now_local:%Y-%m-%d %H:%M} "
+                f"(UTC{off_h:+.1f}h) TZ={os.environ.get('TZ', 'unset')}"
+            )
         try:
             r = _session().get(f"{BASE}/config", headers=HDR, timeout=8) if _GATE.allows("other") else None
             if r is not None:
@@ -7698,16 +7747,16 @@ class Controller:
         except Exception:
             ha_tz = None
         if not ha_tz:
-            return
+            return False
         try:
             from zoneinfo import ZoneInfo
 
             ha_off = datetime.now(ZoneInfo(ha_tz)).utcoffset().total_seconds() / 3600.0
         except Exception as e:  # tzdata missing, unknown zone, etc.
             log("timezone: could not resolve HA zone", ha_tz, e)
-            return
+            return True
         if abs(ha_off - off_h) > 0.01:
-            self._alert(
+            return self._alert(  # a card not created is tried again
                 "tz_mismatch",
                 "CS-405",
                 "time zone mismatch, the grow-day can move",
@@ -7725,6 +7774,7 @@ class Controller:
             )
         else:
             log(f"timezone: matches Home Assistant ({ha_tz})")
+        return True
 
     def _check_holds(self):
         """Name every hold (hold_entities) that Home Assistant answers it does not have (404), from the start,
@@ -7763,13 +7813,18 @@ class Controller:
             f"| loop {self.loop_seconds:.0f}s",
         )
         log("token present:", bool(TOKEN), "| base:", SHOWN_BASE)
-        self._log_timezone()
+        tz_checked = self._log_timezone()
         if self.hold_entities:
             self._check_holds()
         self._start_dosing()
         while True:
             if _GATE.state is not None:
                 self._park_refused()
+            if not tz_checked:  # Home Assistant did not answer at start: CS-405 is checked once it does
+                try:  # on its own: a raise here never skips the pass
+                    tz_checked = self._log_timezone()
+                except Exception as e:
+                    log("timezone check error", e)
             try:
                 if self.hold_entities and self._holds_card is not False:
                     self._check_holds()

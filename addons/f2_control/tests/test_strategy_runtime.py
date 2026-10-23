@@ -3,9 +3,17 @@
 import json
 from datetime import datetime, timedelta, timezone
 
+import pytest
+
 import controller
 import fake_ha
 from strategy_runtime import parse_snapshot, parameter_override, strategy_block
+
+
+@pytest.fixture(autouse=True)
+def _status_from_the_stubbed_get(monkeypatch):
+    """These rigs stub ha_get only: ha_get_status answers from it, never from the real HTTP API."""
+    monkeypatch.setattr(controller, "ha_get_status", fake_ha.status_from_get(controller))
 
 
 def snapshot(now, prefix=""):
