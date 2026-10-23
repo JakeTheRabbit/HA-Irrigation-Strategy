@@ -36,6 +36,7 @@ import {
   serviceFromText,
   spanMinutes,
   testLine,
+  testPhones,
   toDraft,
   toggleKind,
   unlistedPhones,
@@ -890,5 +891,62 @@ describe("mutes and the save's receipt (Task 26)", () => {
     const part = saveReceipt(rows, draft, { ...saved, recipients: draft.recipients, revision: 4 }, at);
     expect(part).toMatchObject({ ok: false, notConfirmed: ["idle"] });
     expect(part.summary).toBe("Manager (Phone 3): New alert kinds — → Dosing");
+  });
+});
+
+describe("Task 26 review round 1", () => {
+  it("refuses quiet hours that are not HH:MM", () => {
+    const draft = updateRow(toDraft(DEMO_NOTIFY), MANAGER, { quiet_hours: { from: "", to: "06:00" } });
+    expect(draftErrors(draft)).toEqual(["Quiet hours need a start and an end as HH:MM."]);
+  });
+  it("reads a row back as sent after the integration trims and cuts its name and fills its user", () => {
+    const long = "  A very long phone name that goes on past forty letters  ";
+    const draft = {
+      ...toDraft(DEMO_NOTIFY),
+      recipients: [...DEMO_NOTIFY.recipients, recipient("notify.mobile_app_new", ["emergency"], { name: long })],
+    };
+    const rows = reviewRows(draftChanges(DEMO_NOTIFY, draft, { kinds: DEMO_KINDS, phones: DEMO_PHONES, rooms: ROOMS }));
+    const back = {
+      ...DEMO_NOTIFY,
+      revision: 4,
+      recipients: [
+        ...DEMO_NOTIFY.recipients,
+        recipient("notify.mobile_app_new", ["emergency"], { name: long.trim().slice(0, 40), user_id: "u-new" }),
+      ],
+    };
+    expect(saveReceipt(rows, draft, back, 1)).toMatchObject({ ok: true });
+    // A different name than the one sent is still not confirmed.
+    const other = {
+      ...back,
+      recipients: [...DEMO_NOTIFY.recipients, recipient("notify.mobile_app_new", ["emergency"], { name: "Else" })],
+    };
+    expect(saveReceipt(rows, draft, other, 1).ok).toBe(false);
+  });
+  it("tests every phone in one call on 3.18 and shows its error on each phone, never a second push", async () => {
+    const call = vi.fn(async () => {
+      throw new Error("timed out");
+    });
+    expect(await testPhones(["notify.a", "notify.b"], true, call)).toEqual({
+      "notify.a": { sent: false, error: "timed out" },
+      "notify.b": { sent: false, error: "timed out" },
+    });
+    expect(call).toHaveBeenCalledTimes(1);
+  });
+  it("tests phone by phone on 3.17, or when the integration refuses services", async () => {
+    const one = vi.fn(async (data: Record<string, unknown>) => {
+      if ("services" in data) throw new Error("extra keys not allowed @ data['services']");
+      return { sent: true, error: null };
+    });
+    const ok = { sent: true, error: null };
+    expect(await testPhones(["notify.a", "notify.b"], false, one)).toEqual({ "notify.a": ok, "notify.b": ok });
+    expect(one).toHaveBeenCalledTimes(2);
+    one.mockClear();
+    expect(await testPhones(["notify.a", "notify.b"], true, one)).toEqual({ "notify.a": ok, "notify.b": ok });
+    expect(one).toHaveBeenCalledTimes(3);
+    const many = vi.fn(async () => ({ results: [{ service: "notify.a", sent: true, error: null }] }));
+    expect(await testPhones(["notify.a", "notify.b"], true, many)).toEqual({
+      "notify.a": ok,
+      "notify.b": { sent: false, error: "No answer for this phone." },
+    });
   });
 });

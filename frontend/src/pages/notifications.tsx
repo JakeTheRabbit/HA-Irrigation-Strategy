@@ -27,6 +27,7 @@ import {
   draftErrors,
   draftSummary,
   hasNotifyConfig,
+  isClock,
   kindCoverage,
   lightSpans,
   liveRevision,
@@ -36,10 +37,10 @@ import {
   notifyError,
   parseNotifyDocument,
   parseTestResult,
-  parseTestResults,
   phoneLabel,
   pressRoom,
   quietSpans,
+  quietWords,
   rebaseDraft,
   reviewRows,
   roomChipWords,
@@ -52,6 +53,7 @@ import {
   serviceFromText,
   spanMinutes,
   testLine,
+  testPhones,
   toDraft,
   toggleKind,
   unlistedPhones,
@@ -66,7 +68,7 @@ import {
   type QuietHours,
   type Span,
 } from "@/lib/notify";
-import { clock, wallText } from "@/lib/time";
+import { clock, hourClock, wallText } from "@/lib/time";
 import type { Controller, Room } from "@/lib/types";
 import { UndoError, offerUndo } from "@/lib/undo";
 import { errorText } from "@/lib/utils";
@@ -87,15 +89,10 @@ interface TestState {
 }
 const MUTE_MS = 2 * 3_600_000;
 const EMPTY: NotifyDraft = { idle_hours: IDLE_HOURS.fallback, recipients: [] };
-/** The window the quiet-hours editor starts on when no phone has one yet: nothing is applied
- * until a phone is put in it. */
+/** The window the quiet-hours editor shows for a phone without quiet hours: nothing is applied
+ * until they are turned on or changed. */
 const FIRST_WINDOW: QuietHours = { from: "22:00", to: "06:00" };
-const sameQuiet = (a: QuietHours | null, b: QuietHours | null) =>
-  !!a && !!b && a.from === b.from && a.to === b.to;
 const hoursText = (minutes: number) => `${Number((minutes / 60).toFixed(2))} h`;
-/** A lights hour (the room's number entity, 6.5 is 06:30) as "HH:MM". */
-const hourClock = (hour: number) =>
-  `${String(Math.floor(hour)).padStart(2, "0")}:${String(Math.round((hour % 1) * 60)).padStart(2, "0")}`;
 
 /** `notify_get`. An answer with an error and no setup is that error, never an empty setup. */
 async function readNotify(controller: Controller): Promise<NotifyDocument> {
@@ -368,7 +365,8 @@ export function Notifications({
   const [tests, setTests] = useState<Record<string, TestState>>({});
   const [testingAll, setTestingAll] = useState(false);
   const [adding, setAdding] = useState(0);
-  const [pinned, setPinned] = useState<QuietHours | null>(null);
+  /** The phone whose quiet hours the editor shows. */
+  const [quietFor, setQuietFor] = useState<string | null>(null);
   const [muting, setMuting] = useState<string | null>(null);
   const added = useRef<string | null>(null);
   /** The setup a save replaced, and the revision the save made: what its Undo writes back. */
@@ -413,6 +411,19 @@ export function Notifications({
   useEffect(() => {
     if (revision !== undefined && live !== null && live !== revision) setReads((n) => n + 1);
   }, [live, revision]);
+  // A mute that ends while the page is open: draw the page again then.
+  const [ticks, setTicks] = useState(0);
+  const mutes = doc?.config.mutes;
+  useEffect(() => {
+    const now = Date.now();
+    const next = Math.min(...Object.values(mutes ?? {}).filter((at) => at > now));
+    if (!Number.isFinite(next)) return;
+    const timer = window.setTimeout(
+      () => setTicks((n) => n + 1),
+      Math.min(next - now + 250, 2 ** 31 - 1),
+    );
+    return () => window.clearTimeout(timer);
+  }, [mutes, ticks]);
   const [policyDirty, setPolicyDirty] = useState(false);
   useLayoutEffect(() => {
     onDirtyChange(dirty || policyDirty);
@@ -465,9 +476,13 @@ export function Notifications({
   const listed = new Set(shown.recipients.map((row) => row.service));
   const hours = shown.idle_hours;
   const now = Date.now();
-  // The quiet-hours editor: the window shown, and the phones in it.
-  const shownWindow =
-    pinned ?? shown.recipients.find((row) => row.quiet_hours)?.quiet_hours ?? FIRST_WINDOW;
+  // The quiet-hours editor: one phone's window at a time.
+  const quietView =
+    views.find((view) => view.recipient.service === quietFor) ??
+    editable.find((view) => view.recipient.quiet_hours) ??
+    editable[0] ??
+    views[0];
+  const shownWindow = quietView?.recipient.quiet_hours ?? FIRST_WINDOW;
   const quiet = quietSpans(shown.recipients.map((row) => row.quiet_hours));
   const lightsOf = (room: Room) => {
     const hour = (key: string) =>
@@ -498,8 +513,8 @@ export function Notifications({
     }
     setTests((current) => ({ ...current, [service]: { busy: false, result, at: Date.now() } }));
   }
-  /** Test all: one `notify_test {services}` call; an integration that tests one phone a call
-   * (3.17) is asked phone by phone. */
+  /** Test all (an administrator) or Test my phones: one `notify_test {services}` call on 3.18, one
+   * call a phone on 3.17. */
   async function testAll() {
     const services = editable.map((view) => view.recipient.service);
     setTestingAll(true);
@@ -509,24 +524,9 @@ export function Notifications({
         ...services.map((service) => [service, { ...current[service], busy: true }]),
       ]),
     );
-    let results: Record<string, NotifyTestResult> | null = null;
-    try {
-      results = parseTestResults(await controller.operator<unknown>("notify_test", { services }));
-    } catch {
-      results = null;
-    }
-    if (!results) {
-      results = {};
-      for (const service of services) {
-        try {
-          results[service] = parseTestResult(
-            await controller.operator<unknown>("notify_test", { service }),
-          );
-        } catch (err) {
-          results[service] = { sent: false, error: errorText(err) };
-        }
-      }
-    }
+    const results = await testPhones(services, doc!.quietAndMutes, (data) =>
+      controller.operator<unknown>("notify_test", data),
+    );
     const at = Date.now();
     setTests((current) => ({
       ...current,
@@ -635,17 +635,10 @@ export function Notifications({
     }
   }
 
-  /** A new window for the quiet-hours editor: every phone in the old one moves with it. */
-  function moveWindow(next: QuietHours) {
-    const old = shownWindow;
-    setPinned(next);
-    if (!next.from || !next.to) return;
-    edit((current) => ({
-      ...current,
-      recipients: current.recipients.map((row) =>
-        sameQuiet(row.quiet_hours, old) && canEditRow(doc!, row) ? { ...row, quiet_hours: next } : row,
-      ),
-    }));
+  /** The shown phone's quiet hours, and only that phone's; a time not complete yet is not taken. */
+  function setQuiet(next: QuietHours | null) {
+    if (!quietView || (next && !(isClock(next.from) && isClock(next.to)))) return;
+    change(quietView.recipient.service, () => ({ quiet_hours: next }));
   }
 
   const removeButton = (view: RowView) =>
@@ -820,7 +813,7 @@ export function Notifications({
               onClick={() => void testAll()}
             >
               {testingAll ? <LoaderCircle className="spin" /> : <Send />}
-              Test all
+              {admin ? "Test all" : "Test my phones"}
             </Button>
           </div>
           {readOnly && (
@@ -947,44 +940,59 @@ export function Notifications({
             <NeedsIntegration feature="Quiet hours" />
           ) : (
             <>
-              <div className="notify-quiet-window">
-                <label>
-                  From
-                  <Input
-                    type="time"
-                    value={shownWindow.from}
-                    disabled={!connected || !editable.length}
-                    onChange={(event) => moveWindow({ ...shownWindow, from: event.target.value })}
-                  />
-                </label>
-                <label>
-                  to
-                  <Input
-                    type="time"
-                    value={shownWindow.to}
-                    disabled={!connected || !editable.length}
-                    onChange={(event) => moveWindow({ ...shownWindow, to: event.target.value })}
-                  />
-                </label>
-              </div>
-              <div className="notify-quiet-phones" role="group" aria-label="Quiet hours on">
-                <span aria-hidden="true">on</span>
+              <div className="notify-quiet-phones" role="group" aria-label="Quiet hours for">
+                <span aria-hidden="true">for</span>
                 {views.map((view) => (
                   <button
                     type="button"
                     key={view.recipient.service}
-                    aria-pressed={sameQuiet(view.recipient.quiet_hours, shownWindow)}
-                    disabled={!view.editable || !connected}
-                    onClick={() =>
-                      change(view.recipient.service, (row) => ({
-                        quiet_hours: sameQuiet(row.quiet_hours, shownWindow) ? null : shownWindow,
-                      }))
-                    }
+                    aria-pressed={view === quietView}
+                    data-quiet-phone={view.recipient.service}
+                    onClick={() => setQuietFor(view.recipient.service)}
                   >
-                    {view.label.title}
+                    {view.label.title}{" "}
+                    <small>
+                      {view.recipient.quiet_hours
+                        ? quietWords(view.recipient.quiet_hours)
+                        : "no quiet hours"}
+                    </small>
                   </button>
                 ))}
               </div>
+              {quietView && (
+                <div className="notify-quiet-window">
+                  <label>
+                    <input
+                      type="checkbox"
+                      role="switch"
+                      className="notify-switch"
+                      checked={!!quietView.recipient.quiet_hours}
+                      disabled={!quietView.editable || !connected}
+                      aria-label={`Quiet hours on ${quietView.label.name}`}
+                      onChange={(event) => setQuiet(event.target.checked ? shownWindow : null)}
+                    />
+                    <span aria-hidden="true">On</span>
+                  </label>
+                  <label>
+                    From
+                    <Input
+                      type="time"
+                      value={shownWindow.from}
+                      disabled={!quietView.editable || !connected}
+                      onChange={(event) => setQuiet({ ...shownWindow, from: event.target.value })}
+                    />
+                  </label>
+                  <label>
+                    to
+                    <Input
+                      type="time"
+                      value={shownWindow.to}
+                      disabled={!quietView.editable || !connected}
+                      onChange={(event) => setQuiet({ ...shownWindow, to: event.target.value })}
+                    />
+                  </label>
+                </div>
+              )}
               <DayStrip quiet={quiet} lights={lights} />
               <p className="notify-strip-legend" data-quiet-legend>
                 <span className="notify-key-quiet" aria-hidden="true" />
@@ -1072,12 +1080,10 @@ export function Notifications({
           applyLabel={`Apply ${count} ${count === 1 ? "change" : "changes"}`}
           checks={errors.map((text) => ({ ok: false, text }))}
           apply={apply}
-          onDiscard={() => {
-            stored.discard();
-            setPinned(null);
-          }}
+          onDiscard={stored.discard}
           onReload={() => setReads((n) => n + 1)}
           timeZone={tz}
+          confirmedBy={controller.demo ? "Demo only. The integration" : "The integration"}
           undo={undoSave}
         />
       </div>

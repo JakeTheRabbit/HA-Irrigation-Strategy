@@ -13,8 +13,9 @@
  * - 3.18: Mute Room A for 2 h: the toast says "Room A muted until 16:10. Written and read back
  *   14:10." and the row says so; Undo: "Room A sends every alert again", and the row is back;
  *   Room B reads "muted until 20:00";
- * - 3.18: quiet hours 22:00–06:00 on Grower: the strip goes from 6 h (the owner's 23:00–05:00) to
- *   8 h, spans 00:00–06:00 and 22:00–24:00, and the bar names "Grower: quiet 22:00–06:00";
+ * - 3.18: each phone's chip shows its own window (Owner 23:00–05:00, Grower none); pick Grower, turn
+ *   them on and set 22:00–06:00: the strip goes from 6 h to 8 h, spans 00:00–06:00 and 22:00–24:00, Owner keeps
+ *   23:00–05:00, and the bar says exactly "1 change not applied yet: Grower: quiet 22:00–06:00";
  *   Discard leaves no draft;
  * - 3.17: quiet hours and room mutes are "Needs integration 3.18" in place; the rest works. */
 import assert from "node:assert/strict";
@@ -131,28 +132,38 @@ await runParity({
     await roomA.getByRole("button", { name: "Mute Room A for 2 h" }).waitFor();
     region("mutes");
 
-    // Quiet hours 22:00–06:00 on Grower: the strip goes from 6 h to 8 h.
+    // Quiet hours 22:00–06:00 on Grower, and on Grower only: the strip goes from 6 h to 8 h.
     const legend = quiet.locator("[data-quiet-legend]");
     assert.match(await legend.innerText(), /quiet 6 h/, `${label}: owner's quiet hours`);
     assert.match(await legend.innerText(), /lights on: Room A 10:00–22:00, Room B 08:00–20:00/, `${label}: lights`);
+    const chips = quiet.getByRole("group", { name: "Quiet hours for" });
+    const chip = (name) => chips.getByRole("button", { name: new RegExp(`^${name} `) });
+    assert.equal((await chip("Owner").innerText()).replace(/\s+/g, " ").trim(), "Owner 23:00–05:00", `${label}: Owner's window`);
+    assert.equal((await chip("Grower").innerText()).replace(/\s+/g, " ").trim(), "Grower no quiet hours", `${label}: Grower has none`);
+    await chip("Grower").click();
+    assert.equal(await chip("Grower").getAttribute("aria-pressed"), "true", `${label}: Grower shown`);
+    assert.equal(await quiet.getByRole("switch", { name: /^Quiet hours on Grower/ }).isChecked(), false, `${label}: Grower off`);
+    await quiet.getByRole("switch", { name: /^Quiet hours on Grower/ }).check();
     await quiet.getByLabel("From").fill("22:00");
     await quiet.getByLabel("to", { exact: true }).fill("06:00");
-    await quiet.getByRole("group", { name: "Quiet hours on" }).getByRole("button", { name: "Grower", exact: true }).click();
+    assert.equal(await quiet.getByRole("switch", { name: /^Quiet hours on Grower/ }).isChecked(), true, `${label}: Grower on`);
     assert.match(await legend.innerText(), /quiet 8 h/, `${label}: strip 8 h`);
     assert.deepEqual(
       await quiet.locator("[data-quiet-span]").evaluateAll((spans) => spans.map((span) => span.dataset.quietSpan)),
       ["0-360", "1320-1440"],
       `${label}: strip spans`,
     );
+    assert.equal((await chip("Owner").innerText()).replace(/\s+/g, " ").trim(), "Owner 23:00–05:00", `${label}: Owner unchanged`);
+    assert.equal((await chip("Grower").innerText()).replace(/\s+/g, " ").trim(), "Grower 22:00–06:00", `${label}: Grower's window`);
     let quietBar = page.locator(".notify-bar");
     if (phone) {
-      await quietBar.getByRole("button", { name: /^Review \d+ changes?$/ }).click();
+      await quietBar.getByRole("button", { name: "Review 1 change", exact: true }).click();
       quietBar = page.getByRole("dialog", { name: "Review and apply" });
     }
-    assert.match(
-      await quietBar.locator("[data-draft-summary]").innerText(),
-      /Grower: quiet 22:00–06:00/,
-      `${label}: bar names the quiet hours`,
+    assert.equal(
+      (await quietBar.locator("[data-draft-summary]").innerText()).trim(),
+      "1 change not applied yet: Grower: quiet 22:00–06:00",
+      `${label}: bar names Grower's quiet hours only`,
     );
     await quietBar.getByRole("button", { name: "Discard", exact: true }).click();
     if (phone && (await quietBar.isVisible())) await quietBar.getByRole("button", { name: "Close" }).click();

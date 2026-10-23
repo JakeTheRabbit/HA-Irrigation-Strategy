@@ -63,6 +63,10 @@ describe("review & apply", () => {
     expect(html).toContain("Re-water point 57% → 56% · Dryback by lights-on 50% → 52%");
     expect(html).toContain("Controller confirmed every value · by Ben");
     expect(html).toContain("Undo: write back the previous values");
+    // A page whose writes another part answers names it, and the demo says it is one.
+    const own = render(props({ rows: [], last: receipt, confirmedBy: "Demo only. The integration" }));
+    expect(own).toContain("Demo only. The integration confirmed every value");
+    expect(own).not.toContain("Controller confirmed");
   });
   test("a mixed write: read-back rows written, unconfirmed rows named, refused rows still held", () => {
     const rows = [...ROWS, row("peak", "Peak target", "63%", "64%")];

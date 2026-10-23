@@ -93,6 +93,8 @@ const whole = (value: unknown): number | null => {
 const SERVICE = /^notify\.[^\s.]+$/;
 const CLOCK = /^(?:[01][0-9]|2[0-3]):[0-5][0-9]$/;
 const PREFIX = /^(?:[a-z0-9_]+_)?$/;
+/** A complete wall time, "HH:MM". */
+export const isClock = (value: string) => CLOCK.test(value);
 export const isService = (value: unknown): value is string =>
   typeof value === "string" && SERVICE.test(value);
 
@@ -220,6 +222,39 @@ export function parseTestResults(value: unknown): Record<string, NotifyTestResul
       return isService(raw.service) ? [[raw.service, parseTestResult(raw)]] : [];
     }),
   );
+}
+/** Test pushes to `services`: one `notify_test {services}` call when the integration takes it
+ * (`many`, 3.18), else one call a phone (3.17, or an integration that refuses `services`). A failed
+ * call is that error on each phone: the pushes may have gone, so none is sent twice. */
+export async function testPhones(
+  services: readonly string[],
+  many: boolean,
+  call: (data: Record<string, unknown>) => Promise<unknown>,
+): Promise<Record<string, NotifyTestResult>> {
+  const failed = (err: unknown): NotifyTestResult => ({
+    sent: false,
+    error: err instanceof Error ? err.message : String(err),
+  });
+  if (many) {
+    try {
+      const results = parseTestResults(await call({ services: [...services] })) ?? {};
+      return Object.fromEntries(
+        services.map((service) => [service, results[service] ?? { sent: false, error: "No answer for this phone." }]),
+      );
+    } catch (err) {
+      if (!/extra keys not allowed/i.test(failed(err).error ?? ""))
+        return Object.fromEntries(services.map((service) => [service, failed(err)]));
+    }
+  }
+  const results: Record<string, NotifyTestResult> = {};
+  for (const service of services) {
+    try {
+      results[service] = parseTestResult(await call({ service }));
+    } catch (err) {
+      results[service] = failed(err);
+    }
+  }
+  return results;
 }
 /** A test push's answer beside its button: "Accepted 13:58" (Home Assistant took the push, which
  * is not proof the phone showed it), or "Failed 13:40 · " and the integration's words. */
@@ -381,9 +416,13 @@ export function draftErrors(draft: NotifyDraft): string[] {
     ...(Number.isInteger(hours) && hours >= IDLE_HOURS.min && hours <= IDLE_HOURS.max
       ? []
       : [`Shots stopped needs ${IDLE_HOURS.min} to ${IDLE_HOURS.max} whole hours.`]),
-    ...(draft.recipients.some((row) => row.quiet_hours && row.quiet_hours.from === row.quiet_hours.to)
-      ? ["Quiet hours need a start and an end that differ."]
-      : []),
+    ...(draft.recipients.some(
+      (row) => row.quiet_hours && !(isClock(row.quiet_hours.from) && isClock(row.quiet_hours.to)),
+    )
+      ? ["Quiet hours need a start and an end as HH:MM."]
+      : draft.recipients.some((row) => row.quiet_hours && row.quiet_hours.from === row.quiet_hours.to)
+        ? ["Quiet hours need a start and an end that differ."]
+        : []),
   ];
 }
 
@@ -712,10 +751,22 @@ export function saveReceipt(
   summary: string;
   eventIds: [];
 } {
-  const mine = new Map(sent.recipients.map((row) => [row.service, rowKey(row)]));
-  const back = new Map(read.recipients.map((row) => [row.service, rowKey(row)]));
-  const confirmed = (key: string) =>
-    key === "idle" ? read.idle_hours === sent.idle_hours : mine.get(key) === back.get(key);
+  const back = new Map(read.recipients.map((row) => [row.service, row]));
+  // As the integration stores a row: its name trimmed and cut to 40, its user filled in when unsent.
+  const stored = (row: NotifyRecipient) => {
+    const was = back.get(row.service);
+    return rowKey({
+      ...row,
+      name: row.name.trim().slice(0, 40) || (was?.name ?? row.service),
+      user_id: row.user_id ?? was?.user_id ?? null,
+    });
+  };
+  const mine = new Map(sent.recipients.map((row) => [row.service, stored(row)]));
+  const confirmed = (key: string) => {
+    if (key === "idle") return read.idle_hours === sent.idle_hours;
+    const was = back.get(key);
+    return mine.get(key) === (was ? rowKey(was) : undefined);
+  };
   const unsure = rows.filter((row) => !confirmed(row.key)).map((row) => row.id);
   return {
     at,

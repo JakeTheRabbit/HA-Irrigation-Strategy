@@ -190,7 +190,7 @@ export class NotifyDemo {
     user: string | null = null,
     private backend: "3.17" | "3.18" = "3.18",
   ) {
-    // Room B muted until six hours from the start, on the hour.
+    // Room B muted until five hours after the next whole hour (5 to 6 h from the start).
     if (backend === "3.18") this.config.mutes = { room_b_: Math.ceil(Date.now() / HOUR) * HOUR + 5 * HOUR };
     const owner = DEMO_PHONES.find(
       (phone) => !!user && phone.user_name?.toLowerCase() === user.trim().toLowerCase(),

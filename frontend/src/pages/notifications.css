@@ -414,8 +414,9 @@
   color: var(--foreground);
   font-weight: 600;
 }
-.notify-quiet-phones button:disabled {
-  opacity: 0.7;
+.notify-quiet-phones button small {
+  font-weight: 400;
+  color: var(--muted-foreground);
 }
 .notify-strip {
   display: grid;
