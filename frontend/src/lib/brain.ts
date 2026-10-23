@@ -293,6 +293,9 @@ export interface JudgeRow {
   shares?: string;
   /** What else decides whether its switch does anything (shown on the switch). */
   hint?: string;
+  /** The Capabilities feature of its power switch (`ai_power_<key>`), on the first judge of that
+   * switch only: a "?feature=" link lands on this row. */
+  feature?: string;
   perRoom: Record<string, JudgeCell>;
 }
 
@@ -333,8 +336,13 @@ export function judgeMatrix(states: States, rooms: Room[]): JudgeRow[] {
       }),
     );
     const { powerKey: _power, ...row } = judge;
+    const feature =
+      judge.powerKey && JUDGES.find((other) => other.powerKey === judge.powerKey) === judge
+        ? `ai_power_${judge.powerKey}`
+        : undefined;
     return {
       ...row,
+      ...(feature ? { feature } : {}),
       name: judgeTitle(judge.id),
       ...(partner ? { shares: judgeTitle(partner.id) } : {}),
       ...(judge.id === "plan" ? { hint: PLAN_HINT } : {}),

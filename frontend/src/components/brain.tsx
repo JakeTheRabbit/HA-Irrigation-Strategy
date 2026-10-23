@@ -539,7 +539,7 @@ export function JudgesCard({ controller }: { controller: Controller }) {
           </thead>
           <tbody>
             {rows.map((row) => (
-              <tr key={row.id} data-judge={row.id}>
+              <tr key={row.id} data-judge={row.id} id={row.feature ? `config-${row.feature}` : undefined}>
                 <th scope="row">
                   <div className="ai-judge-name">
                     <strong>

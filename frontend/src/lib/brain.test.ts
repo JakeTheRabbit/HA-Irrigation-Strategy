@@ -289,6 +289,15 @@ describe("the judges matrix", () => {
     ].map((e) => [e.entity_id, e]),
   );
 
+  it("judgeMatrix names each AI power once, so a Capabilities link lands on its judge", () => {
+    const matrix = judgeMatrix(states, rooms);
+    const features = matrix.flatMap((r) => (r.feature ? [r.feature] : []));
+    expect([...features].sort()).toEqual(AI_POWERS.map((p) => `ai_power_${p.key}`).sort());
+    // One switch, two judges: the first carries the feature.
+    expect(matrix.find((r) => r.id === "dawn")!.feature).toBe("ai_power_advance_phase");
+    expect(matrix.find((r) => r.id === "dusk")!.feature).toBeUndefined();
+  });
+
   it("judgeMatrix maps per-room switches and notes", () => {
     const matrix = judgeMatrix(states, rooms);
     const row = (id: string) => matrix.find((r) => r.id === id)!;
