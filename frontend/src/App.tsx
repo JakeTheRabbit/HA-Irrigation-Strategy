@@ -204,35 +204,45 @@ export default function App() {
         if (!target.matches("a[href], button, input, select, textarea, [tabindex]"))
           target.setAttribute("tabindex", "-1");
         setAnnounce(`Opened at ${featureLabel(id) ?? id}`);
-        // The window, not scrollIntoView: a control inside a panel that clips its overflow does
-        // not scroll the page.
-        requestAnimationFrame(() => {
-          const box = target.getBoundingClientRect();
-          window.scrollTo({ top: window.scrollY + box.top - (window.innerHeight - box.height) / 2 });
-        });
+        requestAnimationFrame(() => centre(target));
       }
       landed.focus({ preventScroll: true });
       return document.activeElement === landed;
     };
-    if (land()) return;
+    // The window, not scrollIntoView: a control inside a panel that clips its overflow does not
+    // scroll the page.
+    const centre = (target: HTMLElement) => {
+      const box = target.getBoundingClientRect();
+      window.scrollTo({ top: window.scrollY + box.top - (window.innerHeight - box.height) / 2 });
+    };
     // The control can arrive later: the room's states, or a page's own data, still loading. The
-    // grower's own click or key ends the wait, so focus is never taken back from them.
-    const observer = new MutationObserver(() => land() && stop());
-    observer.observe(document.body, {
-      childList: true,
-      subtree: true,
-      attributes: true,
-      attributeFilter: ["disabled"],
+    // grower's own click, key or wheel ends the wait, so focus is never taken back from them.
+    const observer = new MutationObserver(() => land() && observer.disconnect());
+    if (!land())
+      observer.observe(document.body, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ["disabled"],
+      });
+    // Content above a landed control can still be loading (the AI instructions, say) and push it
+    // out of view, so it is kept in the middle of the window while the page grows.
+    const resize = new ResizeObserver(() => {
+      if (landed?.isConnected && document.activeElement === landed) centre(landed);
     });
+    resize.observe(document.body);
     const timer = setTimeout(() => stop(), 10_000);
     const stop = () => {
       observer.disconnect();
+      resize.disconnect();
       clearTimeout(timer);
       window.removeEventListener("pointerdown", stop, true);
       window.removeEventListener("keydown", stop, true);
+      window.removeEventListener("wheel", stop, true);
     };
     window.addEventListener("pointerdown", stop, true);
     window.addEventListener("keydown", stop, true);
+    window.addEventListener("wheel", stop, true);
     return stop;
   }, [route, feature]);
   async function refresh() {
