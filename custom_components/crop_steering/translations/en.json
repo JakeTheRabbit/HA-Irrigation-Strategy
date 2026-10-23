@@ -846,6 +846,14 @@
       "title": "Crop Steering: {count} stock tank(s) low (CS-608)",
       "description": "These stock tanks are at or below their low mark:\n\n{tanks}\n\nEach batch tank that the room makes takes a dose from every stock tank.\n\nRefill the stock tanks. Open Crop Steering → Stock tanks. Press Refilled, or enter the level that you read on the tank. The card clears when every tank is above its low mark.\n\nCode CS-608. What it means and what to do: Crop Steering → Help & tools → Error codes."
     },
+    "calibration_due": {
+      "title": "Crop Steering: Feed probe calibration due (CS-612)",
+      "description": "The last calibration of these feed probes is 30 days old or older:\n\n{probes}\n\nA probe drifts over time. The controller uses its reading for the feed checks and the pH correction.\n\nCalibrate each probe in two reference solutions. Open Crop Steering → Equipment → Tank and feed and press Calibrate. The card clears when each probe has a calibration less than 30 days old.\n\nCode CS-612. What it means and what to do: Crop Steering → Help & tools → Error codes."
+    },
+    "probe_offsets_unreadable": {
+      "title": "Crop Steering: Probe offsets could not be read (CS-615)",
+      "description": "The stored offsets of the moisture probes in {room} could not be read, so these probes now read WITHOUT their offsets and the zones steer on the raw readings:\n\n{probes}\n\nNothing has been overwritten. Probe offsets cannot be changed until this is fixed. Check the Home Assistant log for the error, restore the file crop_steering.calibration.ENTRY_ID (ENTRY_ID is the entry ID) from a backup, or ask for help. The card clears when the offsets read again.\n\nCode CS-615. What it means and what to do: Crop Steering \u2192 Help & tools \u2192 Error codes."
+    },
     "outside_zone_bounds": {
       "title": "Crop Steering: {count} setting(s) above zone limit (CS-611)",
       "description": "The limits of the daily water and the maximum shot length now follow the size of each zone. The size comes from the plants, the litres per plant and the dripper flow. These settings were already above the new limit:\n\n{settings}\n\nThe controller keeps these settings and uses them as before. Nothing changes until you edit one of them. A new value must then be in the limit.\n\nExamine the plants, the litres per plant and the dripper flow of each zone in Rooms and setup. If a zone size is too small, correct it. The limit then follows. The card clears when each setting is in its limit.\n\nCode CS-611. What it means and what to do: Crop Steering → Help & tools → Error codes."
@@ -853,6 +861,17 @@
     "deprecated_entities": {
       "title": "Crop Steering: {count} retired entity(s) in use (CS-614)",
       "description": "Nothing in Crop Steering reads these entities any more, and the controller never used them. They are kept, hidden, so that your automations and scripts still load. These automations and scripts use them:\n\n{entities}\n\nThe shots do not change. The entities do not show what the controller does: the EC ratio and the adjusted re-water point read unknown, and the settings change nothing.\n\nRemove the entities from the automations and scripts above. Dashboards and their cards are not checked: look there too. The card clears at the next start of Home Assistant after none of them uses one.\n\nCode CS-614. What it means and what to do: Crop Steering → Help & tools → Error codes."
+    },
+    "upgrade_report_3_18": {
+      "title": "Crop Steering 3.18: Upgrade report (CS-616)",
+      "fix_flow": {
+        "step": {
+          "confirm": {
+            "title": "Upgrade report",
+            "description": "Crop Steering 3.18 is a big upgrade. Watering carries on as before. {carried} things were carried across and {needs_you} need you: open the Upgrade report in Crop Steering → Settings → System status. Each line there links to the page to open and to the section of the upgrade guide (docs/UPGRADING.md) to read.\n\nCode CS-616. What it means and what to do: Crop Steering → Help & tools → Error codes.\n\nMark as read to close this card. The report stays in Settings → System status."
+          }
+        }
+      }
     }
   },
   "selector": {
@@ -950,6 +969,152 @@
         }
       }
     },
+    "journal_append": {
+      "name": "Append journal events",
+      "description": "Stores up to 50 events for a room in the event journal and announces each new one on the bus as `crop_steering_event`. An event whose ID is already stored is skipped, so a repeat is safe. One bad event refuses the whole call and stores nothing. Only an administrator can call it.",
+      "fields": {
+        "room_id": {
+          "name": "Room",
+          "description": "The room the events belong to: `room:` followed by the room prefix. Example: `room:f2_`."
+        },
+        "events": {
+          "name": "Events",
+          "description": "Version 1 events, each with an ID, a time, a kind, an outcome and a source actor. Maximum: 50."
+        }
+      }
+    },
+    "journal_query": {
+      "name": "Read the journal",
+      "description": "Returns a room's events in time order, with a cursor for the next page. Changes nothing. Any signed-in user can call it.",
+      "fields": {
+        "room_id": {
+          "name": "Room",
+          "description": "The room to read: `room:` followed by the room prefix. Example: `room:f2_`."
+        },
+        "since": {
+          "name": "Since",
+          "description": "The first moment to include, as an ISO time with its offset."
+        },
+        "until": {
+          "name": "Until",
+          "description": "The first moment to leave out, as an ISO time with its offset. Empty: no end."
+        },
+        "kinds": {
+          "name": "Kinds",
+          "description": "Return only these event kinds. Empty: all kinds."
+        },
+        "zones": {
+          "name": "Zones",
+          "description": "Return only events of these zone numbers. Empty: all zones."
+        },
+        "actor": {
+          "name": "Actor",
+          "description": "Return only events from this actor. Example: `engine`."
+        },
+        "limit": {
+          "name": "Limit",
+          "description": "The most events to return. Default: 500. Range: 1 to 500."
+        },
+        "cursor": {
+          "name": "Cursor",
+          "description": "The cursor that the previous page returned. Empty: the first page."
+        }
+      }
+    },
+    "history_changes": {
+      "name": "Read the change history",
+      "description": "Returns who changed what: setting, plan, recipe, setup, calibration and alert rule changes, newest first. Changes nothing. Any signed-in user can call it.",
+      "fields": {
+        "room_id": {
+          "name": "Room",
+          "description": "The room to read: `room:` followed by the room prefix. Empty: every room."
+        },
+        "since": {
+          "name": "Since",
+          "description": "The first moment to include, as an ISO time with its offset."
+        },
+        "until": {
+          "name": "Until",
+          "description": "The first moment to leave out, as an ISO time with its offset. Empty: no end."
+        },
+        "zone": {
+          "name": "Zone",
+          "description": "Return only the changes of this zone number. Empty: all zones."
+        },
+        "key": {
+          "name": "Setting",
+          "description": "Return only the changes of this setting key. Example: `p2_shot_size`."
+        },
+        "kinds": {
+          "name": "Kinds",
+          "description": "Return only these change kinds: setpoint, plan, recipe, setup, calibration or alerts. Empty: all kinds."
+        }
+      }
+    },
+    "history_revert": {
+      "name": "Put a change back",
+      "description": "Puts one change back and reads it back. Refused when the value has moved since. Only an administrator can call it.",
+      "fields": {
+        "event_id": {
+          "name": "Change",
+          "description": "The ID of the change, from `history_changes`."
+        },
+        "expected_revision": {
+          "name": "Expected revision",
+          "description": "For a saved section: the revision of the store that you read. Empty: no check."
+        }
+      }
+    },
+    "timeline_get": {
+      "name": "Read the timeline",
+      "description": "Returns what each zone did and is planned to do, at most 48 hours: shots, holds, queued shots, alerts and planned timer and engine shots, with lights windows, pump load and error markers. Changes nothing. Any signed-in user can call it.",
+      "fields": {
+        "rooms": {
+          "name": "Rooms",
+          "description": "The rooms to read: each `room:` followed by the room prefix."
+        },
+        "start": {
+          "name": "Start",
+          "description": "The first moment to include, as an ISO time with its offset."
+        },
+        "end": {
+          "name": "End",
+          "description": "The first moment to leave out, as an ISO time with its offset. At most 48 hours after the start."
+        },
+        "zones": {
+          "name": "Zones",
+          "description": "Return only these zone numbers. Empty: all zones."
+        }
+      }
+    },
+    "timeline_summary": {
+      "name": "Read the timeline summary",
+      "description": "Returns, per room per local day, how many shots ran, failed or warned and how many were held or queued. Changes nothing. Any signed-in user can call it.",
+      "fields": {
+        "rooms": {
+          "name": "Rooms",
+          "description": "The rooms to read: each `room:` followed by the room prefix."
+        },
+        "days": {
+          "name": "Days",
+          "description": "The local dates to count, as YYYY-MM-DD. At most 14."
+        }
+      }
+    },
+    "alert_ack": {
+      "name": "Acknowledge an alert",
+      "description": "Acknowledges one open alert of the room, so it leaves the room's open alerts. The acknowledgement is journaled with who made it. A threshold rule's sensor stays on until its value is back in range. Refused when the alert is unknown or no longer open. Any signed-in user can call it.",
+      "fields": {
+        "room_id": {
+          "name": "Room",
+          "description": "The room: `room:` followed by the room prefix."
+        },
+        "alert_event_id": {
+          "name": "Alert",
+          "description": "The `event_id` of the open alert, from the room's open alerts sensor."
+        }
+      }
+    },
     "notify_get": {
       "name": "Read notifications",
       "description": "Returns who gets which alerts: the row of each phone, the alert types, and the phones of the site with their owners. Changes nothing. It has no administrator check. The answer also shows if the caller can change every row. Use it to read the revision before `notify_save`."
@@ -964,7 +1129,7 @@
         },
         "recipients": {
           "name": "Recipients",
-          "description": "The row of each phone: service, name, user ID, alert types, rooms, high priority and digest. The stored rows become this list. Maximum: 20 rows. Example: one row for `notify.mobile_app_my_phone`."
+          "description": "The row of each phone: service, name, user ID, alert types, rooms, high priority, digest and quiet hours. The stored rows become this list. Maximum: 20 rows. Quiet hours are a from time and a to time, as HH:MM in the Home Assistant time zone, and can cross midnight. In quiet hours, a notification that is not critical waits and goes to the phone as one notification at the end. This includes the warnings that a room does not water, for example CS-206. A critical notification always goes. Default: no quiet hours. Example: one row for `notify.mobile_app_my_phone`."
         },
         "idle_hours": {
           "name": "Hours without water",
@@ -982,11 +1147,15 @@
     },
     "notify_test": {
       "name": "Send a test notification",
-      "description": "Sends one test notification to a phone. An administrator can test any phone. A different signed-in user can test only their own phones. Use it after you add a phone. Make sure that the phone shows the notification.",
+      "description": "Sends one test notification to a phone, or to each phone in a list. An administrator can test any phone. A different signed-in user can test only their own phones. Use it after you add a phone. Make sure that the phone shows the notification.",
       "fields": {
         "service": {
           "name": "Notify service",
-          "description": "The notify service of the phone. A different service sends the test to a different phone. Example: `notify.mobile_app_my_phone`."
+          "description": "The notify service of the phone. A different service sends the test to a different phone. Use this field or the services field, not both. Example: `notify.mobile_app_my_phone`."
+        },
+        "services": {
+          "name": "Notify services",
+          "description": "A list of notify services. Each phone gets a test notification, and the answer gives the result of each phone. Use this field or the service field, not both. Maximum: 20. Example: `notify.mobile_app_my_phone` and `notify.mobile_app_office_tablet`."
         }
       }
     },

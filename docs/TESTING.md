@@ -201,8 +201,9 @@ cd ha-core && python -m script.hassfest --action validate \
 The translation rules most easily broken by a new form field or message are also pinned, with
 hassfest's own patterns, in `tests/test_translations.py`, where a failure takes seconds: keys
 (including a dropdown's option *values*) must be lowercase slugs; no placeholder inside single
-quotes, because ICU MessageFormat treats `'{unit}'` as an escape and shows the literal text; and
-a tooltip needs a label.
+quotes, because ICU MessageFormat treats `'{unit}'` as an escape and shows the literal text;
+every placeholder is an identifier (`{from, to}` is not); nothing looks like an HTML tag
+(`<entry id>` does); and a tooltip needs a label.
 
 ### Hermetic controller state
 

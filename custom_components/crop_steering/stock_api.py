@@ -18,7 +18,9 @@ import logging
 
 from . import stock
 from .admin import async_require_admin
+from .api_v2 import StaleRevision, Unavailable
 from .const import DOMAIN, REPAIRS_DOCS_URL
+from .journal_api import attribution, note
 from .room import room_prefix
 
 _LOGGER = logging.getLogger(__name__)
@@ -178,6 +180,14 @@ class StockStore:
         state = self.hass.states.get(entity) if entity else None
         return state.state if state is not None else None
 
+    def _flow(self, pump):
+        """The pump's flow in mL/s: its flow entity's reading, or with none its calibrated_ml_min / 60
+        (as the controller doses it)."""
+        if pump.get("flow_entity"):
+            return self._read(pump["flow_entity"])
+        ml_min = pump.get("calibrated_ml_min")
+        return ml_min / 60 if isinstance(ml_min, (int, float)) else None
+
     def _watch(self):
         """Follow the pumps linked to stock tanks (docs/DOSING.md, Stock tanks): their power and
         dosing entities, as the dosing setup names them. A pump already running when it is first
@@ -222,7 +232,7 @@ class StockStore:
                 ]
                 self._runs[pump_id] = {
                     "since": min([t for t in changed_at if t] or [_utcnow()]),
-                    "flow": self._read(pump.get("flow_entity")),
+                    "flow": self._flow(pump),
                 }
 
     def _changed(self, new_state):
@@ -236,7 +246,7 @@ class StockStore:
             if on and run is None:
                 self._runs[pump_id] = {
                     "since": at,
-                    "flow": self._read(pump.get("flow_entity")),
+                    "flow": self._flow(pump),
                 }
             elif run is not None and not on:
                 del self._runs[pump_id]
@@ -246,11 +256,26 @@ class StockStore:
         """A linked pump stopped: the seconds it ran times its calibrated flow (read as it started,
         or as it stopped when it could not be read then) come off its stock tank, never below
         empty, logged as "pump" under a key of the pump and the moment it started, so the same
-        run is never drawn twice."""
+        run is never drawn twice. A run during the pump's open calibration (pump_calibrate) went into
+        a measuring jug and is not drawn."""
+        calibration = (
+            self.hass.data.get(DOMAIN, {})
+            .get("_calibration", {})
+            .get(self.entry.entry_id)
+        )
+        if calibration is not None and calibration.pump_run(
+            pump["id"], run["since"], end
+        ):
+            _LOGGER.info(
+                "Stock tanks for %s: %s ran for its calibration, nothing drawn",
+                self.room_id,
+                pump.get("name"),
+            )
+            return
         seconds = (end - run["since"]).total_seconds()
         flow = run["flow"]
         if stock.pumped_ml(seconds, flow) is None:
-            flow = self._read(pump.get("flow_entity"))
+            flow = self._flow(pump)
         ml = stock.pumped_ml(seconds, flow)
         tank = pump["stock_tank"]
         if ml is None:
@@ -349,12 +374,46 @@ class StockStore:
             "error": self.error,
         }
 
-    async def mutate(self, action, data):
+    def _journal(self, kind, who, **data):
+        """One stock event; `who` is journal_api.attribution() of the service call, none for a change the
+        followed entities make (system)."""
+        who = who or {}
+        note(
+            self.hass,
+            self.room_id,
+            kind,
+            actor=who.get("actor", "system"),
+            user_id=who.get("user_id"),
+            client=who.get("client"),
+            data=data,
+        )
+
+    def _journal_draws(self, prior, draft, who):
+        """A `stock.drawn` for each tank the newest history row of `draft` took from, if it is new."""
+        try:
+            row = (draft["history"] or [None])[0]
+            if row and "draw_ml" in row and [row] != prior["history"][:1]:
+                for tank, ml in row["draw_ml"].items():
+                    self._journal(
+                        "stock.drawn",
+                        who,
+                        tank=tank,
+                        ml=ml,
+                        source=row.get("source"),
+                        key=row.get("key"),
+                    )
+        except Exception as err:  # a stock change stands whatever the journal does
+            _LOGGER.debug("Stock journal event not recorded: %s", err)
+
+    async def mutate(self, action, data, who=None):
         async with self._lock:
             if self.error:
-                raise ValueError(self.error)
+                raise Unavailable(self.error)
             if data.get("expected_revision") != self.data["revision"]:
-                raise ValueError("Stock tanks changed elsewhere. Reload before saving.")
+                raise StaleRevision(
+                    "Stock tanks changed elsewhere. Reload before saving.",
+                    self.data["revision"],
+                )
             now = _now()
             draft = deepcopy(self.data)
             skipped = None
@@ -373,13 +432,26 @@ class StockStore:
                 stock.draw(draft, doses, now, "manual")
             else:
                 raise ValueError("Unsupported stock operation")
-            await self._commit(draft)
+            before = {t["id"]: t["level_l"] for t in self.data["tanks"]}
+            await self._commit(draft, who)
+            if action == "stock_refill":
+                self._journal(
+                    "stock.refilled",
+                    who,
+                    tank=data["id"],
+                    level_l=next(
+                        (t["level_l"] for t in draft["tanks"] if t["id"] == data["id"]),
+                        None,
+                    ),
+                    old_level_l=before.get(data["id"]),
+                    full=data.get("level_l") is None,
+                )
             response = self.response()
             if skipped is not None:  # the linked tanks this batch did not draw
                 response["skipped"] = skipped
             return response
 
-    async def draw(self, data):
+    async def draw(self, data, who=None):
         """stock_draw: what the controller dosed out of linked tanks, counted once per key. A tank
         still linked to a pump is left as it is: what that pump runs draws it (_watch), whoever
         starts the dose, so the controller's report of the same dose never counts it twice. No
@@ -387,7 +459,7 @@ class StockStore:
         """
         async with self._lock:
             if self.error:
-                raise ValueError(self.error)
+                raise Unavailable(self.error)
             key = data.get("key")
             duplicate = key in self.data["draw_keys"]
             linked = self.linked()
@@ -402,7 +474,7 @@ class StockStore:
                 linked,
             )
             if counted:
-                await self._commit(draft)
+                await self._commit(draft, who)
             return {
                 **self.response(),
                 "counted": counted,
@@ -416,11 +488,12 @@ class StockStore:
                 ),
             }
 
-    async def _commit(self, draft):
+    async def _commit(self, draft, who=None):
         """Store the next revision; only a saved change becomes the room's tanks."""
         draft["revision"] = self.data["revision"] + 1
         await self._store.async_save(draft)
-        self.data = draft
+        prior, self.data = self.data, draft
+        self._journal_draws(prior, draft, who)
         self._alert()
         from homeassistant.helpers.dispatcher import async_dispatcher_send
 
@@ -474,10 +547,23 @@ def resolve_stock(hass, room_id):
     return matches[0]
 
 
+def _unknown_tanks(call, result):
+    """API v2: a draw that named tanks this room does not have (they are skipped, the others drawn)."""
+    from .api_v2 import failure
+
+    if not result.get("skipped"):
+        return None
+    return failure(
+        "invalid", "Not stock tanks of this room: " + ", ".join(result["skipped"])
+    )
+
+
 async def async_setup_stock(hass, entry):
     import voluptuous as vol
     from homeassistant.core import SupportsResponse
     from homeassistant.exceptions import HomeAssistantError
+
+    from .api_v2 import fields, wrap
 
     manager = StockStore(hass, entry)
     await manager.async_init()
@@ -494,8 +580,8 @@ async def async_setup_stock(hass, entry):
             if call.service == "stock_get":
                 return target.response()
             if call.service == "stock_draw":
-                return await target.draw(call.data)
-            return await target.mutate(call.service, call.data)
+                return await target.draw(call.data, attribution(hass, call))
+            return await target.mutate(call.service, call.data, attribution(hass, call))
         except (ValueError, KeyError, OSError) as error:
             raise HomeAssistantError(str(error)) from error
 
@@ -521,8 +607,8 @@ async def async_setup_stock(hass, entry):
         hass.services.async_register(
             DOMAIN,
             service,
-            handle,
-            schema=vol.Schema(schema),
+            wrap(handle, error_of={"stock_draw": _unknown_tanks}),
+            schema=vol.Schema(fields(schema)),
             # The controller app calls stock_draw over REST without asking for the answer.
             supports_response=(
                 SupportsResponse.OPTIONAL

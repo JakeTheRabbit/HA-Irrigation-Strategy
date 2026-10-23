@@ -5,6 +5,7 @@ import {
   readLandingView,
   saveLandingView,
   LANDING_KEY,
+  LANDING_VIEWS,
 } from "./landing-view";
 import { facilityRooms } from "./facility";
 import { createDemo } from "./demo";
@@ -16,6 +17,10 @@ describe("default landing view", () => {
     expect(landingView("bad")).toBe("all-zones");
     expect(landingView("plan/schedule")).toBe("plan/schedule");
     expect(initialRoute("", "", null).page).toBe("all-zones");
+  });
+  it("moves a saved page that has a new home to that home", () => {
+    expect(readLandingView({ getItem: () => "history/timeline" })).toBe("history/explorer");
+    expect(initialRoute("", "", "history/timeline").page).toBe("history/explorer");
   });
   it("uses a preference only on an unaddressed entry and preserves explicit links", () => {
     expect(initialRoute("", "", "history/water").page).toBe("history/water");
@@ -65,5 +70,11 @@ describe("facility zones", () => {
     expect(
       new Set(views.flatMap((r) => r.view.zones.map((z) => `${r.room.id}/${z.id}`))).size,
     ).toBe(views.reduce((n, r) => n + r.view.zones.length, 0));
+  });
+});
+
+describe("the landing view names", () => {
+  it("calls History's water page what the menu calls it", () => {
+    expect(LANDING_VIEWS.find((v) => v.value === "history/water")?.label).toBe("History · Water & flow");
   });
 });

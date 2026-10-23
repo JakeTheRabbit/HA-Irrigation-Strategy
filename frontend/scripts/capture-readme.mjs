@@ -79,7 +79,8 @@ try {
   await shot("jev-today-phone");
   await page.setViewportSize({ width: 1440, height: 1000 });
   await go("zone/1");
-  await shot("jev-zone-day", "[data-day-timeline]");
+  // ZoneDay lays out through the zone page grid (display: contents): its charts are the last child.
+  await shot("jev-zone-day", "[data-day-timeline] > :last-child");
   await shot("jev-zone-panel", "[data-zone-why]");
   await go("plan/targets");
   await shot("irrigation-workspace");
@@ -98,13 +99,13 @@ try {
   if ((await library.getAttribute("open")) === null)
     await library.locator("summary").first().click();
   await shot("recipe-library", ".recipe-library");
-  await go("history/timeline");
+  // History › Explorer: a zone's probes below the room charts, the AI assistant's decisions under
+  // them; who changed which setting is History › Changes.
+  await go("history/explorer?zone=1");
   await shot("sensor-history", ".history-explorer");
-  const types = page.getByRole("group", { name: "Record type" });
-  await types.getByRole("button", { name: "AI assistant", exact: true }).click();
-  await shot("jev-history", ".timeline-panel");
-  await types.getByRole("button", { name: "Setpoints", exact: true }).click();
-  await shot("jev-history-setpoints", ".timeline-panel");
+  await shot("jev-history", ".explorer-ai");
+  await go("history/changes");
+  await shot("jev-history-setpoints", "[data-changes-backend]");
   await go("history/water");
   await shot("water-use");
   await go("history/compare");

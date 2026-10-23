@@ -25,6 +25,8 @@ async def async_setup_runs(hass, entry):
     from homeassistant.core import SupportsResponse
     from homeassistant.exceptions import HomeAssistantError
 
+    from .api_v2 import fields, wrap
+
     manager = RunStore(hass, entry)
     await manager.async_init()
     hass.data.setdefault(DOMAIN, {}).setdefault("_runs", {})[entry.entry_id] = manager
@@ -54,8 +56,8 @@ async def async_setup_runs(hass, entry):
         hass.services.async_register(
             DOMAIN,
             service,
-            handle,
-            schema=vol.Schema(schema),
+            wrap(handle),
+            schema=vol.Schema(fields(schema)),
             supports_response=SupportsResponse.ONLY,
         )
 

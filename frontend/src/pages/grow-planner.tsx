@@ -14,7 +14,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { UiTip } from "@/components/info-tip";
+import { InfoTip, UiTip } from "@/components/info-tip";
 import {
   Dialog,
   DialogContent,
@@ -28,6 +28,8 @@ import { Empty, number } from "@/components/dashboard";
 import { GrowByStage } from "@/components/grow-by-stage";
 import { PlanCellContext } from "@/components/plan-cell-context";
 import { RecipeLibrary } from "@/components/recipe-library";
+import { RecipeImport } from "@/components/recipe-import";
+import { PresetsPanel } from "@/components/presets-panel";
 import { FieldSuggestionLine, useSensorContext } from "@/components/sensor-context";
 import { fieldCapacitySuggestion, suggestedDraft } from "@/lib/sensor-context";
 import { syncPlanZones } from "@/lib/sync-plan-zones";
@@ -44,6 +46,7 @@ import {
   blockForDay,
   columnRange,
   dateForDay,
+  exceptionOn,
   growDay,
   interpolate,
   localDate,
@@ -51,6 +54,7 @@ import {
   parameterLabels,
   parseBalance,
   parsePlanImport,
+  planEdits,
   planErrors,
   planState,
   rangeBlock,
@@ -58,7 +62,25 @@ import {
 } from "@/lib/grow-plan";
 import { PlannerDayCurve, ReferenceRows } from "@/components/planner-extras";
 import { withReference } from "@/lib/plan-reference";
+import { clock, dayLabel, lightsWindow, startOfDay } from "@/lib/time";
 import "./grow-planner.css";
+
+const HOUR = 3_600_000;
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
+const hh = (hour: number) =>
+  `${String(Math.floor(hour)).padStart(2, "0")}:${String(Math.round((hour % 1) * 60)).padStart(2, "0")}`;
+/** The next lights-on after `now` on the room's clock, or null without its lights hours. */
+function nextLightsOn(controller: Controller, now: number): number | null {
+  const prefix = controller.room.room.prefix;
+  const on = Number(controller.states[`number.crop_steering_${prefix}lights_on_hour`]?.state);
+  const off = Number(controller.states[`number.crop_steering_${prefix}lights_off_hour`]?.state);
+  if (!Number.isFinite(on) || !Number.isFinite(off)) return null;
+  const tz = controller.timeZone;
+  const today = startOfDay(now, tz);
+  const at = (day: number) => lightsWindow(day, hh(on), hh(off), tz).on;
+  const first = at(today);
+  return first > now ? first : at(startOfDay(today + 36 * HOUR, tz));
+}
 
 const moves: Record<string, [number, number]> = {
   ArrowUp: [-1, 0],
@@ -221,6 +243,18 @@ export function GrowPlanner({
   const typed = typedBalance && "value" in typedBalance ? typedBalance.value : null;
   const cellError = typedBalance && "error" in typedBalance ? typedBalance.error : "";
   const liveZone = controller.room.zones.find((z) => z.id === zoneId);
+  // "day 38 of 63": today's grow day of the selected zone against its schedule's last day.
+  const today = zonePlan ? growDay(zonePlan.start_date, localDate()) : NaN;
+  const planDays = Math.max(0, ...(zonePlan?.schedule.map((b) => b.end_day) ?? []));
+  const dayOf = today >= 1 && today <= planDays ? `day ${today} of ${planDays}` : "";
+  const armAt = nextLightsOn(controller, Date.now());
+  const exception = exceptionOn(zonePlan, day);
+  const savedException = exceptionOn(
+    document?.plan.zones.find((z) => z.zone_id === zoneId),
+    day,
+  );
+  const exceptionInDraft =
+    !!exception && JSON.stringify(exception) !== JSON.stringify(savedException);
   // Recorded probe behaviour for the endpoints tab: the chart, and the field-capacity suggestion.
   const sensor = useSensorContext(
     controller,
@@ -292,6 +326,16 @@ export function GrowPlanner({
       });
       input.select();
     }
+  }
+  /** A day set apart from its block: the grid moves to days and focuses that day, whose balance
+   * then changes that day only. */
+  function addException() {
+    if (!plan || disabled) return;
+    const target = day;
+    flushSync(() => setGranularity("day"));
+    const row = plan.zones.findIndex((z) => z.zone_id === zoneId);
+    gridRef.current?.querySelector<HTMLInputElement>(`[data-cell="${row}:${target - 1}"]`)?.focus();
+    setNotice(`Type a balance for day ${target} in the grid: it changes that day only.`);
   }
   function editProfile(side: "vegetative" | "generative", key: string, value: number) {
     if (!plan || !profile || disabled) return;
@@ -496,692 +540,807 @@ export function GrowPlanner({
       ) : (
         <GrowByStage controller={controller} />
       )}
-      {error && (
-        <div className="workspace-message error" role="alert">
-          {error}
-          {dirty && (
-            <p>
-              Your local draft is retained. Export it before discarding changes and reloading the
-              stored plan.
-            </p>
-          )}
-        </div>
-      )}
-      {notice && (
-        <div className="workspace-message" role="status">
-          {notice}
-        </div>
-      )}
-      {!plan || !document ? (
-        <section className="panel workspace-card">
-          <Empty
-            title={busy ? "Loading grow plan" : "Grow planner needs the updated integration"}
-            detail="Install the current Crop Steering integration and controller to store and run zone plans. You can explore the complete workflow in demo mode."
-            action={
-              <div className="workspace-actions">
-                <Button onClick={() => void load()} disabled={busy}>
-                  <RefreshCw size={16} />
-                  Retry
-                </Button>
-                <Button asChild variant="outline">
-                  <a href="#/equipment/setup">Installation & setup</a>
-                </Button>
-              </div>
-            }
-          />
-        </section>
-      ) : (
-        <>
-          <section className="panel workspace-card plan-toolbar">
-            <div>
-              <span className="eyebrow">Plan status</span>
-              <strong className="plan-state">
-                {planState(document).label}
-                {dirty ? " · unsaved changes" : ""}
-              </strong>
-              <p className="plan-state-why">{planState(document).sentence}</p>
-              <p className="muted small">
-                Revision {document.revision} ·{" "}
-                {controller.demo ? "Isolated sample plan" : "Stored in Home Assistant"}
-              </p>
-              <span className="label-with-tip">
-                <Label htmlFor="plan-name">Plan name (optional)</Label>
-                <UiTip copyKey="plan name (optional)" />
-              </span>
-              <Input
-                id="plan-name"
-                maxLength={100}
-                disabled={disabled}
-                value={plan.name ?? ""}
-                placeholder="AI assistant plan line"
-                onChange={(e) => {
-                  const { name: _old, ...unnamed } = plan;
-                  setPlan(e.target.value.trim() ? { ...unnamed, name: e.target.value } : unnamed);
-                }}
-              />
+      <div className="plan-layout">
+        <div className="plan-main">
+          {error && (
+            <div className="workspace-message error" role="alert">
+              {error}
+              {dirty && (
+                <p>
+                  Your local draft is retained. Export it before discarding changes and reloading
+                  the stored plan.
+                </p>
+              )}
             </div>
-            <div className="workspace-actions">
-              <Button
-                variant="outline"
-                disabled={busy || dirty || !connected}
-                onClick={() => void load()}
-                title={
-                  dirty
-                    ? "Export or discard your local draft before reloading"
-                    : "Fetch the latest stored revision"
+          )}
+          {notice && (
+            <div className="workspace-message" role="status">
+              {notice}
+            </div>
+          )}
+          {!plan || !document ? (
+            <section className="panel workspace-card">
+              <Empty
+                title={busy ? "Loading grow plan" : "Grow planner needs the updated integration"}
+                detail="Install the current Crop Steering integration and controller to store and run zone plans. You can explore the complete workflow in demo mode."
+                action={
+                  <div className="workspace-actions">
+                    <Button onClick={() => void load()} disabled={busy}>
+                      <RefreshCw size={16} />
+                      Retry
+                    </Button>
+                    <Button asChild variant="outline">
+                      <a href="#/equipment/setup">Installation & setup</a>
+                    </Button>
+                  </div>
                 }
-              >
-                <RefreshCw size={16} />
-                Reload stored plan
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setPlan(structuredClone(document.plan));
-                  setNotice("");
-                }}
-                disabled={!dirty || busy}
-              >
-                Discard draft
-              </Button>
-              <Button onClick={() => void previewPlan()} disabled={disabled || errors.length > 0}>
-                <Save size={16} />
-                {dirty ? "Review & save" : "Validate preview"}
-              </Button>
-              {document.status === "draft" ? (
-                <Button
-                  variant="outline"
-                  disabled={
-                    busy ||
-                    dirty ||
-                    errors.length > 0 ||
-                    !document.capabilities.controller_supported ||
-                    !connected
-                  }
-                  onClick={() => setReview("activate")}
-                >
-                  <Play size={16} />
-                  Arm plan
-                </Button>
-              ) : (
-                <Button
-                  variant="outline"
-                  disabled={busy || document.status === "disarming" || !connected}
-                  onClick={() => setReview("disarm")}
-                >
-                  <Pause size={16} />
-                  Disarm plan
-                </Button>
-              )}
-            </div>
-          </section>
-          {zoneMismatch && (
-            <div className="workspace-message">
-              <p>
-                Setup's active zones differ from this stored plan. Export first if you need a copy.
-                Updating creates a local draft, preserves existing active schedules, removes
-                archived assignments and starts new zones from their current values at both
-                endpoints.
-              </p>
-              <Button variant="outline" disabled={disabled} onClick={updateZonesFromSetup}>
-                Update zones from setup
-              </Button>
-              <UiTip copyKey="update zones from setup" />
-              {!editable && (
-                <p>Disarm and wait for draft status before updating zone assignments.</p>
-              )}
-            </div>
-          )}
-          {!document.capabilities.controller_supported && (
-            <div className="workspace-message">
-              Controller update required before activation. Plans can still be drafted and
-              previewed.
-            </div>
-          )}
-          {!editable && (
-            <div className="workspace-message">
-              This plan is {document.status}. Disarm it before editing. Active targets change only
-              at the next lights-on boundary.
-            </div>
-          )}
-          {!!errors.length && (
-            <details className="workspace-message error">
-              <summary>
-                {errors.length} item{errors.length === 1 ? "" : "s"} to resolve before saving
-              </summary>
-              <ul>
-                {errors.map((e) => (
-                  <li key={e}>{e}</li>
-                ))}
-              </ul>
-            </details>
-          )}
-          <details
-            className="plan-advanced"
-            open={advanced}
-            onToggle={(event) => setAdvanced((event.currentTarget as HTMLDetailsElement).open)}
-          >
-            <summary>{embedded ? "Calendar & profiles" : "Advanced plan settings"}</summary>
-            <div className="workspace-tabs" role="tablist" aria-label="Grow planner view">
-              <button
-                role="tab"
-                aria-selected={tab === "calendar"}
-                onClick={() => setTab("calendar")}
-              >
-                Steering balance
-              </button>
-              <button
-                role="tab"
-                aria-selected={tab === "profiles"}
-                onClick={() => setTab("profiles")}
-              >
-                Endpoint profiles
-              </button>
-              <button
-                role="tab"
-                aria-selected={tab === "recipes"}
-                onClick={() => setTab("recipes")}
-              >
-                Recipes
-              </button>
-            </div>
-            {tab === "recipes" && (
-              <RecipeLibrary
-                key={`${controller.roomId}:${controller.demo ? "demo" : "live"}`}
-                roomId={controller.roomId}
-                roomName={controller.room.room.name}
-                demo={controller.demo}
-                plan={plan}
-                catalog={document.catalog}
-                activeZoneIds={activeZoneIds}
-                dirty={dirty}
-                canLoad={!disabled && !controller.room.strategy.engaged}
-                onDirtyChange={setLibraryDirty}
-                onLoad={(next) => {
-                  if (disabled || controller.room.strategy.engaged)
-                    throw new Error(
-                      "The grow plan cannot accept a recipe while active, armed, busy or disconnected.",
-                    );
-                  setPlan(next);
-                  setPreview(null);
-                  setError("");
-                  setNotice(
-                    "Recipe loaded into the local draft. Current zone start dates are retained. Review and save before arming.",
-                  );
-                }}
               />
-            )}
-            {tab === "calendar" && (
-              <>
-                <section className="panel workspace-card">
-                  <div className="workspace-section-heading">
-                    <div>
-                      <h2>Grow overview</h2>
-                      <p className="muted">
-                        Each row is a zone. Type a balance (0–100% generative) into a week or day;
-                        Enter applies, Esc cancels, arrows move.
-                      </p>
-                    </div>
-                    <div className="workspace-actions">
-                      <Button
-                        variant={granularity === "week" ? "default" : "outline"}
-                        onClick={() => setGranularity("week")}
-                      >
-                        Weeks
-                      </Button>
-                      <Button
-                        variant={granularity === "day" ? "default" : "outline"}
-                        onClick={() => setGranularity("day")}
-                      >
-                        Days
-                      </Button>
-                    </div>
-                  </div>
-                  <div
-                    className="plan-calendar-scroll"
-                    tabIndex={0}
-                    role="region"
-                    aria-label="Grow schedule"
-                  >
-                    <div
-                      className="plan-calendar"
-                      ref={gridRef}
-                      style={{
-                        gridTemplateColumns:
-                          "150px repeat(" +
-                          columns +
-                          ", minmax(" +
-                          (granularity === "week" ? 76 : 45) +
-                          "px, 1fr))",
-                      }}
-                    >
-                      <div className="calendar-label">Zone / grow age</div>
-                      {Array.from({ length: columns }, (_, i) => (
-                        <div key={i} className="calendar-heading">
-                          {granularity === "week" ? "Week " + (i + 1) : "D" + (i + 1)}
-                        </div>
-                      ))}
-                      {plan.zones.map((z, row) => {
-                        const name =
-                          controller.room.zones.find((x) => x.id === z.zone_id)?.name ||
-                          "Zone " + z.zone_id;
-                        return (
-                          <div className="calendar-row" key={z.zone_id}>
-                            <button className="calendar-label" onClick={() => setZone(z.zone_id)}>
-                              {name}
-                              <small>{z.start_date}</small>
-                            </button>
-                            {Array.from({ length: columns }, (_, i) => {
-                              const { start: d, end } = columnRange(granularity, i);
-                              const { block: b, mixed } = rangeBlock(z, d, end);
-                              const selected =
-                                z.zone_id === zoneId &&
-                                day >= d &&
-                                day < d + (granularity === "week" ? 7 : 1);
-                              const editing = cell?.zone === z.zone_id && cell.col === i;
-                              const invalid = editing && !!cellError;
-                              return (
-                                <label
-                                  key={i}
-                                  className={
-                                    "calendar-cell" +
-                                    (selected ? " selected" : "") +
-                                    (editing ? " editing" : "") +
-                                    (invalid ? " invalid" : "")
-                                  }
-                                  style={{ "--bias": String(b?.bias ?? 0) } as React.CSSProperties}
-                                >
-                                  <input
-                                    data-cell={row + ":" + i}
-                                    aria-label={
-                                      name +
-                                      ", " +
-                                      (granularity === "week" ? "week " + (i + 1) : "day " + d) +
-                                      ", steering balance percent generative"
-                                    }
-                                    aria-invalid={invalid || undefined}
-                                    aria-describedby={invalid ? "plan-cell-message" : undefined}
-                                    inputMode="numeric"
-                                    autoComplete="off"
-                                    readOnly={disabled}
-                                    placeholder={mixed ? "Mixed" : "—"}
-                                    value={editing ? cell.text : mixed || !b ? "" : b.bias + "%"}
-                                    onFocus={(e) => {
-                                      setZone(z.zone_id);
-                                      setDay(d);
-                                      e.currentTarget.select();
-                                    }}
-                                    // A click after focus would drop the selection that lets typing replace the value.
-                                    onClick={(e) => !editing && e.currentTarget.select()}
-                                    onChange={(e) => {
-                                      setCell({ zone: z.zone_id, col: i, text: e.target.value });
-                                      setRejected("");
-                                    }}
-                                    onKeyDown={(e) => cellKey(e, row, i)}
-                                    onBlur={leaveCell}
-                                  />
-                                  <small>{b ? "G" : "No plan"}</small>
-                                </label>
-                              );
-                            })}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                  <p id="plan-cell-message" className="plan-cell-message" aria-live="polite">
-                    {cellError || rejected}
-                  </p>
-                  {zonePlan && selectedColumn < columns && (
-                    <PlanCellContext
-                      zone={zonePlan}
-                      name={liveZone?.name || "Zone " + zoneId}
-                      live={liveZone}
-                      livePlants={liveZone ? zonePlants(controller, liveZone.id) : null}
-                      profile={profile}
-                      limits={limits}
-                      granularity={granularity}
-                      column={selectedColumn}
-                      columns={columns}
-                      typed={typed}
-                      readOnly={disabled}
-                    />
-                  )}
-                </section>
-                <section className="panel workspace-card">
-                  <div className="workspace-section-heading">
-                    <div>
-                      <h2>
-                        {liveZone?.name || "Zone " + zoneId} ·{" "}
-                        {granularity === "week" ? "days " + firstDay + "–" + lastDay : "day " + day}
-                      </h2>
-                      <p className="muted">
-                        {zonePlan ? dateForDay(zonePlan.start_date, firstDay) : ""} ·{" "}
-                        {profile?.name || "Choose a profile"}
-                      </p>
-                    </div>
-                    <div className="workspace-actions">
-                      <span className="label-with-tip">
-                        <Label htmlFor="preview-grow-day">Preview day</Label>
-                        <UiTip copyKey="preview day" />
+            </section>
+          ) : (
+            <>
+              <div className="plan-head">
+                <div className="plan-head-title">
+                  <h2>{controller.room.room.name} grow plan</h2>
+                  <span className="muted">
+                    {[plan.name?.trim() || "Unnamed plan", dayOf].filter(Boolean).join(" · ")}
+                  </span>
+                  <span className="plan-state" data-status={document.status}>
+                    {document.status === "active" && planState(document).label === "Active"
+                      ? "Armed · running"
+                      : planState(document).label}
+                  </span>
+                </div>
+                <div className="plan-draft-bar" data-dirty={dirty || undefined}>
+                  {document.status === "draft" ? (
+                    <>
+                      <span>
+                        {dirty
+                          ? `Draft · ${plural(planEdits(document.plan, plan), "edit")}, not live yet`
+                          : "Saved · not live yet"}
                       </span>
-                      <Input
-                        id="preview-grow-day"
-                        type="number"
-                        min={1}
-                        max={366}
-                        value={day}
-                        onChange={(e) => {
-                          const n = Number(e.target.value);
-                          if (Number.isInteger(n) && n >= 1 && n <= 366) setDay(n);
-                        }}
-                        className="short-input"
-                      />
-                    </div>
-                  </div>
-                  <div className="workspace-form-grid">
-                    <div>
-                      <span className="label-with-tip">
-                        <Label htmlFor="zone-start-date">Zone start date</Label>
-                        <UiTip copyKey="zone grow start date" />
-                      </span>
-                      <Input
-                        id="zone-start-date"
-                        type="date"
-                        disabled={disabled}
-                        value={zonePlan?.start_date || ""}
-                        onChange={(e) =>
-                          setPlan({
-                            ...plan,
-                            zones: plan.zones.map((z) =>
-                              z.zone_id === zoneId ? { ...z, start_date: e.target.value } : z,
-                            ),
-                          })
-                        }
-                      />
-                    </div>
-                    <div>
-                      <span className="label-with-tip">
-                        <Label htmlFor="block-profile">Endpoint profile</Label>
-                        <UiTip copyKey="endpoint profile" />
-                      </span>
-                      <select
-                        id="block-profile"
-                        value={profile?.id || ""}
-                        disabled={disabled}
-                        onChange={(e) => updateBlock({ profile_id: e.target.value })}
-                      >
-                        {plan.profiles.map((p) => (
-                          <option key={p.id} value={p.id}>
-                            {p.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                  <div className="steering-control">
-                    <div className="workspace-section-heading">
-                      <span className="label-with-tip">
-                        <Label htmlFor="steering-balance">Steering balance</Label>
-                        <UiTip copyKey="steering balance" />
-                      </span>
-                      <strong>{currentBlock?.bias ?? 50}% generative</strong>
-                    </div>
-                    <input
-                      id="steering-balance"
-                      type="range"
-                      min={0}
-                      max={100}
-                      step={1}
-                      value={currentBlock?.bias ?? 50}
-                      disabled={disabled}
-                      onChange={(e) => updateBlock({ bias: Number(e.target.value) })}
-                    />
-                    <div className="range-labels">
-                      <span>Vegetative endpoint</span>
-                      <span>Generative endpoint</span>
-                    </div>
-                  </div>
-                  {!renderCurve &&
-                    controller.room.display.options.planner_day_curve &&
-                    profile &&
-                    currentBlock && (
-                      <PlannerDayCurve
-                        controller={controller}
-                        zoneId={zoneId}
-                        parameters={interpolate(profile, currentBlock.bias, limits)}
-                      />
-                    )}
-                </section>
-                <section className="panel workspace-card">
-                  <div className="workspace-section-heading">
-                    <div>
-                      <h2>Zone schedule blocks</h2>
-                      <p className="muted">
-                        Exact inclusive grow-day ranges. Editing a day or week splits its block
-                        without changing neighboring days.
-                      </p>
-                    </div>
+                      {dirty && (
+                        <Button
+                          variant="outline"
+                          onClick={() => {
+                            setPlan(structuredClone(document.plan));
+                            setNotice("");
+                          }}
+                          disabled={busy}
+                        >
+                          Discard draft
+                        </Button>
+                      )}
+                      {dirty ? (
+                        <Button
+                          onClick={() => void previewPlan()}
+                          disabled={disabled || errors.length > 0}
+                        >
+                          <Save size={16} />
+                          Review & save
+                        </Button>
+                      ) : (
+                        <Button
+                          disabled={
+                            busy ||
+                            errors.length > 0 ||
+                            !document.capabilities.controller_supported ||
+                            !connected
+                          }
+                          onClick={() => setReview("activate")}
+                        >
+                          <Play size={16} />
+                          {armAt === null
+                            ? "Arm at next lights-on"
+                            : `Arm at lights-on, ${dayLabel(armAt, controller.timeZone).split(" ")[0]} ${clock(armAt, controller.timeZone)}`}
+                        </Button>
+                      )}
+                    </>
+                  ) : (
                     <Button
                       variant="outline"
-                      disabled={disabled}
-                      onClick={() => {
-                        if (!zonePlan || !profile) return;
-                        const start = Math.max(0, ...zonePlan.schedule.map((b) => b.end_day)) + 1;
-                        if (start <= 366) {
-                          setDay(start);
+                      disabled={busy || document.status === "disarming" || !connected}
+                      onClick={() => setReview("disarm")}
+                    >
+                      <Pause size={16} />
+                      Disarm plan
+                    </Button>
+                  )}
+                </div>
+              </div>
+              <p className="plan-state-why">{planState(document).sentence}</p>
+              <section className="panel workspace-card plan-toolbar">
+                <div>
+                  <p className="muted small">
+                    Revision {document.revision} ·{" "}
+                    {controller.demo ? "Isolated sample plan" : "Stored in Home Assistant"}
+                  </p>
+                  <span className="label-with-tip">
+                    <Label htmlFor="plan-name">Plan name (optional)</Label>
+                    <UiTip copyKey="plan name (optional)" />
+                  </span>
+                  <Input
+                    id="plan-name"
+                    maxLength={100}
+                    disabled={disabled}
+                    value={plan.name ?? ""}
+                    placeholder="AI assistant plan line"
+                    onChange={(e) => {
+                      const { name: _old, ...unnamed } = plan;
+                      setPlan(
+                        e.target.value.trim() ? { ...unnamed, name: e.target.value } : unnamed,
+                      );
+                    }}
+                  />
+                </div>
+                <div className="workspace-actions">
+                  <Button
+                    variant="outline"
+                    disabled={busy || dirty || !connected}
+                    onClick={() => void load()}
+                    title={
+                      dirty
+                        ? "Export or discard your local draft before reloading"
+                        : "Fetch the latest stored revision"
+                    }
+                  >
+                    <RefreshCw size={16} />
+                    Reload stored plan
+                  </Button>
+                  {!dirty && (
+                    <Button
+                      variant="outline"
+                      onClick={() => void previewPlan()}
+                      disabled={disabled || errors.length > 0}
+                    >
+                      <Save size={16} />
+                      Validate preview
+                    </Button>
+                  )}
+                </div>
+              </section>
+              {zoneMismatch && (
+                <div className="workspace-message">
+                  <p>
+                    Setup's active zones differ from this stored plan. Export first if you need a
+                    copy. Updating creates a local draft, preserves existing active schedules,
+                    removes archived assignments and starts new zones from their current values at
+                    both endpoints.
+                  </p>
+                  <Button variant="outline" disabled={disabled} onClick={updateZonesFromSetup}>
+                    Update zones from setup
+                  </Button>
+                  <UiTip copyKey="update zones from setup" />
+                  {!editable && (
+                    <p>Disarm and wait for draft status before updating zone assignments.</p>
+                  )}
+                </div>
+              )}
+              {!document.capabilities.controller_supported && (
+                <div className="workspace-message">
+                  Controller update required before activation. Plans can still be drafted and
+                  previewed.
+                </div>
+              )}
+              {!editable && (
+                <div className="workspace-message">
+                  This plan is {document.status}. Disarm it before editing. Active targets change
+                  only at the next lights-on boundary.
+                </div>
+              )}
+              {!!errors.length && (
+                <details className="workspace-message error">
+                  <summary>
+                    {errors.length} item{errors.length === 1 ? "" : "s"} to resolve before saving
+                  </summary>
+                  <ul>
+                    {errors.map((e) => (
+                      <li key={e}>{e}</li>
+                    ))}
+                  </ul>
+                </details>
+              )}
+              <details
+                className="plan-advanced"
+                open={advanced}
+                onToggle={(event) => setAdvanced((event.currentTarget as HTMLDetailsElement).open)}
+              >
+                <summary>{embedded ? "Calendar & profiles" : "Advanced plan settings"}</summary>
+                <div className="workspace-tabs" role="tablist" aria-label="Grow planner view">
+                  <button
+                    role="tab"
+                    aria-selected={tab === "calendar"}
+                    onClick={() => setTab("calendar")}
+                  >
+                    Steering balance
+                  </button>
+                  <button
+                    role="tab"
+                    aria-selected={tab === "profiles"}
+                    onClick={() => setTab("profiles")}
+                  >
+                    Endpoint profiles
+                  </button>
+                  <button
+                    role="tab"
+                    aria-selected={tab === "recipes"}
+                    onClick={() => setTab("recipes")}
+                  >
+                    Recipes
+                  </button>
+                </div>
+                {tab === "recipes" && (
+                  <>
+                    <div className="plan-browser-heading">
+                      <h2>On this browser</h2>
+                      <p className="muted small">
+                        Recipes kept in this browser only. Presets are stored on the controller.
+                      </p>
+                    </div>
+                    <RecipeLibrary
+                      key={`${controller.roomId}:${controller.demo ? "demo" : "live"}`}
+                      roomId={controller.roomId}
+                      roomName={controller.room.room.name}
+                      demo={controller.demo}
+                      plan={plan}
+                      catalog={document.catalog}
+                      activeZoneIds={activeZoneIds}
+                      dirty={dirty}
+                      canLoad={!disabled && !controller.room.strategy.engaged}
+                      onDirtyChange={setLibraryDirty}
+                      onLoad={(next) => {
+                        if (disabled || controller.room.strategy.engaged)
+                          throw new Error(
+                            "The grow plan cannot accept a recipe while active, armed, busy or disconnected.",
+                          );
+                        setPlan(next);
+                        setPreview(null);
+                        setError("");
+                        setNotice(
+                          "Recipe loaded into the local draft. Current zone start dates are retained. Review and save before arming.",
+                        );
+                      }}
+                    />
+                    <RecipeImport key={`import:${controller.roomId}`} controller={controller} />
+                  </>
+                )}
+                {tab === "calendar" && (
+                  <>
+                    <section className="panel workspace-card">
+                      <div className="workspace-section-heading">
+                        <div>
+                          <h2>Grow overview</h2>
+                          <p className="muted">
+                            Each row is a zone. Type a balance (0–100% generative) into a week or
+                            day; Enter applies, Esc cancels, arrows move.
+                          </p>
+                        </div>
+                        <div className="workspace-actions">
+                          <Button
+                            variant={granularity === "week" ? "default" : "outline"}
+                            onClick={() => setGranularity("week")}
+                          >
+                            Weeks
+                          </Button>
+                          <Button
+                            variant={granularity === "day" ? "default" : "outline"}
+                            onClick={() => setGranularity("day")}
+                          >
+                            Days
+                          </Button>
+                        </div>
+                      </div>
+                      <div
+                        className="plan-calendar-scroll"
+                        tabIndex={0}
+                        role="region"
+                        aria-label="Grow schedule"
+                      >
+                        <div
+                          className="plan-calendar"
+                          ref={gridRef}
+                          style={{
+                            gridTemplateColumns:
+                              "150px repeat(" +
+                              columns +
+                              ", minmax(" +
+                              (granularity === "week" ? 76 : 45) +
+                              "px, 1fr))",
+                          }}
+                        >
+                          <div className="calendar-label">Zone / grow age</div>
+                          {Array.from({ length: columns }, (_, i) => (
+                            <div key={i} className="calendar-heading">
+                              {granularity === "week" ? "Week " + (i + 1) : "D" + (i + 1)}
+                            </div>
+                          ))}
+                          {plan.zones.map((z, row) => {
+                            const name =
+                              controller.room.zones.find((x) => x.id === z.zone_id)?.name ||
+                              "Zone " + z.zone_id;
+                            return (
+                              <div className="calendar-row" key={z.zone_id}>
+                                <button
+                                  className="calendar-label"
+                                  onClick={() => setZone(z.zone_id)}
+                                >
+                                  {name}
+                                  <small>{z.start_date}</small>
+                                </button>
+                                {Array.from({ length: columns }, (_, i) => {
+                                  const { start: d, end } = columnRange(granularity, i);
+                                  const { block: b, mixed } = rangeBlock(z, d, end);
+                                  const selected =
+                                    z.zone_id === zoneId &&
+                                    day >= d &&
+                                    day < d + (granularity === "week" ? 7 : 1);
+                                  const editing = cell?.zone === z.zone_id && cell.col === i;
+                                  const invalid = editing && !!cellError;
+                                  return (
+                                    <label
+                                      key={i}
+                                      className={
+                                        "calendar-cell" +
+                                        (selected ? " selected" : "") +
+                                        (editing ? " editing" : "") +
+                                        (invalid ? " invalid" : "")
+                                      }
+                                      style={
+                                        { "--bias": String(b?.bias ?? 0) } as React.CSSProperties
+                                      }
+                                    >
+                                      <input
+                                        data-cell={row + ":" + i}
+                                        aria-label={
+                                          name +
+                                          ", " +
+                                          (granularity === "week"
+                                            ? "week " + (i + 1)
+                                            : "day " + d) +
+                                          ", steering balance percent generative"
+                                        }
+                                        aria-invalid={invalid || undefined}
+                                        aria-describedby={invalid ? "plan-cell-message" : undefined}
+                                        inputMode="numeric"
+                                        autoComplete="off"
+                                        readOnly={disabled}
+                                        placeholder={mixed ? "Mixed" : "—"}
+                                        value={
+                                          editing ? cell.text : mixed || !b ? "" : b.bias + "%"
+                                        }
+                                        onFocus={(e) => {
+                                          setZone(z.zone_id);
+                                          setDay(d);
+                                          e.currentTarget.select();
+                                        }}
+                                        // A click after focus would drop the selection that lets typing replace the value.
+                                        onClick={(e) => !editing && e.currentTarget.select()}
+                                        onChange={(e) => {
+                                          setCell({
+                                            zone: z.zone_id,
+                                            col: i,
+                                            text: e.target.value,
+                                          });
+                                          setRejected("");
+                                        }}
+                                        onKeyDown={(e) => cellKey(e, row, i)}
+                                        onBlur={leaveCell}
+                                      />
+                                      <small>{b ? "G" : "No plan"}</small>
+                                    </label>
+                                  );
+                                })}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                      <p id="plan-cell-message" className="plan-cell-message" aria-live="polite">
+                        {cellError || rejected}
+                      </p>
+                      {zonePlan && selectedColumn < columns && (
+                        <PlanCellContext
+                          zone={zonePlan}
+                          name={liveZone?.name || "Zone " + zoneId}
+                          live={liveZone}
+                          livePlants={liveZone ? zonePlants(controller, liveZone.id) : null}
+                          profile={profile}
+                          limits={limits}
+                          granularity={granularity}
+                          column={selectedColumn}
+                          columns={columns}
+                          typed={typed}
+                          readOnly={disabled}
+                        />
+                      )}
+                      {zonePlan &&
+                        (exception ? (
+                          <div
+                            className="plan-exception"
+                            data-draft={exceptionInDraft || undefined}
+                          >
+                            <span className="eyebrow">
+                              {exceptionInDraft ? "Exception · in draft" : "Exception"}
+                            </span>
+                            <InfoTip
+                              label="Exception"
+                              copy={{ tooltip: "A one-day schedule block" }}
+                            />
+                            <p>
+                              Day {day}: {exception.bias}% generative,{" "}
+                              {plan.profiles.find((p) => p.id === exception.profile_id)?.name ??
+                                "no profile"}
+                              .
+                              {(() => {
+                                const around =
+                                  blockForDay(zonePlan, day - 1) ?? blockForDay(zonePlan, day + 1);
+                                return around
+                                  ? ` The days around it: ${around.bias}% generative.`
+                                  : "";
+                              })()}
+                            </p>
+                          </div>
+                        ) : (
+                          <Button
+                            variant="outline"
+                            className="plan-exception-add"
+                            disabled={disabled}
+                            onClick={addException}
+                          >
+                            Add exception on day {day}
+                          </Button>
+                        ))}
+                    </section>
+                    <section className="panel workspace-card">
+                      <div className="workspace-section-heading">
+                        <div>
+                          <h2>
+                            {liveZone?.name || "Zone " + zoneId} ·{" "}
+                            {granularity === "week"
+                              ? "days " + firstDay + "–" + lastDay
+                              : "day " + day}
+                          </h2>
+                          <p className="muted">
+                            {zonePlan ? dateForDay(zonePlan.start_date, firstDay) : ""} ·{" "}
+                            {profile?.name || "Choose a profile"}
+                          </p>
+                        </div>
+                        <div className="workspace-actions">
+                          <span className="label-with-tip">
+                            <Label htmlFor="preview-grow-day">Preview day</Label>
+                            <UiTip copyKey="preview day" />
+                          </span>
+                          <Input
+                            id="preview-grow-day"
+                            type="number"
+                            min={1}
+                            max={366}
+                            value={day}
+                            onChange={(e) => {
+                              const n = Number(e.target.value);
+                              if (Number.isInteger(n) && n >= 1 && n <= 366) setDay(n);
+                            }}
+                            className="short-input"
+                          />
+                        </div>
+                      </div>
+                      <div className="workspace-form-grid">
+                        <div>
+                          <span className="label-with-tip">
+                            <Label htmlFor="zone-start-date">Zone start date</Label>
+                            <UiTip copyKey="zone grow start date" />
+                          </span>
+                          <Input
+                            id="zone-start-date"
+                            type="date"
+                            disabled={disabled}
+                            value={zonePlan?.start_date || ""}
+                            onChange={(e) =>
+                              setPlan({
+                                ...plan,
+                                zones: plan.zones.map((z) =>
+                                  z.zone_id === zoneId ? { ...z, start_date: e.target.value } : z,
+                                ),
+                              })
+                            }
+                          />
+                        </div>
+                        <div>
+                          <span className="label-with-tip">
+                            <Label htmlFor="block-profile">Endpoint profile</Label>
+                            <UiTip copyKey="endpoint profile" />
+                          </span>
+                          <select
+                            id="block-profile"
+                            value={profile?.id || ""}
+                            disabled={disabled}
+                            onChange={(e) => updateBlock({ profile_id: e.target.value })}
+                          >
+                            {plan.profiles.map((p) => (
+                              <option key={p.id} value={p.id}>
+                                {p.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                      <div className="steering-control">
+                        <div className="workspace-section-heading">
+                          <span className="label-with-tip">
+                            <Label htmlFor="steering-balance">Steering balance</Label>
+                            <UiTip copyKey="steering balance" />
+                          </span>
+                          <strong>{currentBlock?.bias ?? 50}% generative</strong>
+                        </div>
+                        <input
+                          id="steering-balance"
+                          type="range"
+                          min={0}
+                          max={100}
+                          step={1}
+                          value={currentBlock?.bias ?? 50}
+                          disabled={disabled}
+                          onChange={(e) => updateBlock({ bias: Number(e.target.value) })}
+                        />
+                        <div className="range-labels">
+                          <span>Vegetative endpoint</span>
+                          <span>Generative endpoint</span>
+                        </div>
+                      </div>
+                      {!renderCurve &&
+                        controller.room.display.options.planner_day_curve &&
+                        profile &&
+                        currentBlock && (
+                          <PlannerDayCurve
+                            controller={controller}
+                            zoneId={zoneId}
+                            parameters={interpolate(profile, currentBlock.bias, limits)}
+                          />
+                        )}
+                    </section>
+                    <section className="panel workspace-card">
+                      <div className="workspace-section-heading">
+                        <div>
+                          <h2>Zone schedule blocks</h2>
+                          <p className="muted">
+                            Exact inclusive grow-day ranges. Editing a day or week splits its block
+                            without changing neighboring days.
+                          </p>
+                        </div>
+                        <Button
+                          variant="outline"
+                          disabled={disabled}
+                          onClick={() => {
+                            if (!zonePlan || !profile) return;
+                            const start =
+                              Math.max(0, ...zonePlan.schedule.map((b) => b.end_day)) + 1;
+                            if (start <= 366) {
+                              setDay(start);
+                              setPlan({
+                                ...plan,
+                                zones: plan.zones.map((z) =>
+                                  z.zone_id === zoneId
+                                    ? {
+                                        ...z,
+                                        schedule: [
+                                          ...z.schedule,
+                                          {
+                                            start_day: start,
+                                            end_day: Math.min(start + 6, 366),
+                                            profile_id: profile.id,
+                                            bias: 50,
+                                          },
+                                        ],
+                                      }
+                                    : z,
+                                ),
+                              });
+                            }
+                          }}
+                        >
+                          <Plus size={16} />
+                          Add week
+                        </Button>
+                      </div>
+                      <div className="schedule-blocks">
+                        {zonePlan?.schedule.map((block, i) => (
+                          <button
+                            key={i}
+                            className={
+                              day >= block.start_day && day <= block.end_day ? "selected" : ""
+                            }
+                            onClick={() => setDay(block.start_day)}
+                          >
+                            <strong>
+                              Days {block.start_day}–{block.end_day}
+                            </strong>
+                            <span>
+                              {plan.profiles.find((p) => p.id === block.profile_id)?.name} ·{" "}
+                              {block.bias}% G
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </section>
+                  </>
+                )}
+                {tab === "profiles" && (
+                  <section className="panel workspace-card">
+                    <div className="workspace-section-heading">
+                      <div>
+                        <div className="label-with-tip">
+                          <h2>Vegetative and generative endpoints</h2>
+                          <UiTip copyKey="vegetative and generative endpoints" />
+                        </div>
+                        <p className="muted">
+                          The slider blends between these values. Set appropriate targets for your
+                          substrate, cultivar and grow stage.
+                        </p>
+                      </div>
+                      <Button
+                        variant="outline"
+                        disabled={disabled || !profile}
+                        onClick={() => {
+                          if (!profile) return;
+                          const id = "profile-" + Date.now().toString(36);
+                          const copy = {
+                            ...structuredClone(profile),
+                            id,
+                            name: profile.name + " copy",
+                          };
                           setPlan({
                             ...plan,
+                            profiles: [...plan.profiles, copy],
                             zones: plan.zones.map((z) =>
                               z.zone_id === zoneId
                                 ? {
                                     ...z,
-                                    schedule: [
-                                      ...z.schedule,
-                                      {
-                                        start_day: start,
-                                        end_day: Math.min(start + 6, 366),
-                                        profile_id: profile.id,
-                                        bias: 50,
-                                      },
-                                    ],
+                                    schedule: replaceRange(z.schedule, {
+                                      start_day: firstDay,
+                                      end_day: lastDay,
+                                      bias: 50,
+                                      profile_id: id,
+                                    }),
                                   }
                                 : z,
                             ),
                           });
-                        }
-                      }}
-                    >
-                      <Plus size={16} />
-                      Add week
-                    </Button>
-                  </div>
-                  <div className="schedule-blocks">
-                    {zonePlan?.schedule.map((block, i) => (
-                      <button
-                        key={i}
-                        className={day >= block.start_day && day <= block.end_day ? "selected" : ""}
-                        onClick={() => setDay(block.start_day)}
+                        }}
                       >
-                        <strong>
-                          Days {block.start_day}–{block.end_day}
-                        </strong>
-                        <span>
-                          {plan.profiles.find((p) => p.id === block.profile_id)?.name} ·{" "}
-                          {block.bias}% G
+                        <Copy size={16} />
+                        Duplicate profile
+                      </Button>
+                    </div>
+                    <div className="workspace-form-grid">
+                      <div>
+                        <span className="label-with-tip">
+                          <Label htmlFor="profile-zone">Zone limits</Label>
+                          <UiTip copyKey="zone limits" />
                         </span>
-                      </button>
-                    ))}
-                  </div>
-                </section>
-              </>
-            )}
-            {tab === "profiles" && (
-              <section className="panel workspace-card">
-                <div className="workspace-section-heading">
-                  <div>
-                    <div className="label-with-tip">
-                      <h2>Vegetative and generative endpoints</h2>
-                      <UiTip copyKey="vegetative and generative endpoints" />
-                    </div>
-                    <p className="muted">
-                      The slider blends between these values. Set appropriate targets for your
-                      substrate, cultivar and grow stage.
-                    </p>
-                  </div>
-                  <Button
-                    variant="outline"
-                    disabled={disabled || !profile}
-                    onClick={() => {
-                      if (!profile) return;
-                      const id = "profile-" + Date.now().toString(36);
-                      const copy = {
-                        ...structuredClone(profile),
-                        id,
-                        name: profile.name + " copy",
-                      };
-                      setPlan({
-                        ...plan,
-                        profiles: [...plan.profiles, copy],
-                        zones: plan.zones.map((z) =>
-                          z.zone_id === zoneId
-                            ? {
-                                ...z,
-                                schedule: replaceRange(z.schedule, {
-                                  start_day: firstDay,
-                                  end_day: lastDay,
-                                  bias: 50,
-                                  profile_id: id,
-                                }),
-                              }
-                            : z,
-                        ),
-                      });
-                    }}
-                  >
-                    <Copy size={16} />
-                    Duplicate profile
-                  </Button>
-                </div>
-                <div className="workspace-form-grid">
-                  <div>
-                    <span className="label-with-tip">
-                      <Label htmlFor="profile-zone">Zone limits</Label>
-                      <UiTip copyKey="zone limits" />
-                    </span>
-                    <select
-                      id="profile-zone"
-                      value={zoneId}
-                      onChange={(e) => setZone(Number(e.target.value))}
-                    >
-                      {plan.zones.map((z) => (
-                        <option key={z.zone_id} value={z.zone_id}>
-                          {controller.room.zones.find((x) => x.id === z.zone_id)?.name ||
-                            "Zone " + z.zone_id}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <span className="label-with-tip">
-                      <Label htmlFor="profile-name">Profile name</Label>
-                      <UiTip copyKey="profile name" />
-                    </span>
-                    <Input
-                      id="profile-name"
-                      value={profile?.name || ""}
-                      disabled={disabled}
-                      onChange={(e) =>
-                        setPlan({
-                          ...plan,
-                          profiles: plan.profiles.map((p) =>
-                            p.id === profile?.id ? { ...p, name: e.target.value } : p,
-                          ),
-                        })
-                      }
-                    />
-                  </div>
-                </div>
-                <div className="profile-grid profile-heading">
-                  <strong>Parameter</strong>
-                  <strong>Vegetative</strong>
-                  <strong>Generative</strong>
-                </div>
-                {Object.entries(limits).map(([key, limit]) => (
-                  <div className="profile-grid" key={key}>
-                    <div>
-                      <strong>{parameterLabels[key] || key.replaceAll("_", " ")}</strong>
-                      <p className="muted small">
-                        {parameterHelp[key] || "Configured controller parameter."}
-                      </p>
-                      <small className="muted">
-                        {limit.min}–{limit.max} {limit.unit}
-                      </small>
-                      {key === "field_capacity" && capacitySuggestion && (
-                        <FieldSuggestionLine
-                          suggestion={capacitySuggestion}
-                          zoneName={liveZone?.name}
-                          draftValue={capacityDraft}
-                          unit={limit.unit}
-                          action="for both endpoints"
-                          disabled={
-                            disabled ||
-                            (profile?.vegetative[key] === capacityDraft &&
-                              profile?.generative[key] === capacityDraft)
-                          }
-                          onUse={(value) => curveEdit(key, value)}
-                        />
-                      )}
-                    </div>
-                    {(["vegetative", "generative"] as const).map((side) => (
-                      <div key={side}>
-                        <Label className="sr-only" htmlFor={side + "-" + key}>
-                          {side + " " + (parameterLabels[key] || key)}
-                        </Label>
+                        <select
+                          id="profile-zone"
+                          value={zoneId}
+                          onChange={(e) => setZone(Number(e.target.value))}
+                        >
+                          {plan.zones.map((z) => (
+                            <option key={z.zone_id} value={z.zone_id}>
+                              {controller.room.zones.find((x) => x.id === z.zone_id)?.name ||
+                                "Zone " + z.zone_id}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <span className="label-with-tip">
+                          <Label htmlFor="profile-name">Profile name</Label>
+                          <UiTip copyKey="profile name" />
+                        </span>
                         <Input
-                          id={side + "-" + key}
-                          type="number"
-                          min={limit.min}
-                          max={limit.max}
-                          step={limit.step || "any"}
+                          id="profile-name"
+                          value={profile?.name || ""}
                           disabled={disabled}
-                          value={Number.isFinite(profile?.[side][key]) ? profile![side][key] : ""}
                           onChange={(e) =>
-                            editProfile(
-                              side,
-                              key,
-                              e.target.value === "" ? NaN : Number(e.target.value),
-                            )
+                            setPlan({
+                              ...plan,
+                              profiles: plan.profiles.map((p) =>
+                                p.id === profile?.id ? { ...p, name: e.target.value } : p,
+                              ),
+                            })
                           }
                         />
-                        <small className="muted">{limit.unit}</small>
+                      </div>
+                    </div>
+                    <div className="profile-grid profile-heading">
+                      <strong>Parameter</strong>
+                      <strong>Vegetative</strong>
+                      <strong>Generative</strong>
+                    </div>
+                    {Object.entries(limits).map(([key, limit]) => (
+                      <div className="profile-grid" key={key}>
+                        <div>
+                          <strong>{parameterLabels[key] || key.replaceAll("_", " ")}</strong>
+                          <p className="muted small">
+                            {parameterHelp[key] || "Configured controller parameter."}
+                          </p>
+                          <small className="muted">
+                            {limit.min}–{limit.max} {limit.unit}
+                          </small>
+                          {key === "field_capacity" && capacitySuggestion && (
+                            <FieldSuggestionLine
+                              suggestion={capacitySuggestion}
+                              zoneName={liveZone?.name}
+                              draftValue={capacityDraft}
+                              unit={limit.unit}
+                              action="for both endpoints"
+                              disabled={
+                                disabled ||
+                                (profile?.vegetative[key] === capacityDraft &&
+                                  profile?.generative[key] === capacityDraft)
+                              }
+                              onUse={(value) => curveEdit(key, value)}
+                            />
+                          )}
+                        </div>
+                        {(["vegetative", "generative"] as const).map((side) => (
+                          <div key={side}>
+                            <Label className="sr-only" htmlFor={side + "-" + key}>
+                              {side + " " + (parameterLabels[key] || key)}
+                            </Label>
+                            <Input
+                              id={side + "-" + key}
+                              type="number"
+                              min={limit.min}
+                              max={limit.max}
+                              step={limit.step || "any"}
+                              disabled={disabled}
+                              value={
+                                Number.isFinite(profile?.[side][key]) ? profile![side][key] : ""
+                              }
+                              onChange={(e) =>
+                                editProfile(
+                                  side,
+                                  key,
+                                  e.target.value === "" ? NaN : Number(e.target.value),
+                                )
+                              }
+                            />
+                            <small className="muted">{limit.unit}</small>
+                          </div>
+                        ))}
                       </div>
                     ))}
-                  </div>
-                ))}
-                {controller.room.display.options.planner_reference_rows && profile && (
-                  <ReferenceRows
-                    profile={profile}
-                    disabled={disabled}
-                    onChange={(reference) =>
-                      setPlan({
-                        ...plan,
-                        profiles: plan.profiles.map((p) =>
-                          p.id === profile.id ? withReference(p, reference) : p,
-                        ),
-                      })
-                    }
-                  />
+                    {controller.room.display.options.planner_reference_rows && profile && (
+                      <ReferenceRows
+                        profile={profile}
+                        disabled={disabled}
+                        onChange={(reference) =>
+                          setPlan({
+                            ...plan,
+                            profiles: plan.profiles.map((p) =>
+                              p.id === profile.id ? withReference(p, reference) : p,
+                            ),
+                          })
+                        }
+                      />
+                    )}
+                    <div className="workspace-message">
+                      New live profiles start from current setpoints at both ends. Changing pot size
+                      does not choose crop targets. Demo endpoints are illustrative.
+                    </div>
+                  </section>
                 )}
-                <div className="workspace-message">
-                  New live profiles start from current setpoints at both ends. Changing pot size
-                  does not choose crop targets. Demo endpoints are illustrative.
-                </div>
-              </section>
-            )}
-          </details>
-        </>
-      )}
+              </details>
+            </>
+          )}
+        </div>
+        <aside className="plan-side" aria-label="Presets">
+          <PresetsPanel
+            key={controller.roomId}
+            controller={controller}
+            roomId={controller.roomId}
+            planName={plan?.name?.trim() || `${controller.room.room.name} plan`}
+          />
+        </aside>
+      </div>
       <Dialog
         open={!!review}
         onOpenChange={(open) => {

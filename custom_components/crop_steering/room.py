@@ -144,6 +144,8 @@ def build_engine_config(
     integration_version=None,
     entry_id=None,
     substrate=None,
+    feed_calibration=None,
+    legacy_feed_ec_fallback=None,
 ):
     """PURE. The room descriptor the f2-control add-on reads from
     ``sensor.crop_steering_<prefix>engine_config`` to DISCOVER and drive an additional room
@@ -235,8 +237,22 @@ def build_engine_config(
         for z in range(1, int(num_zones) + 1)
         if (label := (zones.get(str(z)) or zones.get(z) or {}).get("cultivar"))
     }
+    # The feed probes' applied calibrations (calibration.py), {kind: {gain, bias, calibrated_at}}, only
+    # while one is applied. Not one of the keys the setup fingerprint reads, so applying one never holds
+    # the room for adoption.
+    calibrated = {"feed_calibration": feed_calibration} if feed_calibration else {}
+    # The feed EC (mS/cm) controller 3.17.0 assumed when nothing measured or declared one, kept by the
+    # upgrade for a room with no feed EC probe (migration.py, M15). Absent on every other room, and not
+    # one of the keys the setup fingerprint reads.
+    legacy = (
+        {"legacy_feed_ec_fallback": legacy_feed_ec_fallback}
+        if legacy_feed_ec_fallback is not None
+        else {}
+    )
     return {
         **({"zone_cultivars": cultivars} if cultivars else {}),
+        **calibrated,
+        **legacy,
         **declared,
         **versions,
         **which,

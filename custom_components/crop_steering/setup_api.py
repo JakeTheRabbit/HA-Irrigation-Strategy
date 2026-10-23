@@ -10,8 +10,10 @@ import math
 
 from . import units
 from .admin import async_require_admin
+from .api_v2 import StaleRevision
 from .const import DOMAIN, LEGACY_KILL_SWITCH, MAX_ZONES
 from .generated.defaults import SIZING_DEFAULTS
+from .journal_api import attribution, note
 from .plumbing import (
     LABELS as PLUMBING_LABELS,
     PLUMBING_LAYOUTS,
@@ -790,7 +792,7 @@ def _selected(hass, payload):
         type(payload.get("expected_revision")) is not int
         or payload["expected_revision"] != revision
     ):
-        raise ValueError("Room setup changed; refresh and review again")
+        raise StaleRevision("Room setup changed; refresh and review again", revision)
     return entry
 
 
@@ -1015,7 +1017,95 @@ def setup_changes(old, new):
     return said
 
 
-def _record(hass, action, before, result, context):
+def _flat(value, path=""):
+    """PURE. A setup as {dotted path: leaf}. A list of rows that carry an `id` (the zones) is keyed by it."""
+    if isinstance(value, dict):
+        items = value.items()
+    elif (
+        isinstance(value, list)
+        and value
+        and all(isinstance(row, dict) and "id" in row for row in value)
+    ):
+        items = ((row["id"], row) for row in value)
+    else:
+        return {path: value}
+    flat = {}
+    for key, item in items:
+        flat.update(_flat(item, f"{path}.{key}" if path else str(key)))
+    return flat
+
+
+def setup_diff(old, new):
+    """PURE. What differs between two setups, as [{path, old, new}] over dotted paths, in path order."""
+    was, now = _flat(old or {}), _flat(new or {})
+    missing = object()
+    return [
+        {"path": path, "old": was.get(path), "new": now.get(path)}
+        for path in sorted(set(was) | set(now))
+        if was.get(path, missing) != now.get(path, missing)
+    ]
+
+
+# Read-outs of `setup_room` (and of read_setup) that are derived, not set by the operator: left out of a
+# journaled setup so its diff shows only what someone chose.
+DERIVED = (
+    "api_version",
+    "capabilities",
+    "entry_id",
+    "revision",
+    "plumbing_inferred",
+    "active_zone_ids",
+    "safety",
+    "commissioning",
+)
+
+
+def _owned(room):
+    """PURE. `setup_room` without its derived read-outs (and each zone's `sizing_generic`)."""
+    out = {k: v for k, v in room.items() if k not in DERIVED}
+    if isinstance(out.get("zones"), list):
+        out["zones"] = [
+            {k: v for k, v in zone.items() if k != "sizing_generic"}
+            for zone in out["zones"]
+        ]
+    return out
+
+
+def _journal(hass, action, before, room, who):
+    """A saved setup change -> `config.changed` with the whole setup before and after (a create has no before)."""
+    if action not in ("setup_save", "setup_create", "setup_remove"):
+        return
+    old = _owned(before) if before is not None else None
+    new = _owned(room)
+    diff = setup_diff(old, new)
+    if not diff:
+        return
+    who = who or {}
+    note(
+        hass,
+        "room:" + room["prefix"],
+        "config.changed",
+        actor=who.get("actor", "system"),
+        detail=who.get("detail"),
+        user_id=who.get("user_id"),
+        client=who.get("client"),
+        correlation={
+            "setup_revision": room["revision"],
+            **(
+                {"causation_id": who["causation_id"]} if who.get("causation_id") else {}
+            ),
+        },
+        data={
+            "store": "setup",
+            "section": "room",
+            "old": old,
+            "new": new,
+            "diff": diff,
+        },
+    )
+
+
+def _record(hass, action, before, result, context, who=None):
     """A saved setup change goes in Home Assistant's logbook, on the room's engine-config sensor
     with the person who made it (the service call's context), and in its log at INFO. Recording
     never undoes or fails the save."""
@@ -1060,6 +1150,7 @@ def _record(hass, action, before, result, context):
             context=context,
         )
         _LOGGER.info("%s: %s", room["room_name"], message)
+        _journal(hass, action, before, room, who)
     except Exception:  # noqa: BLE001 - the save stands; say why it was not recorded
         _LOGGER.exception("A saved room setup change could not be recorded")
 
@@ -1077,6 +1168,8 @@ async def async_setup_setup_services(hass):
     from homeassistant.exceptions import HomeAssistantError
     import voluptuous as vol
 
+    from .api_v2 import API, fields, wrap
+
     state = hass.data.setdefault(DOMAIN, {}).setdefault("_setup", {})
     if state.get("services_registered"):
         return
@@ -1088,6 +1181,12 @@ async def async_setup_setup_services(hass):
         "setup_remove": remove_setup,
         "setup_commission": commission_setup,
     }
+
+    def _room_of(service_call, result):
+        """API v2: the room a setup answer is about; none for setup_read (every room)."""
+        entry = _entry(hass, (result or {}).get("entry_id"))
+        return "room:" + effective(entry).get("room_prefix", "") if entry else None
+
     for name, handler in handlers.items():
 
         async def call(service_call, fn=handler, action=name):
@@ -1100,7 +1199,14 @@ async def async_setup_setup_services(hass):
                         entry = _entry(hass, service_call.data.get("entry_id"))
                         before = setup_room(hass, entry) if entry else None
                         result = await fn(hass, service_call.data)
-                        _record(hass, action, before, result, service_call.context)
+                        _record(
+                            hass,
+                            action,
+                            before,
+                            result,
+                            service_call.context,
+                            attribution(hass, service_call),
+                        )
             except (ValueError, TypeError) as err:
                 raise HomeAssistantError(str(err)) from err
             return result if service_call.return_response else None
@@ -1108,8 +1214,8 @@ async def async_setup_setup_services(hass):
         hass.services.async_register(
             DOMAIN,
             name,
-            call,
-            schema=vol.Schema({}, extra=vol.ALLOW_EXTRA),
+            wrap(call, room_of=_room_of),
+            schema=vol.Schema(fields({}, API), extra=vol.ALLOW_EXTRA),
             supports_response=(
                 SupportsResponse.ONLY
                 if name == "setup_read"

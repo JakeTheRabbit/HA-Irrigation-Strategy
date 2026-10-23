@@ -59,6 +59,7 @@ async function openTab(name) {
 }
 async function openLibrary() {
   await openTab("Recipes");
+  await page.getByRole("heading", { level: 2, name: "On this browser", exact: true }).waitFor();
   await library().waitFor();
   if ((await library().getAttribute("open")) === null)
     await library().locator("summary").first().click();
@@ -91,8 +92,8 @@ async function axe(name) {
   );
 }
 try {
-  // An old address opens the unified Irrigation calendar.
-  await page.goto(origin + "/dashboard.html?demo=1#/grow-plan", { waitUntil: "networkidle" });
+  // Grow plan & presets: the browser recipe library sits under "On this browser".
+  await page.goto(origin + "/dashboard.html?demo=1#/plan/schedule", { waitUntil: "networkidle" });
   await page.getByRole("heading", { name: "Irrigation", exact: true }).waitFor();
   await openTab("Recipes");
   await library().waitFor();
@@ -221,6 +222,8 @@ try {
         window.location.hash = "#/compare";
       });
       await page.getByRole("heading", { name: "Compare runs", exact: true }).waitFor();
+      // The zone-level view is one tap down, under the room-wide comparison.
+      await page.locator('details[data-section="zone-detail"] > summary').click();
       // The full-resolution chart is the Overlay view, one toggle from the weekly comparison.
       await page.getByRole("button", { name: "Overlay", exact: true }).click();
       await page.waitForFunction(() =>
@@ -261,6 +264,8 @@ try {
       await page.evaluate(() => {
         window.location.hash = "#/settings";
       });
+      // Reset demo session sits under "More display options" (Task 29).
+      await page.locator("details.more-display summary").click();
       await page.getByRole("button", { name: "Reset demo session…", exact: true }).click();
       await page.getByRole("button", { name: "Keep exploring", exact: true }).click();
       assert.equal(await page.getByRole("dialog").count(), 0);
@@ -286,7 +291,7 @@ try {
         "keep",
       );
       await page.evaluate(() => {
-        window.location.hash = "#/grow-plan";
+        window.location.hash = "#/plan/schedule";
       });
       await page.getByRole("heading", { name: "Irrigation", exact: true }).waitFor();
       await openLibrary();

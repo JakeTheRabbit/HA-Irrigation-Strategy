@@ -358,7 +358,7 @@ jobs:
   frontend:
     name: Dashboard build and browser workflows
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
@@ -404,6 +404,17 @@ jobs:
           node frontend/scripts/verify-navigation.mjs
           node frontend/scripts/verify-ai-instructions.mjs
           node frontend/scripts/verify-irrigation-workspace.mjs
+      - name: Verify parity pages against their mockups
+        # Each serves frontend/dist itself: 1440x1000 and 390x844, demo on the current and the 3.17
+        # integration; the compare files land in output/playwright/parity/.
+        run: |
+          node frontend/scripts/verify-parity-harness.mjs
+          for script in frontend/scripts/verify-parity-*.mjs; do
+            [ "$script" = frontend/scripts/verify-parity-harness.mjs ] && continue
+            echo "::group::$script"
+            node "$script"
+            echo "::endgroup::"
+          done
       - name: Build Academy catalogue and install the pinned lesson media
         # The same three commands the Pages deploy runs after merge; here they gate the PR.
         run: |

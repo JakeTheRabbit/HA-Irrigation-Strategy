@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>History — Changes</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#4fc3f7;text-decoration:none}a:hover{color:#b3e5fc}
+</style>
+</helmet>
+<!-- SHELL: 1440x1000 frame. Tokens: canvas #111111, surface #1c1c1c, raised #232323, border #2e2e2e, text #e1e1e1, muted #a4a4a4, faint #8a8a8a, primary #03a9f4, link #4fc3f7, success #81c995, warning #ffca5b, danger #f28b82. Phase P0 #6b7580, P1 #2f6fb5, P2 #6450b0, P3 #34405a. Font Roboto; sizes 12/14/15/17/20/24. Radius 12. -->
+<div style="width: 1440px; height: 1000px; box-sizing: border-box; background: #111111; color: #e1e1e1; font-family: Roboto, Arial, sans-serif; display: flex; overflow: hidden">
+
+<!-- SHELL: menu (sections + live room tree) -->
+<aside style="width: 248px; flex-shrink: 0; background: #1c1c1c; border-right: 1px solid #2e2e2e; padding: 22px 12px 16px; box-sizing: border-box; display: flex; flex-direction: column; gap: 4px">
+<div style="display: flex; align-items: center; gap: 10px; padding: 0 8px 18px">
+<span style="width: 36px; height: 36px; border-radius: 10px; background: #03a9f4; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0b1d27" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.7l5.7 5.7a8 8 0 1 1-11.3 0z"></path></svg></span>
+<span style="display: flex; flex-direction: column"><b style="font-size: 16px; font-weight: 600">Crop Steering</b><span style="font-size: 12px; color: #a4a4a4">Irrigation control</span></span>
+</div>
+<nav aria-label="Main navigation" style="display: flex; flex-direction: column; gap: 1px">
+<a href="S1-AllRooms.dc.html" style="display: flex; align-items: center; gap: 12px; min-height: 38px; padding: 0 12px; border-radius: 8px; color: #b8b8b8; font-weight: 500; font-size: 15px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>Status</a>
+<button type="button" aria-expanded="false" style="display: flex; align-items: center; gap: 12px; min-height: 38px; padding: 0 12px; border: 0; border-radius: 8px; background: transparent; color: #b8b8b8; font: inherit; font-size: 15px; font-weight: 500; text-align: left; cursor: pointer"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.7l5.7 5.7a8 8 0 1 1-11.3 0z"></path></svg>Irrigation<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="margin-left: auto"><polyline points="9 6 15 12 9 18"></polyline></svg></button>
+<button type="button" aria-expanded="true" style="display: flex; align-items: center; gap: 12px; min-height: 38px; padding: 0 12px; border: 0; border-radius: 8px; background: transparent; color: #e1e1e1; font: inherit; font-size: 15px; font-weight: 600; text-align: left; cursor: pointer"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><polyline points="12 7 12 12 15 14"></polyline></svg>History<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="margin-left: auto"><polyline points="6 9 12 15 18 9"></polyline></svg></button>
+<div style="display: flex; flex-direction: column; gap: 1px; margin: 0 0 4px 21px; padding-left: 10px; border-left: 1px solid #333">
+<a href="H1-Explorer.dc.html" style="display: flex; align-items: center; min-height: 32px; padding: 0 10px; border-radius: 6px; color: #b8b8b8; font-size: 14px">Explorer</a>
+<a href="H2-WaterFlow.dc.html" style="display: flex; align-items: center; min-height: 32px; padding: 0 10px; border-radius: 6px; color: #b8b8b8; font-size: 14px">Water &amp; flow</a>
+<a href="H3-Compare.dc.html" style="display: flex; align-items: center; min-height: 32px; padding: 0 10px; border-radius: 6px; color: #b8b8b8; font-size: 14px">Compare runs</a>
+<a href="H4-Changes.dc.html" aria-current="page" style="display: flex; align-items: center; min-height: 32px; padding: 0 10px; border-radius: 6px; background: #2a2a2a; box-shadow: inset 2px 0 0 #03a9f4; color: #4fc3f7; font-size: 14px; font-weight: 600">Changes</a>
+</div>
+<button type="button" aria-expanded="false" style="display: flex; align-items: center; gap: 12px; min-height: 38px; padding: 0 12px; border: 0; border-radius: 8px; background: transparent; color: #b8b8b8; font: inherit; font-size: 15px; font-weight: 500; text-align: left; cursor: pointer"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"></path></svg>Equipment<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="margin-left: auto"><polyline points="9 6 15 12 9 18"></polyline></svg></button>
+<button type="button" aria-expanded="false" style="display: flex; align-items: center; gap: 12px; min-height: 38px; padding: 0 12px; margin-top: 10px; border: 0; border-radius: 8px; background: transparent; color: #b8b8b8; font: inherit; font-size: 15px; font-weight: 500; text-align: left; cursor: pointer"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="4" y1="7" x2="20" y2="7"></line><line x1="4" y1="17" x2="20" y2="17"></line><circle cx="9" cy="7" r="2.5"></circle><circle cx="15" cy="17" r="2.5"></circle></svg>Settings<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="margin-left: auto"><polyline points="9 6 15 12 9 18"></polyline></svg></button>
+</nav>
+<nav aria-label="Rooms" style="display: flex; flex-direction: column; gap: 1px; margin-top: 16px">
+<span style="padding: 0 12px 6px; font-size: 12px; font-weight: 600; letter-spacing: .06em; color: #a4a4a4">ROOMS</span>
+<sc-for list="{{rooms}}" as="r" hint-placeholder-count="3">
+<a href="S2-Room.dc.html" style="display: flex; align-items: center; gap: 8px; min-height: 36px; padding: 0 10px; margin-top: 6px; border-radius: 8px; color: #e1e1e1; font-size: 14px; font-weight: 500"><span style="width: 8px; height: 8px; border-radius: 4px; background: {{r.dot}}"></span>{{r.name}}<span style="margin-left: auto; font-size: 12px; color: #a4a4a4; font-weight: 400">{{r.state}}</span></a>
+<sc-for list="{{r.zones}}" as="z" hint-placeholder-count="3">
+<a href="S3-Zone.dc.html" style="display: flex; align-items: center; gap: 8px; min-height: 30px; padding: 0 10px 0 24px; border-radius: 8px; color: #b8b8b8; font-size: 13px"><span style="min-width: 22px; padding: 0 4px; border-radius: 4px; background: {{z.phColor}}; color: #fff; font-size: 11px; font-weight: 700; text-align: center">{{z.ph}}</span>{{z.name}}<span style="margin-left: auto; font-size: 12px; color: #a4a4a4">{{z.vwc}}</span></a>
+</sc-for>
+</sc-for>
+</nav>
+<div style="margin-top: auto; padding: 0 8px; font-size: 12px; color: #8a8a8a">Integration 3.17.1 · Controller 3.17.1</div>
+</aside>
+
+<div style="flex: 1; min-width: 0; display: flex; flex-direction: column">
+<!-- SHELL: top bar (no room chips on desktop: the tree is the picker) -->
+<header style="height: 56px; flex-shrink: 0; border-bottom: 1px solid #2e2e2e; display: flex; align-items: center; justify-content: flex-end; gap: 12px; padding: 0 24px">
+<span style="font-size: 13px; color: #a4a4a4">Updated 12 s ago</span>
+<span style="display: flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border: 1px solid #2e2e2e; border-radius: 15px; font-size: 13px; font-weight: 600"><span style="width: 7px; height: 7px; border-radius: 4px; background: #81c995"></span>AI acting</span>
+<button type="button" aria-label="Search, Ctrl K" style="display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 12px; border: 1px solid #2e2e2e; border-radius: 8px; background: #1c1c1c; color: #a4a4a4; font: inherit; font-size: 13px">Jump to… <span style="border: 1px solid #3a3a3a; border-radius: 4px; padding: 0 5px; font-size: 11px">Ctrl K</span></button>
+<span style="font-size: 13px; color: #a4a4a4">F2</span>
+<button type="button" style="height: 34px; padding: 0 14px; border: 1px solid #2e2e2e; border-radius: 8px; background: #1c1c1c; color: #e1e1e1; font: inherit; font-size: 14px; font-weight: 600"><span style="display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 4px; background: #81c995"></span>Watering on</button>
+<button type="button" style="height: 34px; padding: 0 14px; border: 1px solid #f28b82; border-radius: 8px; background: transparent; color: #f28b82; font: inherit; font-size: 14px; font-weight: 600">Stop all</button>
+</header>
+
+<main style="flex: 1; min-height: 0; overflow: hidden; padding: 8px 28px 18px; display: flex; flex-direction: column; gap: 12px">
+<div style="display: flex; align-items: center; gap: 12px; border-bottom: 1px solid #2e2e2e">
+<h1 style="margin: 0; padding: 4px 0 2px; font-size: 22px; font-weight: 600; flex-shrink: 0">Changes</h1>
+<span style="margin-left: auto; display: flex; align-items: center; gap: 8px; font-size: 13px; color: #a4a4a4"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"></polyline></svg>Showing <b style="color: #e1e1e1; font-weight: 600">all rooms</b>. Pick a room or zone in the room list to narrow it.</span>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 8px">
+<div role="group" aria-label="Filter by who made the change" style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap">
+<span style="width: 58px; font-size: 13px; color: #a4a4a4">Made by</span>
+<sc-for list="{{srcChips}}" as="c" hint-placeholder-count="6"><button type="button" aria-pressed="{{c.pressed}}" onClick="{{c.onClick}}" style="display: flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border-radius: 16px; border: 1px solid {{c.edge}}; background: {{c.bg}}; color: {{c.ink}}; font: inherit; font-size: 13px; font-weight: 600"><span style="width: 8px; height: 8px; border-radius: 4px; background: {{c.dot}}"></span>{{c.label}}<span style="font-weight: 400; color: #a4a4a4">{{c.count}}</span></button></sc-for>
+</div>
+<div role="group" aria-label="Filter by kind of change" style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap">
+<span style="width: 58px; font-size: 13px; color: #a4a4a4">Kind</span>
+<sc-for list="{{kindChips}}" as="c" hint-placeholder-count="5"><button type="button" aria-pressed="{{c.pressed}}" onClick="{{c.onClick}}" style="display: flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border-radius: 16px; border: 1px solid {{c.edge}}; background: {{c.bg}}; color: {{c.ink}}; font: inherit; font-size: 13px; font-weight: 500">{{c.label}}<span style="color: #a4a4a4">{{c.count}}</span></button></sc-for>
+<span style="margin-left: auto; font-size: 13px; color: #a4a4a4">{{shownTxt}}</span>
+</div>
+</div>
+
+<div style="flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 400px; gap: 16px">
+<div role="list" aria-label="Changes, newest first" style="min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; padding-right: 4px">
+<sc-if value="{{none}}" hint-placeholder-val="{{false}}"><div style="padding: 40px 0; text-align: center; color: #a4a4a4; font-size: 15px">No changes match these filters.</div></sc-if>
+<sc-for list="{{groups}}" as="g" hint-placeholder-count="3">
+<span style="padding: 6px 2px 2px; font-size: 12px; font-weight: 600; letter-spacing: .06em; color: #a4a4a4">{{g.label}}</span>
+<sc-for list="{{g.items}}" as="it" hint-placeholder-count="3">
+<div role="listitem" style="position: relative; display: grid; grid-template-columns: 52px minmax(0, 1fr) auto; gap: 4px 12px; padding: 10px 12px; border-radius: 10px; border: 1px solid {{it.edge}}; background: {{it.bg}}">
+<span style="font-size: 14px; font-weight: 600; color: #e1e1e1; padding-top: 2px">{{it.time}}</span>
+<button type="button" onClick="{{it.onSelect}}" aria-pressed="{{it.selPressed}}" aria-label="{{it.aria}}" style="display: flex; flex-direction: column; gap: 4px; min-width: 0; padding: 0; border: 0; background: transparent; color: #e1e1e1; font: inherit; text-align: left">
+<span style="display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 14px">
+<span style="flex: none; display: flex; align-items: center; gap: 5px; height: 22px; padding: 0 8px; border-radius: 11px; border: 1px solid {{it.srcCol}}; color: {{it.srcCol}}; font-size: 12px; font-weight: 600"><span style="width: 6px; height: 6px; border-radius: 3px; background: {{it.srcCol}}"></span>{{it.src}}</span>
+<span style="flex: none; color: #a4a4a4">{{it.where}}</span>
+<b style="font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{it.what}}</b>
+<span style="flex: none; display: flex; align-items: center; gap: 6px; font-weight: 600"><span style="color: #a4a4a4; text-decoration: line-through">{{it.old}}</span><svg width="16" height="10" viewBox="0 0 16 10" fill="none" stroke="#a4a4a4" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="1" y1="5" x2="14" y2="5"></line><polyline points="10 1 14 5 10 9"></polyline></svg><span style="color: #e1e1e1">{{it.nu}}</span></span>
+</span>
+<span style="display: {{it.lineDisp}}; font-size: 13px; color: #b8b8b8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{it.reason}}</span>
+<span style="display: {{it.effDisp}}; align-items: center; gap: 6px; font-size: 13px; color: {{it.effInk}}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 17 9 11 13 15 21 7"></polyline><polyline points="15 7 21 7 21 13"></polyline></svg>{{it.effect}}</span>
+</button>
+<span style="display: flex; align-items: flex-start">
+<sc-if value="{{it.canRevert}}" hint-placeholder-val="{{true}}"><button type="button" onClick="{{it.onRevert}}" style="height: 32px; padding: 0 12px; border: 1px solid #3a3a3a; border-radius: 8px; background: #1c1c1c; color: #e1e1e1; font: inherit; font-size: 13px; font-weight: 500; white-space: nowrap">{{it.revertLabel}}</button></sc-if>
+<sc-if value="{{it.fixed}}" hint-placeholder-val="{{false}}"><span style="max-width: 150px; font-size: 12px; color: #a4a4a4; text-align: right">{{it.fixedTxt}}</span></sc-if>
+</span>
+<sc-if value="{{it.reverted}}" hint-placeholder-val="{{false}}">
+<span style="grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; margin-top: 4px; padding: 8px 10px; border-radius: 8px; background: rgba(129,201,149,.12); font-size: 13px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#81c995" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="5 12 10 17 19 7"></polyline></svg><span>Back to <b style="font-weight: 600">{{it.old}}</b>. Written and read back 14:06.</span><button type="button" onClick="{{it.onUndo}}" style="margin-left: auto; height: 30px; padding: 0 12px; border: 1px solid #81c995; border-radius: 8px; background: transparent; color: #81c995; font: inherit; font-size: 13px; font-weight: 600">Undo revert</button></span>
+</sc-if>
+</div>
+</sc-for>
+</sc-for>
+</div>
+
+<aside aria-label="Selected change" style="min-height: 0; display: flex; flex-direction: column; gap: 14px; padding: 16px 18px; background: #1c1c1c; border: 1px solid #2e2e2e; border-radius: 12px">
+<span style="font-size: 12px; font-weight: 600; letter-spacing: .06em; color: #a4a4a4">SELECTED CHANGE</span>
+<div style="display: flex; flex-direction: column; gap: 6px">
+<span style="display: flex; align-items: center; gap: 8px"><span style="display: flex; align-items: center; gap: 5px; height: 22px; padding: 0 8px; border-radius: 11px; border: 1px solid {{sel.srcCol}}; color: {{sel.srcCol}}; font-size: 12px; font-weight: 600"><span style="width: 6px; height: 6px; border-radius: 3px; background: {{sel.srcCol}}"></span>{{sel.src}}</span><span style="font-size: 13px; color: #a4a4a4">{{sel.when}}</span></span>
+<b style="font-size: 20px; font-weight: 600">{{sel.what}}</b>
+<span style="font-size: 14px; color: #a4a4a4">{{sel.where}} · {{sel.kind}}</span>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 6px">
+<div style="position: relative; height: 34px">
+<span style="position: absolute; left: 0; right: 0; top: 14px; height: 6px; border-radius: 3px; background: #333333"></span>
+<span style="position: absolute; top: 14px; height: 6px; left: {{sel.spanLeft}}; width: {{sel.spanW}}; background: rgba(3,169,244,.45)"></span>
+<span style="position: absolute; top: 6px; left: {{sel.oldLeft}}; width: 3px; height: 22px; margin-left: -1px; border-radius: 2px; background: #8a8a8a"></span>
+<span style="position: absolute; top: 4px; left: {{sel.newLeft}}; width: 4px; height: 26px; margin-left: -2px; border-radius: 2px; background: #4fc3f7"></span>
+</div>
+<span style="display: flex; justify-content: space-between; font-size: 13px"><span style="color: #a4a4a4">Was <b style="color: #e1e1e1; font-weight: 600">{{sel.old}}</b></span><span style="color: #a4a4a4">Now <b style="color: #4fc3f7; font-weight: 600">{{sel.nu}}</b></span><span style="color: #8a8a8a">{{sel.range}}</span></span>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 4px">
+<span style="font-size: 12px; font-weight: 600; letter-spacing: .06em; color: #a4a4a4">WHY</span>
+<span style="font-size: 14px; line-height: 1.45">{{sel.reason}}</span>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 6px">
+<span style="font-size: 12px; font-weight: 600; letter-spacing: .06em; color: #a4a4a4">WHAT HAPPENED NEXT · {{sel.effMetric}}</span>
+<sc-if value="{{sel.hasChart}}" hint-placeholder-val="{{true}}">
+<div style="position: relative; display: flex; align-items: flex-end; gap: 8px; height: 120px; padding-bottom: 18px">
+<span style="position: absolute; left: 0; right: 0; bottom: {{sel.bandBottom}}; height: {{sel.bandH}}; background: rgba(129,201,149,.12); border-top: 1px dashed rgba(129,201,149,.5); border-bottom: 1px dashed rgba(129,201,149,.5)"></span>
+<sc-for list="{{sel.bars}}" as="b" hint-placeholder-count="6"><span style="position: relative; flex: 1; height: {{b.h}}; border-radius: 4px 4px 0 0; background: {{b.col}}"><span style="position: absolute; top: -17px; left: 0; right: 0; text-align: center; font-size: 11px; color: #e1e1e1">{{b.v}}</span><span style="position: absolute; bottom: -17px; left: -4px; right: -4px; text-align: center; font-size: 11px; color: #a4a4a4">{{b.lab}}</span></span></sc-for>
+<span style="position: absolute; top: -4px; bottom: 14px; left: {{sel.cutLeft}}; border-left: 2px dashed #e1e1e1"><span style="position: absolute; top: -2px; left: 4px; font-size: 11px; font-weight: 600; white-space: nowrap">change</span></span>
+</div>
+</sc-if>
+<span style="font-size: 14px; line-height: 1.45; color: {{sel.effInk}}">{{sel.effect}}</span>
+</div>
+
+<div style="margin-top: auto; display: flex; flex-direction: column; gap: 10px; padding-top: 12px; border-top: 1px solid #2e2e2e">
+<span style="display: flex; align-items: center; gap: 6px; font-size: 13px; color: #a4a4a4"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#81c995" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="5 12 10 17 19 7"></polyline></svg>{{sel.readback}}</span>
+<sc-if value="{{sel.canRevert}}" hint-placeholder-val="{{true}}"><button type="button" onClick="{{sel.onRevert}}" style="height: 40px; border: 1px solid #3a3a3a; border-radius: 8px; background: #232323; color: #e1e1e1; font: inherit; font-size: 14px; font-weight: 600">{{sel.revertLabel}}</button></sc-if>
+<sc-if value="{{sel.fixed}}" hint-placeholder-val="{{false}}"><span style="font-size: 13px; color: #a4a4a4">{{sel.fixedTxt}}</span></sc-if>
+</div>
+</aside>
+</div>
+</main>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1000}}'>
+var PH = { P0: '#6b7580', P1: '#2f6fb5', P2: '#6450b0', P3: '#34405a' };
+function tz(name, ph, vwc) { return { name: name, ph: ph, phColor: PH[ph], vwc: vwc + '%' }; }
+var TREE = [
+  { name: 'F2', dot: '#03a9f4', state: 'Watering', zones: [tz('Zone 1', 'P2', 59.4), tz('Zone 2', 'P2', 58.1), tz('Zone 3', 'P2', 60.2)] },
+  { name: 'F1', dot: '#81c995', state: 'Holding', zones: [tz('Zone 1', 'P1', 63.8), tz('Zone 2', 'P1', 62.9), tz('Zone 3', 'P1', 64.4)] }
+];
+function clamp(x, a, b) { return Math.max(a, Math.min(b, x)); }
+var SRC = { 'You': '#4fc3f7', 'Learner': '#81c995', 'AI judge': '#b9a7f5', 'Timer': '#c8c8c8', 'MCP': '#f5b97a', 'AiGrow': '#7fd6c8' };
+var KINDS = ['Setpoint', 'Plan', 'Recipe', 'Setup', 'Calibration'];
+var C = [
+  { id: 1, grp: 'TODAY · THU 22 OCT', time: '13:42', src: 'You', where: 'F2 · Zone 2', kind: 'Setpoint', what: 'P2 shot size', old: '4.0%', nu: '4.6%',
+    reason: 'Pore EC is over its band, so each P2 shot gives more water to wash it down.', effect: 'Too soon to judge. Measured after tonight’s dryback.', tone: 'pending',
+    rev: 'Revert to 4.0%', rng: [2, 8, 4.0, 4.6, 'allowed 2–8%'], readback: 'Written and read back 13:42:06' },
+  { id: 2, grp: 'TODAY · THU 22 OCT', time: '11:15', src: 'AI judge', where: 'F2 · all zones', kind: 'Setpoint', what: 'P3 dryback target', old: '14%', nu: '13%',
+    reason: 'Zone 2 got less water than asked this morning. Eased the overnight dryback so it does not dry further while the line is checked.', effect: 'Too soon to judge. Measured at lights-on tomorrow.', tone: 'pending',
+    rev: 'Revert to 14%', rng: [8, 20, 14, 13, 'judge may move 12–16%'], readback: 'Written and read back 11:15:02 · ledger entry #418' },
+  { id: 3, grp: 'TODAY · THU 22 OCT', time: '06:00', src: 'Timer', where: 'F2 · room', kind: 'Plan', what: 'Plan step, days 38–44', old: 'Feed EC 2.3', nu: '2.4',
+    reason: 'The grow plan “F2 Bulk 63 d” moved to its day 38–44 targets at lights-on.', effect: 'Feed EC read 2.40 after the 06:10 refill.', tone: 'good',
+    fixed: 'Plan step. Edit the plan to change it.', rng: [1.6, 2.8, 2.3, 2.4, 'plan range 1.6–2.8'], readback: 'Written and read back 06:00:01',
+    chart: { metric: 'FEED EC', vals: [2.31, 2.30, 2.32, 2.31, 2.40, 2.40], labs: ['18:00', '21:00', '00:00', '03:00', '06:10', '12:00'], cut: 4, band: [2.3, 2.5], min: 2.0, dp: 2 } },
+  { id: 4, grp: 'YESTERDAY · WED 21 OCT', time: '21:30', src: 'Learner', where: 'F2 · Zone 1', kind: 'Setpoint', what: 'Field capacity', old: '64.0%', nu: '63.2%',
+    reason: 'The last five P1 ramps peaked between 63.1 and 63.4%, never at 64.', effect: 'P1 stopped one shot sooner today. Runoff unchanged.', tone: 'good',
+    rev: 'Revert to 64.0%', rng: [55, 70, 64.0, 63.2, 'learner may move ±1.5'], readback: 'Written and read back 21:30:04',
+    chart: { metric: 'P1 SHOTS TO FIELD CAPACITY', vals: [5, 5, 5, 5, 4], labs: ['Sat', 'Sun', 'Mon', 'Tue', 'Today'], cut: 4, band: [4, 5], min: 0, dp: 0 } },
+  { id: 5, grp: 'YESTERDAY · WED 21 OCT', time: '17:30', src: 'You', where: 'F2 · feed', kind: 'Recipe', what: 'Recipe “Bulk B” Cal-Mag', old: '0.6 mL/L', nu: '0.8 mL/L',
+    reason: 'Yellowing between the veins on lower leaves in Zone 3.', effect: 'Next mix read back EC 2.40, pH 5.82, both in band.', tone: 'good',
+    rev: 'Revert to 0.6 mL/L', rng: [0, 1.5, 0.6, 0.8, 'label max 1.5 mL/L'], readback: 'Written and read back 17:30:11' },
+  { id: 6, grp: 'YESTERDAY · WED 21 OCT', time: '16:05', src: 'MCP', where: 'F1 · Zone 2', kind: 'Setup', what: 'Back sensor', old: 'in reading', nu: 'left out',
+    reason: 'Claude found it silent for 3 h. You previewed the change and approved it.', effect: 'Zone 2 spread between sensors fell from 3.1 to 0.4 pts.', tone: 'good',
+    rev: 'Put back in reading', rng: null, readback: 'Written and read back 16:05:09',
+    chart: { metric: 'FRONT/BACK SPREAD, PTS', vals: [0.6, 0.5, 2.4, 3.1, 0.4, 0.4], labs: ['10:00', '12:00', '13:00', '15:00', '17:00', '20:00'], cut: 4, band: [0, 1.5], min: 0, dp: 1 } },
+  { id: 7, grp: 'YESTERDAY · WED 21 OCT', time: '09:20', src: 'You', where: 'F2 · feed', kind: 'Calibration', what: 'Feed pH probe offset', old: '0.00', nu: '−0.06',
+    reason: 'Two-point check with pH 4.00 and 7.00 buffers. Slope 98.4%.', effect: 'Feed pH now reads 5.84 where it read 5.90.', tone: 'good',
+    rev: 'Restore previous calibration', rng: [-0.3, 0.3, 0, -0.06, 'offset limit ±0.30'], readback: 'Written and read back 09:20:15' },
+  { id: 8, grp: 'MON 20 OCT', time: '14:00', src: 'AiGrow', where: 'F2 · all zones', kind: 'Setpoint', what: 'Daily max water per zone', old: '9.0 L', nu: '10.0 L',
+    reason: 'Weekly review: Zone 1 hit the cap on 2 of the last 7 days.', effect: 'Cap not hit since. Dryback unchanged.', tone: 'good',
+    rev: 'Revert to 9.0 L', rng: [4, 14, 9, 10, 'allowed 4–14 L'], readback: 'Written and read back 14:00:03' },
+  { id: 9, grp: 'MON 20 OCT', time: '08:40', src: 'Learner', where: 'F2 · Zone 3', kind: 'Setpoint', what: 'P2 shot interval', old: '50 min', nu: '60 min',
+    reason: 'Zone 3 stayed 1.5 pts above its P2 target all of last week, so shots were spread out.', effect: 'Dryback rose 0.8 pts next night, from 13.1 to 13.9%, back inside the plan band.', tone: 'good',
+    rev: 'Revert to 50 min', rng: [20, 120, 50, 60, 'learner may move ±15 min'], readback: 'Written and read back 08:40:02',
+    chart: { metric: 'OVERNIGHT DRYBACK, ZONE 3', vals: [13.0, 13.2, 12.9, 13.1, 13.9, 13.8], labs: ['Thu', 'Fri', 'Sat', 'Sun', 'Mon', 'Tue'], cut: 4, band: [13.5, 15], min: 11, dp: 1 } }
+];
+function pct(x) { return (x * 100).toFixed(2) + '%'; }
+var TONE = { good: '#81c995', pending: '#a4a4a4', neutral: '#b8b8b8' };
+
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { srcOff: {}, kindOff: {}, sel: 9, reverted: {} };
+  }
+  renderVals() {
+    var self = this, st = this.state;
+    var shown = C.filter(function (c) { return !st.srcOff[c.src] && !st.kindOff[c.kind]; });
+    function chip(label, on, count, dot, toggle) {
+      return { label: label, count: count, dot: dot, pressed: on ? 'true' : 'false', edge: on ? (dot || '#4fc3f7') : '#3a3a3a',
+        bg: on ? 'rgba(255,255,255,.06)' : 'transparent', ink: on ? '#e1e1e1' : '#a4a4a4', onClick: toggle };
+    }
+    var srcChips = Object.keys(SRC).map(function (s) {
+      var n = C.filter(function (c) { return c.src === s && !st.kindOff[c.kind]; }).length;
+      return chip(s, !st.srcOff[s], n, SRC[s], function () { var o = Object.assign({}, st.srcOff); o[s] = !o[s]; self.setState({ srcOff: o }); });
+    });
+    var kindChips = KINDS.map(function (k) {
+      var n = C.filter(function (c) { return c.kind === k && !st.srcOff[c.src]; }).length;
+      return chip(k, !st.kindOff[k], n, null, function () { var o = Object.assign({}, st.kindOff); o[k] = !o[k]; self.setState({ kindOff: o }); });
+    });
+
+    var groups = [];
+    shown.forEach(function (c) {
+      var g = groups[groups.length - 1];
+      if (!g || g.label !== c.grp) { g = { label: c.grp, items: [] }; groups.push(g); }
+      var isSel = c.id === st.sel, rev = !!st.reverted[c.id];
+      g.items.push({
+        time: c.time, src: c.src, srcCol: SRC[c.src], where: c.where, what: c.what, old: c.old, nu: c.nu, reason: c.reason,
+        effect: c.effect, effInk: TONE[c.tone], lineDisp: isSel ? 'none' : 'block', effDisp: isSel ? 'none' : 'flex',
+        aria: c.time + ', ' + c.src + ', ' + c.where + ', ' + c.what + ' ' + c.old + ' to ' + c.nu + '. Show details',
+        selPressed: isSel ? 'true' : 'false',
+        edge: isSel ? '#03a9f4' : '#2e2e2e', bg: isSel ? '#1f2a31' : '#1c1c1c',
+        canRevert: !!c.rev && !rev && !isSel, revertLabel: c.rev || '', fixed: !c.rev && !isSel, fixedTxt: c.fixed || '',
+        reverted: rev,
+        onSelect: function () { self.setState({ sel: c.id }); },
+        onRevert: function () { var r = Object.assign({}, st.reverted); r[c.id] = true; self.setState({ reverted: r }); },
+        onUndo: function () { var r = Object.assign({}, st.reverted); delete r[c.id]; self.setState({ reverted: r }); }
+      });
+    });
+
+    var s = C.filter(function (c) { return c.id === st.sel; })[0];
+    var sel = { src: s.src, srcCol: SRC[s.src], when: ({ 'TODAY · THU 22 OCT': 'Today', 'YESTERDAY · WED 21 OCT': 'Yesterday', 'MON 20 OCT': 'Mon 20 Oct' })[s.grp] + ' at ' + s.time, what: s.what, where: s.where, kind: s.kind,
+      old: s.old, nu: s.nu, reason: s.reason, effect: s.effect, effInk: s.tone === 'good' ? '#e1e1e1' : '#a4a4a4', readback: s.readback,
+      canRevert: !!s.rev && !st.reverted[s.id], revertLabel: s.rev || '', fixed: !s.rev || !!st.reverted[s.id],
+      fixedTxt: st.reverted[s.id] ? 'Reverted. Undo it from the list.' : (s.fixed || ''),
+      onRevert: function () { var r = Object.assign({}, st.reverted); r[s.id] = true; self.setState({ reverted: r }); },
+      hasChart: !!s.chart, effMetric: s.chart ? s.chart.metric : s.tone === 'pending' ? 'NOT MEASURED YET' : 'CHECKED' };
+    if (s.rng) {
+      var lo = s.rng[0], hi = s.rng[1], fo = (s.rng[2] - lo) / (hi - lo), fn = (s.rng[3] - lo) / (hi - lo);
+      sel.oldLeft = pct(fo); sel.newLeft = pct(fn); sel.spanLeft = pct(Math.min(fo, fn)); sel.spanW = pct(Math.abs(fn - fo)); sel.range = s.rng[4];
+    } else { sel.oldLeft = '0%'; sel.newLeft = '100%'; sel.spanLeft = '0%'; sel.spanW = '100%'; sel.range = 'on / off setting'; }
+    if (s.chart) {
+      var ch = s.chart, mx = Math.max.apply(null, ch.vals.concat([ch.band[1]])) * 1.08, sc = function (v) { return (v - ch.min) / (mx - ch.min); };
+      sel.bars = ch.vals.map(function (v, i) { return { h: pct(Math.max(0.03, sc(v)) * 0.82), v: v.toFixed(ch.dp), lab: ch.labs[i], col: i >= ch.cut ? '#4fc3f7' : '#4a5a64' }; });
+      sel.cutLeft = pct(ch.cut / ch.vals.length);
+      sel.bandBottom = 'calc(18px + (100% - 18px) * ' + (sc(ch.band[0]) * 0.82).toFixed(4) + ')';
+      sel.bandH = 'calc((100% - 18px) * ' + ((sc(ch.band[1]) - sc(ch.band[0])) * 0.82).toFixed(4) + ')';
+    } else { sel.bars = []; sel.cutLeft = '0%'; sel.bandBottom = '0'; sel.bandH = '0'; }
+
+    return { rooms: TREE, srcChips: srcChips, kindChips: kindChips, groups: groups, none: shown.length === 0, sel: sel,
+      shownTxt: shown.length + ' of ' + C.length + ' changes · last 7 days' };
+  }
+}
+</script>
+</body>
+</html>

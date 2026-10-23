@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { growPoints, growStats, yieldFigures, type GrowDay, type Harvest } from "./grows";
 import type { RunRecord } from "./comparison-types";
@@ -21,5 +22,12 @@ describe("grow comparison boundaries", () => {
     const harvest = { room: { dry_weight_g: 2000, wet_weight_g: 10000, plants_harvested: 10, canopy_m2: 4 }, zones: {}, plants: [] } as unknown as Harvest;
     expect(yieldFigures(harvest, run, "room", 100)).toEqual({ dryG: 2000, wetG: 10000, gramsPerPlant: 200, gramsPerM2: 500, gramsPerLitre: 20, dryWetRatio: 0.2 });
     expect(yieldFigures(undefined, run, "room", 100).gramsPerLitre).toBeNull();
+  });
+});
+
+describe("module graph", () => {
+  it("grows.ts does not import comparison.ts, which imports it (no ESM cycle)", () => {
+    const source = readFileSync(new URL("./grows.ts", import.meta.url), "utf8");
+    expect(source).not.toMatch(/from "\.\/comparison"/);
   });
 });

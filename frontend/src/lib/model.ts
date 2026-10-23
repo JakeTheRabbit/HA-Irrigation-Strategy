@@ -1030,6 +1030,8 @@ export function roomStatus(states: States, room: Room, now = Date.now()): RoomSt
   );
 }
 
+/** Whether the zone has a moisture probe to steer by: its VWC reading's entity exists. */
+export const zoneHasProbe = (zone: Zone, states: States) => !!zone.vwc.entityId && !!states[zone.vwc.entityId];
 export function validateChange(room: RoomView, states: States, change: Change): string | null {
   if (!room.room.id || !readable(descriptor(states, room.room)))
     return "No current readable room descriptor.";
@@ -1039,6 +1041,16 @@ export function validateChange(room: RoomView, states: States, change: Change): 
     return Array.isArray(options) && options.includes(change.value)
       ? null
       : "Choose Zone total or Per plant.";
+  }
+  // What waters a zone (Timer programs): one of the select's own options, Steering only where the
+  // zone has a probe to steer by. It is checked before the plan-engaged refusal below on purpose: a
+  // grow plan owns a zone's targets, not whether the zone steers, runs on timers or is off (timers
+  // are how a zone without probes is watered at all).
+  const moded = room.zones.find((z) => change.entityId === `select.${ROOT}${room.room.prefix}zone_${z.id}_irrigation_mode`);
+  if (moded) {
+    const options = states[change.entityId]?.attributes.options;
+    if (!Array.isArray(options) || !options.includes(change.value)) return "Choose Steering, Timer or Off.";
+    return change.value === "steering" && !zoneHasProbe(moded, states) ? `Zone ${moded.id} has no probe, so it can't steer.` : null;
   }
   if (room.strategy.engaged && /^(number|select)[.]/.test(change.entityId))
     return "An active grow plan owns these targets. Disarm the plan before editing manual setpoints.";
@@ -1111,10 +1123,11 @@ export function validateChange(room: RoomView, states: States, change: Change): 
       ? null
       : "Select one of the available options.";
   }
-  // What the AI assistant may do in the room (brain.ts AI_POWERS): one switch per power. Any other
-  // switch registered in features.json is a configuration control too.
+  // What the AI assistant may do in a room (brain.ts AI_POWERS): one switch per power, in any room,
+  // since Settings › AI assistant shows every room's judges side by side. Any other switch
+  // registered in features.json is a configuration control too.
   const registeredSwitch =
-    change.entityId.startsWith(`switch.${ROOT}${room.room.prefix}ai_power_`) ||
+    discoverRooms(states).some((r) => change.entityId.startsWith(`switch.${ROOT}${r.prefix}ai_power_`)) ||
     registered?.control.domain === "switch";
   if (
     (safeSwitches.has(change.entityId) || registeredSwitch) &&

@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Status — All rooms</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#4fc3f7;text-decoration:none}a:hover{color:#b3e5fc}
+</style>
+</helmet>
+<!-- SHELL: 1440x1000 frame. Tokens: canvas #111111, surface #1c1c1c, raised #232323, border #2e2e2e, text #e1e1e1, muted #a4a4a4, faint #8a8a8a, primary #03a9f4, link #4fc3f7, success #81c995, warning #ffca5b, danger #f28b82. Phase P0 #6b7580, P1 #2f6fb5, P2 #6450b0, P3 #34405a. Font Roboto; sizes 12/14/15/17/20/24. Radius 12. -->
+<div style="width: 1440px; height: 1000px; box-sizing: border-box; background: #111111; color: #e1e1e1; font-family: Roboto, Arial, sans-serif; display: flex; overflow: hidden">
+
+<!-- SHELL: menu (sections + live room tree) -->
+<aside style="width: 248px; flex-shrink: 0; background: #1c1c1c; border-right: 1px solid #2e2e2e; padding: 22px 12px 16px; box-sizing: border-box; display: flex; flex-direction: column; gap: 4px">
+<div style="display: flex; align-items: center; gap: 10px; padding: 0 8px 18px">
+<span style="width: 36px; height: 36px; border-radius: 10px; background: #03a9f4; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0b1d27" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.7l5.7 5.7a8 8 0 1 1-11.3 0z"></path></svg></span>
+<span style="display: flex; flex-direction: column"><b style="font-size: 16px; font-weight: 600">Crop Steering</b><span style="font-size: 12px; color: #a4a4a4">Irrigation control</span></span>
+</div>
+<nav aria-label="Main navigation" style="display: flex; flex-direction: column; gap: 1px">
+<a href="S1-AllRooms.dc.html" aria-current="page" style="display: flex; align-items: center; gap: 12px; min-height: 38px; padding: 0 12px; border-radius: 8px; background: #2a2a2a; box-shadow: inset 2px 0 0 #03a9f4; color: #4fc3f7; font-weight: 600; font-size: 15px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>Status</a>
+<button type="button" aria-expanded="false" style="display: flex; align-items: center; gap: 12px; min-height: 38px; padding: 0 12px; border: 0; border-radius: 8px; background: transparent; color: #b8b8b8; font: inherit; font-size: 15px; font-weight: 500; text-align: left; cursor: pointer"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.7l5.7 5.7a8 8 0 1 1-11.3 0z"></path></svg>Irrigation<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="margin-left: auto"><polyline points="9 6 15 12 9 18"></polyline></svg></button>
+<button type="button" aria-expanded="false" style="display: flex; align-items: center; gap: 12px; min-height: 38px; padding: 0 12px; border: 0; border-radius: 8px; background: transparent; color: #b8b8b8; font: inherit; font-size: 15px; font-weight: 500; text-align: left; cursor: pointer"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><polyline points="12 7 12 12 15 14"></polyline></svg>History<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="margin-left: auto"><polyline points="9 6 15 12 9 18"></polyline></svg></button>
+<button type="button" aria-expanded="false" style="display: flex; align-items: center; gap: 12px; min-height: 38px; padding: 0 12px; border: 0; border-radius: 8px; background: transparent; color: #b8b8b8; font: inherit; font-size: 15px; font-weight: 500; text-align: left; cursor: pointer"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"></path></svg>Equipment<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="margin-left: auto"><polyline points="9 6 15 12 9 18"></polyline></svg></button>
+<button type="button" aria-expanded="false" style="display: flex; align-items: center; gap: 12px; min-height: 38px; padding: 0 12px; margin-top: 10px; border: 0; border-radius: 8px; background: transparent; color: #b8b8b8; font: inherit; font-size: 15px; font-weight: 500; text-align: left; cursor: pointer"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="4" y1="7" x2="20" y2="7"></line><line x1="4" y1="17" x2="20" y2="17"></line><circle cx="9" cy="7" r="2.5"></circle><circle cx="15" cy="17" r="2.5"></circle></svg>Settings<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="margin-left: auto"><polyline points="9 6 15 12 9 18"></polyline></svg></button>
+</nav>
+<nav aria-label="Rooms" style="display: flex; flex-direction: column; gap: 1px; margin-top: 16px">
+<span style="padding: 0 12px 6px; font-size: 12px; font-weight: 600; letter-spacing: .06em; color: #a4a4a4">ROOMS</span>
+<sc-for list="{{rooms}}" as="r" hint-placeholder-count="3">
+<a href="S2-Room.dc.html" style="display: flex; align-items: center; gap: 8px; min-height: 36px; padding: 0 10px; margin-top: 6px; border-radius: 8px; color: #e1e1e1; font-size: 14px; font-weight: 500"><span style="width: 8px; height: 8px; border-radius: 4px; background: {{r.dot}}"></span>{{r.name}}<span style="margin-left: auto; font-size: 12px; color: #a4a4a4; font-weight: 400">{{r.state}}</span></a>
+<sc-for list="{{r.zones}}" as="z" hint-placeholder-count="3">
+<a href="S3-Zone.dc.html" style="display: flex; align-items: center; gap: 8px; min-height: 30px; padding: 0 10px 0 24px; border-radius: 8px; color: #b8b8b8; font-size: 13px"><span style="min-width: 22px; padding: 0 4px; border-radius: 4px; background: {{z.phColor}}; color: #fff; font-size: 11px; font-weight: 700; text-align: center">{{z.ph}}</span>{{z.name}}<span style="margin-left: auto; font-size: 12px; color: #a4a4a4">{{z.vwc}}</span></a>
+</sc-for>
+</sc-for>
+</nav>
+<div style="margin-top: auto; padding: 0 8px; font-size: 12px; color: #8a8a8a">Integration 3.17.1 · Controller 3.17.1</div>
+</aside>
+
+<div style="flex: 1; min-width: 0; display: flex; flex-direction: column">
+<!-- SHELL: top bar (no room chips on desktop: the tree is the picker) -->
+<header style="height: 56px; flex-shrink: 0; border-bottom: 1px solid #2e2e2e; display: flex; align-items: center; justify-content: flex-end; gap: 12px; padding: 0 24px">
+<span style="font-size: 13px; color: #a4a4a4">Updated 12 s ago</span>
+<span style="display: flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border: 1px solid #2e2e2e; border-radius: 15px; font-size: 13px; font-weight: 600"><span style="width: 7px; height: 7px; border-radius: 4px; background: #81c995"></span>AI acting</span>
+<button type="button" aria-label="Search, Ctrl K" style="display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 12px; border: 1px solid #2e2e2e; border-radius: 8px; background: #1c1c1c; color: #a4a4a4; font: inherit; font-size: 13px">Jump to… <span style="border: 1px solid #3a3a3a; border-radius: 4px; padding: 0 5px; font-size: 11px">Ctrl K</span></button>
+<span style="font-size: 13px; color: #a4a4a4">F2</span>
+<button type="button" style="height: 34px; padding: 0 14px; border: 1px solid #2e2e2e; border-radius: 8px; background: #1c1c1c; color: #e1e1e1; font: inherit; font-size: 14px; font-weight: 600"><span style="display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 4px; background: #81c995"></span>Watering on</button>
+<button type="button" style="height: 34px; padding: 0 14px; border: 1px solid #f28b82; border-radius: 8px; background: transparent; color: #f28b82; font: inherit; font-size: 14px; font-weight: 600">Stop all</button>
+</header>
+
+<main style="flex: 1; min-height: 0; overflow: hidden; padding: 22px 28px; display: flex; flex-direction: column; gap: 18px">
+<sc-for list="{{rooms}}" as="r" hint-placeholder-count="2">
+<section style="background: #1c1c1c; border: 1px solid {{r.border}}; border-radius: 12px; padding: 16px 20px 18px; display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 14px 22px">
+<div style="display: flex; flex-direction: column; gap: 10px; min-width: 0">
+<div style="display: flex; align-items: baseline; gap: 12px">
+<a href="S2-Room.dc.html" style="display: flex; align-items: center; gap: 8px; color: #e1e1e1"><span style="width: 10px; height: 10px; border-radius: 5px; background: {{r.dot}}"></span><b style="font-size: 20px; font-weight: 600">{{r.name}}</b></a>
+<span style="font-size: 14px; color: #a4a4a4">{{r.state}} · {{r.stage}}</span>
+<span style="margin-left: auto; font-size: 14px">Day <b>{{r.day}}</b> of {{r.days}} <span style="color: #a4a4a4">· {{r.left}} days left</span></span>
+</div>
+<div style="position: relative; height: 10px; border-radius: 5px; background: #333333"><span style="position: absolute; left: 0; top: 0; bottom: 0; width: {{r.runPct}}; border-radius: 5px; background: #03a9f4"></span><span style="position: absolute; top: -5px; bottom: -5px; left: {{r.runPct}}; width: 2px; background: #e1e1e1"></span></div>
+<div style="display: flex; gap: 28px; font-size: 13px; color: #a4a4a4"><span style="display: flex; flex-direction: column; gap: 2px">Drunk today<b style="font-size: 20px; color: #e1e1e1; font-weight: 600">{{r.perPlant}} <span style="font-size: 14px; font-weight: 500">per plant · {{r.roomL}} room</span></b></span><span style="display: flex; flex-direction: column; gap: 2px">Air<b style="font-size: 15px; color: #e1e1e1; font-weight: 500">{{r.air}}</b></span><span style="display: flex; flex-direction: column; gap: 2px">RH<b style="font-size: 15px; color: #e1e1e1; font-weight: 500">{{r.rh}}</b></span><span style="display: flex; flex-direction: column; gap: 2px">VPD<b style="font-size: 15px; color: #e1e1e1; font-weight: 500">{{r.vpd}}</b></span></div>
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px">
+<sc-for list="{{r.zones}}" as="z" hint-placeholder-count="3">
+<a href="S3-Zone.dc.html" style="display: flex; flex-direction: column; gap: 8px; padding: 12px; border: 1px solid {{z.edge}}; border-radius: 12px; background: {{z.bg}}; color: #e1e1e1; box-shadow: {{z.glow}}">
+<span style="display: flex; gap: 12px; align-items: flex-start">
+<svg width="72" height="72" viewBox="0 0 100 100" aria-hidden="true" style="flex: none; opacity: {{z.slabOpacity}}"><path d="M50 30 V14" stroke="#4c8c3a" stroke-width="2.5" stroke-linecap="round" fill="none"></path><path d="M50 18 C40 10 36 12 34 6 C42 6 48 10 50 18 Z" fill="#64a548"></path><path d="M50 15 C58 7 63 8 66 3 C58 3 52 7 50 15 Z" fill="#64a548"></path><rect x="31" y="22" width="38" height="16" rx="2" fill="#e8dfc8" stroke="#b5a684" stroke-width="1.5"></rect><rect x="4" y="36" width="92" height="56" rx="5" fill="#efe7d2"></rect><rect x="4" y="{{z.waterY}}" width="92" height="{{z.waterH}}" fill="#2f86c4" fill-opacity="0.6"></rect><rect x="4" y="36" width="92" height="56" rx="5" fill="none" stroke="{{z.slabEdge}}" stroke-width="2"></rect><line x1="4" x2="96" y1="{{z.peakY}}" y2="{{z.peakY}}" stroke="#1b4f72" stroke-width="1.5" stroke-dasharray="4 3"></line><circle cx="35" cy="45" r="5" fill="{{z.s1}}" stroke="#fff" stroke-width="1.5"></circle><circle cx="65" cy="45" r="5" fill="{{z.s2}}" stroke="#fff" stroke-width="1.5" opacity="{{z.s2op}}"></circle></svg>
+<span style="display: flex; flex-direction: column; gap: 5px; min-width: 0">
+<b style="font-size: 17px; font-weight: 600">{{z.name}} →</b>
+<span style="display: flex; gap: 6px"><span style="padding: 0 6px; border-radius: 4px; background: {{z.phColor}}; color: #fff; font-size: 12px; font-weight: 700">{{z.ph}}</span><span style="display: flex; align-items: center; gap: 5px; padding: 0 8px; border: 1px solid {{z.modeEdge}}; border-radius: 10px; font-size: 12px; font-weight: 600"><span style="width: 7px; height: 7px; border-radius: 4px; background: {{z.modeDot}}"></span>{{z.mode}}</span></span>
+<span style="font-size: 12px; color: #a4a4a4; letter-spacing: 1px">{{z.shots}}</span>
+</span>
+</span>
+<span style="display: flex; flex-direction: column; gap: 4px"><span style="font-size: 14px"><b style="font-size: 17px; font-weight: 600">{{z.ml}}</b> per plant <span style="color: #a4a4a4">· {{z.l}} today</span></span><span style="position: relative; height: 8px; border-radius: 4px; background: #333333"><span style="position: absolute; left: 0; top: 0; bottom: 0; width: {{z.drinkPct}}; border-radius: 4px; background: #2f86c4"></span><span style="position: absolute; top: -3px; bottom: -3px; left: 62%; width: 2px; background: #b8b8b8"></span></span></span>
+<span style="display: grid; grid-template-columns: 56px 1fr 52px; gap: 5px 8px; align-items: center; font-size: 12px">
+<span style="color: #a4a4a4">VWC</span><span style="position: relative; height: 7px; border-radius: 4px; background: #333333"><span style="position: absolute; left: 45%; width: 25%; top: 0; bottom: 0; background: rgba(129,201,149,.45); border-radius: 4px"></span><span style="position: absolute; left: {{z.vwcPct}}; top: -4px; bottom: -4px; width: 3px; background: #e1e1e1; border-radius: 2px"></span></span><b style="text-align: right">{{z.vwc}}</b>
+<span style="color: #a4a4a4">Pore EC</span><span style="position: relative; height: 7px; border-radius: 4px; background: #333333"><span style="position: absolute; left: 40%; width: 30%; top: 0; bottom: 0; background: rgba(129,201,149,.45); border-radius: 4px"></span><span style="position: absolute; left: {{z.ecPct}}; top: -4px; bottom: -4px; width: 3px; background: {{z.ecTick}}; border-radius: 2px"></span></span><b style="text-align: right; color: {{z.ecInk}}">{{z.ec}}</b>
+<span style="color: #a4a4a4">Root</span><span style="position: relative; height: 7px; border-radius: 4px; background: #333333"><span style="position: absolute; left: 30%; width: 35%; top: 0; bottom: 0; background: rgba(129,201,149,.45); border-radius: 4px"></span><span style="position: absolute; left: {{z.rootPct}}; top: -4px; bottom: -4px; width: 3px; background: #e1e1e1; border-radius: 2px"></span></span><b style="text-align: right">{{z.root}}</b>
+</span>
+<sc-if value="{{z.hasFlag}}" hint-placeholder-val="{{false}}"><span style="display: flex; gap: 6px; align-items: flex-start; padding: 6px 10px; border-radius: 8px; background: rgba(255,202,91,.14); font-size: 13px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ffca5b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: none; margin-top: 2px"><path d="M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12" y2="17"></line></svg>{{z.flag}}</span></sc-if>
+</a>
+</sc-for>
+</div>
+</div>
+<div style="display: flex; flex-direction: column; gap: 8px">
+<a href="E2-Dosing.dc.html" style="display: flex; gap: 12px; padding: 12px; border: 1px solid {{r.tankEdge}}; border-radius: 12px; background: #111111; color: #e1e1e1">
+<svg width="50" height="62" viewBox="0 0 80 100" aria-hidden="true" style="flex: none"><rect x="12" y="14" width="56" height="78" rx="8" fill="#26343c"></rect><rect x="12" y="{{r.tankY}}" width="56" height="{{r.tankH}}" fill="#2f86c4" fill-opacity="0.75"></rect><rect x="12" y="14" width="56" height="78" rx="8" fill="none" stroke="#8a8a8a" stroke-width="1.5"></rect><line x1="12" x2="68" y1="86" y2="86" stroke="#e1e1e1" stroke-width="1.5" stroke-dasharray="3 3"></line><rect x="8" y="8" width="64" height="8" rx="3" fill="#5a5a5a"></rect></svg>
+<span style="display: flex; flex-direction: column; gap: 3px; font-size: 13px"><span style="font-size: 11px; font-weight: 600; letter-spacing: .06em; color: #a4a4a4">FEED TANK</span><span><b style="font-size: 17px">{{r.tankPct}}</b> <span style="color: #a4a4a4">· {{r.tankL}} usable</span></span><span>pH {{r.ph}} · EC {{r.feedEc}} · {{r.feedT}}</span><span style="color: #a4a4a4">Pump off · filled 06:10</span></span>
+</a>
+<a href="E5-Stock.dc.html" style="display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border: 1px solid #2e2e2e; border-radius: 12px; background: #111111; color: #e1e1e1">
+<span style="font-size: 11px; font-weight: 600; letter-spacing: .06em; color: #a4a4a4">STOCK</span>
+<span style="display: flex; gap: 14px">
+<sc-for list="{{r.stock}}" as="s" hint-placeholder-count="4"><span style="display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 11px"><svg width="20" height="30" viewBox="0 0 40 60" aria-hidden="true"><rect x="6" y="14" width="28" height="44" rx="5" fill="#26343c" stroke="#8a8a8a" stroke-width="1.5"></rect><rect x="6" y="{{s.y}}" width="28" height="{{s.h}}" fill="{{s.fill}}"></rect><rect x="13" y="6" width="14" height="8" rx="2" fill="#5a5a5a"></rect></svg><b style="font-weight: 600">{{s.name}}</b><span style="color: {{s.ink}}">{{s.level}}</span></span></sc-for>
+</span>
+</a>
+</div>
+</section>
+</sc-for>
+</main>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1000}}'>
+var PH = { P0: '#6b7580', P1: '#2f6fb5', P2: '#6450b0', P3: '#34405a' };
+function zone(name, ph, vwc, ec, root, ml, l, drink, opts) {
+  opts = opts || {};
+  var y = function (v) { return 92 - v / 80 * 56; };
+  var mode = opts.mode || 'Automated';
+  var watering = mode === 'Watering now', paused = mode === 'Paused';
+  return {
+    name: name, ph: ph, phColor: PH[ph], vwc: vwc + '%', ec: ec + (opts.ecMark || ''), root: root + '°', ml: ml, l: l,
+    drinkPct: drink + '%', vwcPct: Math.min(96, vwc / 80 * 100) + '%', ecPct: (opts.ecPct || 55) + '%', rootPct: (opts.rootPct || 45) + '%',
+    ecTick: opts.ecMark ? '#ffca5b' : '#e1e1e1', ecInk: opts.ecMark ? '#ffca5b' : '#e1e1e1',
+    waterY: y(vwc), waterH: 92 - y(vwc), peakY: y(vwc + (opts.dry || 4)),
+    s1: opts.s1 || '#81c995', s2: opts.s2 || '#81c995', s2op: opts.single ? 0 : 1,
+    mode: mode, modeDot: watering ? '#03a9f4' : paused ? '#a4a4a4' : '#81c995', modeEdge: watering ? '#03a9f4' : '#3a3a3a',
+    edge: opts.flag ? '#ffca5b' : watering ? '#03a9f4' : '#2e2e2e', glow: watering ? '0 0 0 2px rgba(3,169,244,.35)' : 'none',
+    bg: paused ? 'repeating-linear-gradient(-45deg,#111111,#111111 8px,#181818 8px,#181818 16px)' : '#111111',
+    slabOpacity: paused ? 0.45 : 1, slabEdge: opts.flag ? '#ffca5b' : '#b5a684',
+    shots: (opts.shots || 0) + ' shots today', hasFlag: !!opts.flag, flag: opts.flag || ''
+  };
+}
+var ROOMS = [
+  { name: 'F2', dot: '#03a9f4', state: 'Watering', stage: 'Flower · bulk', day: 38, days: 63, left: 25, runPct: '60%', perPlant: '0.21 L', roomL: '24.8 L', air: '26.4 °C', rh: '58%', vpd: '1.31 kPa',
+    tankPct: '68%', tankL: '310 L', ph: '5.84', feedEc: '2.4', feedT: '19.8°', tankY: 39, tankH: 53, tankEdge: '#2e2e2e', border: '#2e2e2e',
+    stock: [{ name: 'Part A', level: '12.9/20 L', y: 30, h: 28, fill: '#2f86c4', ink: '#a4a4a4' }, { name: 'Part B', level: '5.4/20 L', y: 46, h: 12, fill: '#ffca5b', ink: '#ffca5b' }, { name: 'Cal-Mag', level: '6.1/10 L', y: 31, h: 27, fill: '#2f86c4', ink: '#a4a4a4' }, { name: 'pH down', level: '3.8/5 L', y: 24, h: 34, fill: '#2f86c4', ink: '#a4a4a4' }],
+    zones: [zone('Zone 1', 'P2', 59.4, 5.2, 21.4, '212 mL', '8.5 L', 66, { single: true, shots: 7, mode: 'Watering now' }), zone('Zone 2', 'P2', 59.4, 6.6, 21.8, '198 mL', '7.9 L', 61, { single: true, ecMark: ' ▲', ecPct: 82, flag: 'Pore EC 6.6 is over the 4.5–6.0 band', shots: 6 }), zone('Zone 3', 'P2', 60.2, 5.0, 21.1, '209 mL', '8.4 L', 64, { single: true, shots: 7 })] },
+  { name: 'F1', dot: '#81c995', state: 'Holding', stage: 'Flower · stretch', day: 12, days: 63, left: 51, runPct: '19%', perPlant: '0.16 L', roomL: '12.7 L', air: '27.5 °C', rh: '66%', vpd: '1.08 kPa',
+    tankPct: '47%', tankL: '188 L', ph: '6.02', feedEc: '1.9', feedT: '20.4°', tankY: 55, tankH: 37, tankEdge: '#2e2e2e', border: '#2e2e2e',
+    stock: [{ name: 'Part A', level: '15.2/20 L', y: 25, h: 33, fill: '#2f86c4', ink: '#a4a4a4' }, { name: 'Part B', level: '14.8/20 L', y: 26, h: 32, fill: '#2f86c4', ink: '#a4a4a4' }, { name: 'Silica', level: '8.0/10 L', y: 23, h: 35, fill: '#2f86c4', ink: '#a4a4a4' }],
+    zones: [zone('Zone 1', 'P1', 63.8, 4.1, 22.1, '161 mL', '6.4 L', 50, { shots: 4 }), zone('Zone 2', 'P1', 62.9, 4.0, 22.4, '158 mL', '6.3 L', 49, { shots: 4, s2: '#ffca5b', flag: 'Back sensor silent 3 h, left out of the reading' }), zone('Zone 3', 'P1', 64.4, 4.2, 21.9, '—', '0 L', 0, { shots: 0, mode: 'Paused' })] }
+];
+class Component extends DCLogic {
+  renderVals() { return { rooms: ROOMS }; }
+}
+</script>
+</body>
+</html>

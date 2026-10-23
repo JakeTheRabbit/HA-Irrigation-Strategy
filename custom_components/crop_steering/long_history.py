@@ -17,6 +17,7 @@ from urllib.parse import urlsplit
 import aiohttp
 
 from .admin import async_require_admin
+from .api_v2 import StaleRevision
 from .const import DOMAIN
 from .room import room_prefix
 
@@ -338,6 +339,8 @@ async def async_setup_long_history(hass, entry):
     from homeassistant.core import SupportsResponse
     from homeassistant.exceptions import HomeAssistantError
 
+    from .api_v2 import fields, wrap
+
     manager = LongHistory(hass, entry)
     stored = await manager.store.async_load()
     if isinstance(stored, dict):
@@ -372,7 +375,10 @@ async def async_setup_long_history(hass, entry):
                     return target.public()
                 if call.service == "history_connection_save":
                     if call.data["expected_revision"] != target.revision:
-                        raise ValueError("History connection changed elsewhere; reload")
+                        raise StaleRevision(
+                            "History connection changed elsewhere; reload",
+                            target.revision,
+                        )
                     candidate = connection(call.data["connection"], target.config)
                     if candidate["source"] == "influxdb":
                         probe = sorted(target.allowed())[:1]
@@ -437,8 +443,10 @@ async def async_setup_long_history(hass, entry):
         hass.services.async_register(
             DOMAIN,
             service,
-            handle,
-            schema=vol.Schema({vol.Required("room_id"): str, **schemas[service]}),
+            wrap(handle),
+            schema=vol.Schema(
+                fields({vol.Required("room_id"): str, **schemas[service]})
+            ),
             supports_response=SupportsResponse.ONLY,
         )
 

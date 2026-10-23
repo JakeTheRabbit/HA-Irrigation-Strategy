@@ -417,3 +417,12 @@ def test_a_band_that_cant_be_read_doses_nothing(build):
     r = build(**{"number.crop_steering_irrigation_ph_max": "unavailable"})
     minutes(r, 15)
     assert presses(r) == []
+
+
+def test_a_ph_pump_whose_setup_cant_be_read_is_named(build):
+    r = build(pumps=({k: v for k, v in UP.items() if k != "flow_entity"},))  # no flow entity, no calibration
+    minutes(r, 30)
+    assert presses(r) == []
+    (refusal,) = r.creates("CS-809")
+    assert "the setup of pump balance can't be read" in refusal["message"]
+    assert "no dosing pump has the pH up role" not in refusal["message"]

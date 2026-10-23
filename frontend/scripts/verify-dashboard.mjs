@@ -7,6 +7,8 @@ import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
 import AxeBuilder from "@axe-core/playwright";
 import { readmeImage } from "./readme-images.mjs";
+/** Grow plan & presets arms at the room's next lights-on and names it (I4). */
+const ARM_PLAN = /^Arm at (lights-on, \w{3} \d{1,2}:\d{2}( [ap]m)?|next lights-on)$/;
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const publicRoot = path.join(root, "www");
@@ -85,6 +87,19 @@ async function go(route, room = "f2") {
   await page.goto(`${base}/dashboard.html?demo&room=${room}#/${route}`, {
     waitUntil: "networkidle",
   });
+  if (route === "settings") await openMoreDisplay();
+}
+/** Dashboards & display keeps the connection, appearance and display options under "More display
+ * options", closed until opened (Task 29). */
+async function openMoreDisplay() {
+  const more = page.locator("details.more-display");
+  if ((await more.count()) && !(await more.evaluate((d) => d.open))) await more.locator("summary").click();
+}
+/** Opens a page from the tree menu: its section opened first if it is closed. */
+async function openFromMenu(menu, section, label) {
+  const head = menu.locator(`button[data-nav-section="${section}"]`);
+  if ((await head.getAttribute("aria-expanded")) === "false") await head.click();
+  await menu.getByRole("link", { name: label, exact: true }).click();
 }
 async function noOverflow() {
   // A new window size reaches the layout a frame or two after it is set.
@@ -102,7 +117,7 @@ async function noOverflow() {
 /** A menu entry's views sit in one row of tabs, none over another. */
 async function tabsShareRow(section) {
   const tabs = await page
-    .getByRole("navigation", { name: `${section} views` })
+    .getByRole("navigation", { name: `${section} pages` })
     .getByRole("button")
     .evaluateAll((buttons) =>
       buttons.map((button) => {
@@ -197,7 +212,7 @@ try {
     await page.goto(`${base}/dashboard.html?demo&room=f2`, { waitUntil: "networkidle" });
     await expectVisible(page.getByRole("heading", { name: "All rooms", exact: true, level: 1 }));
     await go("settings");
-    const landing = page.getByLabel("Landing page", { exact: true });
+    const landing = page.getByLabel("On this browser", { exact: true });
     assert.equal(await landing.inputValue(), "all-zones");
     await landing.selectOption("plan/schedule");
     await page.reload({ waitUntil: "networkidle" });
@@ -210,27 +225,29 @@ try {
       "room:room_b_",
     );
     await go("today");
-    await expectVisible(page.getByRole("heading", { name: "Room A today", exact: true }));
+    await expectVisible(page.getByRole("heading", { name: "Room A", exact: true, level: 1 }));
     await page.goto(`${base}/dashboard.html?demo&room=f2&view=logs`, { waitUntil: "networkidle" });
-    await expectVisible(page.getByRole("heading", { name: "History", exact: true }));
+    await expectVisible(page.getByRole("heading", { name: "Explorer", exact: true }));
     await go("settings");
     await landing.selectOption("all-zones");
   });
   await check("every old address lands where its content lives now", async () => {
     const moved = [
-      ["overview", "today", "Room A today"],
+      ["overview", "today", "Room A"],
       ["zones", "all-zones", "All rooms"],
       ["strategy", "plan/targets", "Irrigation"],
       ["grow-plan", "plan/schedule", "Irrigation"],
       ["compare", "history/compare", "Compare runs"],
-      ["insights", "equipment/probes", "Probes"],
-      ["activity", "history/timeline", "History"],
-      ["sensors", "equipment/probes", "Probes"],
-      ["stock", "equipment/stock", "Stock tanks"],
+      ["insights", "equipment/probes", "Probes & offsets"],
+      ["activity", "history/explorer", "Explorer"],
+      ["sensors", "equipment/probes", "Probes & offsets"],
+      ["stock", "equipment/stock", "Stock tanks · Room A"],
       ["setup", "equipment/setup", "Rooms and setup"],
-      ["plan", "plan/targets", "Irrigation"],
-      ["history", "history/timeline", "History"],
-      ["equipment", "equipment/probes", "Probes"],
+      ["plan", "plan/watering", "Timeline"],
+      ["history", "history/explorer", "Explorer"],
+      ["history/timeline", "history/explorer", "Explorer"],
+      ["equipment/feed", "equipment/dosing", "Feed & dosing · Room A"],
+      ["equipment", "equipment/probes", "Probes & offsets"],
     ];
     for (const [old, now, heading] of moved) {
       await go(old);
@@ -241,35 +258,42 @@ try {
     await go("help?code=CS-605");
     await expectVisible(page.locator("details#cs-605[open]"));
     await page.goto(`${base}/dashboard.html?demo&room=f2&view=logs`, { waitUntil: "networkidle" });
-    await expectVisible(page.getByRole("heading", { name: "History", exact: true }));
+    await expectVisible(page.getByRole("heading", { name: "Explorer", exact: true }));
     // Rewritten in place: Back returns to the page before, not to the old address.
     await go("today");
     const before = await page.evaluate(() => history.length);
     await page.evaluate(() => (location.hash = "#/sensors"));
-    await expectVisible(page.getByRole("heading", { name: "Probes", exact: true }));
+    await expectVisible(page.getByRole("heading", { name: "Probes & offsets", exact: true }));
     assert.equal(new URL(page.url()).hash, "#/equipment/probes");
     assert.equal(await page.evaluate(() => history.length), before + 1);
     await page.goBack();
-    await expectVisible(page.getByRole("heading", { name: "Room A today", exact: true }));
+    await expectVisible(page.getByRole("heading", { name: "Room A", exact: true, level: 1 }));
   });
   const routes = [
     ["all-zones", "All rooms"],
-    ["today", "Room A today"],
+    ["today", "Room A"],
     ["zone/1", "Zone 1"],
     ["today/ai", "AI assistant"],
     ["plan/targets", "Irrigation"],
     ["plan/schedule", "Irrigation"],
-    ["history/timeline", "History"],
-    ["history/water", "Water use"],
+    ["plan/watering", "Timeline"],
+    ["plan/timers", "Timer programs"],
+    ["history/explorer", "Explorer"],
+    ["history/water", "Water & flow"],
     ["history/compare", "Compare runs"],
-    ["equipment/probes", "Probes"],
-    ["equipment/stock", "Stock tanks"],
-    ["equipment/feed", "Tank and feed"],
-    ["equipment/dosing", "Dosing"],
+    ["history/changes", "Changes"],
+    ["equipment/probes", "Probes & offsets"],
+    ["equipment/stock", "Stock tanks · Room A"],
+    ["equipment/dosing", "Feed & dosing · Room A"],
+    ["equipment/pump-calibration", "Prime & calibrate a pump"],
+    // Desktop names the probe under the room crumb; the phone's full-screen bar names the room.
+    ["equipment/feed-calibration", /^Calibrate (feed pH probe|Room A feed pH)$/],
     ["equipment/setup", "Rooms and setup"],
-    ["settings", "Settings"],
+    ["settings", "Dashboards & display"],
+    ["settings/alerts", "Alert rules"],
     ["settings/features", "Capabilities"],
     ["settings/notifications", "Notifications"],
+    ["settings/system", "System status"],
     ["settings/ai", "AI assistant"],
     ["help", "Help"],
   ];
@@ -285,14 +309,19 @@ try {
     await check(`${route}: render, desktop layout and accessibility`, async () => {
       await go(route);
       await expectVisible(page.getByRole("heading", { name: heading, exact: true, level: 1 }));
-      // A heading carries a sentence only for a behaviour someone could get wrong.
-      if (!route.startsWith("plan/") && !["all-zones", "settings/features"].includes(route))
+      // A heading carries a sentence only for a behaviour someone could get wrong. Probes & offsets
+      // carries its counts instead (mockup 13), checked with the probes below.
+      if (
+        !route.startsWith("plan/") &&
+        !["all-zones", "settings/features", "equipment/probes", "equipment/dosing"].includes(route)
+      )
         assert.equal(
           await page.locator(".page-heading > div > p").count(),
           0,
           `${route}: the heading repeats itself in a description`,
         );
-      if (sectionOf(route)) await tabsShareRow(sectionOf(route));
+      // The tree menu lists every page on a desktop: the in-page tabs stay hidden.
+      assert.equal(await page.locator(".page-tabs").isVisible(), false, `${route}: tabs hidden`);
       await noOverflow();
       await axe(route);
       await page.screenshot({
@@ -301,18 +330,18 @@ try {
       });
     });
   await check(
-    "the menu: five entries, and a page's views as tabs with working history",
+    "the menu: five sections as a tree, and a page's views with working history",
     async () => {
       await go("today");
       const menu = page.getByRole("navigation", { name: "Main navigation" });
-      assert.deepEqual(await menu.getByRole("button").allInnerTexts(), [
+      assert.deepEqual(await menu.locator("[data-nav-section]").allInnerTexts(), [
         "Status",
         "Irrigation",
         "History",
         "Equipment",
         "Settings",
       ]);
-      await menu.getByRole("button", { name: "Irrigation", exact: true }).click();
+      await openFromMenu(menu, "plan", "Current day");
       await expectVisible(page.getByRole("heading", { name: "Irrigation", exact: true }));
       const views = page.getByRole("navigation", { name: "Irrigation views" });
       const targets = views.getByRole("button", { name: "Current day", exact: true });
@@ -323,26 +352,26 @@ try {
       assert.equal(new URL(page.url()).hash, "#/plan/targets");
       assert.equal(await schedule.getAttribute("aria-current"), "page");
       assert.equal(
-        await menu
-          .getByRole("button", { name: "Irrigation", exact: true })
-          .getAttribute("aria-current"),
+        await menu.locator('[data-nav-page="plan/targets"]').getAttribute("aria-current"),
         "page",
       );
       await targets.click();
       assert.equal(await targets.getAttribute("aria-current"), "page");
-      await menu.getByRole("button", { name: "History", exact: true }).click();
+      await openFromMenu(menu, "history", "Explorer");
       await page.goBack();
       await expectVisible(page.getByRole("heading", { name: "Irrigation", exact: true }));
       await page.goForward();
-      await expectVisible(page.getByRole("heading", { name: "History", exact: true }));
+      await expectVisible(page.getByRole("heading", { name: "Explorer", exact: true }));
     },
   );
   await check(
-    "the header: each room's state, the data's age and the two safety switches",
+    "the header: the data's age, Jump to…, the room's name and the two safety switches",
     async () => {
       await go("today");
-      // On a desktop the menu's room tree is the room picker; the header chips step aside.
-      assert.ok(!(await page.locator(".topbar .room-chips").isVisible()), "chips hidden");
+      // The menu's room tree is the room picker; the header has no room chips at all.
+      assert.equal(await page.locator(".topbar [data-room], .topbar .room-chip").count(), 0);
+      await expectVisible(page.getByRole("button", { name: /^Jump to…/ }));
+      assert.equal((await page.locator(".topbar .header-safety-scope").innerText()).trim(), "Room A");
       const rooms = page.locator(".desktop-sidebar .room-tree-room");
       assert.equal(await rooms.count(), 2, "one tree entry per room");
       const chip = (id) =>
@@ -368,7 +397,7 @@ try {
         assert.equal(await page.locator(gone).count(), 0, `no ${gone}`);
       // Another room's chip opens it.
       await chip("room:room_b_").click();
-      await expectVisible(page.getByRole("heading", { name: "Room B today", exact: true }));
+      await expectVisible(page.getByRole("heading", { name: "Room B", exact: true, level: 1 }));
       assert.equal(await chip("room:room_b_").getAttribute("aria-current"), "page");
       // Watering switched off from the header, through its review.
       await page
@@ -397,13 +426,13 @@ try {
     await page.getByRole("dialog").waitFor({ state: "hidden" });
     await page
       .getByRole("navigation", { name: "Main navigation" })
-      .getByRole("button", { name: "Status", exact: true })
+      .getByRole("link", { name: "Status", exact: true })
       .click();
     // The Status tabs give way to the room tree on a desktop; open the room page directly.
     await page.evaluate(() => {
       location.hash = "#/today";
     });
-    await expectVisible(page.getByRole("heading", { name: "Room B today", exact: true }));
+    await expectVisible(page.getByRole("heading", { name: "Room B", exact: true, level: 1 }));
     const stopped = page.locator(".today-stopped");
     assert.match(
       await stopped.innerText(),
@@ -413,7 +442,8 @@ try {
       await page.locator('.desktop-sidebar .room-tree-row[data-room="room:room_b_"]').innerText(),
       /Not watering/,
     );
-    assert.match(await page.locator("[data-today-line]").innerText(), /Watering off/);
+    // The room's own line says it is not watering, beside the header control that says why.
+    assert.match(await page.locator("[data-today-sub]").innerText(), /^Not watering/);
     assert.equal(
       await stopped.getByRole("button", { name: "Switch it on in Settings", exact: true }).count(),
       0,
@@ -457,97 +487,93 @@ try {
     await page.getByRole("button", { name: "Recent activity", exact: true }).click();
     await expectVisible(panel);
     await panel.getByRole("button", { name: "Open the timeline" }).click();
-    await expectVisible(page.getByRole("heading", { name: "History", exact: true }));
+    await expectVisible(page.getByRole("heading", { name: "Explorer", exact: true }));
     assert.equal(await page.getByRole("dialog").count(), 0, "the panel closes when the log opens");
   });
-  await check("today: a compact laptop view says which zone needs you and why", async () => {
+  await check("today: a laptop view says which zone needs you and why, in place", async () => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await go("today");
-    const cards = page.locator("article.today-zone");
-    await expectVisible(cards.first());
-    assert.equal(await cards.count(), 3, "one card per zone");
-    // The demo's readings are in before the page is measured.
-    await page.locator(".today-spark").first().waitFor();
-    // The new window size reaches the layout a frame or two after it is set: read until it settles.
-    await page
-      .waitForFunction(() => document.documentElement.scrollHeight <= innerHeight, null, {
-        timeout: 3_000,
-      })
-      .catch(() => {});
-    const height = await page.evaluate(() => document.documentElement.scrollHeight);
-    assert.ok(height <= 900 + 64, `Today is ${height}px tall in a 900px window`);
-    // The room in one line: watering, the stage and its day, steering, lights, the phase, alerts.
-    const line = await page.locator("[data-today-line]").innerText();
-    for (const part of ["Watering on", "Vegetative", "Pore EC 3.5–6"])
-      assert.ok(line.includes(part), `the room's line says "${part}": ${line}`);
-    // Flagged only when needed, with the reason in a line: zone 1's pore EC under the stage's band,
-    // zone 3's back EC probe left out; zone 2 quiet.
-    const flags = await cards.evaluateAll((all) =>
-      all.map((card) => card.querySelector(".today-flag")?.textContent.trim() ?? null),
+    const rows = page.locator("article.today-zone");
+    await expectVisible(rows.first());
+    assert.equal(await rows.count(), 3, "one row per zone");
+    // Today's shots are in before the page is measured: a track per zone.
+    const tracks = page.locator('[data-today-strip] .st-row[data-kind="zone"]');
+    await tracks.first().waitFor();
+    assert.equal(await tracks.count(), 3, "a strip track per zone");
+    // The header, today's strip and every zone row within 1.35 windows; the plan line and the AI
+    // assistant's card follow.
+    const bottom = await rows.last().evaluate((el) => el.getBoundingClientRect().bottom + scrollY);
+    assert.ok(bottom <= 900 * 1.35, `the zone rows end ${bottom}px down a 900px window`);
+    // The whole page: measured 1357px at 1440 x 900 with the demo, plus 10%.
+    const whole = await page.evaluate(() => document.documentElement.scrollHeight);
+    assert.ok(whole <= 1357 * 1.1, `Today is ${whole}px tall in a 900px window`);
+    // The room: state, stage and plants; the grow day and its stage's end; water, lights, climate.
+    assert.match(
+      await page.locator("[data-today-sub]").innerText(),
+      /^\S.* · Flower bulk · \d+ plants in 3 zones$/,
     );
-    assert.match(flags[0], /^Pore EC 2\.8, under the stage’s 3\.5–6/);
-    assert.equal(flags[1], null);
-    assert.match(flags[2], /^A pore EC probe left out: not reporting/);
-    // Each card: a status line, VWC and pore EC as gauges against their band, water per plant
-    // against the room, the last shot and the next.
+    assert.match(
+      await page.locator("[data-today-day]").innerText(),
+      /^Day 38 of 63 · 25 days left · harvest \d{1,2} [A-Z][a-z]{2}$/,
+    );
+    assert.equal(await page.locator(".today-run-mark").innerText(), "Flower bulk ends day 49");
+    const line = await page.locator("[data-today-line]").innerText();
+    for (const part of [/Water today\s+[\d.]+ L room · [\d.]+ L per watered plant/, /Lights\s+O(n|ff) /, /Air \(reading\)/, /RH/, /VPD/])
+      assert.match(line, part, `the room's line: ${line}`);
+    // Each row: VWC, dryback and pore EC against their targets, water against the room's median,
+    // and its sensors.
     for (const index of [0, 1, 2]) {
-      const card = cards.nth(index);
-      await expectVisible(card.locator(".today-zone-head [data-hmi-status]"));
-      await expectVisible(card.locator(".moisture-bar"));
-      assert.match(
-        await card.locator('[data-gauge="vwc"]').getAttribute("aria-label"),
-        /^VWC now [\d.]+%, (band [\d.]+% to [\d.]+%|target [\d.]+%), /,
-      );
-      assert.match(
-        await card.locator('[data-gauge="pore-ec"]').getAttribute("aria-label"),
-        /^Pore EC [\d.]+, band 3\.5 to 6, /,
-      );
-      // The levels the bar marks keep their key: rescue floor, re-water point and peak.
-      assert.match(
-        await card.locator(".hmi-gauge-marks").innerText(),
-        /^Rescue floor [\d.]+\s+Re-water [\d.]+\s+Peak [\d.]+$/,
-      );
-      const facts = await card.locator(".today-zone-facts").innerText();
-      assert.match(facts, /Water\s+[\d.]+ (mL|L)\/plant · (≈ the room|[\d.]+× the room)/);
-      assert.match(facts, /Last shot\s+\S/);
-      assert.match(facts, /Next\s+\S/);
+      const row = rows.nth(index);
+      assert.equal(await row.locator(".today-gauge").count(), 3);
+      assert.match(await row.locator(".today-gauge").nth(0).innerText(), /^VWC\s+target [\d.]+–[\d.]+%\s+[\d.]+%(\s*, [\d.]+ points (under|over))?$/);
+      assert.match(await row.locator(".today-gauge").nth(2).innerText(), /^Pore EC\s+target 3\.5–6(\.0)?\s+[\d.]+(\s*, [\d.]+ mS\/cm (under|over))?$/);
+      assert.match(await row.locator("[data-today-delta]").innerText(), /^[+−±]\d+ mL vs median \d+ mL$/);
+      assert.equal(await row.locator(".today-sensors li").count(), 2, "front and back sensors");
     }
-    // What the AI assistant changed today: three at most, newest first, with the way to the rest.
-    const jev = page.locator("[data-jev-today]");
-    const changes = jev.locator(".today-jev-list li");
-    assert.ok((await changes.count()) > 0 && (await changes.count()) <= 3);
-    await expectVisible(jev.getByRole("button", { name: "History" }));
-    // A card opens its zone.
-    await cards.nth(1).getByRole("link", { name: "Zone 2" }).click();
+    // Problems in place: zone 1's pore EC under the stage's band on its gauge; zone 3's back EC
+    // probe on its sensor, which says since when and what the zone reads; zone 2 quiet.
+    assert.equal(await rows.nth(0).locator(".today-gauge").nth(2).getAttribute("data-state"), "abnormal");
+    const back = rows.nth(2).locator('.today-sensors li[data-sensor="Back"]');
+    assert.match(await back.locator(".today-sensor-reading").innerText(), /^silent \d+ h$/);
+    assert.match(
+      await back.locator(".today-sensor-note").innerText(),
+      /^Last heard \S.*\. Left out: the zone reads the front sensor only\.$/,
+    );
+    assert.equal(await rows.nth(1).getAttribute("data-attention"), null);
+    assert.equal(await rows.nth(1).locator("[data-today-problem], .today-sensor-note").count(), 0);
+    // The AI assistant's changes are not repeated here, nor the zones as a table.
+    assert.equal(await page.locator("[data-jev-today], [data-today-table]").count(), 0);
+    // A row opens its zone.
+    await rows.nth(1).getByRole("link", { name: "Zone 2" }).click();
     await expectVisible(page.getByRole("heading", { name: "Zone 2", exact: true }));
     assert.equal(new URL(page.url()).hash, "#/zone/2");
+    // The strip opens the full timeline; the AI assistant's card opens its page.
     await go("today");
-    await jev.getByRole("button", { name: "History" }).click();
-    await expectVisible(page.getByRole("heading", { name: "History", exact: true }));
+    await page.locator("[data-today-strip]").getByRole("button", { name: "Open full timeline" }).click();
+    await expectVisible(page.getByRole("heading", { name: "Timeline", exact: true, level: 1 }));
     await page.setViewportSize({ width: 1440, height: 1000 });
   });
-  await check("today: two phone screens at most, in both themes", async () => {
+  await check("today: a phone keeps the room, the strip and each zone in one column, in both themes", async () => {
     await page.setViewportSize({ width: 390, height: 844 });
+    const strip = '[data-today-strip] .st-row[data-kind="zone"]';
     await inBothThemes("today on a phone", async () => {
       await go("today");
-      await page.locator(".today-spark").first().waitFor();
+      await page.locator(strip).first().waitFor();
     });
     await go("today");
-    await page.locator(".today-spark").first().waitFor();
-    const strip = page.locator("[data-run-progress]");
-    await strip.waitFor();
-    await page
-      .waitForFunction(() => document.documentElement.scrollHeight <= 2 * innerHeight, null, {
-        timeout: 3_000,
-      })
-      .catch(() => {});
+    await page.locator(strip).first().waitFor();
+    await page.locator("[data-plan-feed]").waitFor();
     const height = await page.evaluate(() => document.documentElement.scrollHeight);
-    // The run strip sits above the zones and adds its own height; the rest keeps its two screens.
-    const run = await strip.evaluate((el) => el.getBoundingClientRect().height + 16);
-    assert.ok(run <= 220, `the run strip is ${run}px tall on a phone`);
-    // The bottom section bar is fixed chrome; the page pads itself clear of it.
+    // The bottom section bar is fixed chrome; the page pads itself clear of it. Each zone row
+    // carries its sensors in place, so the page is 2.85 phone screens at most (measured 2317px).
     const bar = await page.evaluate(() => document.querySelector(".bottom-nav")?.getBoundingClientRect().height ?? 0);
-    assert.ok(height - run - bar <= 2 * 844, `Today is ${height}px tall on a 844px phone`);
+    assert.ok(height - bar <= 2.85 * 844, `Today is ${height}px tall on a 844px phone`);
+    // Each zone row fits a screen, one column wide.
+    const rows = await page.locator("article.today-zone").evaluateAll((all) =>
+      all.map((row) => row.getBoundingClientRect()),
+    );
+    assert.equal(rows.length, 3);
+    for (const row of rows) assert.ok(row.height <= 844 && row.right <= 390, `a zone row is ${row.height}px tall`);
     await noOverflow();
     await page.setViewportSize({ width: 1440, height: 1000 });
   });
@@ -557,130 +583,61 @@ try {
       await page.goto(`${base}/dashboard.html?demo&room=f2&display=all#/today`, {
         waitUntil: "networkidle",
       });
-      // Table mode hides the desktop cards. Phones retain those cards instead of the table.
-      const ready =
-        page.viewportSize().width > 720
-          ? "[data-today-table] tbody tr"
-          : ".today-zones .today-spark";
-      await page.locator(ready).first().waitFor();
+      await page.locator('[data-today-strip] .st-row[data-kind="zone"]').first().waitFor();
+      await page.locator("[data-plan-feed]").waitFor();
     };
     await page.setViewportSize({ width: 1440, height: 900 });
     await open();
-    await page
-      .waitForFunction(() => document.documentElement.scrollHeight <= innerHeight, null, {
-        timeout: 3_000,
-      })
-      .catch(() => {});
-    const laptop = await page.evaluate(() => document.documentElement.scrollHeight);
-    assert.ok(
-      laptop <= 900 + 64,
-      `Today with every option on is ${laptop}px tall in a 900px window`,
-    );
+    // The tank readout joins the room's line; the zone rows still end within 1.35 windows.
+    await expectVisible(page.locator("[data-today-tank]"));
+    const bottom = await page
+      .locator("article.today-zone")
+      .last()
+      .evaluate((el) => el.getBoundingClientRect().bottom + scrollY);
+    assert.ok(bottom <= 900 * 1.35, `with every option on the zone rows end ${bottom}px down`);
     await page.setViewportSize({ width: 390, height: 844 });
     await open();
-    const strip = page.locator("[data-run-progress]");
-    await strip.waitFor();
-    await page
-      .waitForFunction(() => document.documentElement.scrollHeight <= 2 * innerHeight, null, {
-        timeout: 3_000,
-      })
-      .catch(() => {});
     const phone = await page.evaluate(() => document.documentElement.scrollHeight);
-    const run = await strip.evaluate((el) => el.getBoundingClientRect().height + 16);
     // The bottom section bar is fixed chrome; the page pads itself clear of it.
     const bar = await page.evaluate(() => document.querySelector(".bottom-nav")?.getBoundingClientRect().height ?? 0);
-    assert.ok(
-      phone - run - bar <= 2 * 844 + 64,
-      `Today with every option on is ${phone}px tall on a phone`,
-    );
+    assert.ok(phone - bar <= 3 * 844 + 64, `Today with every option on is ${phone}px tall on a phone`);
     await noOverflow();
     await page.setViewportSize({ width: 1440, height: 1000 });
   });
   await check(
-    "today: the run strip shows the day, the phases, the grow plan and the feed recipe",
+    "today: the header owns the grow day; the plan line keeps the grow plan and the feed recipe",
     async () => {
       await go("today");
-      const strip = page.locator('[data-run-progress="running"]');
+      // The day once, in the header, with its run bar; no second run strip.
+      await expectVisible(page.locator("[data-today-run]"));
+      assert.match(await page.locator("[data-today-day]").innerText(), /^Day 38 of 63 /);
+      assert.equal(await page.locator("[data-run-figure], .run-bar").count(), 0);
+      assert.equal(await page.getByText(/^Day\s+\d+ of \d+$/).count(), 0, "no second day count");
+      const strip = page.locator("[data-plan-feed]");
       await expectVisible(strip);
-      // The demo run started 14 days ago; the demo grow plan runs 84 days in four phases.
-      const figure = (name) => strip.locator(`[data-run-figure="${name}"]`).innerText();
-      assert.match(await figure("day"), /^Day\s+15 of 84$/);
-      assert.match(await figure("done"), /^Done\s+14$/);
-      assert.match(await figure("left"), /^Left\s+70$/);
-      assert.match(await figure("end"), /^Harvest\s+\S+/);
-      const bar = strip.getByRole("progressbar", { name: "Run progress" });
-      assert.deepEqual(
-        await bar.evaluate((el) =>
-          ["aria-valuemin", "aria-valuenow", "aria-valuemax"].map((name) => el.getAttribute(name)),
-        ),
-        ["0", "14", "84"],
-      );
-      assert.equal(
-        await bar.getAttribute("aria-valuetext"),
-        "Day 15 of 84: 14 days done, 70 days left",
-      );
-      const phases = strip.getByRole("list", { name: "Phases of the grow" }).getByRole("listitem");
-      assert.deepEqual(
-        await phases.evaluateAll((items) =>
-          items.map((item) => [
-            item.querySelector(".run-phase-full").textContent,
-            item.getAttribute("aria-current"),
-          ]),
-        ),
-        [
-          ["20% generative", null],
-          ["70% generative", "step"],
-          ["40% generative", null],
-          ["60% generative", null],
-        ],
-      );
-      // Each phase is as wide as its days: 14, 21, 28 and 21 of 84.
-      const widths = await phases.evaluateAll((items) =>
-        items.map((item) => item.getBoundingClientRect().width),
-      );
-      const whole = widths.reduce((sum, width) => sum + width, 0);
-      [14, 21, 28, 21].forEach((days, index) =>
-        assert.ok(Math.abs(widths[index] / whole - days / 84) < 0.01, `phase ${index + 1} width`),
-      );
       const recipe = (name) => strip.locator(`[data-run-recipe="${name}"]`).innerText();
       assert.match(await recipe("plan"), /^Grow plan\s+Unnamed plan · Draft$/);
-      assert.match(await recipe("stage"), /^Stage\s+Flower bulk \u00b7 flower day 37 of 56$/);
       assert.match(await recipe("feed"), /^Feed\s+Bloom · week 3 of 12 · EC 2\.4 mS\/cm$/);
-      // A tooltip on each element, on keyboard focus too.
-      await phases.nth(1).focus();
+      // The stage is the header's.
+      assert.equal(await strip.locator('[data-run-recipe="stage"]').count(), 0);
+      // A tooltip on each, on keyboard focus too.
+      await strip.locator('[data-run-recipe="feed"]').focus();
       assert.match(
         await page.getByRole("tooltip").innerText(),
-        /^Phase 2, days 15 to 35: 70% generative\. The grow plan sets this phase\./,
+        /^The batch tank mixes this feed recipe today\. The feed schedule selects this recipe for this week\./,
       );
-      await strip.locator('[data-run-figure="left"]').focus();
-      assert.match(await page.getByRole("tooltip").innerText(), /^70 days stay in the run\./);
       await page.keyboard.press("Escape");
       await page.evaluate(() => document.activeElement?.blur());
       await strip.screenshot({ path: path.join(out, "run-progress-desktop.png") });
-      await axe("today run strip", '[data-run-progress="running"]');
-      await axeDark("today run strip", '[data-run-progress="running"]');
-      // At 375px the bar stays on the screen and the phases take their short labels.
+      await axe("today plan line", "[data-plan-feed]");
+      await axeDark("today plan line", "[data-plan-feed]");
+      // At 375px the header's run bar and the plan line stay on the screen.
       await page.setViewportSize({ width: 375, height: 812 });
       await go("today");
       await expectVisible(strip);
       await noOverflow();
-      const box = await bar.boundingBox();
-      assert.ok(box.x >= 0 && box.x + box.width <= 375, "the bar fits a 375px screen");
-      assert.deepEqual(
-        await phases.evaluateAll((items) =>
-          items.map((item) => [
-            item.querySelector(".run-phase-short").checkVisibility() &&
-              item.querySelector(".run-phase-short").textContent,
-            item.querySelector(".run-phase-full").getBoundingClientRect().width <= 1,
-          ]),
-        ),
-        [
-          ["20% G", true],
-          ["70% G", true],
-          ["40% G", true],
-          ["60% G", true],
-        ],
-      );
+      const box = await page.locator("[data-today-run]").boundingBox();
+      assert.ok(box.x >= 0 && box.x + box.width <= 375, "the run bar fits a 375px screen");
       await strip.screenshot({ path: path.join(out, "run-progress-mobile.png") });
       await page.setViewportSize({ width: 1440, height: 1000 });
       // Run records have one owner in History.
@@ -689,25 +646,14 @@ try {
       await ongoing.getByRole("button", { name: "Archive" }).click();
       // An archived run leaves the list.
       await ongoing.waitFor({ state: "detached" });
-      await page
-        .locator(".desktop-sidebar")
-        .getByRole("button", { name: "Status", exact: true })
-        .click();
-      // The Status tabs give way to the room tree on a desktop; open the room page directly.
-    await page.evaluate(() => {
-      location.hash = "#/today";
-    });
-      const empty = page.locator('[data-run-progress="none"]');
-      await expectVisible(empty);
-      assert.match(await empty.innerText(), /^No run is active in this room\./);
-      assert.equal(await page.getByRole("progressbar", { name: "Run progress" }).count(), 0);
-      await axe("today run strip, no run", '[data-run-progress="none"]');
-      await empty.getByRole("button", { name: "Add a run" }).click();
-      await expectVisible(page.locator("#run-records"));
+      // The room page's plan line does not depend on a run.
+      await go("today");
+      await expectVisible(page.locator("[data-plan-feed]"));
+      assert.match(await recipe("plan"), /^Grow plan\s+Unnamed plan · Draft$/);
     },
   );
   await check(
-    "zone page: the day as a phase reference chart, fitted to today, against yesterday or a typical day",
+    "zone page: the day as a phase reference chart, fitted to today, against yesterday or the last run",
     async () => {
       await go("zone/1");
       const day = page.locator("[data-day-timeline]");
@@ -798,30 +744,33 @@ try {
       assert.doesNotMatch(await readout.innerText(), /pore EC/);
       await page.mouse.move(0, 0);
       assert.equal(await key.getByRole("button").count(), await key.locator("li").count());
-      const compare = day.getByRole("combobox", { name: "Compare with" });
-      await compare.selectOption("typical");
+      // Compare with Off, Yesterday, the last run's day of the same number (mockup 04) or Typical.
+      const compare = day.getByRole("group", { name: "Compare with" });
+      const choice = (name) => compare.getByRole("button", { name, exact: true });
+      await choice("Typical").click();
       await expectVisible(layer("typical"));
       assert.ok(
         (await layer("typical").locator(".typical-band").getAttribute("d")).length > 100,
         "the typical day is a p25-p75 band",
       );
       assert.equal(await layer("yesterday").count(), 0);
-      await compare.selectOption("none");
+      // Off takes the typical day away again, as it was drawn a moment ago.
+      await choice("Off").click();
       assert.equal(await layer("typical").count(), 0);
       assert.equal(await layer("yesterday").count(), 0);
       // The choices are remembered in the browser.
       await page.reload({ waitUntil: "networkidle" });
       await expectVisible(day.locator(".grow-svg"));
-      assert.equal(await compare.inputValue(), "none");
+      assert.equal(await choice("Off").getAttribute("aria-pressed"), "true");
       assert.equal(await ecKey.getAttribute("aria-pressed"), "false");
       assert.equal(await layer("ec").count(), 0);
       await ecKey.click();
       await expectVisible(layer("ec"));
-      await compare.selectOption("yesterday");
+      await choice("Yesterday").click();
       await expectVisible(layer("yesterday"));
       await axe("zone day", "[data-day-timeline]");
       await axeDark("zone day", "[data-day-timeline]");
-      await day.screenshot({ path: path.join(out, "dashboard-zone-day.png") });
+      await day.locator(".zone-day-chart").screenshot({ path: path.join(out, "dashboard-zone-day.png") });
     },
   );
   await check("zone page: why, the AI, the controls, and the rest on request", async () => {
@@ -996,11 +945,8 @@ try {
       assert.deepEqual(chips, ["AI assistant · 59–62 %", "AI assistant · 3–5 %"]);
       // With the AI assistant's Setpoints judge on the room, the Auto switch says what it lets the AI assistant do.
       await expectVisible(page.getByText("AI assistant: P2 shot size, re-water point"));
-      // Edit, Review, Apply & verify: the stepper is on its first step while editing.
-      assert.match(
-        await page.locator('.workflow-steps [aria-current="step"]').innerText(),
-        /Edit draft$/,
-      );
+      // Nothing is written until it is reviewed and applied in the bar.
+      await expectVisible(page.getByText("Nothing is sent to the controller until you apply"));
       // The steering select says what the mode does, with the zone's own overnight dryback.
       assert.match(
         await page.locator(".targets-consequence").innerText(),
@@ -1032,7 +978,11 @@ try {
         Number(other.split(" ")[0]),
       );
       await steering.selectOption("Vegetative");
-      assert.equal(await page.locator(".draft-bar").count(), 0, "switching back leaves no draft");
+      assert.equal(
+        await page.locator(".review-apply[data-pending]").count(),
+        0,
+        "switching back leaves no draft",
+      );
       // The hardware is in Setup.
       assert.equal(
         await page
@@ -1051,33 +1001,31 @@ try {
     const original = Number(await field.inputValue());
     await field.fill("999");
     await expectVisible(page.locator('[id="note-number.crop_steering_zone_1_p1_target_vwc"]'));
+    await expectVisible(page.getByText("Fix the red check to apply"));
     assert.equal(
-      await page
-        .getByRole("button", { name: /^Review/ })
-        .first()
-        .isDisabled(),
-      true,
+      await page.getByRole("button", { name: /^Apply \d+ changes?$/ }).count(),
+      0,
+      "an invalid draft has no Apply",
     );
     await field.fill(String(original + 1));
     await page.getByRole("button", { name: "Refresh controller data" }).click();
     assert.equal(await field.inputValue(), String(original + 1));
-    // The Plan entry counts the unsaved change.
+    // The Current day entry counts the unsaved change.
     assert.match(
       await page
         .getByRole("navigation", { name: "Main navigation" })
-        .getByRole("button", { name: /Irrigation/ })
+        .locator('[data-nav-page="plan/targets"]')
         .innerText(),
       /1$/,
     );
-    await page.getByRole("button", { name: /^Review 1 change/ }).click();
-    await expectVisible(page.getByRole("dialog").getByText(/Room A only/));
+    const bar = page.getByRole("region", { name: "Review and apply" });
+    await expectVisible(bar.getByText("1 change · Review & apply"));
+    // The change is the selected room's only.
+    await expectVisible(bar.getByText("These changes affect Room A only."));
     await axe("targets review");
     await page.screenshot({ path: path.join(out, "dashboard-review.png") });
-    await page
-      .getByRole("dialog")
-      .getByRole("button", { name: "Apply 1 change", exact: true })
-      .click();
-    await expectVisible(page.getByText("Changes applied and verified by controller readback."));
+    await bar.getByRole("button", { name: "Apply 1 change", exact: true }).click();
+    await expectVisible(bar.getByText(/^Written and read back \d\d:\d\d$/));
     assert.equal(await field.inputValue(), String(original + 1));
     await field.fill(String(original + 2));
     await page.locator('.desktop-sidebar .room-tree-row[data-room="room:room_b_"]').click();
@@ -1128,7 +1076,7 @@ try {
       assert.equal(await page.locator(".grow-weeks li[aria-current]").innerText(), "W6");
       // Validate and arm stay in view; the balance grid, endpoints and recipes are one tap down.
       await expectVisible(page.getByRole("button", { name: "Validate preview" }));
-      await expectVisible(page.getByRole("button", { name: "Arm plan" }));
+      await expectVisible(page.getByRole("button", { name: ARM_PLAN }));
       const advanced = page.locator("details.plan-advanced");
       if ((await advanced.getAttribute("open")) === null) await advanced.locator("summary").click();
       const tabs = page.getByRole("tablist", { name: "Grow planner view" });
@@ -1142,76 +1090,59 @@ try {
       await axe("schedule, advanced open");
     },
   );
-  await check("timeline: one list with Jev in it, filtered, with its outcome checks", async () => {
-    await go("history/timeline");
-    const rows = page.locator(".timeline-row");
-    await expectVisible(rows.first());
-    const all = await rows.count();
-    assert.ok(all > 10, `the demo's records and Jev's journal, ${all}`);
-    assert.deepEqual(await page.locator(".timeline-day h2").allInnerTexts(), [
-      "TODAY",
-      "YESTERDAY",
+  await check("explorer: the room's charts under its phase and shot lanes, chips and CSV export", async () => {
+    await go("history/explorer");
+    const explorer = page.locator("[data-room-explorer]");
+    await expectVisible(explorer);
+    await page.waitForFunction(
+      () => Number(document.querySelector("[data-room-explorer]")?.dataset.explorerLoads) > 0,
+      null,
+      { timeout: 20_000 },
+    );
+    // The lanes and the charts: every zone's VWC and EC, the feed EC and the tank level.
+    await expectVisible(page.locator("[data-phase-lane] [data-phase]").first());
+    assert.deepEqual(await page.locator("[data-chart]").evaluateAll((all) => all.map((el) => el.dataset.chart)), [
+      "VWC",
+      "Pore EC",
+      "Feed EC",
+      "Tank level",
     ]);
-    // The AI assistant's actions by default; every decision on request.
-    const toggle = page.getByLabel("All AI assistant decisions");
-    await toggle.check();
-    assert.ok((await rows.count()) > all, "every decision shows more rows");
-    await toggle.uncheck();
-    assert.equal(await rows.count(), all);
-    // An outcome is a tick or a cross on the decision it checks.
-    assert.ok((await page.locator(".timeline-outcome").count()) > 0);
-    // Water only; one zone; the room only.
-    const types = page.getByRole("group", { name: "Record type" });
-    await types.getByRole("button", { name: "Water", exact: true }).click();
-    const kinds = await rows.evaluateAll((all) => [...new Set(all.map((row) => row.dataset.kind))]);
-    assert.deepEqual(kinds, ["water"]);
-    await types.getByRole("button", { name: "All", exact: true }).click();
-    const zone = page.getByLabel("Timeline zone");
-    await zone.selectOption("2");
-    const zones = await rows.locator(".timeline-zone").allInnerTexts();
-    assert.ok(zones.length > 0 && zones.every((name) => name === "Zone 2"), zones.join());
-    await zone.selectOption("room");
-    assert.deepEqual([...new Set(await rows.locator(".timeline-zone").allInnerTexts())], ["Room"]);
-    await zone.selectOption("all");
-    // A setpoint changed by hand is yours; the AI assistant only noted it.
-    await types.getByRole("button", { name: "Setpoints", exact: true }).click();
-    await expectVisible(page.locator('.timeline-jev-tag[data-by="you"]').first());
-    await expectVisible(page.getByText("Noted by the AI assistant").first());
-    await types.getByRole("button", { name: "All", exact: true }).click();
-    await inBothThemes("timeline", async () => {
-      await go("history/timeline");
-      await expectVisible(page.locator(".timeline-row").first());
+    // The old list, its filters and the setpoint log are gone: changes live on History › Changes.
+    assert.equal(await page.locator(".timeline-row").count(), 0);
+    // A chip adds its chart; the export counts what is charted.
+    const exportButton = page.locator("[data-export-csv]");
+    assert.equal((await exportButton.innerText()).trim(), "Export CSV · 8 series");
+    await page.getByRole("button", { name: "Room VPD", exact: true }).click();
+    await expectVisible(page.locator('[data-chart="VPD"]'));
+    assert.equal((await exportButton.innerText()).trim(), "Export CSV · 9 series");
+    await page.getByRole("button", { name: "Room VPD", exact: true }).click();
+    await inBothThemes("explorer", async () => {
+      await go("history/explorer");
+      await expectVisible(page.locator("[data-chart]").first());
     });
-    // A room without the AI assistant: its controller records, without the AI assistant's toggle.
-    await go("history/timeline", "room_b");
-    await expectVisible(page.locator(".timeline-row").first());
-    assert.equal(await page.getByLabel("All AI assistant decisions").count(), 0);
-    assert.equal(await page.locator('.timeline-row[data-source="jev"]').count(), 0);
-    // Every kind of record is coloured the way the pills are: water blue, phase violet, alerts amber.
-    const colours = await page
-      .locator(".timeline-kind")
-      .evaluateAll((all) => [...new Set(all.map((kind) => kind.dataset.kind))].sort());
-    assert.deepEqual(colours, ["alert", "phase", "water"]);
-  });
-  await check("timeline: search, clear and CSV export", async () => {
-    await go("history/timeline");
-    await page.getByRole("textbox", { name: "Search the timeline" }).fill("no-such-event");
-    await expectVisible(page.getByRole("heading", { name: "Nothing matches this view" }));
-    await page.getByRole("button", { name: "Clear filters" }).click();
+    // Room B: the same page on its own zones.
+    await go("history/explorer", "room_b");
+    await expectVisible(page.locator('[data-chart="VWC"]'));
+    await go("history/explorer");
+    await page.waitForFunction(
+      () => Number(document.querySelector("[data-room-explorer]")?.dataset.explorerLoads) > 0,
+      null,
+      { timeout: 20_000 },
+    );
     const downloadPromise = page.waitForEvent("download");
-    await page.getByRole("button", { name: "Export CSV" }).click();
+    await exportButton.click();
     const download = await downloadPromise;
-    assert.match(download.suggestedFilename(), /room-a-timeline-.+\.csv/);
-    await download.saveAs(path.join(out, "timeline-export.csv"));
-    const csv = await readFile(path.join(out, "timeline-export.csv"), "utf8");
-    assert.match(csv, /Timestamp.*Room.*Zone.*Type.*Message.*Result/);
-    assert.match(csv, /"AI assistant · /);
+    assert.match(download.suggestedFilename(), /room-a-explorer-.+\.csv/);
+    await download.saveAs(path.join(out, "explorer-export.csv"));
+    const csv = await readFile(path.join(out, "explorer-export.csv"), "utf8");
+    assert.match(csv, /^\uFEFF?Time,Zone 1 VWC \(%\),Zone 1 Pore EC \(mS\/cm\),/);
   });
-  await check("a zone page's Jev history opens the timeline on that zone", async () => {
+  await check("a zone page's history opens the explorer on that zone", async () => {
     await go("zone/2");
     await page.getByRole("button", { name: "Explore recorded history and comparisons" }).click();
-    await expectVisible(page.getByRole("heading", { name: "History", exact: true }));
-    assert.equal(await page.getByLabel("Timeline zone").inputValue(), "2");
+    await expectVisible(page.getByRole("heading", { name: "Explorer", exact: true }));
+    await expectVisible(page.locator('[data-zone-detail="2"] [data-history-explorer]'));
+    assert.match(await page.locator(".explorer-lane-name").first().innerText(), /Zone 2/i);
   });
   await check(
     "water use: every zone's litres, its grow weeks, and water per plant today",
@@ -1271,6 +1202,8 @@ try {
     "compare runs: by grow week, the biggest differences, the overlay toggle, the detail one tap down",
     async () => {
       await go("history/compare");
+      // The zone-level week-by-week view is one tap down, under the room-wide comparison.
+      await page.locator('details[data-section="zone-detail"] > summary').click();
       // The run in progress against the latest ended one, chosen to start with.
       assert.match(
         await page.getByLabel("Current run").locator("option:checked").innerText(),
@@ -1412,29 +1345,41 @@ try {
     },
   );
   await check(
-    "probes: every probe's health, the controller and Jev, the internals one tap down",
+    "probes: the room's moisture probes and their health, the controller and Jev, the internals one tap down",
     async () => {
       await go("equipment/probes");
+      // The room's moisture probes under its name, pore EC beside each.
       const rows = page.locator(".probes-table tr[data-probe]");
       await expectVisible(rows.first());
-      assert.equal(await rows.count(), 12, "two moisture and two EC probes in each of three zones");
-      // Name first, entity id under it.
-      const first = await rows.first().locator("td").first().innerText();
-      assert.match(first, /^Zone 1 front VWC\nsensor\.demo_z1_front_vwc$/);
-      const health = await pillTones(".probes-table [data-probe-health]");
-      assert.equal(health.filter(([text]) => text === "OK").length, 11);
-      assert.deepEqual(
-        health.find(([text]) => text !== "OK"),
-        ["Silent 3 h, left out of the zone's reading", "warn"],
+      assert.equal(await rows.count(), 6, "front and back moisture probes in each of three zones");
+      assert.equal(await page.locator('tbody[data-probes-room="room:"]').count(), 1);
+      assert.equal(
+        (await page.locator(".page-heading p").innerText()).trim(),
+        "12 probes · 11 in zone values · raw readings always kept",
       );
-      // Each probe's last six hours.
+      // Every probe counts, moisture and pore EC: zone 3's silent back EC probe is the one not healthy.
+      assert.equal(
+        (await page.locator('tbody[data-probes-room="room:"] .probes-room-health').innerText()).trim(),
+        "11 of 12 probes healthy",
+      );
+      // The probe's side, its entity id on hover.
+      const first = rows.first().locator('td[data-label="Probe"] strong');
+      assert.equal((await first.innerText()).trim(), "Front");
+      assert.equal(await first.getAttribute("title"), "sensor.demo_z1_front_vwc");
+      const health = await pillTones(".probes-table .pill[data-probe-health]");
+      assert.deepEqual(health, Array(6).fill(["OK", "on"]));
+      // Room A zone 3's back pore EC probe is silent: said beside its reading.
+      assert.match(
+        await page.locator('[data-probe-ec="sensor.demo_z3_back_ec"]').innerText(),
+        /Silent 3 h/,
+      );
+      // Each probe's last 24 hours.
       await page.locator(".probes-table [data-sensor-trend] .sparkline").first().waitFor();
-      assert.equal(await page.locator(".probes-table [data-sensor-trend] .sparkline").count(), 12);
-      // Each zone's valve; the controller and the AI assistant at the top.
-      assert.equal(await page.locator(".probes-zone [data-zone-valve]").count(), 3);
+      assert.equal(await page.locator(".probes-table [data-sensor-trend] .sparkline").count(), 6);
+      // The controller and the AI assistant at the top.
       assert.match(
         await page.locator(".probes-status").innerText(),
-        /Probes\s+11 of 12 OK[\s\S]*Controller\s+Reporting[\s\S]*AI assistant\s+On/,
+        /Controller\s+Reporting[\s\S]*AI assistant\s+On/,
       );
       // The controller's own sensors: collapsed, then as the Sensors page had them.
       const internals = page.locator("details.probes-more", {
@@ -1492,40 +1437,46 @@ try {
       "Does not count",
     );
     await expectVisible(row("sensor.demo_z1_front_vwc").locator("[data-probe-primary]"));
-    assert.match(await page.locator(".probes-status").innerText(), /Probes\s+11 of 12 OK/);
+    // The room's health counts every probe, moisture and pore EC: the one left out and zone 3's silent
+    // back EC are not healthy.
+    assert.equal(
+      (await page.locator('tbody[data-probes-room="room:"] .probes-room-health').innerText()).trim(),
+      "10 of 12 probes healthy",
+    );
     await page.setViewportSize({ width: 1440, height: 1000 });
   });
   await check(
-    "stock tanks: the next to run out, refill, set a level, record a batch and add a tank",
+    "stock tanks: the next to run out, refill with undo, set a level, record a batch and add a tank",
     async () => {
       await go("equipment/stock");
       const card = (id) => page.locator(`[data-stock-tank="${id}"]`);
       await expectVisible(card("part_b"));
       assert.equal(await page.locator("[data-stock-tank]").count(), 4);
-      assert.equal(
-        await page.locator("[data-stock-next]").innerText(),
-        "Next to run out: Part B, about 3 batches left.",
-      );
+      // Part B runs out first: its card is the one marked, about 3 batches left.
+      assert.equal(await page.locator("[data-stock-next]").getAttribute("data-stock-tank"), "part_b");
+      assert.match(await card("part_b").locator("[data-stock-outlook]").innerText(), /^3 batches/);
       await page.screenshot({ path: img("stock-tanks.png") });
-      // Each tank is linked to its dosing pump: drawn by what the pump doses, its draws listed.
+      // Each tank is linked to its dosing pump: drawn by what the pump doses.
       assert.equal(
         await card("part_b").locator("[data-stock-drawn]").innerText(),
-        "Drawn by\nPart B as it doses",
+        "Drawn by Part B as it doses",
       );
-      assert.match(
-        await card("silica").locator("[data-stock-draws] li").first().innerText(),
-        /Dose\s+25 mL$/,
+      // Part B starts within half again of its low mark: amber, "low" in its bottle's words.
+      assert.equal(await card("part_b").getAttribute("data-state"), "low");
+      assert.match(await card("part_b").getByRole("img").getAttribute("aria-label"), /, low$/);
+      await card("part_b").getByRole("button", { name: "Log refill to 20 L", exact: true }).click();
+      await expectVisible(
+        page
+          .locator("[data-sonner-toast]")
+          .filter({ hasText: /^Part B refilled to 20 L\. Written and read back/ }),
       );
-      // Part B starts within half again of its low mark: amber, "Getting low".
-      assert.equal(await card("part_b").locator(".pill").textContent(), "Getting low");
-      await card("part_b").getByRole("button", { name: "Refilled", exact: true }).click();
-      await expectVisible(card("part_b").getByText("OK", { exact: true }));
-      assert.match(await card("part_b").locator("dd").first().textContent(), /^20 of 20 L$/);
+      assert.equal(await card("part_b").getAttribute("data-state"), "ok");
+      assert.equal(await card("part_b").locator("[data-stock-level]").textContent(), "20 L of 20 L");
 
       await card("cleaner").getByRole("button", { name: "Set level" }).click();
       await card("cleaner").getByLabel("Tank level (L)", { exact: true }).fill("0.8");
       await card("cleaner").getByRole("button", { name: "Save level", exact: true }).click();
-      await expectVisible(card("cleaner").getByText("Low", { exact: true }));
+      await expectVisible(card("cleaner").getByText("Below the low line. Order now."));
 
       await page.getByRole("button", { name: "Record a batch", exact: true }).click();
       const confirm = page.getByRole("dialog");
@@ -1537,7 +1488,9 @@ try {
       assert.equal(await history.getAttribute("open"), null);
       await history.locator("summary").click();
       await expectVisible(history.getByRole("heading", { name: "Recent draws" }));
-      assert.match(await card("part_b").locator("dd").first().textContent(), /^18\.2 of 20 L$/);
+      // Silica's hand dose from before, listed with what it drew.
+      assert.match(await history.locator("tr", { hasText: "Dose" }).first().innerText(), /\b25 mL/);
+      assert.equal(await card("part_b").locator("[data-stock-level]").textContent(), "18.2 L of 20 L");
 
       await page.getByRole("button", { name: "Edit stock tanks" }).click();
       const editor = page.getByRole("dialog");
@@ -1548,7 +1501,7 @@ try {
       await expectVisible(card("enzymes"));
       // No pump draws Enzymes: each batch takes its dose.
       assert.equal(await card("enzymes").locator("[data-stock-drawn]").count(), 0);
-      await expectVisible(card("enzymes").getByText("Per batch"));
+      await expectVisible(card("enzymes").getByText("No dose per batch set"));
       await axe("stock tanks after edits");
       await noOverflow();
     },
@@ -1556,9 +1509,12 @@ try {
   await check(
     "dosing: each room's pumps, a dose and a batch through their reviews, and stop; only requests are sent",
     async () => {
-      // Room A's four pumps and Room B's six, one of them not calibrated yet.
-      const cards = page.locator("[data-dosing-pump]");
-      const strip = page.locator("[data-stock-strip]");
+      // Room A's four pumps and Room B's six, one of them not calibrated yet, on the plumbing.
+      const cards = page.locator("[data-plumbing] [data-dosing-pump]");
+      const linked = () =>
+        page
+          .locator("[data-plumbing] [data-pump-stock]")
+          .evaluateAll((nodes) => nodes.map((node) => node.getAttribute("data-pump-stock")));
       const stockOf = (id) => page.locator(`[data-dosing-pump="${id}"] [data-pump-stock]`);
       await go("equipment/dosing");
       await expectVisible(cards.first());
@@ -1578,13 +1534,14 @@ try {
       assert.deepEqual(await pillTones('[data-dosing-pump="finisher"] .pill'), [
         ["Not calibrated", "warn"],
       ]);
-      assert.deepEqual(await strip.locator("[data-stock-gauge] strong").allInnerTexts(), [
-        "Veg base",
-        "Line cleaner",
-        "Silica",
-        "Finisher",
-        "Part A",
-        "Part B",
+      // Each pump drawn with the stock tank it is linked to, in pump order.
+      assert.deepEqual(await linked(), [
+        "veg_base",
+        "cleaner",
+        "silica",
+        "finisher",
+        "part_a",
+        "part_b",
       ]);
       // Part A, passed by in the recipe and dosed by hand: its tank lasts doses at its last one.
       assert.equal(
@@ -1600,26 +1557,20 @@ try {
         await go("equipment/dosing");
         await expectVisible(cards.first());
       });
-      // A fresh Room A: each card shows the stock tank its pump is linked to, Part B's drawn to
-      // scale with its litres and the batches its recipe amount leaves, and the stock strip every
-      // linked tank in pump order.
+      // A fresh Room A: each pump shows the stock tank it is linked to, Part B's drawn to scale with
+      // its litres and the batches its recipe amount leaves, every linked tank in pump order.
       await go("equipment/dosing");
       await expectVisible(cards.first());
       assert.equal(await stockOf("part_b").getAttribute("data-pump-stock"), "part_b");
       assert.equal(
         await stockOf("part_b").locator(".dosing-stock-litres").innerText(),
-        "5.4 L of 20 L",
+        "5.4 / 20.0 L",
       );
       assert.equal(
         await stockOf("part_b").locator(".dosing-stock-left").innerText(),
         "about 3 batches left",
       );
-      assert.deepEqual(await strip.locator("[data-stock-gauge] strong").allInnerTexts(), [
-        "Silica",
-        "Part B",
-        "Part A",
-        "Line cleaner",
-      ]);
+      assert.deepEqual(await linked(), ["silica", "part_b", "part_a", "cleaner"]);
       // A dose of Part B, through its review: its card doses, then the history has it.
       await page.locator('[data-dosing-pump="part_b"] .dosing-pump-select').click();
       await page.getByLabel("Quantity (mL)", { exact: true }).fill("60");
@@ -1652,13 +1603,9 @@ try {
         await page.locator('[data-dosing-pump="part_b"]').getAttribute("data-state"),
         "idle",
       );
-      // What it dosed came off Part B's stock tank: 5.4 L less 60 mL, on its card and in the strip.
+      // What it dosed came off Part B's stock tank: 5.4 L less 60 mL, on its bottle.
       await expectVisible(
-        stockOf("part_b").locator(".dosing-stock-litres", { hasText: "5.3 L of 20 L" }),
-      );
-      assert.equal(
-        await strip.locator('[data-stock-gauge="part_b"] .dosing-stock-litres').innerText(),
-        "5.3 L of 20 L",
+        stockOf("part_b").locator(".dosing-stock-litres", { hasText: "5.3 / 20.0 L" }),
       );
       // A batch, through its review: its steps walk, and stop ends it where it is.
       await page.getByRole("button", { name: "Make a batch", exact: true }).click();
@@ -1674,8 +1621,8 @@ try {
       await stop.getByRole("button", { name: "Send stop", exact: true }).click();
       await stop.waitFor({ state: "hidden" });
       await expectVisible(
-        page.locator("[data-batch-summary]", {
-          hasText: /^Last batch stopped \S.* \(stop requested during [a-z ]+\)$/,
+        page.locator("[data-batch-line]", {
+          hasText: /^No batch running · last batch stopped \S.* \(stop requested during [a-z ]+\)$/,
         }),
       );
       assert.equal((await pillTones('tr[data-history-kind="batch"] .pill'))[0][1], "warn");
@@ -1851,9 +1798,9 @@ try {
       });
       const part_b = live.locator('[data-dosing-pump="part_b"]');
       await expectVisible(part_b);
-      // No pump is linked to a stock tank here: the cards say so, and there is no stock strip.
+      // No pump is linked to a stock tank here: the drawing says so, with no bottle.
       assert.equal(await part_b.locator("[data-pump-stock]").innerText(), "No stock tank linked");
-      assert.equal(await live.locator("[data-stock-strip]").count(), 0);
+      assert.equal(await live.locator("[data-plumbing] .stock-bottle").count(), 0);
       // A pump whose dosing sensor is unavailable: greyed out, a question mark on its head.
       const veg_base = live.locator('[data-dosing-pump="veg_base"]');
       assert.equal(await veg_base.getAttribute("data-state"), "unavailable");
@@ -1883,12 +1830,12 @@ try {
           { action: "stop", room_id: "room:" },
         ],
       );
-      // Besides reads (dosing_get, and What's new on opening), those three requests are all it sent:
-      // no pump, valve or number was written.
+      // Besides reads (dosing_get, stock_get for the next batch, and What's new on opening), those
+      // three requests are all it sent: no pump, valve or number was written.
       assert.deepEqual(
         posts
           .map((post) => post.path)
-          .filter((path) => !/\/crop_steering\/(dosing_get|whats_new_get)$/.test(path)),
+          .filter((path) => !/\/crop_steering\/(dosing_get|stock_get|whats_new_get)$/.test(path)),
         Array(3).fill("/api/services/crop_steering/dosing_request"),
         "the page wrote nothing but its dosing requests",
       );
@@ -1900,50 +1847,46 @@ try {
     },
   );
   await check(
-    "dosing: each room's stock strip, light and dark, on a phone, and its way to Stock tanks",
+    "dosing: each room's stock bottles on the plumbing, light and dark, and on a phone",
     async () => {
-      const strip = page.locator("[data-stock-strip]");
-      const gauges = strip.locator("[data-stock-gauge]");
+      const gauges = page.locator("[data-plumbing] [data-pump-stock]:has(.stock-bottle)");
       for (const [room, count] of [
         ["f2", 4],
         ["room_b", 6],
       ]) {
         await go("equipment/dosing", room);
-        await expectVisible(strip);
-        assert.equal(await gauges.count(), count, `${room}: a gauge per linked tank`);
-        // Each labelled with its level, its litres and what it has left, its low mark drawn.
+        await expectVisible(gauges.first());
+        assert.equal(await gauges.count(), count, `${room}: a bottle per linked tank`);
+        // Each labelled with its litres and what it has left, its low mark drawn.
         for (const text of await gauges.allInnerTexts())
           assert.match(
             text,
-            /\n\d+%\n[\d.]+ L of [\d.]+ L(\n(about \d+|less than one) (batch|batches|dose|doses) left)?/,
+            /^[\d.]+ \/ [\d.]+ L(\n(low|very low))?(\n(about \d+|less than one) (batch|batches|dose|doses) left)?$/,
           );
         assert.equal(await gauges.locator(".sb-low").count(), count);
       }
       await inBothThemes("dosing, Room B", async () => {
         await go("equipment/dosing", "room_b");
-        await expectVisible(strip);
+        await expectVisible(gauges.first());
       });
       await go("equipment/dosing");
-      await expectVisible(strip);
+      await expectVisible(gauges.first());
       await page.screenshot({ path: path.join(out, "dashboard-dosing-light.png"), fullPage: true });
       await page.evaluate(() => localStorage.setItem("irrigation-theme", "dark"));
       await page.reload({ waitUntil: "networkidle" });
-      await expectVisible(strip);
+      await expectVisible(gauges.first());
       await page.screenshot({ path: path.join(out, "dashboard-dosing-dark.png"), fullPage: true });
       await page.evaluate(() => localStorage.setItem("irrigation-theme", "light"));
-      // A phone: both rooms fit, the strip two tanks to a row.
+      // A phone: both rooms fit, the pumps two to a row.
       await page.setViewportSize({ width: 390, height: 844 });
       for (const room of ["room_b", "f2"]) {
         await go("equipment/dosing", room);
-        await expectVisible(strip);
+        await expectVisible(gauges.first());
         await noOverflow();
       }
       await axe("dosing on a phone");
       await page.screenshot({ path: path.join(out, "mobile-dosing.png"), fullPage: true });
       await page.setViewportSize({ width: 1440, height: 1000 });
-      await strip.getByRole("button", { name: /^Stock tanks/ }).click();
-      await expectVisible(page.getByRole("heading", { name: "Stock tanks", exact: true }));
-      assert.match(page.url(), /#\/equipment\/stock$/);
     },
   );
   await check("setup: every mapping says whether it is mapped; the checks are pills", async () => {
@@ -2085,10 +2028,11 @@ try {
     await expectVisible(water);
     assert.match(await water.innerText(), /^Water today\s+\d+ mL\/plant\s+[\d.]+ L in the zone/);
     await page.evaluate(() => (location.hash = "#/settings"));
+    await openMoreDisplay();
     await choice.getByRole("button", { name: "Zone total", exact: true }).click();
   });
   await check(
-    "notifications: a checkbox per phone and kind, saved through the review, a test push, others' phones read-only; only notify_save and notify_test are sent",
+    "notifications: a checkbox per phone and kind, applied from the bottom bar, a test push, others' phones read-only; only notify_save and notify_test are sent",
     async () => {
       const table = page.locator("table.notify-table");
       const rows = table.locator("tbody tr");
@@ -2100,10 +2044,11 @@ try {
           .evaluateAll((boxes) =>
             boxes.filter((item) => item.checked).map((item) => item.dataset.kind),
           );
-      const review = page.getByRole("dialog", { name: "Save notifications?" });
-      const saveDraft = () => page.getByRole("button", { name: /^Review and save/ }).click();
-      const discard = () =>
-        page.getByRole("button", { name: "Discard draft", exact: true }).click();
+      const bar = page.locator(".notify-bar");
+      const summary = () => bar.locator("[data-draft-summary]").innerText();
+      const applyDraft = () => bar.getByRole("button", { name: /^Apply \d+ changes?$/ }).click();
+      const receipt = bar.locator(".review-apply-receipt", { hasText: /^Written and read back / });
+      const discard = () => bar.getByRole("button", { name: "Discard", exact: true }).click();
       await go("settings/notifications");
       await expectVisible(table);
       // The demo's saved setup: Owner everything, Grower hardware lockouts, stock tanks and dosing,
@@ -2145,31 +2090,37 @@ try {
         /A zone changing phase, as a push/,
       );
       await page.keyboard.press("Escape");
-      // Grower ticks Phase changes and keeps to Room B: a draft, reviewed phone by phone, saved.
+      // Grower ticks Phase changes and keeps to Room B (every room shows each chip on: Room A
+      // goes out): a draft, said in the bottom bar, applied, read back.
       await box("Grower (Phone 2): Phase changes").check();
-      await rooms("Grower (Phone 2)").getByRole("button", { name: "Room B" }).click();
-      await expectVisible(page.locator(".draft-bar", { hasText: "Unsaved changes to 1 phone" }));
-      await saveDraft();
-      await expectVisible(review);
-      assert.deepEqual(await review.locator(".review-row").allInnerTexts(), [
-        "Grower (Phone 2)\nNew alert kinds: Phase changes\nRooms: All rooms → Room B",
+      await rooms("Grower (Phone 2)").getByRole("button", { name: "Room A" }).click();
+      assert.equal(
+        await summary(),
+        "2 changes not applied yet: Grower gets Phase changes · Grower: Room B only",
+      );
+      assert.deepEqual(await bar.locator(".review-apply-rows .review-apply-label").allInnerTexts(), [
+        "Grower (Phone 2): New alert kinds",
+        "Grower (Phone 2): Rooms",
+      ]);
+      assert.deepEqual(await bar.locator(".review-apply-rows .review-apply-diff").allInnerTexts(), [
+        "— → Phase changes",
+        "All rooms → Room B",
       ]);
       await axe("notifications: the review");
-      await review.getByRole("button", { name: "Save notifications", exact: true }).click();
-      await review.waitFor({ state: "hidden" });
-      await expectVisible(page.getByText("Saved as revision 4. The next push follows it."));
+      await applyDraft();
+      await expectVisible(receipt);
       assert.equal(await box("Grower (Phone 2): Phase changes").isChecked(), true);
-      assert.equal(await page.locator(".draft-bar").count(), 0);
+      assert.equal(await bar.locator("[data-draft-summary]").count(), 0);
       // A test push, its answer beside the button.
       await page
-        .getByRole("button", { name: "Send a test to Manager (Phone 3)", exact: true })
+        .getByRole("button", { name: "Send test to Manager (Phone 3)", exact: true })
         .click();
       await expectVisible(
         page.locator('tr[data-notify-row="notify.mobile_app_phone_3"] [data-test-result="sent"]'),
       );
       // A room nobody gets emergencies for is named above the grid.
       await box("Owner (Phone 1): Emergencies").uncheck();
-      await rooms("Manager (Phone 3)").getByRole("button", { name: "Room A" }).click();
+      await rooms("Manager (Phone 3)").getByRole("button", { name: "Room B" }).click();
       assert.deepEqual(await page.locator("[data-uncovered] strong").allInnerTexts(), [
         "Nobody gets emergencies for Room B",
       ]);
@@ -2200,13 +2151,7 @@ try {
       );
       await page.getByRole("button", { name: "Remove Manager (Phone 3)", exact: true }).click();
       assert.equal(await rows.count(), 3);
-      await saveDraft();
-      assert.deepEqual(await review.locator(".review-row > strong").allInnerTexts(), [
-        "Assistant (Phone 4) · added",
-        "Manager (Phone 3) · removed",
-      ]);
-      await review.getByRole("button", { name: "Back to editing", exact: true }).click();
-      await review.waitFor({ state: "hidden" });
+      assert.equal(await summary(), "2 changes not applied yet: Assistant added · Manager removed");
       await discard();
       // Both themes, and a phone: a card per phone with the same checkboxes.
       await inBothThemes("notifications", async () => {
@@ -2258,10 +2203,13 @@ try {
       await noOverflow();
       await page.screenshot({ path: path.join(out, "mobile-notifications.png"), fullPage: true });
       await box("Grower (Phone 2): AI assistant").check();
-      await expectVisible(page.locator(".draft-bar"));
+      await bar.getByRole("button", { name: "Review 1 change", exact: true }).click();
+      const sheet = page.getByRole("dialog", { name: "Review and apply" });
+      await expectVisible(sheet);
       await noOverflow();
       await axe("notifications on a phone");
-      await discard();
+      await sheet.getByRole("button", { name: "Discard", exact: true }).click();
+      await sheet.waitFor({ state: "hidden" });
       await page.setViewportSize({ width: 1440, height: 1000 });
       // Grower, who is not an administrator (the demo as them): their own phone's row, nothing else.
       await page.goto(`${base}/dashboard.html?demo&notify-user=grower#/settings/notifications`, {
@@ -2275,10 +2223,13 @@ try {
       );
       for (const name of ["Owner (Phone 1)", "Manager (Phone 3)"]) {
         assert.equal(await box(`${name}: Emergencies`).isDisabled(), true, `${name} is read-only`);
-        assert.equal(await box(`${name}: High priority for emergencies`).isDisabled(), true);
+        assert.equal(
+          await page.getByRole("switch", { name: `${name}: Emergencies loud`, exact: true }).isDisabled(),
+          true,
+        );
         assert.equal(
           await page
-            .getByRole("button", { name: `Send a test to ${name}`, exact: true })
+            .getByRole("button", { name: `Send test to ${name}`, exact: true })
             .isDisabled(),
           true,
         );
@@ -2286,13 +2237,12 @@ try {
       assert.equal(await page.getByRole("button", { name: "Add a phone" }).count(), 0);
       assert.equal(await page.getByRole("button", { name: /^Remove / }).count(), 0);
       assert.equal(
-        await page.getByRole("spinbutton", { name: /^Alert after no shot for/ }).isDisabled(),
+        await page.getByRole("spinbutton", { name: /^Send Shots stopped after/ }).isDisabled(),
         true,
       );
       await box("Grower (Phone 2): Emergencies").check();
-      await saveDraft();
-      await review.getByRole("button", { name: "Save notifications", exact: true }).click();
-      await expectVisible(page.getByText("Saved as revision 4. The next push follows it."));
+      await applyDraft();
+      await expectVisible(receipt);
       await axe("notifications, not an administrator");
       await page.screenshot({
         path: path.join(out, "dashboard-notifications-not-admin.png"),
@@ -2408,16 +2358,14 @@ try {
         "Owner",
       ]);
       await box("Grower (Pixel 7): Phase changes", live).check();
-      await live.getByRole("spinbutton", { name: /^Alert after no shot for/ }).fill("4");
-      await live.getByRole("button", { name: /^Review and save/ }).click();
-      const liveReview = live.getByRole("dialog", { name: "Save notifications?" });
-      const liveSave = liveReview.getByRole("button", { name: "Save notifications", exact: true });
+      await live.getByRole("spinbutton", { name: /^Send Shots stopped after/ }).fill("4");
+      const liveBar = live.locator(".notify-bar");
+      const liveSave = liveBar.getByRole("button", { name: "Apply 2 changes", exact: true });
       await liveSave.click();
       // Saved elsewhere meanwhile: read again with this draft kept on top, and said so.
-      await expectVisible(liveReview.getByText(/^Someone else saved the notifications meanwhile/));
+      await expectVisible(liveBar.getByText(/^Someone else changed this since you started editing/));
       await liveSave.click();
-      await liveReview.waitFor({ state: "hidden" });
-      await expectVisible(live.getByText("Saved as revision 9. The next push follows it."));
+      await expectVisible(liveBar.locator(".review-apply-receipt", { hasText: /^Written and read back / }));
       const callum = { ...pixel, kinds: ["stock", "phases"] };
       assert.deepEqual(
         posts.filter((post) => post.path.endsWith("/notify_save")).map((post) => post.body),
@@ -2427,7 +2375,7 @@ try {
         ],
       );
       await live
-        .getByRole("button", { name: "Send a test to Owner (iPhone)", exact: true })
+        .getByRole("button", { name: "Send test to Owner (iPhone)", exact: true })
         .click();
       await expectVisible(
         live.locator(`tr[data-notify-row="${iphone.service}"] [data-test-result="sent"]`),
@@ -2614,27 +2562,30 @@ try {
       path: path.join(out, "dashboard-dark.png"),
       fullPage: true,
     });
+    // The reload closed More display options again.
+    await openMoreDisplay();
     await page.getByRole("button", { name: "Light", exact: true }).click();
   });
   await check("keyboard skip retains page and browser history works", async () => {
     await go("today");
     await page.getByRole("link", { name: "Skip to content" }).focus();
     await page.keyboard.press("Enter");
-    await expectVisible(page.getByRole("heading", { name: "Room A today", exact: true }));
+    await expectVisible(page.getByRole("heading", { name: "Room A", exact: true, level: 1 }));
     assert.equal(await page.evaluate(() => document.activeElement?.id), "main-content");
     assert.match(page.url(), /#\/today$/);
-    await page
-      .getByRole("navigation", { name: "Main navigation" })
-      .getByRole("button", { name: "Equipment", exact: true })
-      .click();
-    await expectVisible(page.getByRole("heading", { name: "Probes", exact: true }));
+    await openFromMenu(
+      page.getByRole("navigation", { name: "Main navigation" }),
+      "equipment",
+      "Probes & offsets",
+    );
+    await expectVisible(page.getByRole("heading", { name: "Probes & offsets", exact: true }));
     await page.goBack();
-    await expectVisible(page.getByRole("heading", { name: "Room A today", exact: true }));
+    await expectVisible(page.getByRole("heading", { name: "Room A", exact: true, level: 1 }));
     await page.goForward();
-    await expectVisible(page.getByRole("heading", { name: "Probes", exact: true }));
+    await expectVisible(page.getByRole("heading", { name: "Probes & offsets", exact: true }));
   });
   await check("history explorer: range, any sensor, previous run, 390px", async () => {
-    await go("history/timeline?zone=1");
+    await go("history/explorer?zone=1");
     const explorer = page.locator("[data-history-explorer]");
     await expectVisible(explorer);
     const loads = async () => Number(await explorer.getAttribute("data-explorer-loads"));
@@ -2665,9 +2616,9 @@ try {
       DEMO_DAY.getTime() - 7 * 86_400_000,
     );
     const rangeQuery = new URLSearchParams(new URL(page.url()).hash.split("?")[1]);
-    assert.equal(new URL(page.url()).hash.split("?")[0], "#/history/timeline");
+    assert.equal(new URL(page.url()).hash.split("?")[0], "#/history/explorer");
     assert.equal(rangeQuery.get("zone"), "1");
-    assert.equal(rangeQuery.get("range"), "7d");
+    assert.equal(rangeQuery.get("zr"), "7d");
     // Any sensor of the room: ticking one adds its series, on an axis of its own unit.
     const more = await loads();
     await explorer.locator('[data-sensor="sensor.demo_vpd"]').check();
@@ -2753,8 +2704,11 @@ try {
   await check("mobile navigation and every page fit 390px", async () => {
     await page.setViewportSize({ width: 390, height: 844 });
     await go("today");
-    // The phone header in words: the room and the data's age, then both switches and Stop all labelled.
+    // The phone header in words: the page's title over the data's age, then both switches and Stop
+    // all labelled; Jump to… stays on a desktop.
     assert.match(await page.locator(".data-age").innerText(), /^Updated \d+ (s|min) ago$/);
+    assert.ok(await page.locator(".topbar-title").isVisible(), "phone header names the page");
+    assert.equal(await page.getByRole("button", { name: /^Jump to…/ }).isVisible(), false);
     assert.deepEqual(await page.locator(".safety-switch-text").allInnerTexts(), [
       "Watering on",
       "Stop all",
@@ -2767,17 +2721,20 @@ try {
     await page.getByRole("button", { name: "Open navigation" }).click();
     await axe("mobile navigation");
     const mobileMenu = page.getByRole("dialog");
-    // The "About" buttons of the menu's controls are help, not entries.
     const entries = await mobileMenu
       .getByRole("navigation", { name: "Main navigation" })
-      .locator("button:not(.info-tip-trigger)")
+      .locator("[data-nav-section]")
       .allInnerTexts();
     assert.deepEqual(entries, ["Status", "Irrigation", "History", "Equipment", "Settings"]);
     // Under the sections: every room, and every zone under its room, one tap each.
     const tree = mobileMenu.getByRole("navigation", { name: "Rooms" });
     assert.ok((await tree.locator(".room-tree-room").count()) >= 2, "every room listed");
     assert.ok((await tree.locator(".room-tree-zone").count()) >= 2, "zones listed under rooms");
-    await mobileMenu.getByRole("button", { name: "Irrigation", exact: true }).click();
+    await openFromMenu(
+      mobileMenu.getByRole("navigation", { name: "Main navigation" }),
+      "plan",
+      "Current day",
+    );
     await expectVisible(page.getByRole("heading", { name: "Irrigation", exact: true }));
     const views = page.getByRole("navigation", { name: "Irrigation views" });
     await views.getByRole("button", { name: "Calendar", exact: true }).click();
@@ -2823,9 +2780,9 @@ try {
         .locator(".features-row")
         .filter({ hasText: "Per-probe grow comparison" });
       await expectVisible(catalogueRow);
-      assert.equal(await catalogueRow.getByRole("link").getAttribute("href"), "#/history/timeline");
+      assert.equal(await catalogueRow.getByRole("link").getAttribute("href"), "#/history/explorer");
       await axe("per-probe compare catalogue");
-      await page.goto(`${base}/dashboard.html?demo&room=f2#/history/timeline?zone=1&range=7d`, {
+      await page.goto(`${base}/dashboard.html?demo&room=f2#/history/explorer?zone=1&range=7d`, {
         waitUntil: "networkidle",
       });
       const picker = page.locator("[data-probe-compare]").first();

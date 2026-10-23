@@ -9,25 +9,62 @@ const BODY =
 const EMPTY = 60,
   FULL = 18;
 
+/** The smallest a bottle is drawn, so it stays readable: a tank under 0.3³ (2.7%) of the largest is
+ * drawn larger than to scale. */
+export const MIN_BOTTLE = 0.3;
+/** How big the bottle is drawn: `capacityScale` (the tank's capacity over the room's largest) by
+ * volume, the cube root, as a real bottle holding that much; else `scale`. MIN_BOTTLE at the least. */
+export const bottleSize = (scale: number, capacityScale?: number) =>
+  Math.max(MIN_BOTTLE, Math.min(1, capacityScale === undefined ? scale : Math.cbrt(capacityScale)));
+
+/** Where `litres` sits in a bottle drawn at this size, as a percentage of the drawing's height from
+ * its top, so a page can label the low mark or the level beside it. */
+export function bottleTop(litres: number, capacity: number, capacityScale: number): number {
+  const size = bottleSize(1, capacityScale);
+  const y = EMPTY - Math.max(0, Math.min(1, litres / capacity)) * (EMPTY - FULL) * size;
+  return (y / 62) * 100;
+}
+
+/** Where the bottle's percent label sits (as bottleTop): in the middle of the liquid, unless too
+ * little shows to hold it or that is on the dashed low line; then in the liquid above the low line
+ * when there is room, else just above the level or the low line, whichever is higher. */
+export function percentTop(
+  litres: number,
+  capacity: number,
+  lowLitres: number,
+  capacityScale: number,
+): number {
+  const HALF = 8; // half the label's height and a little, in percent of the drawing
+  const top = bottleTop(litres, capacity, capacityScale);
+  const low = bottleTop(lowLitres, capacity, capacityScale);
+  const middle = bottleTop(litres / 2, capacity, capacityScale);
+  if (litres / capacity >= 0.25 && Math.abs(middle - low) >= HALF) return middle;
+  if (low - top >= 2 * HALF) return (low + top) / 2;
+  return Math.min(top, low) - HALF;
+}
+
 /** A stock tank drawn as a bottle to scale: its liquid at its level and its low mark dashed across,
- * and the bottle itself `scale` of the room's largest (0.3 at the least). Amber within half again of
- * the low mark, red at or under it (the Stock tanks page's rule). */
+ * and the bottle itself `scale` of the room's largest, or drawn by volume with `capacityScale`
+ * (without it the drawing is as before). Amber within half again of the low mark, red at or under
+ * it (the Stock tanks page's rule). */
 export function StockBottle({
   tank,
   state,
   scale = 1,
+  capacityScale,
   label,
 }: {
   tank: StockTankReading;
   state: StockState;
   scale?: number;
+  capacityScale?: number;
   label: string;
 }) {
   const clip = useId();
   const y = (litres: number) =>
     EMPTY - Math.max(0, Math.min(1, litres / tank.capacity_l)) * (EMPTY - FULL);
   const top = y(tank.level_l);
-  const size = Math.max(0.3, Math.min(1, scale));
+  const size = bottleSize(scale, capacityScale);
   return (
     <svg
       className="stock-bottle"

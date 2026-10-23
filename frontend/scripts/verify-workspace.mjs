@@ -6,6 +6,8 @@ import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
 import AxeBuilder from "@axe-core/playwright";
 import { readmeImage } from "./readme-images.mjs";
+/** Grow plan & presets arms at the room's next lights-on and names it (I4). */
+const ARM_PLAN = /^Arm at (lights-on, \w{3} \d{1,2}:\d{2}( [ap]m)?|next lights-on)$/;
 const out = fileURLToPath(new URL("../../output/playwright/", import.meta.url));
 await mkdir(out, { recursive: true });
 // CI must exercise the checked-out artifact without relying on a developer's server.
@@ -65,25 +67,34 @@ async function fresh(route) {
   target.hash = "/" + route;
   await page.goto(target.toString(), { waitUntil: "networkidle" });
 }
+/** Opens a page from the tree menu: its section opened first if it is closed. */
+async function tree(section, label, target = page) {
+  const nav = target.locator('.desktop-sidebar nav[aria-label="Main navigation"]');
+  const head = nav.locator(`button[data-nav-section="${section}"]`);
+  if ((await head.getAttribute("aria-expanded")) === "false") await head.click();
+  await nav.getByRole("link", { name: label, exact: true }).click();
+}
+/** A menu entry's own page, as the five-entry menu opened it before the tree. */
+const ENTRY_PAGES = {
+  Irrigation: ["plan", "Current day"],
+  Plan: ["plan", "Current day"],
+  Settings: ["settings", "Dashboards & display"],
+};
 async function navigate(label, target = page) {
   if (label === "Today") {
     await target.evaluate(() => (location.hash = "#/today"));
     return;
   }
-  label = label === "Plan" ? "Irrigation" : label;
-  await target
-    .locator(".desktop-sidebar")
-    .getByRole("button", { name: label, exact: true })
-    .click();
+  await tree(...ENTRY_PAGES[label], target);
 }
-/** A view under a menu entry: the entry, then its tab. */
+/** A page under a menu entry, by its name in the tree. */
+const VIEW_PAGES = { "Equipment/Setup": ["equipment", "Setup: pumps & valves"] };
 async function navigateTo(section, view, target = page) {
-  await navigate(section, target);
-  await target
-    .getByRole("navigation", { name: `${section} views` })
-    .getByRole("button", { name: view, exact: true })
-    .click();
+  await tree(...VIEW_PAGES[`${section}/${view}`], target);
 }
+/** The room page's heading: the room's name. */
+const roomHeading = (target = page) =>
+  target.getByRole("heading", { level: 1, name: /^Room [AB]$/ });
 /** Irrigation › Calendar keeps the steering balance, endpoint profiles and recipes together. */
 async function openPlanner(tab = "Steering balance", target = page) {
   const advanced = target.locator("details.plan-advanced");
@@ -96,11 +107,7 @@ async function openPlanner(tab = "Steering balance", target = page) {
   if (tab === "Steering balance") await visible(target.locator("#steering-balance"));
 }
 async function navigateSchedule(target = page) {
-  await navigate("Irrigation", target);
-  await target
-    .getByRole("navigation", { name: "Irrigation views" })
-    .getByRole("button", { name: /^Calendar/ })
-    .click();
+  await tree("plan", "Grow plan & presets", target);
   await openPlanner("Steering balance", target);
 }
 async function exported() {
@@ -274,6 +281,9 @@ async function liveSetup(run, history = false, blockers = []) {
       Object.assign(room, { zones: data.zones, revision: room.revision + 1 });
       return reply({ changed_states: [], service_response: room });
     }
+    // An integration before 3.18, as Home Assistant answers a service it does not have: the
+    // pumps & valves editor at the top of Setup reads its supply once and shows Needs integration.
+    if (action === "supply_get") return reply({ message: "Service crop_steering.supply_get not found." }, 400);
     return reply({ message: "The sizing fixture has no such service" }, 400);
   });
   const lp = await live.newPage();
@@ -289,8 +299,9 @@ async function liveSetup(run, history = false, blockers = []) {
     );
     await run(lp, calls);
     assert.deepEqual(
-      // The dashboard asks once per visit whether there is anything new to show: not the helpers.
-      [...new Set(calls.map((call) => call.action))].filter((a) => a !== "whats_new_get").sort(),
+      // The dashboard asks once per visit whether there is anything new to show, and the pumps &
+      // valves editor reads the supply once: neither is the helpers.
+      [...new Set(calls.map((call) => call.action))].filter((a) => a !== "whats_new_get" && a !== "supply_get").sort(),
       history
         ? ["history_connection_get", "setup_read", "setup_save"]
         : ["setup_read", "setup_save"],
@@ -464,19 +475,12 @@ try {
       await fresh("plan/schedule");
       await openPlanner();
       await setBalance(83);
-      await page
-        .getByRole("navigation", { name: "Irrigation views" })
-        .getByRole("button", { name: /^Current day/ })
-        .click();
-      assert.equal(
-        await page.getByRole("dialog").count(),
-        0,
-        "Views of one workspace preserve its draft without discarding",
-      );
-      await page
-        .getByRole("navigation", { name: "Irrigation views" })
-        .getByRole("button", { name: /^Calendar/ })
-        .click();
+      // Current day and Grow plan are pages of their own in the tree menu: leaving the plan with a
+      // draft asks first, and Keep editing stays on it with the draft.
+      await tree("plan", "Current day");
+      await visible(page.getByRole("heading", { name: "Discard unsaved workspace changes?" }));
+      await page.getByRole("button", { name: "Keep editing" }).click();
+      assert.equal(new URL(page.url()).hash, "#/plan/schedule");
       assert.equal(await page.locator("#steering-balance").inputValue(), "83");
       await navigate("Today");
       await visible(page.getByRole("heading", { name: "Discard unsaved workspace changes?" }));
@@ -495,7 +499,7 @@ try {
       );
       await navigate("Today");
       await page.getByRole("button", { name: "Discard and continue" }).click();
-      await visible(page.getByRole("heading", { level: 1, name: / today$/ }));
+      await visible(roomHeading());
       await navigateSchedule();
       assert.notEqual(await page.locator("#steering-balance").inputValue(), "83");
       // Use a clean history entry: prior refused hash changes restore their own entries.
@@ -528,12 +532,12 @@ try {
     await visible(page.getByRole("heading", { name: "Review grow plan", exact: true }));
     assert.match(await page.getByRole("dialog").innerText(), /Room A only/);
     await page.getByRole("button", { name: "Save draft", exact: true }).click();
-    await visible(page.getByRole("button", { name: "Arm plan", exact: true }));
+    await visible(page.getByRole("button", { name: ARM_PLAN }));
     assert.equal(
-      await page.getByRole("button", { name: "Arm plan", exact: true }).isEnabled(),
+      await page.getByRole("button", { name: ARM_PLAN }).isEnabled(),
       true,
     );
-    await page.getByRole("button", { name: "Arm plan", exact: true }).click();
+    await page.getByRole("button", { name: ARM_PLAN }).click();
     await page.getByRole("button", { name: "Arm for next lights-on", exact: true }).click();
     await visible(page.getByRole("button", { name: "Disarm plan", exact: true }));
     assert.equal(await page.locator("#steering-balance").isDisabled(), true);
@@ -543,7 +547,7 @@ try {
     assert.equal(await gridCell.isEditable(), false, "An armed plan's grid is read only");
     await page.getByRole("button", { name: "Disarm plan", exact: true }).click();
     await page.getByRole("button", { name: "Confirm disarm", exact: true }).click();
-    await visible(page.getByRole("button", { name: "Arm plan", exact: true }));
+    await visible(page.getByRole("button", { name: ARM_PLAN }));
     assert.equal(await page.locator("#steering-balance").isEnabled(), true);
     assert.equal(await gridCell.isEditable(), true);
   });
@@ -556,7 +560,7 @@ try {
         why = page.locator(".plan-state-why");
       assert.equal(await label.innerText(), "Draft");
       assert.match(await why.innerText(), /^Saved, not running\./);
-      await page.getByRole("button", { name: "Arm plan", exact: true }).click();
+      await page.getByRole("button", { name: ARM_PLAN }).click();
       await page.getByRole("button", { name: "Arm for next lights-on", exact: true }).click();
       await visible(page.getByRole("button", { name: "Disarm plan", exact: true }));
       await label.filter({ hasText: /^Scheduled$/ }).waitFor({ state: "visible" });
@@ -565,7 +569,7 @@ try {
       await page.screenshot({ path: out + `workspace-plan-state-${width}.png`, fullPage: true });
       await page.getByRole("button", { name: "Disarm plan", exact: true }).click();
       await page.getByRole("button", { name: "Confirm disarm", exact: true }).click();
-      await visible(page.getByRole("button", { name: "Arm plan", exact: true }));
+      await visible(page.getByRole("button", { name: ARM_PLAN }));
     }
     await page.setViewportSize({ width: 1440, height: 1000 });
   });
@@ -744,7 +748,8 @@ try {
       await noOverflow();
       const stops = [
         ["Plan", "#/plan/targets"],
-        ["History", "#/history/timeline"],
+        // The tour's old History address lands on the Explorer.
+        ["History", "#/history/explorer"],
         ["Equipment", "#/equipment/probes"],
         ["Help", "#/help"],
       ];
@@ -1094,19 +1099,18 @@ try {
       // The switcher moves the header chip with the page, with no reload.
       await page.getByLabel("Sample AI state", { exact: true }).selectOption("budget");
       await visible(page.locator(".brain-chip").getByText("AI paused: budget"));
-      // The same permission now has one reviewed editor in Settings.
+      // The same permission has one editor in Settings: its judge's switch, written at once with Undo.
       await page
         .locator("[data-brain-powers]")
         .getByRole("link", { name: "Manage permissions" })
         .click();
-      const tune = page.getByRole("switch", { name: /Tune shot sizes/i });
-      assert.equal(await tune.isChecked(), false);
+      const tune = page.getByRole("switch", { name: "Shot sizes in Room A", exact: true });
+      assert.equal(await tune.getAttribute("aria-checked"), "false");
       await tune.click();
-      assert.equal(await tune.isChecked(), true, "Permission change is staged locally");
-      await page.getByRole("button", { name: "Review changes", exact: true }).click();
-      await page.getByRole("button", { name: /^Apply 1 change/ }).click();
-      await page.getByRole("dialog").waitFor({ state: "hidden" });
-      assert.equal(await tune.isChecked(), true, "Reviewed permission reads back enabled");
+      await visible(
+        page.locator("[data-sonner-toast]").filter({ hasText: /^Shot sizes on in Room A\. Written and read back/ }),
+      );
+      assert.equal(await tune.getAttribute("aria-checked"), "true", "Permission reads back enabled");
       await page.setViewportSize({ width: 1440, height: 1000 });
     },
   );
@@ -1355,7 +1359,7 @@ try {
         await lp.getByRole("button", { name: "Review & save", exact: true }).click();
         await lp.getByRole("button", { name: "Save draft", exact: true }).click();
         await lp.getByRole("dialog").waitFor({ state: "hidden" });
-        await lp.getByRole("button", { name: "Arm plan", exact: true }).click();
+        await lp.getByRole("button", { name: ARM_PLAN }).click();
         await lp.getByRole("button", { name: "Arm for next lights-on", exact: true }).click();
         await visible(lp.getByRole("button", { name: "Disarm plan", exact: true }));
         await lp.locator("#preview-grow-day").fill("22");
@@ -1363,7 +1367,7 @@ try {
         document.revision++;
         await lp
           .locator(".plan-state")
-          .filter({ hasText: /^active$/i })
+          .filter({ hasText: /^Armed · running$/ })
           .waitFor({ state: "visible" });
         assert.equal(
           await lp.locator("#preview-grow-day").inputValue(),
@@ -1405,7 +1409,7 @@ try {
         await lp.reload();
         await openPlanner("Steering balance", lp);
         assert.equal(await lp.locator("#steering-balance").isDisabled(), true);
-        assert.equal(await lp.getByRole("button", { name: "Arm plan", exact: true }).count(), 0);
+        assert.equal(await lp.getByRole("button", { name: ARM_PLAN }).count(), 0);
         assert.equal(
           await lp.getByRole("button", { name: "Disarm plan", exact: true }).isEnabled(),
           true,
@@ -1442,7 +1446,7 @@ try {
         assert.match(await rewater.innerText(), /77/);
         const mutations = () =>
           apiCalls.filter(
-            (call) => !["setup_read", "strategy_get", "strategy_preview"].includes(call.action),
+            (call) => !["setup_read", "strategy_get", "strategy_preview", "preset_list"].includes(call.action),
           );
         const writesBeforeToday = structuredClone(mutations());
         await navigate("Plan", lp);
@@ -1463,10 +1467,8 @@ try {
           await lp.locator('input[id^="setting-"]:visible, select[id^="choice-"]:visible').count(),
           0,
         );
-        assert.equal(
-          await lp.getByRole("button", { name: "Review changes", exact: true }).isDisabled(),
-          true,
-        );
+        // The armed plan owns the targets: there is nothing to review and apply.
+        assert.equal(await lp.locator(".review-apply").count(), 0);
         assert.deepEqual(
           mutations(),
           writesBeforeToday,
@@ -1545,7 +1547,7 @@ try {
         );
         await lp.screenshot({ path: out + "workspace-stale-banner-390.png", fullPage: true });
         await band.getByRole("button", { name: "Probes", exact: true }).click();
-        await visible(lp.getByRole("heading", { name: "Probes", exact: true }));
+        await visible(lp.getByRole("heading", { name: "Probes & offsets", exact: true }));
         await visible(band);
         await lp.setViewportSize({ width: 1440, height: 1000 });
       } finally {
@@ -1578,7 +1580,7 @@ try {
         await tp.goto(origin + "/workspace-theme-parent.html");
         const frame = tp.frames().find((f) => f !== tp.mainFrame());
         assert.ok(frame);
-        await visible(frame.getByRole("heading", { level: 1, name: / today$/ }));
+        await visible(roomHeading(frame));
         await frame.waitForFunction(
           () =>
             document.documentElement.dataset.themeSource === "home-assistant" &&
@@ -1623,7 +1625,7 @@ try {
           path: readmeImage("rooms-setup.png"),
         });
         await navigate("Today", frame);
-        await visible(frame.getByRole("heading", { level: 1, name: / today$/ }));
+        await visible(roomHeading(frame));
         await tp.setViewportSize({ width: 390, height: 844 });
         await tp.screenshot({
           path: readmeImage("mobile-overview.png"),
@@ -1644,6 +1646,8 @@ try {
               .trim() === "#fafafa",
         );
         await navigate("Settings", frame);
+        // Appearance sits under "More display options", closed until opened (Task 29).
+        await frame.locator("details.more-display > summary").click();
         await frame.getByRole("button", { name: "Light", exact: true }).click();
         await frame.waitForFunction(
           () => document.documentElement.dataset.themeSource === "override",

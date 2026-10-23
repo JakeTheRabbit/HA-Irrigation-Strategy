@@ -37,8 +37,14 @@ ISSUE_IDS = (
     "outside_zone_bounds",
     # Raised by deprecations.py, once per Home Assistant run, as deprecated_<service or select>.
     "deprecated_feature",
+    # Raised and cleared by calibration.py, hourly and when a feed probe is calibrated.
+    "calibration_due",
+    # Raised and cleared by calibration.py, when it loads and hourly.
+    "probe_offsets_unreadable",
     # Raised and cleared by deprecation.py, once Home Assistant has started.
     "deprecated_entities",
+    # Raised by migration.py while the room's Upgrade report lists something for the grower.
+    "upgrade_report_3_18",
 )
 # The platforms whose entities the controller reads by exact id and has no other way to find.
 # Fused sensors are left out: the controller tolerates their legacy naming and an add-on option
@@ -221,11 +227,14 @@ def run_health_check(hass: HomeAssistant, entry: ConfigEntry) -> None:
         if room is not None and str(room.state).lower() == "off":
             for base in ISSUE_IDS:
                 # Stock runs low whether or not anything grows, and only its own store
-                # raises that card again; the same goes for a setting held above its limit.
+                # raises that card again; the same goes for a setting held above its limit,
+                # a feed probe due for calibration and a retired entity still in use.
                 if base not in (
                     "entities_moved",
                     "stock_low",
                     "outside_zone_bounds",
+                    "calibration_due",
+                    "probe_offsets_unreadable",
                     "deprecated_entities",
                 ):
                     _issue(hass, False, _iid(base, slug), ir.IssueSeverity.WARNING)

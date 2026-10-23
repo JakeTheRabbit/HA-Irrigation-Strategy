@@ -49,9 +49,26 @@ CHANGES = {
         "probe": "feed_ph",
         "points": [],
     },
+    # The feed probe calibration wizard: a session pauses the room's dosing, a commit changes what the
+    # controller reads from the feed probe.
+    "calibration_start": {"room_id": ROOM, "probe": "feed_ph"},
+    "calibration_capture": {"session_id": "s", "point": 0},
+    "calibration_commit": {"session_id": "s"},
+    "calibration_revert": {"room_id": ROOM, "probe": "feed_ph"},
+    "calibration_abandon": {"session_id": "s"},
+    "probe_offset_set": {
+        "room_id": ROOM,
+        "entity_id": "sensor.probe",
+        "expected_revision": 0,
+        "offset": 1.0,
+    },
     "dosing_save": {"room_id": ROOM, "expected_revision": 0, "pumps": [], "batch": {}},
     # A stop is the one dosing request anyone may make (test_an_ordinary_user_may_stop_dosing).
     "dosing_request": {"room_id": ROOM, "action": "dose", "pump": "balance", "ml": 5},
+    # A prime or a calibration runs a pump; a commit changes the flow it doses by.
+    "pump_prime": {"room_id": ROOM, "pump": "balance", "seconds": 10},
+    "pump_calibrate": {"room_id": ROOM, "pump": "balance", "seconds": 30},
+    "pump_calibration_commit": {"room_id": ROOM, "session_id": "s", "measured_ml": 150},
     # A push to the phones: the controller app's, as Home Assistant's administrator Supervisor user.
     "notify": {"key": "k", "title": "t", "message": "m"},
     # An ask spends the room's AI budget.
@@ -62,6 +79,18 @@ CHANGES = {
     "brain_prompt_publish": {"room_id": ROOM, "expected_revision": 0, "live": {}},
     # What the dashboard shows in the room, for everyone who opens it.
     "display_save": {"room_id": ROOM, "expected_revision": 0, "options": {"show_climate": True}},
+    "supply_save": {"expected_revision": 0, "irrigation_pumps": []},
+    # The site's presets, and the writes a preset or a copy makes to the rooms' settings.
+    "preset_save": {"name": "p", "scope": "all", "from": {"room_id": ROOM}, "expected_revision": 0},
+    "preset_delete": {"id": "x", "expected_revision": 0},
+    "preset_apply": {"preset_id": "x", "to": [{"room_id": ROOM}]},
+    "copy_config": {"from": {"room_id": ROOM}, "to": [{"room_id": ROOM}], "sections": ["targets"]},
+    # A dashboard made from a template, in Home Assistant's own dashboards.
+    "dashboard_create": {"template": "facility_wall", "rooms": [ROOM]},
+    # The room's timer programs and skips: what the controller app waters by.
+    "timer_program_set": {"room_id": ROOM, "expected_revision": 0, "program": {}},
+    "timer_program_delete": {"room_id": ROOM, "expected_revision": 0, "id": "x"},
+    "timer_skip": {"room_id": ROOM, "expected_revision": 0, "zone": 1, "at": "2026-10-22T08:00:00+13:00"},
     "save_recipe": {"recipe": {}},
     "apply_recipe": {},
     "set_manual_override": {"zone": 1},
@@ -73,6 +102,12 @@ CHANGES = {
     "test_shot": {"room_id": ROOM, "zone": 1},
     "overlay_keep": {"room_id": ROOM, "entity_id": "number.crop_steering_zone_1_p2_shot_size"},
     "overlay_undo": {"room_id": ROOM, "entity_id": "number.crop_steering_zone_1_p2_shot_size"},
+    "journal_append": {"room_id": ROOM, "events": []},
+    "history_revert": {"event_id": "01JAAAAAAAAAAAAAAAAAAAAAAA"},
+    # The site's threshold alert rules, and a test push through one (a test that sends nothing is a read).
+    "alert_rule_set": {"expected_revision": 0, "rule": {}},
+    "alert_rule_delete": {"id": "x", "expected_revision": 0},
+    "alert_rule_test": {"rule": {}, "send": True},
 }
 READS = {
     "harvests_get": {"room_id": ROOM},
@@ -85,10 +120,27 @@ READS = {
     "overlay_get": {"room_id": ROOM},
     "stock_get": {"room_id": ROOM},
     "calibration_get": {"room_id": ROOM},
+    "calibration_status": {"session_id": "s"},
     "dosing_get": {"room_id": ROOM},
+    "pump_precheck": {"room_id": ROOM, "pump": "balance"},
     "display_get": {"room_id": ROOM},
+    "migration_report": {"room_id": ROOM},
+    "supply_get": {},
+    "preset_list": {},
+    "dashboard_list": {},
+    "timer_program_list": {},
+    "timer_program_preview": {"room_id": ROOM, "program": {}},
     "notify_get": {},
     "whats_new_get": {},
+    "journal_query": {"room_id": ROOM, "since": "2026-01-01T00:00:00+00:00"},
+    "history_changes": {"since": "2026-01-01T00:00:00+00:00"},
+    "timeline_get": {"rooms": [ROOM], "start": "2026-01-01T00:00:00+00:00",
+                     "end": "2026-01-02T00:00:00+00:00"},
+    "timeline_summary": {"rooms": [ROOM], "days": ["2026-01-01"]},
+    "alert_rule_list": {},
+    "system_status_get": {},
+    "alert_rule_preview": {"rule": {"room_id": ROOM, "source": "tank.level", "op": "below",
+                                    "threshold": 30}},
 }
 # Changes nothing but whether the dashboard's What's new window shows again: whoever opens the
 # dashboard first after an update may dismiss it, administrator or not.
@@ -101,7 +153,11 @@ PER_USER = {
 }
 # Stop all only switches things off (the kill switch, then the room's pumps and valves): whoever may look at a
 # room may stop it, as anyone may stop its dosing.
-STOPS = {"stop_all": {"room_id": ROOM}}
+# Ending one pump's prime or calibration likewise (tests_ha/test_pump_calibration.py).
+STOPS = {"stop_all": {"room_id": ROOM}, "pump_stop": {"room_id": ROOM, "pump": "balance"}}
+# Staff ack alarms: anyone signed in may acknowledge an open alert (an unknown one is refused for
+# itself, never for who asks).
+ACKS = {"alert_ack": {"room_id": ROOM, "alert_event_id": "01JAAAAAAAAAAAAAAAAAAAAAAA"}}
 EVENTS = ("crop_steering_manual_override",)
 
 
@@ -129,7 +185,7 @@ async def test_an_ordinary_user_can_look_and_changes_nothing(hass):
     assert hass.data[frontend.DATA_PANELS]["crop-steering"].require_admin is False  # still shown
     # Every service the integration registers is one or the other: nothing new slips through.
     assert set(hass.services.async_services()[DOMAIN]) == (
-        set(CHANGES) | set(READS) | set(NOTICES) | set(PER_USER) | set(STOPS)
+        set(CHANGES) | set(READS) | set(NOTICES) | set(PER_USER) | set(STOPS) | set(ACKS)
     )
     fired = []
     for event in EVENTS:
@@ -141,6 +197,9 @@ async def test_an_ordinary_user_can_look_and_changes_nothing(hass):
             await _call(hass, staff, name, data)
     for name, data in NOTICES.items():
         assert "seen" in await _call(hass, staff, name, data)
+    for name, data in ACKS.items():
+        with pytest.raises(HomeAssistantError, match="No alert"):
+            await _call(hass, staff, name, data)
     # Someone else's phone: reached with who they are, and refused by the store.
     for name, data in PER_USER.items():
         assert (await _call(hass, staff, name, data))["error"].startswith("not allowed: ")

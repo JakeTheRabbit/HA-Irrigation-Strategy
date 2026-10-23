@@ -1,5 +1,5 @@
-/* Today: one line for the room, a card per zone, and what the AI assistant changed. Quiet unless something
-   needs a person: a flagged card gets a coloured edge and its reason in words. */
+/* The Room page (mockup 03): the room's day, today's strip and a row per zone. Quiet unless something
+   needs a person: a flagged row gets a coloured edge and its reason in words, on the thing that has it. */
 .today {
   display: grid;
   gap: 16px;
@@ -9,88 +9,116 @@
 }
 .today-head {
   display: grid;
-  gap: 8px;
+  gap: 10px;
 }
 .today-title {
   display: flex;
-  align-items: center;
+  align-items: baseline;
   flex-wrap: wrap;
-  gap: 6px 12px;
+  gap: 4px 12px;
 }
 .today-title h1 {
-  font-size: 22px;
+  font-size: 26px;
 }
-.today-state {
-  padding: 1px 10px;
-  border-radius: 999px;
-  background: var(--muted);
-  color: var(--muted-foreground);
-  font-size: var(--text-sm);
-  font-weight: 600;
-  line-height: 22px;
-}
-.today-state[data-tone="holding"] {
-  background: color-mix(in srgb, var(--success) 14%, var(--surface));
-  color: color-mix(in srgb, var(--success) 55%, var(--foreground));
-}
-.today-state[data-tone="watering"] {
-  background: color-mix(in srgb, var(--primary) 14%, var(--surface));
-  color: var(--primary-strong);
-}
-.today-state[data-tone="stopped"],
-.today-state[data-tone="stale"] {
-  background: color-mix(in srgb, var(--destructive) 12%, var(--surface));
-  color: var(--destructive);
-}
-.today-line {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  row-gap: 6px;
-  color: var(--muted-foreground);
-  font-size: var(--text-sm);
-  line-height: 1.5;
-}
-.today-line > * + * {
-  margin-left: 12px;
-  padding-left: 12px;
-  border-left: 1px solid var(--border);
-}
-.today-fact strong {
-  color: var(--foreground);
-  font-weight: 600;
-}
-.today-fact[data-watering] {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  color: var(--foreground);
-  font-weight: 600;
-}
-.today-fact[data-watering] i {
-  width: 8px;
-  height: 8px;
+.today-dot {
+  align-self: center;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
   background: var(--muted-foreground);
 }
-.today-fact[data-watering="true"] i {
+.today-dot[data-tone="holding"] {
   background: var(--success);
 }
-.today-fact[data-watering="false"] {
-  color: var(--destructive);
+.today-dot[data-tone="watering"] {
+  background: var(--primary);
 }
-.today-fact[data-watering="false"] i {
+.today-dot[data-tone="stopped"],
+.today-dot[data-tone="stale"] {
   background: var(--destructive);
 }
-.today-steering {
-  color: var(--foreground);
+.today-sub {
+  margin: 0;
+  color: var(--muted-foreground);
+  font-size: var(--text-lg);
+}
+.today-state[data-tone="stopped"],
+.today-state[data-tone="stale"] {
+  color: var(--destructive);
   font-weight: 600;
 }
-.today-steering[data-steering="vegetative"] {
-  color: color-mix(in srgb, var(--success) 70%, var(--foreground));
+.today-day {
+  margin: 0 0 0 auto;
+  font-size: var(--text-lg);
+  font-variant-numeric: tabular-nums;
 }
-.today-steering[data-steering="generative"] {
-  color: color-mix(in srgb, #7c4dbc 75%, var(--foreground));
+.today-day strong {
+  font-weight: 600;
+}
+/* Where the grow is: the run so far, now, and where the stage ends. */
+.today-run {
+  position: relative;
+  padding-bottom: 22px;
+}
+.today-run-track {
+  position: relative;
+  display: block;
+  height: 8px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--muted-foreground) 20%, transparent);
+}
+.today-run-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 4px;
+  background: var(--primary);
+}
+.today-run-now {
+  position: absolute;
+  top: -5px;
+  bottom: -5px;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--foreground);
+}
+.today-run-mark {
+  position: absolute;
+  bottom: 0;
+  transform: translateX(-50%);
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+  white-space: nowrap;
+}
+.today-facts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px 28px;
+  margin: 0;
+}
+.today-facts > div {
+  display: grid;
+  gap: 1px;
+}
+.today-facts dt {
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+}
+.today-facts dd {
+  margin: 0;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.today-fact-lead dd {
+  font-weight: 400;
+}
+.today-fact-lead strong {
+  font-size: 20px;
+  font-weight: 600;
+}
+.today-fact-climate {
+  padding-left: 28px;
+  border-left: 1px solid var(--border);
 }
 .today-alerts {
   display: inline-flex;
@@ -183,69 +211,310 @@
   text-decoration: underline;
 }
 
-/* A card per zone: three across on a laptop, one under another on a phone. */
-.today-zones {
+/* Today's shots: a track per zone, midnight to midnight. */
+.today-strip {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
-  gap: 16px;
+  gap: 10px;
+  margin: 0;
+  padding: 14px 20px 12px;
 }
-.today-zone {
-  position: relative;
+.today-strip-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 18px;
+}
+.today-strip-head h2 {
+  font-size: var(--text-lg);
+}
+.today-strip-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+}
+.today-strip-legend li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.today-strip-legend li::before {
+  content: "";
+  box-sizing: border-box;
+  width: 4px;
+  height: 14px;
+  border-radius: 1px;
+  background: color-mix(in srgb, var(--muted-foreground) 75%, var(--surface));
+}
+.today-strip-legend [data-glyph="planned"]::before {
+  border: 1.5px dashed var(--primary);
+  background: color-mix(in srgb, var(--primary) 14%, transparent);
+}
+.today-strip-legend [data-glyph="lights"]::before {
+  width: 14px;
+  background: color-mix(in srgb, var(--warning) 25%, transparent);
+}
+.today-strip-open {
+  margin-left: auto;
+}
+.today-strip-body {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  column-gap: 12px;
+}
+.today-strip-labels {
   display: grid;
   align-content: start;
-  gap: 7px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-sm);
+}
+/* Each label as tall as a strip track (28 px and its rule). */
+.today-strip-labels li {
+  display: flex;
+  align-items: center;
+  height: 29px;
+  white-space: nowrap;
+}
+.today-strip-axis {
+  position: relative;
+  grid-column: 2;
+  height: 22px;
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
+.today-strip-axis span {
+  position: absolute;
+  top: 6px;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+.today-strip-axis span:first-child {
+  transform: none;
+}
+.today-strip-axis [data-end] {
+  transform: translateX(-100%);
+}
+.today-strip-axis .today-strip-now {
+  z-index: 1;
+  padding: 0 4px;
+  background: var(--surface);
+  color: var(--foreground);
+  font-weight: 600;
+}
+.today-strip-note {
+  margin: 0;
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+}
+
+/* A row per zone: the slab, its water, its gauges and its sensors. */
+.today-zones {
+  display: grid;
+  gap: 14px;
+  container-type: inline-size;
+}
+.today-zone {
+  display: grid;
+  grid-template-columns: 112px minmax(190px, 1fr) minmax(250px, 1.25fr) minmax(220px, 1fr);
+  align-items: start;
+  gap: 12px 22px;
   min-width: 0;
-  padding: 15px 18px 14px;
+  padding: 16px 20px;
   border: 1px solid color-mix(in srgb, var(--border) 75%, transparent);
   border-radius: var(--radius);
   background: var(--surface);
   box-shadow: var(--ha-native-shadow, 0 1px 2px rgb(0 0 0 / 4%));
-  transition: border-color 0.15s;
-}
-.today-zone:hover {
-  border-color: color-mix(in srgb, var(--foreground) 30%, var(--border));
 }
 .today-zone[data-attention="warning"] {
-  border-color: color-mix(in srgb, var(--warning) 50%, var(--border));
-  box-shadow: inset 4px 0 0 var(--warning);
+  border-color: color-mix(in srgb, var(--warning) 70%, var(--border));
 }
 .today-zone[data-attention="critical"] {
-  border-color: color-mix(in srgb, var(--destructive) 55%, var(--border));
-  box-shadow: inset 4px 0 0 var(--destructive);
+  border-color: color-mix(in srgb, var(--destructive) 65%, var(--border));
 }
-.today-zone-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
+.today-zone .zone-slab {
+  width: 100%;
+  height: auto;
 }
-.today-zone-head h2 {
+.today-zone-main {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+.today-zone-main h2 {
   font-size: var(--text-lg);
 }
-/* The whole card opens the zone: its name is the link, stretched over the card. */
-.today-zone-link::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
+.today-zone-link {
+  color: var(--foreground);
 }
-.today-zone-link:focus-visible {
-  outline: none;
+.today-zone-link:hover {
+  text-decoration: underline;
 }
 .today-zone-go {
   display: inline-block;
-  margin-left: 2px;
-  color: var(--muted-foreground);
+  margin-left: 4px;
   vertical-align: -3px;
-  transition: transform 0.15s;
 }
-.today-zone:hover .today-zone-go {
-  color: var(--foreground);
-  transform: translateX(2px);
+.today-zone-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
 }
-.today-zone-link:focus-visible::after {
-  outline: 2px solid var(--ring);
-  outline-offset: 2px;
+.today-phase,
+.today-mode {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 1px 8px;
+  border-radius: 5px;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  line-height: 20px;
+}
+.today-phase {
+  background: color-mix(in srgb, var(--primary) 18%, var(--surface));
+  color: var(--primary-strong);
+}
+.today-mode {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+}
+.today-mode i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--success);
+}
+.today-water-label,
+.today-drink-delta {
+  margin: 0;
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+}
+.today-zone-gauges {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+.today-gauge {
+  display: grid;
+  grid-template-columns: minmax(96px, 1fr) minmax(60px, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  font-variant-numeric: tabular-nums;
+}
+.today-gauge-label {
+  display: grid;
+  font-size: var(--text-sm);
+}
+.today-gauge-label small {
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+}
+.today-gauge-value {
+  min-width: 52px;
+  text-align: right;
+  font-size: var(--text-lg);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.today-gauge[data-state="abnormal"] .today-gauge-value {
+  color: var(--warning);
+}
+.today-gauge[data-state="abnormal"] .mini-gauge-tick {
+  background: var(--warning);
+}
+.today-paused {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  font-size: var(--text-sm);
+}
+.today-paused p {
+  flex: 1 1 180px;
+  margin: 0;
+}
+.today-paused .today-paused-failed {
+  flex-basis: 100%;
+  color: var(--destructive);
+  font-weight: 600;
+}
+.today-sensors {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+.today-sensors h3 {
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+.today-sensors ul {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.today-sensors li {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px 10px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  font-size: var(--text-sm);
+}
+.today-sensor-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  /* A sensor named only by its entity id wraps inside its card. */
+  min-width: 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.today-sensor-name i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--success);
+}
+.today-sensor-reading {
+  color: var(--muted-foreground);
+  font-variant-numeric: tabular-nums;
+}
+.today-sensors li:not([data-health="ok"]):not([data-health="not-counted"]) {
+  border-color: var(--warning);
+  background: var(--warning-bg);
+}
+.today-sensors li:not([data-health="ok"]):not([data-health="not-counted"]) i {
+  background: var(--warning);
+}
+.today-sensors li:not([data-health="ok"]):not([data-health="not-counted"]) .today-sensor-reading {
+  color: var(--warning);
+  font-weight: 600;
+}
+.today-sensor-note {
+  flex-basis: 100%;
+  margin: 0;
+  line-height: 1.45;
+}
+.today-zone-flags {
+  display: grid;
+  grid-column: 2 / -1;
+  gap: 6px;
 }
 .today-flag {
   display: flex;
@@ -268,166 +537,75 @@
   background: color-mix(in srgb, var(--destructive) 10%, var(--surface));
   color: var(--destructive);
 }
-.today-flag-more {
-  font-weight: 500;
+/* A narrower main column: the sensors go under the water and the gauges. */
+@container (max-width: 980px) {
+  .today-zone {
+    grid-template-columns: 96px minmax(0, 1fr) minmax(0, 1.2fr);
+  }
+  .today-sensors {
+    grid-column: 2 / -1;
+  }
 }
-.today-spark {
-  display: block;
-  width: 100%;
-  min-width: 0;
-  height: 28px;
-  overflow: visible;
-}
-.today-spark path {
-  fill: none;
-  stroke: var(--foreground);
-  stroke-width: 1.8;
-  stroke-linejoin: round;
-  stroke-linecap: round;
-}
-.today-spark path.today-spark-now {
-  stroke-width: 7;
-}
-.today-spark-empty {
-  display: block;
-}
-.today-zone-head {
-  flex-wrap: wrap;
-}
-.today-zone-head h2 {
-  white-space: nowrap;
-}
-.today-zone-facts {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: 5px 14px;
-  margin: 0;
-  padding-top: 7px;
-  border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
-  font-size: var(--text-sm);
-  line-height: 1.5;
-}
-.today-zone-facts > div {
-  display: contents;
-}
-.today-zone-facts dt {
-  color: var(--muted-foreground);
-}
-.today-zone-facts dd {
-  margin: 0;
-  min-width: 0;
-  font-variant-numeric: tabular-nums;
-  overflow-wrap: anywhere;
-}
-.today-next[data-stopped] dd {
-  color: var(--destructive);
-  font-weight: 500;
-}
-/* What the AI assistant changed today. */
-.today-jev {
-  margin-bottom: 0;
-}
-/* The AI assistant's card beside what the AI assistant changed: side by side when there is room. */
-.today-pair {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr));
-  gap: 16px;
-  align-items: start;
-}
-.today-jev .panel-heading {
-  padding: 12px 18px 6px;
-}
-.today-jev-list {
-  margin: 0;
-  padding: 0 20px 8px;
-  list-style: none;
-}
-.today-jev-list li {
-  display: grid;
-  grid-template-columns: 76px 80px minmax(0, 1fr) auto;
-  align-items: baseline;
-  gap: 10px;
-  padding: 9px 0;
-  border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
-  font-size: var(--text-sm);
-}
-.today-jev-list time,
-.today-jev-zone {
-  color: var(--muted-foreground);
-  font-variant-numeric: tabular-nums;
-}
-.today-jev-what strong {
-  font-weight: 600;
-}
-.today-jev-outcome {
-  display: inline-grid;
-  place-items: center;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: color-mix(in srgb, var(--success) 16%, var(--surface));
-  color: color-mix(in srgb, var(--success) 60%, var(--foreground));
-  align-self: center;
-}
-.today-jev-outcome[data-worked="false"] {
-  background: color-mix(in srgb, var(--destructive) 14%, var(--surface));
-  color: var(--destructive);
-}
-.today-jev-none {
-  padding: 4px 18px 16px;
-  color: var(--muted-foreground);
-  font-size: var(--text-sm);
+/* A phone: the slab beside the zone's name and water, the rest under them. */
+@container (max-width: 640px) {
+  .today-zone {
+    grid-template-columns: 72px minmax(0, 1fr);
+    gap: 12px 14px;
+    padding: 14px;
+  }
+  .today-zone-gauges,
+  .today-sensors,
+  .today-zone-flags {
+    grid-column: 1 / -1;
+  }
+  .today-zone-gauges {
+    gap: 8px;
+  }
+  /* Two sensors side by side; a silent one's card takes the row. */
+  .today-sensors ul {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .today-sensors li {
+    padding: 6px 10px;
+  }
+  .today-sensors li:not([data-health="ok"]):not([data-health="not-counted"]) {
+    grid-column: 1 / -1;
+  }
 }
 @media (max-width: 720px) {
   .today {
     gap: 14px;
   }
   .today-title h1 {
-    font-size: 20px;
+    font-size: 22px;
   }
-  /* Wrapped facts: space, not dividers, so no line starts with one. */
-  .today-line {
-    gap: 4px 14px;
+  .today-sub,
+  .today-day {
+    font-size: var(--text-base, 15px);
   }
-  .today-line > * + * {
+  .today-day {
+    flex-basis: 100%;
     margin-left: 0;
+  }
+  .today-facts {
+    gap: 8px 18px;
+  }
+  .today-fact-lead {
+    flex-basis: 100%;
+  }
+  .today-fact-climate {
     padding-left: 0;
     border-left: 0;
   }
-  .today-zones {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 12px;
+  .today-strip {
+    padding: 12px 14px;
   }
-  .today-zone {
-    padding: 13px 14px 12px;
+  .today-strip-body {
+    grid-template-columns: 52px minmax(0, 1fr);
+    column-gap: 8px;
   }
-  .today-jev .panel-heading {
-    padding: 12px 14px 4px;
-  }
-  .today-jev-list {
-    padding: 0 14px 6px;
-  }
-  .today-jev-list li {
-    grid-template-columns: auto minmax(0, 1fr) auto;
-    grid-template-areas:
-      "time zone outcome"
-      "what what outcome";
-    gap: 2px 10px;
-  }
-  .today-jev-list time {
-    grid-area: time;
-  }
-  .today-jev-zone {
-    grid-area: zone;
-  }
-  .today-jev-what {
-    grid-area: what;
-  }
-  .today-jev-outcome {
-    grid-area: outcome;
-  }
-  .today-jev-none {
-    padding: 4px 14px 14px;
+  .today-strip-axis [data-odd] {
+    display: none;
   }
 }
 
@@ -449,54 +627,6 @@
    (Today keeps to two phone screens), and Equipment › Feed shows the tank there. */
 @media (max-width: 640px) {
   [data-today-tank="readout"] {
-    display: none;
-  }
-}
-/* Settings › Display › Zones as › Table: a laptop shows the table; a phone keeps the cards. */
-.today-zone-table {
-  overflow-x: auto;
-  padding: 4px 0;
-}
-.today-zone-table table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: var(--text-sm);
-  font-variant-numeric: tabular-nums;
-}
-.today-zone-table th,
-.today-zone-table td {
-  padding: 7px 12px;
-  text-align: left;
-  white-space: nowrap;
-}
-.today-zone-table thead th {
-  color: var(--muted-foreground);
-  font-weight: 500;
-  border-bottom: 1px solid var(--border);
-}
-.today-zone-table tbody tr {
-  cursor: pointer;
-  border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
-}
-.today-zone-table tbody tr:hover {
-  background: var(--muted);
-}
-.today-zone-table tbody th a {
-  color: var(--foreground);
-  font-weight: 600;
-  margin-right: 8px;
-}
-.today-zone-table .today-table-next {
-  white-space: normal;
-  color: var(--muted-foreground);
-}
-@media (min-width: 721px) {
-  .today-zones.is-phone-only {
-    display: none;
-  }
-}
-@media (max-width: 720px) {
-  .today-zone-table {
     display: none;
   }
 }

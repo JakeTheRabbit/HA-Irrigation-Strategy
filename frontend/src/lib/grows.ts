@@ -1,7 +1,7 @@
 /** Grows side by side from the room's grow-day summaries (crop_steering.grow_days_get) and the harvests
  * (crop_steering.harvests_get): each run's days lined up by grow day, its statistics, and its yield against water
  * and steering. Read-only: nothing here changes watering. */
-import { daysBetween } from "./comparison";
+import { daysBetween } from "./time";
 import type { RunRecord } from "./comparison-types";
 
 export interface Band {

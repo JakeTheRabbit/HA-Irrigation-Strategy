@@ -52,6 +52,7 @@ controller still reports a setup change (CS-201) and a hardware hold (CS-301, CS
 | [CS-210](#cs-210) | Hold entity missing | Warning | Notification |
 | [CS-211](#cs-211) | Shots held for too long | Critical | Notification |
 | [CS-212](#cs-212) | Controller error in room | Critical | Notification |
+| [CS-214](#cs-214) | Zone needs more than its pump | Warning | Notification |
 | [CS-301](#cs-301) | Hardware fault latch | Critical | Notification |
 | [CS-302](#cs-302) | Pump command error | Warning | Notification |
 | [CS-303](#cs-303) | Main-line valve command error | Warning | Notification |
@@ -69,6 +70,8 @@ controller still reports a setup change (CS-201) and a hardware hold (CS-301, CS
 | [CS-315](#cs-315) | Rescue shots not absorbed | Critical | Notification |
 | [CS-316](#cs-316) | Waste valve not closed | Warning | Notification |
 | [CS-317](#cs-317) | Pump runs with every valve shut | Warning | Notification |
+| [CS-318](#cs-318) | Less water than expected | Warning | Notification |
+| [CS-319](#cs-319) | Water flowing with no zone on | Warning | Notification |
 | [CS-401](#cs-401) | Setting outside controller range | Warning | Notification |
 | [CS-402](#cs-402) | Missing settings | Critical | Notification |
 | [CS-403](#cs-403) | Lights hours from the integration | Information | Notification |
@@ -90,8 +93,11 @@ controller still reports a setup change (CS-201) and a hardware hold (CS-301, CS
 | [CS-609](#cs-609) | Second controller for room | Warning | Notification |
 | [CS-610](#cs-610) | Engine Enabled not kill switch | Warning | Repairs card |
 | [CS-611](#cs-611) | Settings above zone limit | Warning | Repairs card |
+| [CS-612](#cs-612) | Feed probe calibration due | Warning | Repairs card |
 | [CS-613](#cs-613) | Deprecated feature in use | Warning | Repairs card |
 | [CS-614](#cs-614) | Retired entities in use | Warning | Repairs card |
+| [CS-615](#cs-615) | Probe offsets unreadable | Warning | Repairs card |
+| [CS-616](#cs-616) | Upgrade report | Warning | Repairs card |
 | [CS-701](#cs-701) | No water at the zone | Warning | Notification |
 | [CS-702](#cs-702) | Unusual water for each plant | Information | Notification |
 | [CS-703](#cs-703) | Overnight probe fault suspected | Warning | Notification |
@@ -506,6 +512,28 @@ controller still reports a setup change (CS-201) and a hardware hold (CS-301, CS
 - Report the error with the log.
 - Until the error stops, water the room by hand.
 
+<a id="cs-214"></a>
+
+### CS-214: Zone needs more than its pump
+
+*Warning · Notification*
+
+**What it means.** A supply is set in Crop Steering (the pumps, their flow and the zones on each). This zone alone needs more water per hour than its pump gives, from its plants, drippers per plant and dripper flow. Or a shot of this zone waited more than 10 minutes for its turn at the pump, behind the other shots of the same pass. The alert names the zone, the pump and the litres per hour.
+
+**Effect on water.** Water continues; the zone takes turns with the others on its pump.
+
+**Probable causes**
+
+- The pump's maximum flow in the supply is lower than the zone's demand, or set wrong.
+- The plant count, the drippers per plant or the dripper flow of the zone is set too high.
+- Many zones of the room fire in the same pass, and each one waits for the shots before it.
+
+**What to do**
+
+- Check the maximum flow of the pump in the supply that is set in Crop Steering (crop_steering.supply_get shows it).
+- Check the plant count, drippers per plant and dripper flow of the zone.
+- If the zone really needs more than the pump gives, split the zone or use a bigger pump: the zone gets less pressure, and its drippers can give less water than the controller counts.
+
 ## Pumps and valves (CS-3xx)
 
 <a id="cs-301"></a>
@@ -918,6 +946,50 @@ controller still reports a setup change (CS-201) and a hardware hold (CS-301, CS
 - CAUTION: Check the pump now. A pump that runs dry or against shut valves can be damaged.
 - Switch the pump off, or open the valve that it should feed.
 - If the pump uses power when it is off, increase Pump dead-head power above that value.
+
+<a id="cs-318"></a>
+
+### CS-318: Less water than expected
+
+*Warning · Notification*
+
+**What it means.** A flow meter is set in the supply in Crop Steering for this zone, or for its pump. After a shot, the meter saw less than 80% of the litres that the controller counted for it. The controller counts the water from the plant count, the drippers per plant and the dripper flow, not from the meter. The alert names the litres of both and the meter.
+
+**Effect on water.** Water continues as usual. The zone can get less water than the controller counts, so the substrate can dry out. The alert clears after a shot of the zone that the meter sees in full.
+
+**Probable causes**
+
+- A line, a filter or the drippers of the zone are blocked or kinked, or a hand valve is partly closed.
+- The dripper flow, the drippers per plant or the plant count of the zone is set higher than the real value.
+- The meter reports late, in steps that are too big, or in a unit that is set wrong.
+
+**What to do**
+
+- CAUTION: Check the zone soon. A blocked line can leave the zone dry while the controller counts water.
+- Check the line, the filter and the drippers of the zone, and do a catch test on one dripper.
+- Check the dripper settings of the zone, and the meter and its unit.
+
+<a id="cs-319"></a>
+
+### CS-319: Water flowing with no zone on
+
+*Warning · Notification*
+
+**What it means.** A flow meter is set in the supply in Crop Steering. Between shots, with no shot of its room running, the meter counted more than 0.5 L. After each shot that the meter measured, the count moves past the water of the shot: what the meter saw, or what the controller counted if the meter has not reported all of it yet. So the late report of a shot is not counted, and a leak is still seen in a room that waters on most loops. A meter that the shot did not measure, for example the pump's meter behind a zone with its own meter, starts again from its first reading after the shot. Water that flows through it between the shot and that reading is not counted. The alert names the meter.
+
+**Effect on water.** The alert does not change the water. The controller does not switch anything off. The alert clears when the meter stops counting.
+
+**Probable causes**
+
+- A zone valve is stuck open or leaks.
+- A line or a fitting after the meter is broken.
+- Someone waters by hand, or an automation opens a valve, through the same meter.
+
+**What to do**
+
+- CAUTION: Check the valves and the lines after the meter now. Water that flows with no zone on can flood a table or the room.
+- Close the valve that is open, or repair the leak.
+- If the water was given by hand, no action is needed.
 
 ## Settings (CS-4xx)
 
@@ -1384,6 +1456,26 @@ controller still reports a setup change (CS-201) and a hardware hold (CS-301, CS
 - If the zone size is wrong, correct it in Rooms and setup, and the limit changes with it.
 - If the size is correct, decrease the setting to its limit at the next change. The card clears when each setting is inside its limit.
 
+<a id="cs-612"></a>
+
+### CS-612: Feed probe calibration due
+
+*Warning · Repairs card*
+
+**What it means.** The last calibration of the feed pH or feed EC probe of the room is 30 days old or older. A probe drifts over time, and the controller trusts its reading for the feed checks and the pH correction.
+
+**Effect on water.** Water continues. The controller uses the calibration that is applied, or the raw reading if none is applied. A probe that drifted can make the feed checks and the pH correction wrong.
+
+**Probable causes**
+
+- Nobody calibrated the probe in the last 30 days.
+- A calibration was not finished, so the last calibration is still the old one.
+
+**What to do**
+
+- Calibrate the probe in two reference solutions: open Crop Steering → Equipment → Tank and feed and press Calibrate.
+- The card clears when each probe has a calibration less than 30 days old. A calibration from before this release is never due.
+
 <a id="cs-613"></a>
 
 ### CS-613: Deprecated feature in use
@@ -1422,6 +1514,45 @@ controller still reports a setup change (CS-201) and a hardware hold (CS-301, CS
 
 - Remove the entities that the card names from the automations and scripts that it names. The re-water point in force for each zone is on its zone page, under Waiting for.
 - The card clears at the next start of Home Assistant after no automation or script uses one.
+
+<a id="cs-615"></a>
+
+### CS-615: Probe offsets unreadable
+
+*Warning · Repairs card*
+
+**What it means.** The stored offsets of the moisture probes of the room could not be read. The probes named on the card now read without their offsets, so the zones steer on the raw readings.
+
+**Effect on water.** Water continues. The zones steer on the raw probe readings, which differ from the corrected readings by the offsets that were set. Nothing is overwritten, and probe offsets cannot be changed until the file reads again.
+
+**Probable causes**
+
+- The file crop_steering.calibration.<entry id> in the .storage folder is damaged or was edited by hand.
+- A restore put back a file the integration does not understand.
+
+**What to do**
+
+- Look in the Home Assistant log for the line that says the probe offsets could not be read.
+- Restore the file from a backup, or ask for help. The card clears when the offsets read again.
+
+<a id="cs-616"></a>
+
+### CS-616: Upgrade report
+
+*Warning · Repairs card*
+
+**What it means.** The room was updated to 3.18. The update carried its settings into the new features where it could do so without guessing, and listed the rest in the room's Upgrade report under Needs you.
+
+**Effect on water.** Water and dosing continue as before. The update turns on nothing that waters or doses.
+
+**Probable causes**
+
+- The room was set up on a release before 3.18 and has just been updated.
+
+**What to do**
+
+- Open Crop Steering → Settings → System status → Upgrade report. Each line under Needs you links to the page to open and to the section of the upgrade guide to read.
+- Mark the card as read to close it. The report stays in Settings.
 
 ## AI assistant (CS-7xx)
 

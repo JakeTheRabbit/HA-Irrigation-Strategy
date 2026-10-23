@@ -1,5 +1,6 @@
 import { settingWords } from "./setting-words";
-import { dayWord } from "./utils";
+import type { Controller, EntityState, States } from "./types";
+import { dayWord, sameValue } from "./utils";
 import { calendarDays, formatClock } from "./clock";
 
 /** The room's AI overlays (crop_steering.overlay_get): settings the AI brain moved that go back to
@@ -44,4 +45,25 @@ export function overlayText(overlay: Overlay, now: number) {
 /** This zone's open overlays, oldest first; none for another room's document or no document. */
 export function zoneOverlays(doc: OverlayDocument | null, roomId: string, zone: number) {
   return doc?.room_id === roomId ? doc.overlays.filter((overlay) => overlay.zone === zone) : [];
+}
+
+/** Undo after Keep: the AI's change has ended (neither overlay_undo nor history_revert can take it
+ * back), so the grower's own value is written back, and only while the setting still holds the
+ * AI's value. Throws with the reason when it has changed since or is not read back. */
+export async function undoKept(
+  overlay: Overlay,
+  states: () => States,
+  write: Controller["write"],
+): Promise<void> {
+  if (!readsValue(states()[overlay.entity_id], overlay.new))
+    throw new Error("This value has changed since you applied it. Nothing was undone.");
+  const result = await write([{ entityId: overlay.entity_id, value: overlay.old }]);
+  if (!result.applied.includes(overlay.entity_id))
+    throw new Error(result.failed[0]?.reason || "The controller did not confirm the previous value.");
+}
+
+/** Whether a number entity reads `want`, to the precision of its own step. */
+export function readsValue(entity: EntityState | undefined, want: number): boolean {
+  const step = Number(entity?.attributes.step);
+  return sameValue(entity?.state, want, Number.isFinite(step) && step > 0 ? step : undefined);
 }

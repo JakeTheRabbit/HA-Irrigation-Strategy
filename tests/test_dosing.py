@@ -506,3 +506,17 @@ def test_a_pump_ph_role_is_stored_only_when_set_and_one_pump_per_role():
     second["ph_role"] = "ph_down"
     pumps, _ = clean([pump(ph_role="ph_up"), second], exists=None)
     assert [p.get("ph_role") for p in pumps] == ["ph_up", "ph_down"]
+
+
+def test_a_pump_with_a_calibrated_flow_needs_no_flow_entity():
+    raw = {k: v for k, v in PUMP.items() if k != "flow_entity"}
+    [stored], _ = clean([{**raw, "calibrated_ml_min": 300}])
+    assert stored["flow_entity"] is None and stored["calibrated_ml_min"] == 300
+    [blank], _ = clean([{**raw, "flow_entity": "", "calibrated_ml_min": 300}])
+    assert blank["flow_entity"] is None
+
+
+@pytest.mark.parametrize("flow", [None, ""])
+def test_a_pump_with_neither_a_flow_entity_nor_a_calibrated_flow_is_refused(flow):
+    with pytest.raises(dosing.DosingError, match="flow entity or a calibrated flow"):
+        clean([pump(flow_entity=flow)])

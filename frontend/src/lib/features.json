@@ -487,7 +487,7 @@
           "default": 0.0
         }
       ],
-      "alsoOn": "equipment/feed"
+      "alsoOn": "equipment/dosing"
     },
     {
       "id": "ai_no_touch",
@@ -1086,6 +1086,20 @@
       "group": "phases",
       "label": "P2 mode",
       "id": "new_01"
+    },
+    {
+      "id": "irrigation_mode",
+      "group": "phases",
+      "label": "Watering by",
+      "help": "Steering: the engine waters the zone, as always. Timer: the room's timer programs water it. Off: nothing waters it.",
+      "settings": [
+        {
+          "key": "irrigation_mode",
+          "scope": "zone",
+          "default": "steering",
+          "domain": "select"
+        }
+      ]
     },
     {
       "id": "runoff_estimator",

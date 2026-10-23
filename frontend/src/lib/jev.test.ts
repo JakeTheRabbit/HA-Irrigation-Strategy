@@ -3,9 +3,6 @@ import {
   attachOutcomes,
   brainWords,
   jevAnswer,
-  jevChange,
-  jevChanges,
-  jevChangeText,
   jevCost,
   jevResult,
   outcomeText,
@@ -273,84 +270,6 @@ describe("a zone's AI assistant sensor", () => {
       judges: [],
     });
     expect(parseJevZone(undefined)).toBeNull();
-  });
-});
-
-describe("what changed something", () => {
-  const at = (hour: number, minute = 0) =>
-    `2026-09-28T${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}:00`;
-  const entry = (raw: Record<string, unknown>, index = 0) =>
-    parseJevEntry({ ...decision, ...raw }, index)!;
-  it("is a phase brought forward, a setpoint moved, a probe set aside, the EC steer's mode or an alert", () => {
-    expect(jevChange(entry({ judge: "dawn", action: "start the ramp now" }))).toBe("phase");
-    expect(jevChange(entry({ judge: "ramp", action: "hand over to maintenance" }))).toBe("phase");
-    expect(jevChange(entry({ judge: "dusk", action: "end the day's watering" }))).toBe("phase");
-    expect(
-      jevChange(
-        entry({ judge: "setpoints", verdict: "smaller shots", action: "P2 shot 5% -> 4.5%" }),
-      ),
-    ).toBe("setpoint");
-    expect(jevChange(entry({ judge: "probe", action: "set the probe aside (reads flat)" }))).toBe(
-      "probe",
-    );
-    expect(jevChange(entry({ action: "hold the EC steer" }))).toBe("ec");
-    expect(jevChange(entry({ judge: "alerts", zone: null, action: "CS-608: card only" }))).toBe(
-      "alert",
-    );
-    expect(
-      jevChange(entry({ judge: "stage", action: "CS-705: this zone is off the stage's arc" })),
-    ).toBe("alert");
-  });
-  it("is not an answer that asked for nothing, a refusal, an outcome, or the grower's own edit", () => {
-    expect(jevChange(entry({ result: "no action", action: "" }))).toBeNull();
-    expect(jevChange(entry({ result: "refused" }))).toBeNull();
-    expect(jevChange(entry({ result: "waiting" }))).toBeNull();
-    expect(jevChange(entry({ kind: "outcome", result: "worked", action: "" }))).toBeNull();
-    expect(
-      jevChange(
-        entry({ judge: "setpoints", verdict: "set by hand", action: "p2 shot size 5 -> 4" }),
-      ),
-    ).toBeNull();
-  });
-  it("lists today's changes newest first, one row per alert however many judges raised it", () => {
-    const log = parseJevLog(
-      entity("sensor.crop_steering_jev_log", "x", {
-        entries: [
-          {
-            ...decision,
-            t: at(15, 2),
-            zone: 2,
-            judge: "alerts",
-            title: "Alert triage",
-            action: "CS-705: card only",
-            reason: "this zone is off the stage's arc",
-          },
-          {
-            ...decision,
-            t: at(15),
-            zone: 2,
-            judge: "stage",
-            action: "CS-705: this zone is off the stage's arc",
-          },
-          { ...decision, t: at(14), zone: 1, result: "no action", action: "" },
-          { ...decision, t: at(12), zone: 1, judge: "ramp", action: "hand over to maintenance" },
-          {
-            ...decision,
-            t: "2026-09-27T21:00:00",
-            zone: 3,
-            judge: "dusk",
-            action: "end the day's watering",
-          },
-        ],
-      }),
-    )!;
-    const today = jevChanges(log.entries, new Date(2026, 8, 28, 10).getTime());
-    expect(today.map((item) => [item.judge, item.zone])).toEqual([
-      ["alerts", 2],
-      ["ramp", 1],
-    ]);
-    expect(jevChangeText(today[0])).toBe("CS-705: this zone is off the stage's arc (card only)");
-    expect(jevChangeText(today[1])).toBe("hand over to maintenance");
   });
 });
 

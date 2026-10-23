@@ -2,7 +2,7 @@
 
 Crop Steering can make a batch of nutrient solution and dose single pumps into a room's batch tank:
 fill the tank, mix it, dose each nutrient in order, mix again and stamp the fill. Each room has its
-own dosing page (Equipment › Dosing) for its own tank, so a site with two tanks sees two separate
+own dosing page (Equipment › Feed & dosing) for its own tank, so a site with two tanks sees two separate
 pages, one per room.
 
 It drives dosing pumps whose firmware times each dose itself: Home Assistant sets a volume, presses
@@ -17,8 +17,8 @@ pump name or recipe is assumed.
 | Layer | Owns | Never does |
 |---|---|---|
 | Integration | Each room's dosing configuration and its one pending request, in a revisioned store; the services to read, save and request; `sensor.crop_steering_<prefix>dosing_config` for the controller | Switch, press or set any hardware |
-| Controller app | Every action: doses, batches, stops, the irrigation hold during a batch and while dosing hardware does not read off, recovery after a restart, the mix check after a batch, alerts CS-801 to CS-809; `sensor.crop_steering_<prefix>dosing` with live status | Act on a dose or batch asked for more than 120 s before, or on a room whose configuration it cannot read; switch a dosing pump's power on |
-| Dashboard | Equipment › Dosing: pumps, a dose form, the batch, the recipe, history, and the dosing setup | Write any hardware entity; everything goes through `dosing_request` |
+| Controller app | Every action: doses, batches, stops, the irrigation hold during a batch and while dosing hardware does not read off, recovery after a restart, the mix check after a batch, alerts CS-801 to CS-809; `sensor.crop_steering_<prefix>dosing` with live status | Act on a dose or batch asked for more than 120 s before, or on a room whose configuration it cannot read; switch a dosing pump's power on, except for a prime or a calibration run (A timed run, below) |
+| Dashboard | Equipment › Feed & dosing: pumps, a dose form, the batch, the recipe, history, and the dosing setup | Write any hardware entity; everything goes through `dosing_request` |
 
 ## Configuration (integration store `crop_steering.dosing.<entry_id>`)
 
@@ -35,7 +35,11 @@ pump name or recipe is assumed.
       "dosing_prefix": "Dosing",       // sensor type only; default "Dosing"
       "power_entity": "switch.x",      // switch.*   turning it off stops the motor (the stop and the overrun cut)
       "flow_entity": "number.x",       // number.* | input_number.* | sensor.*   calibrated flow, mL/s
-                                       // (or mL/min, L/h: Units and hardware, below)
+                                       // (or mL/min, L/h: Units and hardware, below). It wins over
+                                       // calibrated_ml_min; a pump with no flow_entity and a calibrated_ml_min
+                                       // is dosed at calibrated_ml_min / 60 mL/s (pump_calibration_commit).
+                                       // Optional once the pump has a calibrated_ml_min; a pump with
+                                       // neither is refused at save
       "max_ml": 2000,                  // 1..5000; a request above it is refused
       "restore_volume": true,          // put the volume number back after a single dose (firmware that
                                        // keeps its batch recipe in that number); default true
@@ -223,12 +227,24 @@ read has no request taken.
   `power_entity` is the motor's own switch on the firmwares this drives (off = idle), so a stop never
   switches it back on.
 - `dose`: one pump, `ml` mL, into the tank as it is.
+- `prime` / `calibrate`: one pump's power on for `seconds` (A timed run, below).
+- `stop_pump`: one pump. Its prime or calibration running in the room ends within one tick (1 s); a
+  dose, batch or pH correction running in the room is left alone ("refused: a batch is running, and a
+  pump's stop leaves it alone": the room's `stop` ends those); otherwise the pump's `power_entity` is
+  switched off and read back, and one that does not read off is held and raises **CS-801** as a timed
+  run's does (A timed run, step 6). Like a `stop`, it is acted on however old it is while the room is busy
+  or held.
 - `batch`: the batch sequence. Refused while `hold_entity` is already on (something else is
   dosing) or can't be read, or while the room has a latched hardware fault.
 - Dosing does one thing at a time: while a dose or a batch runs, in any room, a `dose` or a
   `batch` is refused (a `stop` is always acted on), and so is one for a room held by dosing hardware
   that does not read off ("refused: <entity> does not read off yet"). A request refused meanwhile
   keeps its own `handled_result`: the end of the running dose or batch never takes its place.
+- A pump whose published setup can't be read (a pump from an older setup with neither a flow entity
+  nor a calibrated flow) is refused on its own ("refused: the setup of pump <id> can't be read"), and
+  the controller's status lists it under `unreadable_pumps`; the room's other pumps work as before,
+  and a `stop` or `stop_pump` still switches its `power_entity` off. A pump list or batch that can't
+  be read still leaves the whole room's dosing untouched.
 - One room's error never stops the others: each room is read in its own turn, and a room that fails
   15 passes in a row (30 s) raises CS-806 ("dosing in this room keeps failing").
 
@@ -238,7 +254,17 @@ the dose's result ("finished", "ended early", "ran past its time", "not confirme
 drawn from its stock tank"); for a batch "making a batch", then "finished", "finished; <entity>
 could not be stamped" or "stopped: <step>: <reason>"; a refusal "refused: <reason>" (for example
 "refused: Bloom is not calibrated (flow 0)" or "refused: a batch is running"); an old request "too
-old to act on"; a stop "stopped", or "stopped; <entity> does not read off".
+old to act on"; a stop "stopped", or "stopped; <entity> does not read off". A prime or a calibration
+reads "priming" or "calibrating" while it runs, and its answer, refusals included, is the report
+`{id, action, pump, ran_s, result}` (A timed run, below).
+
+`handled_results` keeps the answer to each of the last 10 requests under its request id, so a request
+handled later never takes an earlier one's away: a dose refused during a prime keeps "refused: a prime
+is running", and the prime's report still lands under the prime's id. `handled` and `handled_result`
+stay the request handled last, as before; a run that ends after a later request was handled (a stop,
+a refusal) writes its end only under its own id. The integration reads a prime's or calibration's
+report by its own request id from `handled_results` (from `handled_result` only with a controller that
+publishes no `handled_results`).
 
 ### Units and hardware
 
@@ -261,7 +287,8 @@ these.
 
 ### One dose (`ml` into a pump)
 
-1. Refuse unless the pump's `flow_entity` reads a finite number of at least 0.05 mL/s (a firmware
+1. Refuse unless the pump's flow (its `flow_entity`; with none, its `calibrated_ml_min` / 60) is a
+   finite number of at least 0.05 mL/s (a firmware
    that divides by a zero flow runs its motor for ever, and a tiny one would put every time limit
    hours away: "refused: <pump> is not calibrated (flow 0.01)"), `ml` ≤ `max_ml`, the dose's
    expected time `ml / flow` is at most 20 minutes, `dosing_entity` reads, and does not read dosing,
@@ -295,6 +322,42 @@ these.
 7. Clear the dose from `dosing_state.json`; publish the result. When its power does not read off
    (after the deadline, a stop or an error), the record is kept instead and the room's watering is
    held until it does (Holding, below).
+
+### A timed run (prime, calibrate)
+
+`pump_prime` (1 to 30 s, ruling R7) and `pump_calibrate` (5 to 120 s) leave a `prime` or `calibrate`
+request with `seconds`. It is the one thing that switches a dosing pump's power on.
+
+1. Refuse ("refused: <reason>", nothing switched) when the pump is not set up, `seconds` is not a
+   positive number, the room has a latched hardware fault, a shot is in flight in the room, the pump
+   is not calibrated (a prime only: a calibration is how a pump gets its flow), the batch's
+   `hold_entity` is on or can't be read, a calibration or prime holds the room (`calibrating`: every
+   hold but this pump's own prime or calibration, "dosing pump calibration or prime in progress" or
+   "feed probe calibration in progress"), or the room's kill switch is off. The run is at most its
+   `seconds`, and never longer than 30 s for a prime or 120 s for a calibration.
+2. Write it to `dosing_state.json` (its pump's power to switch off) before anything moves.
+3. Switch `power_entity` on and read it back on, waiting at most the run's own `seconds` (and never
+   more than 6 s), so a short run never runs long waiting for its on. One that does not read on is
+   switched off and read back: "refused: <entity> did not read on".
+4. Every second: the app stopping, a `stop` or `stop_pump` (read now), the room's kill switch off, a
+   hardware fault latched, a shot in flight in the room. Any of them ends it: "stopped".
+5. At `seconds`, or on any end (an error in the controller included): switch `power_entity` off and
+   read it back (re-sent once). The report's `ran_s` is the seconds from the switch-on to the off
+   (0.1 s); `result` is "done", "stopped", "refused: <reason>" or "stuck".
+6. A power that does not read off: "stuck", `ran_s` 0 (the pump may still run, so no calibration or
+   prime is taken from it), **CS-801**, and the room is held as under Holding (below) until it reads
+   off; every dosing request in the room is refused meanwhile.
+
+The way out (SIGTERM) sends the off and keeps the record, as for a dose; the next start reads it
+back (After a restart) and reports the run "stopped" with `ran_s` 0. Each run is journaled as
+`dose.completed` with `data.kind` "prime" or "calibrate", its `seconds`, `ran_s` and `result`, and
+kept in the history with `kind` "prime" or "calibrate".
+
+The grower's walkthrough (precheck, prime, calibrate, measure, commit) and the integration-side
+services `pump_precheck`, `pump_prime`, `pump_stop`, `pump_calibrate` and `pump_calibration_commit` are in
+[Calibration](features/calibration.md#dosing-pump-prime-and-calibrate). While a feed pH/EC calibration
+session is open, batches and pH auto-correct wait and primes and calibrations are refused; see
+[what waits while a session is open](features/calibration.md#safety-what-waits-while-a-session-is-open).
 
 ### A batch
 
@@ -361,6 +424,10 @@ gate reads it.
   and a batch made by hand are never refused for it.
 - While the check is still due, an automation's batch is refused too ("the last batch's mix is not
   checked yet").
+- While a feed probe's calibration may be open, or `dosing_config` can't be read, the check waits. A
+  `dosing_config` that can't be read, or is not published, for 30 minutes after the check was due ends
+  it with no verdict (`mix.gave_up_at`): **CS-808** says so once, the batch is never marked good, and an
+  automation's batch stays refused.
 
 The mix check never holds watering, whatever it finds. The source-water gate still holds a zone on its
 own, as it always did, while the feed probe reads off its band or stays dead past its grace. The
@@ -436,8 +503,10 @@ State: `idle` | `dosing` | `batch` | `unavailable` (the room's configuration can
             "pump": "bloom" | null, "name": "Week 3", "started_at": "…", "step_started_at": "…",
             "steps": [{"step": "fill", "state": "done" | "running" | "skipped" | "failed", "at": "…", "note": "…"}],
             "result": null | "finished" | "stopped: <reason>", "ended_at": null | "…"},
-  "handled": "<request id>", "handled_result": "…",
-  "history": [{"kind": "dose" | "batch" | "draw", "at": "…", "ended_at": "…", "result": "…",
+  "handled": "<request id>", "handled_result": "…" | {"id": "…", "action": "prime" | "calibrate",
+                                                      "pump": "balance", "ran_s": 9.9, "result": "done"},
+  "handled_results": {"<request id>": "…" | {…}},  // the last 10 requests' answers, by id
+  "history": [{"kind": "dose" | "batch" | "draw" | "prime" | "calibrate", "at": "…", "ended_at": "…", "result": "…",
                "name": "Week 3",                                  // a batch's recipe name
                "doses": {"balance": 300, "bloom": 1800},           // what was asked
                "dosed": [{"pump": "balance", "name": "Balance", "ml": 300, "given": 300,
@@ -569,7 +638,7 @@ it again.
 
 | Code | Title | Watering |
 |---|---|---|
-| CS-801 | A dosing pump ran past its time and was switched off | carries on (a batch stops), unless its power does not read off: then the room is held until it does |
+| CS-801 | A dosing pump ran past its time and was switched off, or a prime's or calibration's power does not read off | carries on (a batch stops), unless its power does not read off: then the room is held until it does |
 | CS-802 | A dose could not be confirmed, or ended early | carries on (a batch stops) |
 | CS-803 | A dose or batch was interrupted by a restart | the rooms it held stay held until its dosing hardware reads off |
 | CS-804 | The batch tank could not be filled | held rooms water again; the fill valve was closed |
@@ -659,7 +728,7 @@ the low-stock Repairs card (CS-608) as usual. Unknown tank ids are skipped and l
 response. It answers only when asked (`SupportsResponse.OPTIONAL`): the controller asks, over REST
 (`?return_response`); a call without asking (an older controller) is taken all the same.
 
-## The page (Equipment › Dosing)
+## The page (Equipment › Feed & dosing)
 
 For the selected room:
 
@@ -667,7 +736,7 @@ For the selected room:
   state in one line.
 - **Stock**: every stock tank a pump is linked to (`stock_tank`), in pump order: its level, its
   litres, about how many batches or doses it has left, its low mark drawn, and a way to
-  Equipment › Stock tanks.
+  Equipment › Stock.
 - **Pumps**: a card per pump with a peristaltic-pump drawing (the rotor turns while it doses;
   still under reduced motion), its name, a status pill (Idle, Dosing, Unavailable, Not calibrated),
   its flow in mL/s, its last dose (mL, when, result), and a progress bar during a dose (elapsed

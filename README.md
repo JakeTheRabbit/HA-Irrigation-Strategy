@@ -7,6 +7,13 @@
 
 **Crop Steering waters each zone of a grow room from what its probes read, inside Home Assistant. It refuses to water when something is wrong, and it shows you every shot.**
 
+> **3.18 (the parity release) is a big upgrade.** Watering keeps its targets and limits, but almost every
+> dashboard page is new and many new features wait for you to set them up. Do not update a room that is
+> in a grow unless you have a few clear hours afterwards, and never in the hour before lights-on. Update
+> the integration first, then the controller. Read [Upgrading to 3.18](docs/UPGRADING-TO-PARITY.md)
+> first. To let an AI assistant help with the configuration session, follow
+> [Set up an install with an AI assistant](docs/AI-SETUP.md).
+
 ![All rooms across both demo rooms, grouped by room with current VWC, pore EC, water delivery and feed supply](img/all-zones.png)
 
 [The whole system, part by part](https://cropsteering.growlabs.nz/features) · [Try the released demo](https://jaketherabbit.github.io/HA-Irrigation-Strategy/dashboard.html?demo=1) · [Take the free beginner course](https://jaketherabbit.github.io/HA-Irrigation-Strategy/learn/) · [Safety first](#safety-first) · [New to crop steering?](#new-to-crop-steering) · [Install](#install) · [First-run setup](#first-run-setup) · [Daily use](#daily-use) · [The AI assistant](#the-ai-assistant) · [Upgrade](#upgrade) · [Troubleshooting](#troubleshooting) · [Documents](#documents)
@@ -24,7 +31,7 @@
 9. **You can trust it.** Alerts with a code go to the phones you choose, as Home Assistant notifications and Repairs cards.
 10. **Start.** [Install](#install) below, or try the demo first.
 
-**In progress, not in a release yet:** a shot timeline, timer programs, a pump queue, feed probe and dosing pump calibration, a change journal with put back and undo, presets and copy, alert rules tested against yesterday, an alerts inbox, quiet hours per phone, display units and a system status page.
+**New in 3.18:** a shot timeline, [timer programs](docs/features/timers-and-modes.md), [pump sharing and flow checks](docs/features/water-supply.md), [feed probe and dosing pump calibration](docs/features/calibration.md), [a change journal with put back and undo](docs/features/history-and-changes.md), [presets and copy](docs/features/presets-and-copy.md), [alert rules tested against yesterday, an alerts inbox and quiet hours per phone](docs/features/alerts.md), [display units and dashboards](docs/features/dashboards-and-display.md) and [a system status page](docs/features/system-status.md). Each room's Upgrade report says what the update carried across and what needs you ([Upgrading to 3.18](docs/UPGRADING-TO-PARITY.md)).
 
 The [feature matrix](docs/FEATURE_MATRIX.md) lists each released feature with how it was tested and what is still unproven.
 
@@ -416,12 +423,17 @@ Code keeps control of all physical actions. An answer from the AI assistant is o
 
 HACS offers the update of the integration. The app store offers the update of the controller. Your rooms, settings and entity IDs stay.
 
+> **3.18:** update the integration first and restart Home Assistant, then update the controller: the
+> controller sends its journal history to the new integration. The plan for update day, a first-hour
+> checklist and how to go back are in [Upgrading to 3.18](docs/UPGRADING-TO-PARITY.md); each row of the
+> Upgrade report has its section in [UPGRADING.md](docs/UPGRADING.md).
+
 1. Make a backup of Home Assistant, the data of the controller and your setpoints. Export your grow plans.
 2. Record which kill switches are on.
 3. Set the kill switches to off. Wait until the pump, the main line and the valves are off.
-4. Update the controller in place, to the version of the release. Do not install a second copy.
-5. Download the same version of the integration with HACS.
-6. Restart Home Assistant. Make sure that each room loads.
+4. Download the new version of the integration with HACS.
+5. Restart Home Assistant. Make sure that each room loads.
+6. Update the controller in place, to the same version. Do not install a second copy.
 7. Start the controller with the kill switches still off.
 8. Examine the version, the heartbeat, the sensor readings and the setup acknowledgement.
 9. Compare the setpoints and the zone sizes with the backup.
@@ -527,6 +539,9 @@ Some facts to know:
 
 ## Documents
 
+- [All documents, by task](docs/README.md) · [Upgrading to 3.18](docs/UPGRADING-TO-PARITY.md) · [one section per Upgrade report row](docs/UPGRADING.md)
+- [Set up an install with an AI assistant](docs/AI-SETUP.md) and the [MCP connector](docs/MCP.md)
+- Features new in 3.18: [water supply](docs/features/water-supply.md) · [timers and modes](docs/features/timers-and-modes.md) · [presets and copy](docs/features/presets-and-copy.md) · [history and changes](docs/features/history-and-changes.md) · [alerts](docs/features/alerts.md) · [calibration](docs/features/calibration.md) · [system status](docs/features/system-status.md) · [dashboards and display](docs/features/dashboards-and-display.md)
 - [The AI assistant in full: each judge, the envelope and the options](docs/AI_ASSISTANT.md)
 - [User guide: each page of the dashboard](docs/USER_GUIDE.md) and [grow plans](docs/GROW_PLANS.md)
 - [Install, upgrade and roll back](docs/INSTALL.md)

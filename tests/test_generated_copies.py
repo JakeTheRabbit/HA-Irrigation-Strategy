@@ -12,35 +12,41 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
-SOURCE = "crop-steering-engine/src/crop_steering_engine/defaults.py"
-COPIES = [
-    "addons/f2_control/f2_control/crop_steering_engine/defaults.py",
-    "custom_components/crop_steering/generated/defaults.py",
+SRC = "crop-steering-engine/src/crop_steering_engine/"
+COPY_DIRS = [
+    "addons/f2_control/f2_control/crop_steering_engine/",
+    "custom_components/crop_steering/generated/",
 ]
-SHOT_SOURCE = "crop-steering-engine/src/crop_steering_engine/shot_length.py"
-SHOT_COPIES = [
-    "addons/f2_control/f2_control/crop_steering_engine/shot_length.py",
-    "custom_components/crop_steering/generated/shot_length.py",
-]
+PAIRS: list[tuple[Path, Path]] = [
+    (ROOT / SRC / name, ROOT / d / name)
+    for name in ("defaults.py", "ids.py", "timers.py", "guards.py", "shot_length.py")
+    for d in COPY_DIRS
+] + [(ROOT / SRC / "flow.py", ROOT / COPY_DIRS[0] / "flow.py")]
 
 
 def _same(source: Path, copy: Path) -> bool:
     return copy.read_bytes() == source.read_bytes()
 
 
-@pytest.mark.parametrize(
-    "source, copy",
-    [(SOURCE, c) for c in COPIES] + [(SHOT_SOURCE, c) for c in SHOT_COPIES],
-)
-def test_each_copy_is_its_source_byte_for_byte(source, copy):
-    assert _same(ROOT / source, ROOT / copy), f"{copy} differs: cp {source} {copy}"
+def _label(pair):
+    return str(pair[1].relative_to(ROOT))
 
 
+@pytest.mark.parametrize("pair", PAIRS, ids=_label)
+def test_each_copy_is_its_source_byte_for_byte(pair):
+    source, copy = pair
+    assert _same(
+        source, copy
+    ), f"{_label(pair)} differs: cp {source.relative_to(ROOT)} {_label(pair)}"
+
+
+@pytest.mark.parametrize("pair", PAIRS, ids=_label)
 @pytest.mark.parametrize("position", [0, "middle", -1])
-def test_a_one_byte_edit_anywhere_in_a_copy_is_caught(tmp_path, position):
-    data = bytearray((ROOT / SOURCE).read_bytes())
+def test_a_one_byte_edit_anywhere_in_a_copy_is_caught(tmp_path, pair, position):
+    source, _ = pair
+    data = bytearray(source.read_bytes())
     at = len(data) // 2 if position == "middle" else position
     data[at] ^= 0x01
-    edited = tmp_path / "defaults.py"
+    edited = tmp_path / source.name
     edited.write_bytes(bytes(data))
-    assert not _same(ROOT / SOURCE, edited)
+    assert not _same(source, edited)

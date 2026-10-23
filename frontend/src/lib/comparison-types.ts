@@ -75,3 +75,16 @@ export interface DailyRanges {
   series: { entityId: string; daily: DailyReading[] }[];
   warnings: string[];
 }
+/** One run on History › Compare runs: its whole-room daily values by grow day (day 1 is the run's
+ * start date). Metrics: VWC daily mean (%), overnight dryback (VWC points lost lights-off), pore EC
+ * daily mean (mS/cm) and water per plant (litres a day). */
+export interface ComparedRun {
+  id: string;
+  name: string;
+  /** The run in progress: named "this run". */
+  current: boolean;
+  days: Partial<Record<"vwc" | "dryback" | "pore_ec" | "water", { day: number; value: number }[]>>;
+  /** Decimals of the readings behind each metric, before zones were averaged: a gap is shown no
+   * finer. Absent: the decimals of `days` themselves. */
+  digits?: Partial<Record<"vwc" | "dryback" | "pore_ec" | "water", number>>;
+}

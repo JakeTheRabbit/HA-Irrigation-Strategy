@@ -50,7 +50,7 @@ describe("the legacy dashboard links keep working", () => {
   it("keeps an old ?view= link's page and the rest of its query", () => {
     expect(opens(follow("www", "f2.html", "?view=tune"))).toBe("plan/targets");
     const target = follow("www", "f2.html", "?view=logs&demo=1");
-    expect(opens(target)).toBe("history/timeline");
+    expect(opens(target)).toBe("history/explorer");
     expect(new URL(target, "http://box/").searchParams.get("demo")).toBe("1");
   });
   it("opens the classic page on the room it named", () => {

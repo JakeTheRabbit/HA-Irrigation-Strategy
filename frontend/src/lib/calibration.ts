@@ -22,6 +22,10 @@ export interface CalibrationRecord extends CalibrationResult {
   entity_id: string | null;
   at: string;
   note: string;
+  /** 3.18: the calibration in force on the probe (a guided calibration); a check is never applied. */
+  applied?: boolean;
+  due_days?: number;
+  superseded_by?: string | null;
 }
 export interface CalibrationDocument {
   schema_version: number;
@@ -104,7 +108,8 @@ export class CalibrationDemo {
     };
     let document = this.documents.get(roomId);
     if (!document) {
-      // Flower 2's pH probe was checked three weeks ago and was drifting.
+      // Flower 2's pH probe was checked three weeks ago and was drifting. Due every 19 days, it went
+      // due two days ago, as the demo's binary_sensor …calibration_due says (parity-demo/status.ts).
       const ph = sensor("feed_ph_sensor");
       const seeded = evaluate("ph", [
         { reference: 7, reading: 7.12 },
@@ -124,6 +129,7 @@ export class CalibrationDemo {
                 at: new Date(this.now() - 21 * 86_400_000).toISOString(),
                 note: "",
                 ...seeded,
+                due_days: 19,
               },
             ]
           : [],
@@ -135,6 +141,10 @@ export class CalibrationDemo {
     }
     document.sensors = { feed_ph: sensor("feed_ph_sensor"), feed_ec: sensor("feed_ec_sensor") };
     return document;
+  }
+  /** The room's stored document itself, for the demo's guided calibration (parity-demo/feed-calibration.ts). */
+  live(roomId: string): CalibrationDocument {
+    return this.document(roomId);
   }
   call(action: string, data: Record<string, unknown>): CalibrationDocument {
     const roomId = String(data.room_id);

@@ -29,7 +29,7 @@ test("real stdio initialize, tools/list, bounded reads, exact room isolation, an
     { client, stderr } = await stdio(t, ha);
   assert.equal(client.getServerVersion().name, "crop-steering");
   const tools = (await client.listTools()).tools;
-  assert.equal(tools.length, 9);
+  assert.equal(tools.length, 22);
   assert.deepEqual(
     tools
       .filter((tool) => !tool.annotations.readOnlyHint)

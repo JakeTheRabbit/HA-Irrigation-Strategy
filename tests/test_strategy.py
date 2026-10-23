@@ -487,3 +487,23 @@ def test_strategy_bounds_match_canonical_engine_validation():
     }
     for key, bounds in ENGINE_BOUNDS.items():
         assert actual[aliases.get(key, key)] == bounds
+
+
+def test_api_v2_types_a_stale_probe_as_a_guard_and_lost_storage_as_unavailable(
+    monkeypatch,
+):
+    from custom_components.crop_steering.api_v2 import GuardRefused, Unavailable
+
+    manager, states, now = manager_fixture(monkeypatch)
+
+    async def scenario():
+        await manager.async_init()
+        await manager.save(plan(), 0)
+        del states["sensor.crop_steering_vwc_zone_1"]
+        with pytest.raises(GuardRefused, match="^Zone 1 VWC is unavailable or stale$"):
+            await manager.activate(1, now)
+        manager._store = None
+        with pytest.raises(Unavailable, match="^Strategy storage is unavailable$"):
+            await manager._persist()
+
+    asyncio.run(scenario())

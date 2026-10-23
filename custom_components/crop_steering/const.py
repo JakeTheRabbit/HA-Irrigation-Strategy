@@ -2,6 +2,9 @@
 
 DOMAIN = "crop_steering"
 
+# Every stored journal event is re-fired on the bus under this type (journal_api.py).
+EVENT_JOURNAL = "crop_steering_event"
+
 # The default room's kill switch on an installation from before the setup wizard: a helper the
 # operator made by hand, and the controller app's shipped `enable_flag` option. A room made by the
 # wizard stops on its own Engine Enabled switch instead. Named here once; room.room_gate decides.
@@ -212,5 +215,8 @@ SERVICE_SAVE_RECIPE = "save_recipe"
 # A zone's P2 mode (select zone_N_p2_mode): the first is the default, moisture-driven P2 as always.
 # The controller maps them to the engine's p2_mode moisture / timed / timed_guarded.
 P2_MODES = ["Moisture", "Timed", "Timed with guards"]
+# What waters a zone (select zone_N_irrigation_mode): the first is the default, the engine as always;
+# timer runs the room's timer programs (timers_api.py) and off waters nothing.
+IRRIGATION_MODES = ["steering", "timer", "off"]
 # Which automatic writers the room's Max setpoint move per day holds; the first is the default.
 SETPOINT_STEP_SCOPES = ["Auto setpoints", "Auto setpoints and AI"]

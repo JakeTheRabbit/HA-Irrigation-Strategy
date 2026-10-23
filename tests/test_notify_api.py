@@ -262,6 +262,7 @@ def test_saving_moves_the_revision_and_a_stale_or_invalid_save_changes_nothing()
         "rooms": [],
         "urgent_high_priority": True,
         "digest": False,
+        "quiet_hours": None,
     }
     assert (group["name"], group["rooms"], group["user_id"]) == (
         "Everyone",
@@ -806,3 +807,79 @@ def test_a_card_pushes_nothing_while_nobody_is_set_up_and_its_wording_never_lose
     assert service == PHONE_A
     assert payload["title"] == "A card in Settings → Repairs (CS-602)"
     assert "Code CS-602." in payload["message"]
+
+
+def test_api_v2_a_refusal_answered_instead_of_raised_is_not_ok(services):
+    def v2(name, user, **data):
+        request = SimpleNamespace(
+            service=name,
+            data={"api": 2, **data},
+            context=SimpleNamespace(user_id=getattr(user, "id", user)),
+            return_response=True,
+        )
+        return asyncio.run(services.hass.services.registered[(DOMAIN, name)](request))
+
+    # notify_get reports the settings' revision, which it carries in `config`.
+    assert v2("notify_get", ADMIN)["revision"] == 0
+    other = v2("notify_test", OTHER, service=PHONE_A)
+    assert other["ok"] is False and other["error"]["code"] == "forbidden"
+    assert other["data"]["sent"] is False
+    assert other["error"]["message"].startswith("not allowed: ")
+    # v1 answers exactly as before.
+    v1 = services.call("notify_test", OTHER, service=PHONE_A)
+    assert v1 == other["data"]
+    assert v2("notify_test", STAFF, service=PHONE_A)["ok"] is True
+    staff = v2("notify_save", STAFF, expected_revision=0, recipients=[row(PHONE_A)])
+    assert staff["ok"] is False and staff["error"]["code"] == "forbidden"
+    stale = v2("notify_save", ADMIN, expected_revision=7, recipients=[])
+    assert stale["error"]["code"] == "stale_revision"
+    assert stale["error"]["current_revision"] == 0
+    gone = v2("notify_test", "someone-deleted", service=PHONE_A)
+    assert gone["error"]["code"] == "forbidden"
+
+
+def test_api_v2_a_push_or_test_no_phone_got_is_unavailable(services):
+    def v2(name, **data):
+        request = SimpleNamespace(
+            service=name,
+            data={"api": 2, **data},
+            context=SimpleNamespace(user_id=ADMIN.id),
+            return_response=True,
+        )
+        return asyncio.run(services.hass.services.registered[(DOMAIN, name)](request))
+
+    failing = services.hass.services.failing
+    push = {"key": "k", "title": "T", "message": "M", "room": ""}
+    services.call(
+        "notify_save",
+        ADMIN,
+        expected_revision=0,
+        recipients=[row(PHONE_A, kinds=["stock"]), row(PHONE_B, kinds=["stock"])],
+    )
+    assert v2("notify", code="CS-608", **push)["ok"] is True
+    # Nobody ticks it: nobody gets it, and that is not a failure.
+    nobody = v2("notify", code="CS-705", **push)
+    assert nobody["ok"] is True and nobody["data"]["sent_to"] == []
+    failing[PHONE_A] = failing[PHONE_B] = HomeAssistantError("device not connected")
+    lost = v2("notify", code="CS-608", **push)
+    assert lost["ok"] is False and lost["error"]["code"] == "unavailable"
+    assert lost["data"]["sent_to"] == [] and PHONE_A in lost["error"]["message"]
+    # Several phones tested: ok only when every one sent.
+    del failing[PHONE_A]
+    some = v2("notify_test", services=[PHONE_A, PHONE_B])
+    assert some["ok"] is False and some["error"]["code"] == "unavailable"
+    assert (
+        PHONE_B in some["error"]["message"] and PHONE_A not in some["error"]["message"]
+    )
+    assert [r["sent"] for r in some["data"]["results"]] == [True, False]
+    failing.clear()
+    assert v2("notify_test", services=[PHONE_A, PHONE_B])["ok"] is True
+    # A push held for a phone's digest is not a failure, and the answer says it is held.
+    services.call(
+        "notify_save",
+        ADMIN,
+        expected_revision=1,
+        recipients=[row(PHONE_A, kinds=["stock"], digest=True)],
+    )
+    held = v2("notify", code="CS-608", **push)
+    assert held["ok"] is True and held["data"]["held"] == [PHONE_A]

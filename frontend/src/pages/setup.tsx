@@ -28,6 +28,7 @@ import { UiTip } from "@/components/info-tip";
 import { ControllerSettings } from "@/components/controller-settings";
 import { HistoryConnection } from "@/components/history-connection";
 import { SetupWizard } from "@/components/setup-wizard";
+import { SupplyEditor } from "@/components/supply-editor";
 import { RunoffPanel } from "@/components/runoff";
 import { Pill } from "@/components/mini-visuals";
 import {
@@ -235,12 +236,13 @@ export function Setup({
   const units = useSizingUnits();
   const [settingsDirty, setSettingsDirty] = useState(false);
   const [equipmentDirty, setEquipmentDirty] = useState(false);
+  const [supplyDirty, setSupplyDirty] = useState(false);
   const dirty = !!draft && (isNew || JSON.stringify(draft) !== JSON.stringify(original));
   const connected = ["live", "demo"].includes(controller.connection);
   useLayoutEffect(() => {
-    onDirtyChange(dirty || settingsDirty || equipmentDirty);
+    onDirtyChange(dirty || settingsDirty || equipmentDirty || supplyDirty);
     return () => onDirtyChange(false);
-  }, [dirty, settingsDirty, equipmentDirty, onDirtyChange]);
+  }, [dirty, settingsDirty, equipmentDirty, supplyDirty, onDirtyChange]);
   function selectRoom(room: SetupRoom | undefined) {
     setIsNew(false);
     setOriginal(room ? structuredClone(room) : null);
@@ -583,6 +585,7 @@ export function Setup({
           </Button>
         }
       />
+      {connected && <SupplyEditor key={controller.roomId} controller={controller} onDirtyChange={setSupplyDirty} />}
       <div className="workspace-tabs" role="tablist" aria-label="Setup view">
         <button role="tab" aria-selected={tab === "rooms"} onClick={() => setTab("rooms")}>
           Rooms & mappings

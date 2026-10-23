@@ -774,6 +774,230 @@ calibration_record:
       required: false
       selector:
         text:
+calibration_start:
+  name: Start a probe calibration
+  description: >-
+    Opens a calibration session for the feed pH or feed EC probe of the room and starts to watch its
+    reading. While the session is open the dosing descriptor carries `calibrating`, so the controller
+    holds batches and pH correction. Only one session is open in a room: a new start replaces the last.
+    The session ends at commit, revert or abandon, or 30 minutes after its last capture. Refused when the
+    probe has not reported for 2 minutes. Returns the session ID, the raw and tank temperature entities,
+    `dosing_paused` and when the session expires. When a signed-in user calls it, that user must be a
+    Home Assistant administrator.
+  fields:
+    room_id:
+      name: Room ID
+      description: >-
+        The canonical ID of the room. Example: `room:f2_`.
+      required: true
+      selector:
+        text:
+    probe:
+      name: Probe
+      description: >-
+        The feed probe: `feed_ph` or `feed_ec`. Example: `feed_ph`.
+      required: true
+      selector:
+        select:
+          options:
+            - feed_ph
+            - feed_ec
+    solutions:
+      name: Reference solutions
+      description: >-
+        The two reference solutions, in the order you use them. Optional. Default: [7.0, 4.0] for pH and
+        [1.413, 2.77] mS/cm for EC. Example: [7.0, 4.0].
+      required: false
+      selector:
+        object:
+calibration_capture:
+  name: Capture a calibration point
+  description: >-
+    Captures what the probe reads now in reference solution 0 or 1 of the session. A reading that moved
+    in the last 30 seconds (0.02 pH, or 1 % of the EC) is not captured unless `force` is true: the
+    answer then has `stable` false. Answers the reading, the raw value, `stable`, the drift and how many
+    seconds the reading has been steady. When a signed-in user calls it, that user must be a Home
+    Assistant administrator.
+  fields:
+    session_id:
+      name: Session ID
+      description: >-
+        The session ID that calibration_start returned. An unknown or expired session is refused with
+        "Calibration session expired. Start again." Example: 01JB2Y3M4N5P6Q7R8S9T0V1W2X.
+      required: true
+      selector:
+        text:
+    point:
+      name: Point
+      description: >-
+        Which reference solution the probe is in: 0 for the first, 1 for the second. Example: 0.
+      required: true
+      selector:
+        number:
+          min: 0
+          max: 1
+          mode: box
+    force:
+      name: Capture anyway
+      description: >-
+        Capture the reading even though it still moves. The calibration can then be off. Optional.
+        Default: false.
+      required: false
+      selector:
+        boolean:
+calibration_status:
+  name: Read a calibration session
+  description: >-
+    Answers what the probe of the session reads now, whether it is steady, its drift, the steady
+    seconds, how many points are captured and when the session expires. Changes nothing, never
+    captures a point and does not extend the session. It has no administrator check.
+  fields:
+    session_id:
+      name: Session ID
+      description: >-
+        The session ID that calibration_start returned. An unknown or expired session is refused with
+        "Calibration session expired. Start again." Example: 01JB2Y3M4N5P6Q7R8S9T0V1W2X.
+      required: true
+      selector:
+        text:
+calibration_commit:
+  name: Apply a probe calibration
+  description: >-
+    Works out the slope, the offset and the result from the two captured points, records them and
+    ends the session. A "pass" or "drifting" result is applied: the corrected feed sensor of the room
+    then reads the raw value corrected, and the result replaces the calibration applied before. A
+    "fail" is recorded but not applied, and the call is refused with a message that says so. When a
+    signed-in user calls it, that user must be a Home Assistant administrator.
+  fields:
+    session_id:
+      name: Session ID
+      description: >-
+        The session ID that calibration_start returned. An unknown or expired session is refused with
+        "Calibration session expired. Start again." Example: 01JB2Y3M4N5P6Q7R8S9T0V1W2X.
+      required: true
+      selector:
+        text:
+calibration_revert:
+  name: Put back the previous probe calibration
+  description: >-
+    Takes the applied calibration off the probe and applies the calibration that it replaced, or
+    none: the corrected feed sensor then reads unknown and the controller reads the raw probe. Ends
+    any calibration session of the room. When a signed-in user calls it, that user must be a Home
+    Assistant administrator.
+  fields:
+    room_id:
+      name: Room ID
+      description: >-
+        The canonical ID of the room. Example: `room:f2_`.
+      required: true
+      selector:
+        text:
+    probe:
+      name: Probe
+      description: >-
+        The feed probe: `feed_ph` or `feed_ec`. Example: `feed_ph`.
+      required: true
+      selector:
+        select:
+          options:
+            - feed_ph
+            - feed_ec
+probe_offset_set:
+  name: Set a moisture probe's offset or curve
+  description: >-
+    Sets the offset (percentage points of moisture) and/or the curve of one moisture probe of the
+    room, or, with `match_handheld`, the offset that makes the probe read what a handheld meter
+    reads. The zone applies it before it combines its probes, and the probe gets a
+    sensor.<probe>_corrected sensor. With `preview` nothing is saved. A curve is refused on a probe
+    that does not report permittivity; `fused_before` and `fused_after` are estimates. When a signed-in user calls it, that user must be a
+    Home Assistant administrator.
+  fields:
+    room_id:
+      name: Room ID
+      description: >-
+        The canonical ID of the room. Example: `room:f2_`.
+      required: true
+      selector:
+        text:
+    entity_id:
+      name: Probe
+      description: >-
+        The moisture probe's entity. Example: `sensor.f2_teros_a`.
+      required: true
+      selector:
+        text:
+    expected_revision:
+      name: Expected revision
+      description: >-
+        The revision the caller last read (calibration_get). Needed to save; a preview does not need it.
+      required: false
+      selector:
+        number:
+          min: 0
+          mode: box
+    offset:
+      name: Offset
+      description: >-
+        Percentage points added to the probe's reading, from -20 to 20. Zero with no curve removes
+        the setting.
+      required: false
+      selector:
+        number:
+          min: -20
+          max: 20
+          step: 0.1
+          mode: box
+    curve:
+      name: Curve
+      description: >-
+        `generic_rockwool` or `generic_soilless` turns a raw permittivity reading into moisture; `none`
+        removes the curve. Generic approximation (Topp 1980 mineral-soil fit), not a substrate
+        calibration: match a handheld after choosing. Only for a probe whose unit is a permittivity
+        label (for example ε). The answer carries a `warning` while a curve is set.
+      required: false
+      selector:
+        select:
+          options:
+            - generic_rockwool
+            - generic_soilless
+            - none
+    match_handheld:
+      name: Handheld reading
+      description: >-
+        What a handheld meter reads now (percent moisture). The offset becomes that minus the
+        probe's reading now. Not together with `offset`.
+      required: false
+      selector:
+        number:
+          min: 0
+          max: 100
+          step: 0.1
+          mode: box
+    preview:
+      name: Preview
+      description: >-
+        Answer with the offset, the reading it gives, an estimate of the zone's reading before and after
+        (`fused_before`, `fused_after`) and which probes that would leave out (`excluded_after`), and save
+        nothing.
+      required: false
+      selector:
+        boolean:
+calibration_abandon:
+  name: Abandon a probe or pump calibration
+  description: >-
+    Ends the calibration session without a record. The dosing descriptor drops `calibrating`. A
+    pump's calibration session (from pump_calibrate) can be abandoned once its run is reported;
+    before that, stop the pump with pump_stop. When a signed-in user calls it, that user must be a
+    Home Assistant administrator.
+  fields:
+    session_id:
+      name: Session ID
+      description: >-
+        The session ID that calibration_start returned. An unknown or expired session is refused with
+        "Calibration session expired. Start again." Example: 01JB2Y3M4N5P6Q7R8S9T0V1W2X.
+      required: true
+      selector:
+        text:
 stock_get:
   name: Read stock tanks
   description: >-
@@ -1066,13 +1290,26 @@ notify_save:
       required: false
       selector:
         object:
+# A recipients row may carry quiet_hours: {from: "HH:MM", to: "HH:MM"} (00:00 to 23:59, may cross midnight; from
+# and to must differ), or null for none (the default; a row saved before has none, a row sent without it keeps its
+# own). Inside the window, in Home Assistant's time zone, a push to that phone that is not critical waits in its
+# digest queue, even with digest off, and goes as one push when the window ends. The controller's non-critical
+# "not watering" warnings (NOT_WATERING_CODES, e.g. CS-206, CS-316) wait too: only critical codes break through.
+# A push with Keep/Undo buttons (an AI setpoint change) is never held for quiet hours unless the phone takes a digest.
+# notify_test takes `service` (one phone -> {sent, error}) or `services` (several -> {results: [{service, sent,
+# error}]}), not both.
 notify_test:
   fields:
     service:
-      required: true
+      required: false
       example: "notify.mobile_app_my_phone"
       selector:
         text:
+    services:
+      required: false
+      example: '["notify.mobile_app_my_phone", "notify.mobile_app_office_tablet"]'
+      selector:
+        object:
 notify:
   fields:
     key:
@@ -1383,6 +1620,284 @@ display_save:
       required: true
       selector:
         object:
+
+system_status_get:
+  name: Read system status
+  description: >-
+    Returns the site's health: for each room every entity its setup maps (the zones' probes and
+    valves, the pump, the main line, the feed probes, the tank sensors and the zones' flow meters),
+    each with its kind, name, zone, last seen, last change, whether it is online and its share of the
+    last 7 days online (from the recorder; null without one), grouped by kind; the room's percent
+    online, open alerts and controller heartbeat (its last 120 beats, a missed beat marked). Also the
+    controller (running, stale or absent), the controller app's and Home Assistant's versions, the AI
+    assistant's calls today against its daily budget, and the version of the dashboard card Home
+    Assistant loads. A probe is online while it reports within 3 times its usual interval (at least
+    180 s). Changes nothing. It has no administrator check.
+
+supply_get:
+  name: Read supply settings
+  description: >-
+    Returns the site's supply settings: the irrigation pumps with their output and how many zones
+    each may feed at once, the water sources, the exclusive groups of zones and the flow meter of
+    each zone, with a capacity check (the worst case each pump must carry and, for every pair of
+    zones on a pump, whether they can run together). Changes nothing. It has no administrator
+    check. Use it to read the revision before you save.
+
+supply_save:
+  name: Save supply settings
+  description: >-
+    Replaces the site's pumps, and optionally its water sources, exclusive groups and zone flow
+    meters. The integration refuses with pump_over_capacity when a pump is set to feed more zones
+    at once than its output can carry, and says how many it can. When a signed-in user calls it,
+    that user must be a Home Assistant administrator. An automation can call it without this
+    check. Give the revision that you read with supply_get. The integration refuses the save when
+    the settings changed after you read them. With preview it checks and answers with the
+    difference and the capacity check, and saves nothing.
+  fields:
+    expected_revision:
+      name: Expected revision
+      description: >-
+        The revision that supply_get returned. Example: 0.
+      required: true
+      selector:
+        number:
+          min: 0
+          max: 1000000
+          mode: box
+    irrigation_pumps:
+      name: Irrigation pumps
+      description: >-
+        The pumps, each as entity_id (the pump switch of the rooms that use it), max_flow_lph
+        (optional), max_concurrent_zones (1 or more, default 1) and flow_meter (optional).
+        Example: [{"entity_id": "switch.pump", "max_flow_lph": 1200, "max_concurrent_zones": 2}].
+      required: true
+      selector:
+        object:
+    water_sources:
+      name: Water sources
+      description: >-
+        The water sources, as a list. Left out, the saved ones are kept.
+      required: false
+      selector:
+        object:
+    zone_groups:
+      name: Exclusive groups
+      description: >-
+        The exclusive group of each zone, by room and zone number. Zones in one group never run
+        together. Left out, the saved groups are kept. Example: {"room:f2_": {"3": "a"}}.
+      required: false
+      selector:
+        object:
+    zone_meters:
+      name: Zone flow meters
+      description: >-
+        The flow meter of each zone, by room and zone number. Left out, the saved meters are kept.
+        Example: {"room:f2_": {"3": "sensor.f2_meter_3"}}.
+      required: false
+      selector:
+        object:
+    preview:
+      name: Preview
+      description: Check and answer without saving.
+      required: false
+      selector:
+        boolean:
+
+preset_list:
+  name: List presets
+  description: >-
+    Returns the site's presets that are not deleted, the same list for every caller, and the
+    revision to save against. Changes nothing. It has no administrator check.
+
+preset_save:
+  name: Save a preset
+  description: >-
+    Saves the current settings of a room or one of its zones as a named preset every client can
+    apply. The scope picks what it holds: targets, timers, or all (targets, phase timing, water
+    limits and timers). When a signed-in user calls it, that user must be a Home Assistant
+    administrator. Give the revision that preset_list returned; the save is refused when the
+    presets changed after you read them. It answers with the preset and `skipped`, the settings
+    that could not be read and are not in it.
+  fields:
+    name:
+      name: Name
+      description: >-
+        Up to 60 characters. Example: Flower week 3.
+      required: true
+      selector:
+        text:
+    scope:
+      name: Scope
+      description: What the preset holds.
+      required: true
+      selector:
+        select:
+          options:
+            - targets
+            - timers
+            - all
+    from:
+      name: From
+      description: >-
+        The room, or one zone of it, whose settings to save. Example: {"room_id": "room:f2_",
+        "zone": 3}.
+      required: true
+      selector:
+        object:
+    expected_revision:
+      name: Expected revision
+      description: >-
+        The revision that preset_list returned. Example: 0.
+      required: true
+      selector:
+        number:
+          min: 0
+          max: 1000000
+          mode: box
+    values:
+      name: Values
+      description: >-
+        Optional. The settings to save, by section, instead of reading them from the room: what the
+        dashboard sends when it imports a grow-plan recipe saved in a browser. Only the sections of
+        the scope (never timers), only their settings, numbers (P2 mode a text). From names the room
+        the preset is for. Example: {"targets": {"p2_shot_size": 6.5}}.
+      required: false
+      selector:
+        object:
+
+preset_delete:
+  name: Delete a preset
+  description: >-
+    Removes a preset from the list. The delete is soft: the preset stays in the store, marked
+    deleted. When a signed-in user calls it, that user must be a Home Assistant administrator.
+  fields:
+    id:
+      name: Preset ID
+      description: The id of the preset, from preset_list.
+      required: true
+      selector:
+        text:
+    expected_revision:
+      name: Expected revision
+      description: >-
+        The revision that preset_list returned. Example: 1.
+      required: true
+      selector:
+        number:
+          min: 0
+          max: 1000000
+          mode: box
+
+preset_apply:
+  name: Apply a preset
+  description: >-
+    Writes a preset's settings to rooms or zones, then reads each one back. It answers with the
+    rows that change (diff), the settings a target has no entity for (missing, never written)
+    and, unless previewed, each write's readback, verified or refused, with the error of a
+    refused one. A refused write does not stop the others. A zone or room is never taken out of
+    its timer programs by a source that has none: that row is refused with the reason. When a signed-in user calls it, that user must be a Home Assistant
+    administrator.
+  fields:
+    preset_id:
+      name: Preset ID
+      description: The id of the preset, from preset_list.
+      required: true
+      selector:
+        text:
+    to:
+      name: To
+      description: >-
+        The rooms or zones to write to. Example: [{"room_id": "room:f2_", "zone": 1}].
+      required: true
+      selector:
+        object:
+    preview:
+      name: Preview
+      description: Answer with the difference and write nothing.
+      required: false
+      selector:
+        boolean:
+
+copy_config:
+  name: Copy settings
+  description: >-
+    Copies the settings of a room or zone to other rooms or zones, by section: targets, phase
+    timing, water limits and timers. It answers as preset_apply does, and with preview it writes
+    nothing. When a signed-in user calls it, that user must be a Home Assistant administrator.
+  fields:
+    from:
+      name: From
+      description: >-
+        The room, or one zone of it, to copy from. Example: {"room_id": "room:f2_", "zone": 3}.
+      required: true
+      selector:
+        object:
+    to:
+      name: To
+      description: >-
+        The rooms or zones to copy to. Example: [{"room_id": "room:f2_", "zone": 1}].
+      required: true
+      selector:
+        object:
+    sections:
+      name: Sections
+      description: What to copy.
+      required: true
+      selector:
+        select:
+          multiple: true
+          options:
+            - targets
+            - phase_timing
+            - water_limits
+            - timers
+    preview:
+      name: Preview
+      description: Answer with the difference and write nothing.
+      required: false
+      selector:
+        boolean:
+
+dashboard_create:
+  name: Create a dashboard from a template
+  description: >-
+    Creates a Home Assistant dashboard from a template, in Settings > Dashboards, using built-in
+    cards and only the entities the chosen rooms have: facility_wall (every chosen room at a
+    glance), room_tablet (one room's zones) or dosing_station (feed EC and pH, tanks and dosing).
+    Its address is crop-steering-<template>-<n>. Switches nothing. When a signed-in user calls it,
+    that user must be a Home Assistant administrator. It answers with the url_path and the title.
+  fields:
+    template:
+      name: Template
+      description: Which dashboard to make.
+      required: true
+      selector:
+        select:
+          options:
+            - facility_wall
+            - room_tablet
+            - dosing_station
+    rooms:
+      name: Rooms
+      description: >-
+        The room IDs it shows; room_tablet takes exactly one. Example: ["room:f2_"].
+      required: true
+      selector:
+        object:
+    title:
+      name: Title
+      description: >-
+        The dashboard's title in the sidebar. Left out, the template's name and the rooms'.
+      required: false
+      selector:
+        text:
+
+dashboard_list:
+  name: List dashboards made from templates
+  description: >-
+    Returns the dashboards dashboard_create made, each with exists false once it was deleted in Home
+    Assistant, and the templates there are. Changes nothing. It has no administrator check.
+
 harvests_get:
   name: Read harvests
   description: >-
@@ -1598,3 +2113,687 @@ brain_prompt_publish:
       required: true
       selector:
         object:
+journal_append:
+  name: Append journal events
+  description: Administrator-only. Stores up to 50 events for a room, idempotent on the event id, and re-fires each new one on the bus as crop_steering_event.
+  fields:
+    room_id:
+      name: Room
+      description: Canonical room id, "room:" plus the room prefix.
+      required: true
+      selector:
+        text:
+    events:
+      name: Events
+      description: Up to 50 version 1 events.
+      required: true
+      selector:
+        object:
+journal_query:
+  name: Query the journal
+  description: Reads a room's events in time order. Any signed-in user. Returns the events and a cursor for the next page, or null.
+  fields:
+    room_id:
+      name: Room
+      description: Canonical room id, "room:" plus the room prefix.
+      required: true
+      selector:
+        text:
+    since:
+      name: Since
+      description: ISO-8601 start time, inclusive.
+      required: true
+      selector:
+        text:
+    until:
+      name: Until
+      description: ISO-8601 end time, exclusive.
+      required: false
+      selector:
+        text:
+    kinds:
+      name: Kinds
+      description: Only these event kinds.
+      required: false
+      selector:
+        object:
+    zones:
+      name: Zones
+      description: Only these zone numbers.
+      required: false
+      selector:
+        object:
+    actor:
+      name: Actor
+      description: Only events from this actor.
+      required: false
+      selector:
+        text:
+    limit:
+      name: Limit
+      description: Most events to return, 1 to 500.
+      required: false
+      selector:
+        number:
+          min: 1
+          max: 500
+          mode: box
+    cursor:
+      name: Cursor
+      description: The cursor a previous page returned.
+      required: false
+      selector:
+        text:
+
+history_changes:
+  name: Change history
+  description: >-
+    Who changed what: setting, plan, recipe, setup, calibration and alert rule changes from the
+    journal, newest first, each with its user, its outcome line and whether it can be put back.
+    Any signed-in user. Without a room, every room merged by time.
+  fields:
+    room_id:
+      name: Room
+      description: Canonical room id, "room:" plus the room prefix. Empty for every room.
+      required: false
+      selector:
+        text:
+    since:
+      name: Since
+      description: ISO-8601 start time, inclusive.
+      required: true
+      selector:
+        text:
+    until:
+      name: Until
+      description: ISO-8601 end time, exclusive.
+      required: false
+      selector:
+        text:
+    zone:
+      name: Zone
+      description: Only this zone's changes.
+      required: false
+      selector:
+        number:
+          min: 1
+          max: 99
+          mode: box
+    key:
+      name: Setting
+      description: Only changes of this setting key.
+      required: false
+      selector:
+        text:
+    kinds:
+      name: Kinds
+      description: Only these change kinds (setpoint, plan, recipe, setup, calibration, alerts).
+      required: false
+      selector:
+        object:
+
+history_revert:
+  name: Put a change back
+  description: >-
+    Puts one change back: a setting is written back to its old value and read back, a saved
+    section is saved again from its old copy. Journaled as a manual "put back" change. Refused
+    when the setting or section has changed since. Administrators only.
+  fields:
+    event_id:
+      name: Change
+      description: The id of the change, from history_changes.
+      required: true
+      selector:
+        text:
+    expected_revision:
+      name: Expected revision
+      description: For a saved section, the store revision the caller read.
+      required: false
+      selector:
+        number:
+          min: 0
+          mode: box
+
+timeline_get:
+  name: Read the timeline
+  description: >-
+    What each zone did and is planned to do, at most 48 h: shots (done or failed), holds, queued
+    shots and alerts from the journal, and planned timer and engine shots from the controller
+    app's projection, with each room's lights windows, pump load and the error markers. Times in
+    Home Assistant's local time. Any signed-in user.
+  fields:
+    rooms:
+      name: Rooms
+      description: Canonical room ids, "room:" plus the room prefix.
+      required: true
+      selector:
+        object:
+    start:
+      name: Start
+      description: ISO-8601 start time, inclusive.
+      required: true
+      selector:
+        text:
+    end:
+      name: End
+      description: ISO-8601 end time, exclusive. At most 48 h after the start.
+      required: true
+      selector:
+        text:
+    zones:
+      name: Zones
+      description: Only these zone numbers.
+      required: false
+      selector:
+        object:
+
+timeline_summary:
+  name: Read the timeline summary
+  description: >-
+    Per room per local day: shots, failed, warnings, held and queued counts, from the journal.
+    Any signed-in user.
+  fields:
+    rooms:
+      name: Rooms
+      description: Canonical room ids, "room:" plus the room prefix.
+      required: true
+      selector:
+        object:
+    days:
+      name: Days
+      description: Local dates as YYYY-MM-DD, at most 14.
+      required: true
+      selector:
+        object:
+
+alert_ack:
+  name: Acknowledge an alert
+  description: >-
+    Acknowledges one open alert of the room: it leaves the room's open alerts
+    (sensor.crop_steering_<prefix>alerts_open) and is journaled as alert.acknowledged with who did
+    it. A threshold rule's sensor stays on until its value is back in range. Refused when the alert
+    is not in the room's journal or is no longer open. Any signed-in user.
+  fields:
+    room_id:
+      name: Room
+      description: The room, "room:" plus the room prefix.
+      required: true
+      selector:
+        text:
+    alert_event_id:
+      name: Alert
+      description: The event_id of the open alert, from the alerts_open sensor.
+      required: true
+      selector:
+        text:
+
+timer_program_set:
+  name: Save a timer program
+  description: >-
+    Adds a timer program to the room, or changes one when the program has an id. A zone may belong
+    to one active timer program only. The controller app runs a program for the zones whose
+    Watering by select reads timer. When a signed-in user calls it, that user must be a Home
+    Assistant administrator. Give the revision that you read with timer_program_list. Answers with
+    the saved program, the new revision and its shots over the next 24 hours.
+  fields:
+    room_id:
+      name: Room ID
+      description: >-
+        The canonical ID of the room: `room:` for the default room, or `room:` and the room prefix
+        for a named room. Example: `room:f2_`.
+      required: true
+      selector:
+        text:
+    expected_revision:
+      name: Expected revision
+      description: >-
+        The revision that timer_program_list returned. Example: 0.
+      required: true
+      selector:
+        number:
+          min: 0
+          max: 1000000
+          mode: box
+    program:
+      name: Program
+      description: >-
+        The program: name, type (recycle, simple or one_off), zones, duration_s, active, window
+        ({"kind": "all"}, lights_on, lights_off, or custom with from and to as HH:MM), and
+        interval_min with an optional sync_time (recycle), frequency_per_day (simple) or start_at
+        (one_off). Example: {"name": "Mothers AM", "type": "recycle", "zones": [1], "duration_s":
+        120, "interval_min": 30, "window": {"kind": "custom", "from": "08:00", "to": "12:00"}}.
+      required: true
+      selector:
+        object:
+
+timer_program_delete:
+  name: Delete a timer program
+  description: >-
+    Switches a timer program off and marks it deleted. It stays in the store for its history and is
+    no longer listed. When a signed-in user calls it, that user must be a Home Assistant
+    administrator.
+  fields:
+    room_id:
+      name: Room ID
+      description: >-
+        The canonical ID of the room. Example: `room:f2_`.
+      required: true
+      selector:
+        text:
+    expected_revision:
+      name: Expected revision
+      description: >-
+        The revision that timer_program_list returned. Example: 3.
+      required: true
+      selector:
+        number:
+          min: 0
+          max: 1000000
+          mode: box
+    id:
+      name: Program ID
+      description: The id of the program to delete.
+      required: true
+      selector:
+        text:
+
+timer_program_preview:
+  name: Preview a timer program
+  description: >-
+    Checks a timer program, saved or a draft without an id, and answers with the shots it would
+    give over the coming hours, how many and their total seconds. Saves nothing. It has no
+    administrator check.
+  fields:
+    room_id:
+      name: Room ID
+      description: >-
+        The canonical ID of the room. Example: `room:f2_`.
+      required: true
+      selector:
+        text:
+    program:
+      name: Program
+      description: The program, as timer_program_set takes it.
+      required: true
+      selector:
+        object:
+    hours:
+      name: Hours
+      description: How many hours ahead, up to 48. Default 24.
+      required: false
+      selector:
+        number:
+          min: 1
+          max: 48
+          mode: box
+
+timer_program_list:
+  name: List timer programs
+  description: >-
+    Returns the room's timer programs that are not deleted, each with its next shot and the zones
+    whose Watering by select reads timer, and the revision to save against. Without a room it
+    returns every room's programs, each with its room_id, and each room's revision. Changes
+    nothing. It has no administrator check.
+  fields:
+    room_id:
+      name: Room ID
+      description: >-
+        The canonical ID of the room. Leave it out for every room. Example: `room:f2_`.
+      required: false
+      selector:
+        text:
+
+timer_skip:
+  name: Skip a planned shot
+  description: >-
+    Skips the planned shot of one zone at a given time: the timer shot, or the engine shot the
+    timeline showed then. Rescue and emergency shots are never skipped. The time may be up to 48
+    hours ahead. The skip covers 15 minutes from that time and is dropped 24 hours after it. When a signed-in user calls it, that user must be a Home Assistant administrator.
+  fields:
+    room_id:
+      name: Room ID
+      description: >-
+        The canonical ID of the room. Example: `room:f2_`.
+      required: true
+      selector:
+        text:
+    expected_revision:
+      name: Expected revision
+      description: >-
+        The revision that timer_program_list returned. Example: 3.
+      required: true
+      selector:
+        number:
+          min: 0
+          max: 1000000
+          mode: box
+    zone:
+      name: Zone
+      description: >-
+        The zone number. Example: 3.
+      required: true
+      selector:
+        number:
+          min: 1
+          max: 24
+          mode: box
+    at:
+      name: At
+      description: >-
+        The time of the planned shot, as an ISO date and time with its offset. Example:
+        2026-10-22T08:00:00+13:00.
+      required: true
+      selector:
+        text:
+pump_precheck:
+  name: Check a dosing pump can prime or calibrate
+  description: >-
+    Answers whether a timed run of the dosing pump (a prime or a calibration) could start now, and
+    every blocker in the checklist's words: no power switch, room dosing running, mix pump on, tank
+    filling, a feed probe calibration open, another pump's calibration open, or the controller
+    offline (no heartbeat for 10 minutes). Changes nothing. It has no administrator check.
+  fields:
+    room_id:
+      name: Room ID
+      description: >-
+        The canonical ID of the room. Example: `room:f2_`.
+      required: true
+      selector:
+        text:
+    pump:
+      name: Pump
+      description: >-
+        The ID of the dosing pump. Example: `balance`.
+      required: true
+      selector:
+        text:
+pump_prime:
+  name: Prime a dosing pump
+  description: >-
+    Leaves a request for the controller to run the pump's power switch for a number of seconds, to
+    fill its line. Doses and batches of the room wait for its run and 60 seconds after it.
+    Refused, with the blockers, while any pump_precheck blocker stands; refused while another
+    dosing request still waits for the controller. At most 30 seconds. pump_stop ends it early.
+    When a signed-in user calls it, that user must be a Home Assistant administrator.
+  fields:
+    room_id:
+      name: Room ID
+      description: >-
+        The canonical ID of the room. Example: `room:f2_`.
+      required: true
+      selector:
+        text:
+    pump:
+      name: Pump
+      description: >-
+        The ID of the dosing pump. Example: `balance`.
+      required: true
+      selector:
+        text:
+    seconds:
+      name: Seconds
+      description: >-
+        How long the pump runs, 1 to 30 seconds. Example: 10.
+      required: true
+      selector:
+        number:
+          min: 1
+          max: 30
+          unit_of_measurement: s
+          mode: box
+pump_stop:
+  name: Stop a dosing pump's prime or calibration
+  description: >-
+    Leaves a request for the controller to end the prime or the calibration run of this pump now. It
+    replaces this pump's own waiting prime, calibration or stop (the answer names it in `replaced`).
+    When another pump's prime, calibration or stop still waits, it leaves a room stop instead, which
+    stops every pump; `replaced` is then {upgraded_to: stop, was: the waiting request}. A waiting
+    room stop stops this pump too and is kept. Any signed-in user may call it, but only an
+    administrator (or an automation) may replace a waiting dose or batch; anyone else is refused
+    with "A dose or batch is waiting — an admin, or the room Stop, can cancel it." It never touches
+    a running batch or another pump's running job. To stop all dosing in the room, use
+    dosing_request with the action stop.
+  fields:
+    room_id:
+      name: Room ID
+      description: >-
+        The canonical ID of the room. Example: `room:f2_`.
+      required: true
+      selector:
+        text:
+    pump:
+      name: Pump
+      description: >-
+        The ID of the dosing pump. Example: `balance`.
+      required: true
+      selector:
+        text:
+pump_calibrate:
+  name: Run a dosing pump calibration
+  description: >-
+    Opens a pump calibration session and leaves a request for the controller to run the pump's power
+    switch for a number of seconds into a measuring jug. Doses and batches of the room wait while
+    the session is open (calibration_abandon ends it). Refused, with the blockers, while any
+    pump_precheck blocker stands. The seconds it really ran appear in dosing_get under the pump's
+    `calibration_session` once the controller reports them. That run is not drawn from the pump's
+    stock tank. When a signed-in user calls it, that user must be a Home Assistant administrator.
+  fields:
+    room_id:
+      name: Room ID
+      description: >-
+        The canonical ID of the room. Example: `room:f2_`.
+      required: true
+      selector:
+        text:
+    pump:
+      name: Pump
+      description: >-
+        The ID of the dosing pump. Example: `balance`.
+      required: true
+      selector:
+        text:
+    seconds:
+      name: Seconds
+      description: >-
+        How long the pump runs, 5 to 120 seconds. Example: 30.
+      required: true
+      selector:
+        number:
+          min: 5
+          max: 120
+          unit_of_measurement: s
+          mode: box
+pump_calibration_commit:
+  name: Save a dosing pump calibration
+  description: >-
+    Works out the pump's flow from the mL it gave in its calibration run: mL / seconds ran x 60, in
+    mL/min. Stores it as the pump's calibrated flow (the newest 30 calibrations are kept), sets a
+    flow number of the pump to it in mL/s and reads that back, and ends the session. Refused until
+    the controller has reported the run. When a signed-in user calls it, that user must be a Home
+    Assistant administrator.
+  fields:
+    room_id:
+      name: Room ID
+      description: >-
+        The canonical ID of the room. Example: `room:f2_`.
+      required: true
+      selector:
+        text:
+    session_id:
+      name: Session ID
+      description: >-
+        The session ID that pump_calibrate returned. An unknown or expired session is refused with
+        "Calibration session expired. Start again." Example: 01JB2Y3M4N5P6Q7R8S9T0V1W2X.
+      required: true
+      selector:
+        text:
+    measured_ml:
+      name: Measured mL
+      description: >-
+        How many mL the pump gave into the jug. Example: 150.
+      required: true
+      selector:
+        number:
+          min: 0
+          max: 50000
+          step: 0.1
+          unit_of_measurement: mL
+          mode: box
+
+# Threshold alert rules (G6). A rule watches one source of a room and, when the value stays above or
+# below its threshold for min_duration_s inside its window, raises alert.raised and pushes to the
+# phones that tick its routing kind; binary_sensor.crop_steering_rule_<id> is on while it fires.
+# Sources: zone.vwc, zone.ec, zone.temperature, feed.ph, feed.ec, tank.level, stock.pct,
+# stock.litres (with tank_id), zone.flow_ratio, controller.heartbeat and probe.silence_s (with
+# entity_id). Climate sources are refused. A room's mute holds every rule not routed to emergency.
+# Rules only notify: they never touch irrigation.
+alert_rule_set:
+  name: Save an alert rule
+  description: >-
+    Adds a threshold alert rule, or changes one when the rule has an id. When a signed-in user calls
+    it, that user must be a Home Assistant administrator. Give the revision that you read with
+    alert_rule_list. Answers with the saved rule, its sentence and the new revision.
+  fields:
+    expected_revision:
+      name: Expected revision
+      description: >-
+        The alert rules revision you read. Example: 0.
+      required: true
+      selector:
+        number:
+          min: 0
+          max: 1000000
+          mode: box
+    rule:
+      name: Rule
+      description: >-
+        The rule: room_id, source, zones (zone sources), op (above or below), threshold in the
+        source's unit, window (all, lights_on, lights_off, or {"kind": "custom", "from": "HH:MM",
+        "to": "HH:MM"}), min_duration_s, severity (info, warning or emergency), routing (a
+        notification kind, default sensors), active, and tank_id or entity_id where the source needs
+        one. Example: {"room_id": "room:f2_", "source": "tank.level", "op": "below", "threshold":
+        30, "min_duration_s": 600, "window": "lights_on"}.
+      required: true
+      selector:
+        object:
+
+alert_rule_delete:
+  name: Delete an alert rule
+  description: >-
+    Removes a threshold alert rule and its binary sensor. When a signed-in user calls it, that user
+    must be a Home Assistant administrator.
+  fields:
+    id:
+      name: Rule ID
+      description: >-
+        The ID of the rule. Example: 01JB2Y3M4N5P6Q7R8S9T0V1W2X.
+      required: true
+      selector:
+        text:
+    expected_revision:
+      name: Expected revision
+      description: >-
+        The alert rules revision you read. Example: 1.
+      required: true
+      selector:
+        number:
+          min: 0
+          max: 1000000
+          mode: box
+
+alert_rule_test:
+  name: Test an alert rule
+  description: >-
+    Replays a saved rule (id) or a draft (rule) against the recorder's history and says how often it
+    would have fired. With send, it also sends a test push through the rule's routing and answers
+    with each phone's delivery; sending needs a Home Assistant administrator.
+  fields:
+    id:
+      name: Rule ID
+      description: >-
+        A saved rule. Give either id or rule.
+      required: false
+      selector:
+        text:
+    rule:
+      name: Rule
+      description: >-
+        A draft rule, as for alert_rule_set. Give either id or rule.
+      required: false
+      selector:
+        object:
+    hours:
+      name: Hours
+      description: >-
+        How far back to replay, 1 to 168 hours. Default 24.
+      required: false
+      selector:
+        number:
+          min: 1
+          max: 168
+          unit_of_measurement: h
+          mode: box
+    send:
+      name: Send a test push
+      description: >-
+        Send a test push to the phones the rule routes to. Default off.
+      required: false
+      selector:
+        boolean:
+
+alert_rule_preview:
+  name: Preview an alert rule
+  description: >-
+    Replays a draft rule against the recorder's history without saving or sending anything: the
+    series (at most 1440 points), when it would have fired, the breaches it would have ignored and
+    why, and a sentence. Any signed-in user can call it.
+  fields:
+    rule:
+      name: Rule
+      description: >-
+        A draft rule, as for alert_rule_set.
+      required: true
+      selector:
+        object:
+    hours:
+      name: Hours
+      description: >-
+        How far back to replay, 1 to 168 hours. Default 24.
+      required: false
+      selector:
+        number:
+          min: 1
+          max: 168
+          unit_of_measurement: h
+          mode: box
+
+alert_rule_list:
+  name: List alert rules
+  description: >-
+    Returns the threshold alert rules with each one's state, when it last fired, since when it fires,
+    the source's value now and its unit. Any signed-in user can call it.
+  fields:
+    room_id:
+      name: Room ID
+      description: >-
+        Only this room's rules. Empty: every room's. Example: `room:f2_`.
+      required: false
+      selector:
+        text:
+migration_report:
+  name: Read the upgrade report
+  description: >-
+    Returns the room's upgrade report for 3.18: the settings the update carried into the new
+    features ("carried") and the ones it could not carry without guessing ("needs_you"), each with
+    the dashboard page to open and the section of docs/UPGRADING.md to read. Empty for a room set up
+    on 3.18. Changes nothing. It has no administrator check.
+  fields:
+    room_id:
+      name: Room ID
+      description: >-
+        The canonical ID of the room: `room:` for the default room, or `room:` and the room prefix for a
+        named room. The integration refuses an unknown ID. Example: `room:f1_` for a named room, or
+        `room:` for the default room.
+      required: true
+      selector:
+        text:

@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Settings — System</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+select,input{color-scheme:dark}
+button{cursor:pointer}
+a{color:#4fc3f7;text-decoration:none}a:hover{color:#b3e5fc}
+</style>
+</helmet>
+<!-- SHELL: 1440x1000 frame. Tokens: canvas #111111, surface #1c1c1c, raised #232323, border #2e2e2e, text #e1e1e1, muted #a4a4a4, faint #8a8a8a, primary #03a9f4, link #4fc3f7, success #81c995, warning #ffca5b, danger #f28b82. Phase P0 #6b7580, P1 #2f6fb5, P2 #6450b0, P3 #34405a. Font Roboto; sizes 12/14/15/17/20/24. Radius 12. -->
+<div style="width: 1440px; height: 1000px; box-sizing: border-box; background: #111111; color: #e1e1e1; font-family: Roboto, Arial, sans-serif; display: flex; overflow: hidden">
+
+<!-- SHELL: menu (sections + live room tree) -->
+<aside style="width: 248px; flex-shrink: 0; background: #1c1c1c; border-right: 1px solid #2e2e2e; padding: 22px 12px 16px; box-sizing: border-box; display: flex; flex-direction: column; gap: 4px">
+<div style="display: flex; align-items: center; gap: 10px; padding: 0 8px 18px">
+<span style="width: 36px; height: 36px; border-radius: 10px; background: #03a9f4; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0b1d27" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.7l5.7 5.7a8 8 0 1 1-11.3 0z"></path></svg></span>
+<span style="display: flex; flex-direction: column"><b style="font-size: 16px; font-weight: 600">Crop Steering</b><span style="font-size: 12px; color: #a4a4a4">Irrigation control</span></span>
+</div>
+<nav aria-label="Main navigation" style="display: flex; flex-direction: column; gap: 1px">
+<a href="S1-AllRooms.dc.html" style="display: flex; align-items: center; gap: 12px; min-height: 38px; padding: 0 12px; border-radius: 8px; color: #b8b8b8; font-weight: 500; font-size: 15px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>Status</a>
+<button type="button" aria-expanded="false" style="display: flex; align-items: center; gap: 12px; min-height: 38px; padding: 0 12px; border: 0; border-radius: 8px; background: transparent; color: #b8b8b8; font: inherit; font-size: 15px; font-weight: 500; text-align: left; cursor: pointer"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.7l5.7 5.7a8 8 0 1 1-11.3 0z"></path></svg>Irrigation<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="margin-left: auto"><polyline points="9 6 15 12 9 18"></polyline></svg></button>
+<button type="button" aria-expanded="false" style="display: flex; align-items: center; gap: 12px; min-height: 38px; padding: 0 12px; border: 0; border-radius: 8px; background: transparent; color: #b8b8b8; font: inherit; font-size: 15px; font-weight: 500; text-align: left; cursor: pointer"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><polyline points="12 7 12 12 15 14"></polyline></svg>History<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="margin-left: auto"><polyline points="9 6 15 12 9 18"></polyline></svg></button>
+<button type="button" aria-expanded="false" style="display: flex; align-items: center; gap: 12px; min-height: 38px; padding: 0 12px; border: 0; border-radius: 8px; background: transparent; color: #b8b8b8; font: inherit; font-size: 15px; font-weight: 500; text-align: left; cursor: pointer"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"></path></svg>Equipment<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="margin-left: auto"><polyline points="9 6 15 12 9 18"></polyline></svg></button>
+<button type="button" aria-expanded="true" style="display: flex; align-items: center; gap: 12px; min-height: 38px; padding: 0 12px; margin-top: 10px; border: 0; border-radius: 8px; background: transparent; color: #e1e1e1; font: inherit; font-size: 15px; font-weight: 600; text-align: left; cursor: pointer"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="4" y1="7" x2="20" y2="7"></line><line x1="4" y1="17" x2="20" y2="17"></line><circle cx="9" cy="7" r="2.5"></circle><circle cx="15" cy="17" r="2.5"></circle></svg>Settings<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="margin-left: auto"><polyline points="6 9 12 15 18 9"></polyline></svg></button>
+<div style="display: flex; flex-direction: column; gap: 1px; margin: 0 0 4px 21px; padding-left: 10px; border-left: 1px solid #333">
+<a href="T1-AlertRules.dc.html" style="display: flex; align-items: center; min-height: 32px; padding: 0 10px; border-radius: 6px; color: #b8b8b8; font-size: 14px">Alert rules</a>
+<a href="T2-Notifications.dc.html" style="display: flex; align-items: center; min-height: 32px; padding: 0 10px; border-radius: 6px; color: #b8b8b8; font-size: 14px">Notifications</a>
+<a href="T3-System.dc.html" aria-current="page" style="display: flex; align-items: center; min-height: 32px; padding: 0 10px; border-radius: 6px; background: #2a2a2a; box-shadow: inset 2px 0 0 #03a9f4; color: #4fc3f7; font-size: 14px; font-weight: 600">System status</a>
+<a href="T4-AI.dc.html" style="display: flex; align-items: center; min-height: 32px; padding: 0 10px; border-radius: 6px; color: #b8b8b8; font-size: 14px">AI assistant</a>
+<a href="T5-Dashboards.dc.html" style="display: flex; align-items: center; min-height: 32px; padding: 0 10px; border-radius: 6px; color: #b8b8b8; font-size: 14px">Dashboards &amp; display</a>
+</div>
+</nav>
+<nav aria-label="Rooms" style="display: flex; flex-direction: column; gap: 1px; margin-top: 16px">
+<span style="padding: 0 12px 6px; font-size: 12px; font-weight: 600; letter-spacing: .06em; color: #a4a4a4">ROOMS</span>
+<sc-for list="{{rooms}}" as="r" hint-placeholder-count="3">
+<a href="S2-Room.dc.html" style="display: flex; align-items: center; gap: 8px; min-height: 36px; padding: 0 10px; margin-top: 6px; border-radius: 8px; color: #e1e1e1; font-size: 14px; font-weight: 500"><span style="width: 8px; height: 8px; border-radius: 4px; background: {{r.dot}}"></span>{{r.name}}<span style="margin-left: auto; font-size: 12px; color: #a4a4a4; font-weight: 400">{{r.state}}</span></a>
+<sc-for list="{{r.zones}}" as="z" hint-placeholder-count="3">
+<a href="S3-Zone.dc.html" style="display: flex; align-items: center; gap: 8px; min-height: 30px; padding: 0 10px 0 24px; border-radius: 8px; color: #b8b8b8; font-size: 13px"><span style="min-width: 22px; padding: 0 4px; border-radius: 4px; background: {{z.phColor}}; color: #fff; font-size: 11px; font-weight: 700; text-align: center">{{z.ph}}</span>{{z.name}}<span style="margin-left: auto; font-size: 12px; color: #a4a4a4">{{z.vwc}}</span></a>
+</sc-for>
+</sc-for>
+</nav>
+<div style="margin-top: auto; padding: 0 8px; font-size: 12px; color: #8a8a8a">Integration 3.17.1 · Controller 3.17.1</div>
+</aside>
+
+<div style="flex: 1; min-width: 0; display: flex; flex-direction: column">
+<!-- SHELL: top bar (no room chips on desktop: the tree is the picker) -->
+<header style="height: 56px; flex-shrink: 0; border-bottom: 1px solid #2e2e2e; display: flex; align-items: center; justify-content: flex-end; gap: 12px; padding: 0 24px">
+<span style="font-size: 13px; color: #a4a4a4">Updated 12 s ago</span>
+<span style="display: flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border: 1px solid #2e2e2e; border-radius: 15px; font-size: 13px; font-weight: 600"><span style="width: 7px; height: 7px; border-radius: 4px; background: #81c995"></span>AI acting</span>
+<button type="button" aria-label="Search, Ctrl K" style="display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 12px; border: 1px solid #2e2e2e; border-radius: 8px; background: #1c1c1c; color: #a4a4a4; font: inherit; font-size: 13px">Jump to… <span style="border: 1px solid #3a3a3a; border-radius: 4px; padding: 0 5px; font-size: 11px">Ctrl K</span></button>
+<span style="font-size: 13px; color: #a4a4a4">F2</span>
+<button type="button" style="height: 34px; padding: 0 14px; border: 1px solid #2e2e2e; border-radius: 8px; background: #1c1c1c; color: #e1e1e1; font: inherit; font-size: 14px; font-weight: 600"><span style="display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 4px; background: #81c995"></span>Watering on</button>
+<button type="button" style="height: 34px; padding: 0 14px; border: 1px solid #f28b82; border-radius: 8px; background: transparent; color: #f28b82; font: inherit; font-size: 14px; font-weight: 600">Stop all</button>
+</header>
+
+<main style="flex: 1; min-height: 0; overflow: hidden; padding: 18px 28px 22px; display: flex; flex-direction: column; gap: 16px">
+<div style="display: flex; align-items: stretch; gap: 22px; height: 44px; flex-shrink: 0; border-bottom: 1px solid #2e2e2e">
+<h1 style="margin: 0; align-self: center; font-size: 20px; font-weight: 600">System status</h1>
+</div>
+<section aria-label="Overall health" style="background: #1c1c1c; border: 1px solid #2e2e2e; border-radius: 12px; display: flex; align-items: center; gap: 14px; padding: 10px 18px">
+<svg width="56" height="56" viewBox="0 0 56 56" aria-hidden="true"><circle cx="28" cy="28" r="22" fill="none" stroke="#333333" stroke-width="6"></circle><circle cx="28" cy="28" r="22" fill="none" stroke="#81c995" stroke-width="6" stroke-linecap="round" stroke-dasharray="129.94 138.23" transform="rotate(-90 28 28)"></circle><text x="28" y="33" text-anchor="middle" fill="#e1e1e1" font-size="15" font-weight="700" font-family="Roboto, Arial, sans-serif">94</text></svg>
+<p style="margin: 0; font-size: 17px"><b style="font-weight: 600">System health 94 %:</b> 34 of 35 devices online, both controllers beating, 3 open alerts, each shown below where it happens. <span style="font-size: 13px; color: #a4a4a4">Checked 14:02:11</span></p>
+</section>
+<div style="flex: 1; min-height: 0; display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 16px">
+<div style="display: flex; flex-direction: column; gap: 16px; min-height: 0">
+<section aria-labelledby="sw-h" style="background: #1c1c1c; border: 1px solid #2e2e2e; border-radius: 12px; padding: 14px 16px">
+<h2 id="sw-h" style="margin: 0 0 8px; font-size: 17px; font-weight: 600">Software</h2>
+<sc-for list="{{software}}" as="s" hint-placeholder-count="5">
+<div style="display: flex; flex-direction: column; padding: 7px 0; border-top: 1px solid #2e2e2e">
+<span style="display: flex; align-items: baseline; gap: 8px"><span style="font-size: 14px">{{s.name}}</span><b style="margin-left: auto; font-size: 14px; font-weight: 600">{{s.version}}</b></span>
+<span style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: {{s.ink}}"><span style="width: 7px; height: 7px; border-radius: 4px; background: {{s.ink}}"></span>{{s.note}}</span>
+<sc-if value="{{s.hasAlert}}" hint-placeholder-val="{{false}}"><span style="display: flex; align-items: center; gap: 8px; margin: 6px 0 0 0; padding: 6px 10px; border-radius: 8px; background: rgba(255,202,91,.12); font-size: 12px"><b style="font-weight: 700; color: #ffca5b">{{s.code}}</b><span style="flex: 1">{{s.alert}}</span><a href="{{s.help}}" style="font-weight: 600; white-space: nowrap">What to do →</a></span></sc-if>
+</div>
+</sc-for>
+</section>
+<section aria-labelledby="hb-h" style="background: #1c1c1c; border: 1px solid #2e2e2e; border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 12px">
+<h2 id="hb-h" style="margin: 0; font-size: 17px; font-weight: 600">Heartbeat</h2>
+<sc-for list="{{beats}}" as="b" hint-placeholder-count="2">
+<div style="display: flex; flex-direction: column; gap: 5px">
+<span style="display: flex; align-items: baseline; gap: 8px; font-size: 14px"><span>{{b.name}}</span><b style="margin-left: auto; font-weight: 600; color: #81c995">{{b.age}}</b></span>
+<span aria-hidden="true" style="display: flex; gap: 2px; height: 16px; align-items: flex-end"><sc-for list="{{b.ticks}}" as="t" hint-placeholder-count="40"><span style="flex: 1; height: {{t.h}}; border-radius: 1px; background: {{t.c}}"></span></sc-for></span>
+<span style="font-size: 12px; color: #a4a4a4">{{b.note}}</span>
+</div>
+</sc-for>
+</section>
+</div>
+<section aria-labelledby="dv-h" style="background: #1c1c1c; border: 1px solid #2e2e2e; border-radius: 12px; padding: 14px 18px; min-height: 0; overflow: hidden; display: flex; flex-direction: column; gap: 10px">
+<div style="display: flex; align-items: baseline; gap: 12px"><h2 id="dv-h" style="margin: 0; font-size: 17px; font-weight: 600">Every mapped device</h2><span style="font-size: 13px; color: #a4a4a4">Last seen, and the share of the last 7 days it was online. Point at a row for its entity.</span></div>
+<div style="display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; min-height: 0">
+<div style="display: flex; flex-direction: column; gap: 12px; min-width: 0">
+<sc-for list="{{colA}}" as="g" hint-placeholder-count="3">
+<div style="display: flex; flex-direction: column">
+<div style="display: flex; align-items: baseline; gap: 10px; padding-bottom: 4px; border-bottom: 1px solid #2e2e2e"><b style="font-size: 14px; font-weight: 600">{{g.name}}</b><span style="margin-left: auto; font-size: 12px; color: {{g.ink}}">{{g.summary}}</span></div>
+<sc-for list="{{g.items}}" as="d" hint-placeholder-count="5">
+<div title="{{d.entity}}" style="display: grid; grid-template-columns: 8px minmax(0, 1fr) 104px 40px 42px; align-items: center; gap: 6px; min-height: 25px; font-size: 13px">
+<span style="width: 8px; height: 8px; border-radius: 4px; background: {{d.dot}}"></span>
+<span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: {{d.ink}}">{{d.name}}</span>
+<span style="font-size: 12px; color: {{d.seenInk}}; text-align: right">{{d.seen}}</span>
+<span style="position: relative; height: 6px; border-radius: 3px; background: #333333"><span style="position: absolute; left: 0; top: 0; bottom: 0; width: {{d.barW}}; border-radius: 3px; background: {{d.barC}}"></span></span>
+<span style="font-size: 12px; text-align: right; color: {{d.pctInk}}">{{d.pct}}</span>
+</div>
+<sc-if value="{{d.hasAlert}}" hint-placeholder-val="{{false}}"><span style="display: flex; align-items: center; gap: 8px; margin: 2px 0 6px 16px; padding: 6px 10px; border-radius: 8px; background: rgba(255,202,91,.12); font-size: 12px"><b style="font-weight: 700; color: #ffca5b">{{d.code}}</b><span style="flex: 1">{{d.alert}}</span><a href="{{d.help}}" style="font-weight: 600; white-space: nowrap">What to do →</a></span></sc-if>
+</sc-for>
+</div>
+</sc-for>
+</div>
+<div style="display: flex; flex-direction: column; gap: 12px; min-width: 0">
+<sc-for list="{{colB}}" as="g" hint-placeholder-count="3">
+<div style="display: flex; flex-direction: column">
+<div style="display: flex; align-items: baseline; gap: 10px; padding-bottom: 4px; border-bottom: 1px solid #2e2e2e"><b style="font-size: 14px; font-weight: 600">{{g.name}}</b><span style="margin-left: auto; font-size: 12px; color: {{g.ink}}">{{g.summary}}</span></div>
+<sc-for list="{{g.items}}" as="d" hint-placeholder-count="5">
+<div title="{{d.entity}}" style="display: grid; grid-template-columns: 8px minmax(0, 1fr) 104px 40px 42px; align-items: center; gap: 6px; min-height: 25px; font-size: 13px">
+<span style="width: 8px; height: 8px; border-radius: 4px; background: {{d.dot}}"></span>
+<span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: {{d.ink}}">{{d.name}}</span>
+<span style="font-size: 12px; color: {{d.seenInk}}; text-align: right">{{d.seen}}</span>
+<span style="position: relative; height: 6px; border-radius: 3px; background: #333333"><span style="position: absolute; left: 0; top: 0; bottom: 0; width: {{d.barW}}; border-radius: 3px; background: {{d.barC}}"></span></span>
+<span style="font-size: 12px; text-align: right; color: {{d.pctInk}}">{{d.pct}}</span>
+</div>
+<sc-if value="{{d.hasAlert}}" hint-placeholder-val="{{false}}"><span style="display: flex; align-items: center; gap: 8px; margin: 2px 0 6px 16px; padding: 6px 10px; border-radius: 8px; background: rgba(255,202,91,.12); font-size: 12px"><b style="font-weight: 700; color: #ffca5b">{{d.code}}</b><span style="flex: 1">{{d.alert}}</span><a href="{{d.help}}" style="font-weight: 600; white-space: nowrap">What to do →</a></span></sc-if>
+</sc-for>
+</div>
+</sc-for>
+</div>
+</div>
+</section>
+</div>
+</main>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1000}}'>
+var PH = { P0: '#6b7580', P1: '#2f6fb5', P2: '#6450b0', P3: '#34405a' };
+function tz(name, ph, vwc) { return { name: name, ph: ph, phColor: PH[ph], vwc: vwc + '%' }; }
+var ROOMS = [
+  { name: 'F2', dot: '#03a9f4', state: 'Watering', zones: [tz('Zone 1', 'P2', 59.4), tz('Zone 2', 'P2', 58.1), tz('Zone 3', 'P2', 60.2)] },
+  { name: 'F1', dot: '#81c995', state: 'Holding', zones: [tz('Zone 1', 'P1', 63.8), tz('Zone 2', 'P1', 62.9), tz('Zone 3', 'P1', 64.4)] }
+];
+function sw(on) { return { onStr: on ? 'true' : 'false', track: on ? '#03a9f4' : '#4a4a4a', knob: on ? '20px' : '0px' }; }
+
+function dev(name, entity, seen, pct, o) {
+  o = o || {};
+  var bad = !!o.offline;
+  return { name: name, entity: entity, seen: seen, pct: pct.toFixed(1) + '%', barW: pct + '%', barC: pct < 95 ? '#ffca5b' : '#81c995',
+    pctInk: pct < 95 ? '#ffca5b' : '#a4a4a4', dot: bad ? '#f28b82' : o.warn ? '#ffca5b' : '#81c995', ink: '#e1e1e1', seenInk: bad ? '#f28b82' : '#a4a4a4',
+    hasAlert: !!o.code, code: o.code || '', alert: o.alert || '', help: o.help || '' };
+}
+function grp(name, items) {
+  var on = items.filter(function (d) { return d.dot !== '#f28b82'; }).length;
+  var avg = items.reduce(function (s, d) { return s + parseFloat(d.pct); }, 0) / items.length;
+  return { name: name, items: items, summary: on + ' of ' + items.length + ' online · ' + avg.toFixed(1) + '% over 7 days', ink: on < items.length ? '#ffca5b' : '#a4a4a4' };
+}
+var COL_A = [
+  grp('Moisture and EC probes', [
+    dev('F2 Zone 1 probe', 'sensor.f2_z1_vwc', '4 s ago', 100), dev('F2 Zone 2 probe', 'sensor.f2_z2_vwc', '4 s ago', 99.9), dev('F2 Zone 3 probe', 'sensor.f2_z3_vwc', '5 s ago', 100),
+    dev('F1 Zone 1 front', 'sensor.f1_z1_front_vwc', '6 s ago', 100), dev('F1 Zone 1 back', 'sensor.f1_z1_back_vwc', '6 s ago', 99.8),
+    dev('F1 Zone 2 front', 'sensor.f1_z2_front_vwc', '6 s ago', 99.7),
+    dev('F1 Zone 2 back', 'sensor.f1_z2_back_vwc', '3 h 04 min ago', 91.4, { offline: true, code: 'CS-102', alert: 'Probe with no reading. Zone 2 runs on its front probe.', help: 'E1-Probes.dc.html' }),
+    dev('F1 Zone 3 front', 'sensor.f1_z3_front_vwc', '7 s ago', 100), dev('F1 Zone 3 back', 'sensor.f1_z3_back_vwc', '7 s ago', 99.9)]),
+  grp('Valves', [
+    dev('F2 main line', 'switch.f2_main_line', 'switched 13:58', 100), dev('F2 Zone 1 valve', 'switch.f2_z1_valve', 'open now', 100), dev('F2 Zone 2 valve', 'switch.f2_z2_valve', 'switched 13:41', 100),
+    dev('F2 Zone 3 valve', 'switch.f2_z3_valve', 'switched 13:44', 100), dev('F1 main line', 'switch.f1_main_line', 'switched 13:20', 100), dev('F1 Zone 1 valve', 'switch.f1_z1_valve', 'switched 13:20', 100),
+    dev('F1 Zone 2 valve', 'switch.f1_z2_valve', 'switched 13:23', 100), dev('F1 Zone 3 valve', 'switch.f1_z3_valve', 'paused · 2 s ago', 100)])
+];
+var COL_B = [
+  grp('Pumps', [dev('F2 feed pump', 'switch.f2_feed_pump', 'running · 3 s ago', 100), dev('F1 feed pump', 'switch.f1_feed_pump', 'off · 4 s ago', 100), dev('Sump pump', 'switch.sump_pump', 'last ran 13:12', 99.6)]),
+  grp('Tank and feed sensors', [
+    dev('F2 tank level', 'sensor.f2_tank_level', '5 s ago', 100), dev('F2 feed pH', 'sensor.f2_feed_ph', '5 s ago', 99.9), dev('F2 feed EC', 'sensor.f2_feed_ec', '5 s ago', 98.7), dev('F2 feed temperature', 'sensor.f2_feed_temp', '5 s ago', 100),
+    dev('F1 tank level', 'sensor.f1_tank_level', '6 s ago', 99.9), dev('F1 feed pH', 'sensor.f1_feed_ph', '6 s ago', 100), dev('F1 feed EC', 'sensor.f1_feed_ec', '6 s ago', 100), dev('F1 feed temperature', 'sensor.f1_feed_temp', '6 s ago', 100)]),
+  grp('Dosing', [
+    dev('F2 dosing heads (4)', 'switch.f2_dose_*', 'dosed 06:10', 100), dev('F2 mix pump', 'switch.f2_mix_pump', 'ran 06:12', 100),
+    dev('F2 stock tanks (4)', 'sensor.f2_stock_*', 'drawn 06:10', 100, { warn: true, code: 'CS-608', alert: 'Stock tanks low: Part B 5.4 L of 20 L.', help: 'E5-Stock.dc.html' }),
+    dev('F1 dosing heads (3)', 'switch.f1_dose_*', 'dosed 06:05', 100), dev('F1 mix pump', 'switch.f1_mix_pump', 'ran 06:07', 99.8)]),
+  grp('Room climate (readings only)', [dev('F2 air and RH', 'sensor.f2_air_temp', '9 s ago', 99.9), dev('F1 air and RH', 'sensor.f1_air_temp', '11 s ago', 99.7)])
+];
+var SOFTWARE = [
+  { name: 'Controller app (f2_control)', version: '3.17.1', note: 'Up to date', ink: '#81c995' },
+  { name: 'Integration (crop_steering)', version: '3.17.1', note: 'Up to date · matches the controller', ink: '#81c995' },
+  { name: 'Dashboard cards', version: '3.17.1', note: 'Loaded as ?v=3171 in every browser seen today', ink: '#81c995' },
+  { name: 'Home Assistant', version: '2026.10.3', note: 'Supported', ink: '#81c995' },
+  { name: 'AI assistant', version: 'claude-haiku-5-5', note: 'Acting · 146 calls today', ink: '#ffca5b', hasAlert: true, code: 'CS-706', alert: 'AI budget 82% used. Rules take over at 100%.', help: 'T4-AI.dc.html' }
+].map(function (s) { s.hasAlert = !!s.hasAlert; s.code = s.code || ''; s.alert = s.alert || ''; s.help = s.help || ''; return s; });
+function ticks(missAt) { var t = []; for (var i = 0; i < 40; i++) { var miss = missAt.indexOf(i) >= 0; t.push({ h: miss ? '4px' : (10 + (i * 7 % 6)) + 'px', c: miss ? '#ffca5b' : '#81c995' }); } return t; }
+var BEATS = [
+  { name: 'F2 controller', age: 'beat 4 s ago', ticks: ticks([]), note: 'Every 5 s · 0 missed in the last hour · read-back 1.2 s' },
+  { name: 'F1 controller', age: 'beat 6 s ago', ticks: ticks([17]), note: 'Every 5 s · 1 missed at 13:24 · read-back 1.4 s' }
+];
+class Component extends DCLogic {
+  renderVals() { return { rooms: ROOMS, colA: COL_A, colB: COL_B, software: SOFTWARE, beats: BEATS }; }
+}
+
+</script>
+</body>
+</html>
