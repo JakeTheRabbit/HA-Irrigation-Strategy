@@ -9,7 +9,7 @@ notes**, the entity- and code-level detail for developers and AI agents working 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [3.18.0] - 2026-10-24
 
 **⚠️ THIS IS A MASSIVE UPGRADE. It is fucking huge.** Almost every page of the dashboard is new or
 rebuilt: timer programs, presets, alert rules, a new History section, feed and pump calibration, pump
@@ -17,6 +17,10 @@ supply sharing, quiet hours and an Upgrade report.
 
 **If you are running this on a live grow, do NOT just click update** unless you have time for a big
 configuration session straight after. Watering will not stop, but there is a lot to set up and check.
+
+**Get your AI to configure it from the new docs.** Point your AI assistant (Claude, ChatGPT, or any
+assistant connected through the Crop Steering MCP server) at the new documentation and have it work
+through the Upgrade report with you, one line at a time, asking you before each save.
 
 **Your settings come across as far as they can.** The update keeps every zone watering and dosing
 exactly as before, and carries your current settings into the new features wherever it can do that
@@ -37,135 +41,206 @@ without guessing. Nothing new that waters or doses is switched on for you.
 - Each room's **Upgrade report** lists exactly what was carried and what needs you: Crop Steering →
   Settings → System status, and a card in Home Assistant's Settings → Repairs.
 
-**Get your AI to configure it.** Point your AI assistant (Claude, ChatGPT, or any assistant connected
-through the Crop Steering MCP server) at the new documentation and have it work through the Upgrade
-report with you, one line at a time, asking you before each save:
-
-- [Upgrading to 3.18](docs/UPGRADING.md): one section per Upgrade report line, written so an AI can
-  follow it step by step.
-- [Configure Crop Steering through MCP](docs/MCP.md): connect an assistant to your Home Assistant, and
-  [Set up an install with an AI assistant](docs/AI-SETUP.md): start read-only and approve each change.
-- [Upgrading to 3.18](docs/UPGRADING-TO-PARITY.md): the plan for update day and how to go back.
-- [User guide](docs/USER_GUIDE.md), [AI assistant](docs/AI_ASSISTANT.md) and the
-  [Crop Steering Academy](https://jaketherabbit.github.io/HA-Irrigation-Strategy/learn/).
-
-**Order:** update the integration first, restart Home Assistant, then update the controller app.
-
-### 🌱 In plain English
-
-A short tour. These are screenshots of the 3.18 dashboard running on its built-in demo data (sample
+**What it looks like.** Screenshots of the 3.18 dashboard running on its built-in demo data (sample
 rooms, not a real facility); the phone view is in the dark theme.
 
 - **Status: all rooms.** Every room and every zone on one page: phase, moisture and water today.
 
-  ![Status, all rooms](docs/screens/status-all-rooms-desktop-light.png)
+  ![Status, all rooms](https://raw.githubusercontent.com/JakeTheRabbit/HA-Irrigation-Strategy/v3.18.0/docs/screens/status-all-rooms-desktop-light.png)
 
 - **Zone page.** One zone in full: moisture, EC, what it is waiting for and every shot today.
 
-  ![Zone page](docs/screens/zone-desktop-light.png)
+  ![Zone page](https://raw.githubusercontent.com/JakeTheRabbit/HA-Irrigation-Strategy/v3.18.0/docs/screens/zone-desktop-light.png)
 
 - **Timeline.** The day's phases and shots for a room on one line, so you can see what happened when.
 
-  ![Irrigation timeline](docs/screens/irrigation-timeline-desktop-light.png)
+  ![Irrigation timeline](https://raw.githubusercontent.com/JakeTheRabbit/HA-Irrigation-Strategy/v3.18.0/docs/screens/irrigation-timeline-desktop-light.png)
 
 - **Timer programs.** Each zone can water by steering (as before), by timer programs, or be off.
 
-  ![Timer programs](docs/screens/timer-programs-desktop-light.png)
+  ![Timer programs](https://raw.githubusercontent.com/JakeTheRabbit/HA-Irrigation-Strategy/v3.18.0/docs/screens/timer-programs-desktop-light.png)
 
 - **Grow plan & presets.** Save a room's or a zone's targets, phase timing and limits, and copy them to other rooms or zones.
 
-  ![Grow plan and presets](docs/screens/grow-plan-presets-desktop-light.png)
+  ![Grow plan and presets](https://raw.githubusercontent.com/JakeTheRabbit/HA-Irrigation-Strategy/v3.18.0/docs/screens/grow-plan-presets-desktop-light.png)
 
 - **History: explorer.** Any reading, any room, any period, on one chart.
 
-  ![History explorer](docs/screens/history-explorer-desktop-light.png)
+  ![History explorer](https://raw.githubusercontent.com/JakeTheRabbit/HA-Irrigation-Strategy/v3.18.0/docs/screens/history-explorer-desktop-light.png)
 
 - **History: changes.** Every setting change, who made it and when, including what the upgrade carried across.
 
-  ![History of changes](docs/screens/history-changes-desktop-light.png)
+  ![History of changes](https://raw.githubusercontent.com/JakeTheRabbit/HA-Irrigation-Strategy/v3.18.0/docs/screens/history-changes-desktop-light.png)
 
 - **Feed & dosing.** Each dosing pump with its solution, its stock tank and its doses.
 
-  ![Feed and dosing](docs/screens/feed-dosing-desktop-light.png)
+  ![Feed and dosing](https://raw.githubusercontent.com/JakeTheRabbit/HA-Irrigation-Strategy/v3.18.0/docs/screens/feed-dosing-desktop-light.png)
 
 - **Feed pH/EC calibration.** A guided 2-point calibration at the tank; nothing changes until you commit it.
 
-  ![Feed probe calibration](docs/screens/feed-calibration-desktop-light.png)
+  ![Feed probe calibration](https://raw.githubusercontent.com/JakeTheRabbit/HA-Irrigation-Strategy/v3.18.0/docs/screens/feed-calibration-desktop-light.png)
 
 - **Setup: pumps & valves.** Your pumps, main line and valves, and the new pump supply: real flow and zones at once.
 
-  ![Setup, pumps and valves](docs/screens/setup-pumps-valves-desktop-light.png)
+  ![Setup, pumps and valves](https://raw.githubusercontent.com/JakeTheRabbit/HA-Irrigation-Strategy/v3.18.0/docs/screens/setup-pumps-valves-desktop-light.png)
 
 - **Alert rules.** Your own notifications, with a preview of how often each would have fired.
 
-  ![Alert rules](docs/screens/alert-rules-desktop-light.png)
+  ![Alert rules](https://raw.githubusercontent.com/JakeTheRabbit/HA-Irrigation-Strategy/v3.18.0/docs/screens/alert-rules-desktop-light.png)
 
 - **System status.** The health of every part, and each room's Upgrade report.
 
-  ![System status](docs/screens/system-status-desktop-light.png)
+  ![System status](https://raw.githubusercontent.com/JakeTheRabbit/HA-Irrigation-Strategy/v3.18.0/docs/screens/system-status-desktop-light.png)
 
 - **AI assistant.** The exact instructions it works from, your room notes and what it costs.
 
-  ![AI assistant settings](docs/screens/ai-assistant-desktop-light.png)
+  ![AI assistant settings](https://raw.githubusercontent.com/JakeTheRabbit/HA-Irrigation-Strategy/v3.18.0/docs/screens/ai-assistant-desktop-light.png)
 
 - **On your phone.** Every page works on a phone in the grow room.
 
-  ![Phone view](docs/screens/status-all-rooms-phone-dark.png)
+  ![Phone view](https://raw.githubusercontent.com/JakeTheRabbit/HA-Irrigation-Strategy/v3.18.0/docs/screens/status-all-rooms-phone-dark.png)
+
+**Update the integration BEFORE the add-on.** Update Crop Steering in HACS first and restart Home
+Assistant, then update the Crop Steering controller app. The integration runs the upgrade and writes
+the Upgrade report; the 3.18 controller reads what it writes.
+
+**Upgrade guide and AI setup.**
+
+- [Upgrading to 3.18](docs/UPGRADING.md): one section per Upgrade report line, written so an AI can
+  follow it step by step.
+- [Upgrading to 3.18: update day](docs/UPGRADING-TO-PARITY.md): what stays the same, a first-hour
+  checklist and how to go back.
+- [Set up an install with an AI assistant](docs/AI-SETUP.md): start read-only and approve each change,
+  and [Configure Crop Steering through MCP](docs/MCP.md): connect an assistant to your Home Assistant.
+- [User guide](docs/USER_GUIDE.md), [AI assistant](docs/AI_ASSISTANT.md) and the
+  [Crop Steering Academy](https://jaketherabbit.github.io/HA-Irrigation-Strategy/learn/).
+
+Pair: **controller 3.18.0**. **C3: the parity release.** The controller, the engine, the integration,
+entities, add-on behaviour, persisted state and the dashboard all change. **Approved rehearsal, no
+staging soak:** the owner approved releasing and promoting this candidate without the staging soak
+on 2026-10-23 (docs/RELEASING.md step 5, `approved-rehearsal`). It passed CI (including the real Home
+Assistant tier on the newest and oldest supported versions, the add-on image builds and the controller
+container smoke), a 216-visit route sweep of the dashboard and a final code review. **Nothing in this
+release has been run on real plumbing**: no staging photoperiod, no catch test and no fault drills.
+
+### 🌱 In plain English
+
+**New in 3.18 (the parity release)**
+
+- **Timer programs and watering modes.** Each zone waters by steering (as before), by timer
+  programs, or is off.
+- **Pump sharing and flow checks.** Say how much each pump really delivers and how many zones it can
+  feed at once; shots queue instead of starving each other. A flow meter checks each shot's water
+  against what was asked for, and the controller looks for leaks.
+- **Calibration.** A guided 2-point feed pH and EC probe calibration, and a prime-and-calibrate wizard
+  for each dosing pump. Nothing changes until you commit it.
+- **Presets and copy.** Save a room's or a zone's targets, phase timing and limits as a preset and
+  copy them to other rooms or zones. Grow-plan recipes saved in your browser import as presets in one
+  click.
+- **History.** An explorer for any reading over any period, a change journal of every setting change
+  (who, when, and what the upgrade carried across) with put back and undo, and a compare view.
+- **Alerts.** Your own alert rules, tested against yesterday before you save them, an alerts inbox and
+  quiet hours per phone.
+- **Display and dashboards.** Display units (ppm or mS/cm, °F or °C), and dashboards made from
+  templates.
+- **System status.** The health of every part and each room's Upgrade report in one place.
+- **Feed & dosing.** Every dosing pump with its solution, stock tank and doses; dosing refusals are
+  recorded with their reason.
+- **The upgrade itself.** Your settings carried across where that was safe, with a report of the rest.
+
+**Fixed**
+
+- A shot that fails after its valve opened now counts the water it delivered.
+- The controller reads the pump, the main-line valve and the zone valve back ON at the start of every
+  shot. A dead relay or an offline plug now cancels the shot with an alert instead of counting water
+  that never flowed, and a zone that keeps failing backs off.
+- P0 now waits for the plants to start drinking after lights-on. Only a zone at its rescue floor skips
+  the wait (#195). Rooms that skipped P0 every morning now take their first shot later, up to the
+  zone's P0 maximum wait.
+- A zone with a dead moisture probe gets its minimum daily water again, only with the lights on and
+  outside P0. Its fallback timer shot no longer fires at night or outside P1/P2.
+- With no feed EC probe and no recipe feed EC, the controller no longer invents a feed EC of 3.0 on a
+  new room; such a room gets one card saying EC flushing is off. Rooms that had it before the update
+  keep the 3.0 assumption (see the Upgrade report).
+- A failed read of the shot-length cap no longer lifts it to 900 s, an unreadable feed EC/pH band
+  holds the shots, and a failed Home Assistant read or write is never taken as a real value.
+- An error in one room's pass no longer stops the other rooms, and a shot-start error can no longer
+  wedge the controller.
+- Lights-on and lights-off set to the same hour are not used.
+- A setpoint the controller failed to write is no longer credited to it in History.
+- The phase sensor never makes up a phase, and the controller says so when it has no next-shot
+  estimate.
+- One source of truth for the derived watering values (shot length, adjusted re-water point, EC ratio,
+  room averages, shots today). Settings that only fed retired sensors are hidden, and Repairs names any
+  automation that still uses one.
+- The dashboard shows the controller's own dryback, peak and next shot, its own limits, EC band and
+  tank marks, reads water volumes in the unit Home Assistant reports, shows every time on Home
+  Assistant's clock, and its links land where they say.
+- All rooms is a visual page with slabs and tanks, without duplicate pickers.
+- The dosing form uses the room's own dose limits.
+- `apply_recipe` and `save_recipe` act on one room, and the Recipe stage select shows a stage only once
+  it is applied.
+- Long-term history reads the sensors from this room's archived runs.
+- The MCP server accepts what the integration accepts (pumps, valves, probe units).
+
+**Deprecated.** The named-stage recipe system (the Recipe stage and Irrigation phase selects, and the
+`apply_recipe` and `save_recipe` services) is marked as going away in **a future major release**. It
+still works; the first use after a restart raises a Repairs notice saying what to use instead.
+
+**Documentation.** A shorter README, a [documentation index](docs/README.md), one page per new feature
+in [docs/features](docs/README.md#using-it), the system map and ranked system audit, and help text that
+follows the 3.18 page names.
 
 ### 🔧 Technical notes
 
-- Upgrade migration: `custom_components/crop_steering/migration.py`, a run-once, versioned ledger
+- **Upgrade migration:** `custom_components/crop_steering/migration.py`, a run-once, versioned ledger
   (`crop_steering.migration` store) per room and site. Every seeded value is journaled as
   `config.changed` with actor `migration`; old stores are read only. The report is served by
   `crop_steering.migration_report` and raised as the Repairs issue `upgrade_report_3_18` (CS-616)
-  while a room has a "Needs you" line. Row by row: [docs/UPGRADING.md](docs/UPGRADING.md).
-- The tour images in `docs/screens/` are captured from the compiled demo with the clock pinned
+  while a room has a "Needs you" line. M15 keeps controller 3.17.0's 3.0 mS/cm feed EC for a room with
+  no feed EC probe and no recipe feed EC. Row by row: [docs/UPGRADING.md](docs/UPGRADING.md).
+- **Parity backend (#230):** one ordered GuardChain for every shot check, with dosing refusals through
+  it and journalled; pump capacity and an exclusive-valve queue; timer programs and per-zone watering
+  modes (an unparseable `timers_config` falls back to the engine under each zone's mode); timed pump
+  prime and calibration runs; metered-vs-commanded water reconcile per shot (`flow.py`, baseline from
+  the pass's own reading, never a read before the pump opens) and CS-319 leak detection; calibrated
+  feed probes for the source-water gate, mix check and pH correct; journal outbox and backfill;
+  integration APIs for site, timers, presets and copy, alert rules and inbox, changes, timeline, system
+  status, dashboards, probe offsets and calibration. New error codes CS-612, CS-615, CS-616.
+- **Parity dashboard (#230):** Feed & dosing, Pumps & valves, Prime & calibrate a pump, Feed
+  calibration, Stock, Water & flow, Timer programs, History explorer/changes/compare, Alerts,
+  Notifications, System status and AI pages. Bundles rebuilt deterministically (three copies
+  byte-identical). Route sweep: every page × desktop/phone × light/dark × 3.18/3.17 demo backends,
+  216 of 216 visits clean.
+- **Fix pull requests merged through #229:** #196 All rooms visual slabs and tanks; #197 shot error
+  after the valve opened counts its water; #198 docs follow 3.17 section names; #199 water volumes in
+  Home Assistant's unit; #200 dosing form uses room dose limits; #201 failed shot-cap read no longer
+  lifts the cap (CS-203); #202 unreadable feed EC/pH band holds shots; #203 blind fallback shot only
+  with lights on, in P1/P2; #204 one room's error no longer stops the others (CS-212); #205
+  `apply_recipe`/`save_recipe` scoped to one room; #206 recipe stage select shows a stage once applied;
+  #207 `current_phase` never invents a phase; #208 pump, main line and valve read back ON at shot start
+  (CS-302/303/304, backoff after 3 cancelled shots); #209 equal lights-on/off hours unused; #210
+  shot-start error cannot wedge the controller (CTL-032); #211 controller's own dryback, peak and next
+  shot on the dashboard; #212 system map and ranked audit; #213 Academy local URL; #214 MCP accepts
+  pumps, valves, probe units; #215 failed Home Assistant read/write never a real value; #216 blind-zone
+  minimum daily water and no invented feed EC (CTL-031, CTL-008, CS-907); #217 every dashboard and
+  Academy browser check on pull requests; #218 no next-shot estimate said so; #219 dashboard links land
+  where they say; #220 `history_long` reads this room's archived runs; #221 recipe system deprecated
+  (CS-613), stage applied once, dashboard follows the controller's steering mode; #222 one source of
+  truth for derived watering values (`shot_length.py`, CS-614); #223 failed setpoint write takes back
+  its claim (CTL-035); #224 actions pinned to commits, honest `run_ci.sh`, faster container smoke;
+  #225 dashboard one source for limits, bands, time and readability; #226 README and feature matrix;
+  #227 P0 bypass only at the rescue floor (#195); #228 help text catch-up.
+- **Deprecation (#221):** new `deprecations.py` (`note_deprecated`): a log warning on every use and
+  one Repairs issue (`deprecated_<key>`, CS-613) per Home Assistant run. `apply_recipe` no longer
+  calls `select.select_option` (INT-003); `buildRoom` picks the EC target family as the controller's
+  `_veg()` does (INT-014).
+- **Documentation:** new `docs/README.md`, `docs/UPGRADING-TO-PARITY.md`, `docs/AI-SETUP.md`,
+  `docs/features/*.md`; `docs/ENTITIES.md` gains the 3.18 entities. The screenshots in `docs/screens/`
+  are captured from the compiled demo with the clock pinned
   (`node frontend/scripts/capture-screens.mjs`, then `python scripts/optimise_screens.py`).
-
-**3.18, the parity release (documentation).** This entry covers the documentation for the release; the
-code changes are recorded with the release itself. Read [Upgrading to 3.18](docs/UPGRADING-TO-PARITY.md)
-before updating a room that is in a grow.
-
-### 🌱 In plain English
-
-- **A plan for update day.** [Upgrading to 3.18](docs/UPGRADING-TO-PARITY.md) says what stays the same,
-  what the update carries across, what needs you, a first-hour checklist and how to go back.
-- **One page per new feature.** Water supply and pump sharing, timer programs, presets, history and
-  putting a change back, alert rules and quiet hours, calibration, system status, and dashboards, in
-  [docs/features](docs/README.md#using-it).
-- **Set up with an AI assistant.** [AI setup](docs/AI-SETUP.md) walks through connecting the MCP server,
-  starting read-only and approving each change.
-- **A shorter README** and a [documentation index](docs/README.md).
-
-### 🔧 Technical notes
-
-- New: `docs/README.md`, `docs/UPGRADING-TO-PARITY.md`, `docs/AI-SETUP.md`, `docs/features/*.md`.
-- `docs/ENTITIES.md` gains `zone_N_irrigation_mode`, `supply_config`, `pump_load_pct`, `timers_config`,
-  `projection_app`, `alerts_open`, `system_health`, `feed_ph_corrected` / `feed_ec_corrected`,
-  `zone_N_flow_ratio`, probe `_corrected` sensors and the binary sensors `rule_<id>` and `shot_queued`.
-- `docs/USER_GUIDE.md`, `UPGRADING.md`, `NOTIFICATIONS.md`, `DOSING.md`, `MCP.md`, `INSTALL.md`,
-  `troubleshooting.md`, `HA_SIDEBAR.md`, `SYSTEM_OVERVIEW.md`, `AI_ASSISTANT.md`, `GROW_PLANS.md`,
-  `RECIPE_LIBRARY.md` and `REPOSITORY_MAP.md` follow the 3.18 page names and link the
-  feature pages. `UPGRADING.md` no longer says a flow meter may report a rate, that quiet hours are set on
-  the Notifications page, or that the report is on System status.
-- No code change.
-
-**Deprecation: the named-stage recipe system and the Irrigation phase select.** Nothing is removed in this change; planned removal: **a future major release**. Merge after #205 and #206 (`apply_recipe` and `save_recipe` take a room).
-
-### 🌱 In plain English
-
-- **Three things you probably never use are now marked as going away.** They are the Recipe stage and Irrigation phase selects, and the `apply_recipe` and `save_recipe` services. Nothing in the dashboard or the controller uses them. They still work. The first time one is used after Home Assistant starts, a notice appears in Repairs that says what to use instead: set the targets in the dashboard, use a grow plan, or move one zone with its own Set phase select. If an automation of yours calls them, change it before that release.
-- **Applying a recipe stage no longer does the work twice.** The service wrote every setpoint, and then its own change to the Recipe stage select wrote every setpoint again.
-- **The dashboard shows the same EC targets the controller uses.** For a zone with no steering mode of its own, the dashboard used the room's Steering mode, while the controller uses the room's Growth stage. A room could show vegetative targets while the controller steered generative. The dashboard now follows the controller.
-- **Wrong help text fixed.** The help no longer says the Recipe stage select is used from the Plan page, that the controller writes the Irrigation phase select, or that the dashboard calls `save_recipe`.
-
-### 🔧 Technical notes
-
-- New `deprecations.py` (`note_deprecated`): a log warning on every use and one Repairs issue (`deprecated_<key>`, translation key `deprecated_feature`, warning, not fixable, new code CS-613) per Home Assistant run. Called by `apply_recipe`, `save_recipe` and by choosing a value in `select.recipe_stage` or `select.irrigation_phase`. New issue text in `strings.json` and `translations/en.json`; `services.yaml`, `docs/ENTITIES.md`, `features.json` and `ste-copy.ts` say deprecated.
-- INT-003: `apply_recipe` no longer calls `select.select_option`. The recipe select registers itself in `hass.data[DOMAIN]["_recipe_selects"]` and the service calls its `sync_stage()`, which only sets the shown option.
-- INT-014: `buildRoom` picks the EC target family as the controller's `_veg()` does: `zone_N_steering_mode`, else `growth_stage`, else Generative. The room `steering_mode` select stays (the EC ratio sensor uses it). Dashboard bundles rebuilt.
-- No change to the controller, entity ids, the `crop_steering_recipes_<entry>` store, add-on options or `/data/state.json`; a stored recipe from an older install loads as before (`tests_ha/test_recipe_deprecated.py`).
-
+- Rolling back to 3.17.0, and what 3.17.0 does not read after the update, is covered in
+  [Upgrading to 3.18](docs/UPGRADING-TO-PARITY.md).
 
 ## [3.17.0] - 2026-10-21
 
