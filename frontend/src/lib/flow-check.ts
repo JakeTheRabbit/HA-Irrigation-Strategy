@@ -100,11 +100,17 @@ export function trendWord(days: (number | null)[]): "steady" | "fell today" | "r
   return today < before - 0.1 ? "fell today" : today > before + 0.1 ? "rose today" : "steady";
 }
 
-/** Each CS-319 the controller raised (water through a meter with every valve shut). `litres` only
- * when the alert carries it: the controller's alert says it in words, not as a number. */
-export function leakIncidents(alerts: CsEvent[]): { at: number; title: string; litres: number | null }[] {
+/** A CS-319 the controller raised about `meter` (controller.py _watch_meters: key `flow_idle_<meter>`,
+ * `entity_id` the meter). */
+function meterAlert(e: CsEvent, meter: string): boolean {
+  return e.kind === "alert.raised" && e.code === "CS-319" && (e.data.entity_id === meter || e.data.key === `flow_idle_${meter}`);
+}
+
+/** Each CS-319 the controller raised about `meter` (water through it with every valve shut). `litres`
+ * only when the alert carries it: the controller's alert says it in words, not as a number. */
+export function leakIncidents(alerts: CsEvent[], meter: string): { at: number; title: string; litres: number | null }[] {
   return alerts
-    .filter((e) => e.kind === "alert.raised" && e.code === "CS-319")
+    .filter((e) => meterAlert(e, meter))
     .map((e) => ({ at: Date.parse(e.ts), title: String(e.data.title ?? "Water through the meter with no zone on"), litres: finite(e.data.litres) }))
     .sort((a, b) => a.at - b.at);
 }
@@ -197,18 +203,31 @@ export function meterShared(
   roomId: string,
   meter: string,
 ): boolean {
-  return rooms.some((room) => room.id !== roomId && room.zones.some((zone) => zoneMeter(supply, room.id, zone, room.pump) === meter));
+  return meterRooms(supply, rooms, meter).some((id) => id !== roomId);
+}
+
+/** Every room whose zones read `meter`. The controller journals the meter's CS-319 under the first
+ * of them (_watch_meters `readers[0]`), which may be another room than the one on screen. */
+export function meterRooms(
+  supply: { zone_meters?: unknown; irrigation_pumps?: unknown } | null | undefined,
+  rooms: { id: string; zones: number[]; pump: unknown }[],
+  meter: string,
+): string[] {
+  return rooms.filter((room) => room.zones.some((zone) => zoneMeter(supply, room.id, zone, room.pump) === meter)).map((room) => room.id);
 }
 
 /** The controller's CS-319 bound (controller.py METER_IDLE_L): a rise above it, with no shot in flight. */
 export const METER_IDLE_L = 0.5;
+/** Watched less than this today, a quiet meter is not yet a clear day. */
+export const MIN_WATCH_MS = 3_600_000;
 
 export type LeakVerdict = "flowing" | "clear" | "no_alert" | "unwatched";
 /** The leak check's word for today. Only the controller's CS-319 says `flowing`: the page's own
  * count is shown as litres, never as the verdict. On a meter another room reads too (`shared`),
  * only the alert tells: `no_alert`. `unwatched` when a zone on the meter has no recorded valve
  * (`blind`: its shots cannot be told from a leak) or nothing was read in litres. `clear` when the
- * page counted no more than METER_IDLE_L with every valve shut, else `no_alert`. */
+ * page counted no more than METER_IDLE_L with every valve shut over at least MIN_WATCH_MS, else
+ * `no_alert`. */
 export function leakVerdict(
   watch: { litres: number | null; watchedMs: number },
   alertsToday: number,
@@ -218,17 +237,21 @@ export function leakVerdict(
   if (alertsToday > 0) return "flowing";
   if (shared) return "no_alert";
   if (blind || watch.litres === null || watch.watchedMs <= 0) return "unwatched";
-  return watch.litres > METER_IDLE_L ? "no_alert" : "clear";
+  return watch.litres > METER_IDLE_L || watch.watchedMs < MIN_WATCH_MS ? "no_alert" : "clear";
 }
 
-/** The id of the room's newest `flow.reconciled` or CS-319 in the live feed, or null: a new one
- * re-reads the page's Journal, so a shot's bar shows once the meter has counted it, and a leak
- * alert shows as it is raised. */
-export function latestFlowEvent(events: readonly CsEvent[], roomId: string): string | null {
-  return (
-    events.filter((e) => e.room_id === roomId && (e.kind === "flow.reconciled" || (e.kind === "alert.raised" && e.code === "CS-319"))).at(-1)
-      ?.id ?? null
-  );
+/** The id of the newest of the room's `flow.reconciled`, or of `meter`'s CS-319 from any room, in the
+ * live feed, or null: a new one re-reads the page's Journal, so a shot's bar shows once the meter has
+ * counted it, and a leak alert shows as it is raised. */
+export function latestFlowEvent(events: readonly CsEvent[], roomId: string, meter: string): string | null {
+  return events.filter((e) => (e.room_id === roomId && e.kind === "flow.reconciled") || meterAlert(e, meter)).at(-1)?.id ?? null;
+}
+
+/** The test shot the controller runs (controller.py, Test Shot): the zone's Manual shot length cut to
+ * whole seconds when it reads MIN_SHOT_S (5 s) or more, else TEST_SHOT_S (10 s). */
+export function testShotSeconds(state: string | undefined): number {
+  const asked = Number(state);
+  return state !== undefined && state.trim() !== "" && Number.isFinite(asked) && asked >= 5 ? Math.trunc(asked) : 10;
 }
 
 /** A lane's spans in words, for its screen-reader label: "3 times, 06:00 to 15:40". */

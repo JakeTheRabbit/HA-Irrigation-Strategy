@@ -17,9 +17,11 @@ import {
   leakIncidents,
   leakVerdict,
   leakWatch,
+  meterRooms,
   meterShared,
   roomPump,
   spanWords,
+  testShotSeconds,
   trendWord,
   zoneFlow,
   zoneMeter,
@@ -56,6 +58,8 @@ export function WaterUsePage({ controller }: { controller: Controller }) {
     return { id: "room:" + room.prefix, pump: attributes?.pump, zones: Array.from({ length: count }, (_, i) => i + 1) };
   });
   const shared = !!meter && meterShared(supply.data, others, roomId, meter);
+  // Where the controller may journal this meter's CS-319: the first room that reads it.
+  const alertRooms = meter ? meterRooms(supply.data, others, meter) : [];
   const oneAtATime = roomPump<{ max_concurrent_zones?: unknown }>(supply.data?.irrigation_pumps, pump)?.max_concurrent_zones === 1;
   return (
     <>
@@ -73,7 +77,7 @@ export function WaterUsePage({ controller }: { controller: Controller }) {
         </p>
       ) : supply.state === "ready" && zones.length ? (
         meter ? (
-          <FlowCheck controller={controller} meters={meters} meter={meter} shared={shared} oneAtATime={oneAtATime} />
+          <FlowCheck controller={controller} meters={meters} meter={meter} shared={shared} alertRooms={alertRooms} oneAtATime={oneAtATime} />
         ) : (
           <section className="panel wf-no-meter" data-no-meter>
             <p>Add a flow meter to prove water reached the plants.</p>
@@ -124,19 +128,29 @@ function MeterLine({ controller, meter }: { controller: Controller; meter: strin
   );
 }
 
-function useFlowEvents(controller: Controller, since: number) {
+/** The room's flow events since `since`, with the alerts other rooms reading the meter journaled
+ * (`alertRooms`): the controller journals a shared meter's CS-319 under the first of them only. */
+function useFlowEvents(controller: Controller, since: number, meter: string, alertRooms: string[]) {
   const roomId = controller.roomId;
   const connected = ["live", "demo"].includes(controller.connection);
   const [read, setRead] = useState<{ key: string; outcome: V2Outcome<{ events: CsEvent[] }> } | null>(null);
   // A shot the meter has counted since, or a CS-319 raised (the live feed): read the Journal again.
-  const fresh = latestFlowEvent(controller.recentEvents, roomId);
-  const key = `${roomId}|${since}`;
+  const fresh = latestFlowEvent(controller.recentEvents, roomId, meter);
+  const others = alertRooms.filter((id) => id !== roomId);
+  const key = `${roomId}|${since}|${others.join()}`;
   useEffect(() => {
     if (!connected) return;
     let live = true;
-    void pagedQuery(controller, { room_id: roomId, since: new Date(since).toISOString(), kinds: KINDS }).then(
-      (outcome) => live && setRead({ key, outcome }),
-    );
+    const from = new Date(since).toISOString();
+    void Promise.all([
+      pagedQuery(controller, { room_id: roomId, since: from, kinds: KINDS }),
+      ...others.map((id) => pagedQuery(controller, { room_id: id, since: from, kinds: ["alert.raised"] })),
+    ]).then((outcomes) => {
+      const [own] = outcomes;
+      const failed = outcomes.find((o) => o.kind !== "ok");
+      const events = outcomes.flatMap((o) => (o.kind === "ok" ? o.data.events : []));
+      if (live) setRead({ key, outcome: failed ?? (own.kind === "ok" ? { ...own, data: { events } } : own) });
+    });
     return () => {
       live = false;
     };
@@ -150,12 +164,14 @@ function FlowCheck({
   meters,
   meter,
   shared,
+  alertRooms,
   oneAtATime,
 }: {
   controller: Controller;
   meters: (string | null)[];
   meter: string;
   shared: boolean;
+  alertRooms: string[];
   oneAtATime: boolean;
 }) {
   const tz = controller.timeZone;
@@ -167,7 +183,7 @@ function FlowCheck({
   }, []);
   const dayStart = startOfDay(now, tz);
   const since = startOfDay(dayStart - 6 * DAY + 12 * 3_600_000, tz);
-  const read = useFlowEvents(controller, since);
+  const read = useFlowEvents(controller, since, meter, alertRooms);
   const events = read?.kind === "ok" ? read.data.events : [];
   const zones = controller.room.zones;
   const flows = useMemo(
@@ -395,8 +411,8 @@ function BlockedCard({ controller, zone, since }: { controller: Controller; zone
   const [sent, setSent] = useState<{ at: number; pressed: number } | { error: string } | null>(null);
   // The press as the controller recorded it: the test-shot button's last-pressed time.
   const recorded = Date.parse(controller.states[`button.crop_steering_${controller.room.room.prefix}zone_${zone.id}_test_shot`]?.state ?? "");
-  const seconds = Number(controller.states[`number.crop_steering_${controller.room.room.prefix}zone_${zone.id}_manual_shot_seconds`]?.state);
-  const label = Number.isFinite(seconds) && seconds > 0 ? `Run ${seconds} s test shot on ${zone.name}` : `Run a test shot on ${zone.name}`;
+  const seconds = testShotSeconds(controller.states[`number.crop_steering_${controller.room.room.prefix}zone_${zone.id}_manual_shot_seconds`]?.state);
+  const label = `Run ${seconds} s test shot on ${zone.name}`;
   const connected = ["live", "demo"].includes(controller.connection);
   const run = () => {
     setSent(null);
@@ -509,7 +525,7 @@ function LeakCheck({
   const watch = read?.rows
     ? leakWatch(Object.keys(valves).map((id) => read.rows![id] ?? []), read.rows[meter] ?? [], unit, dayStart, read.end)
     : null;
-  const incidents = leakIncidents(events);
+  const incidents = leakIncidents(events, meter);
   const today = incidents.filter((i) => i.at >= dayStart);
   const verdict = watch ? leakVerdict(watch, today.length, shared, blind.length > 0) : null;
   const flowing = verdict === "flowing";
@@ -549,7 +565,7 @@ function LeakCheck({
           <span>Meter flow</span>
           {lane(watch.meterFlow, "meter", "Meter flow")}
           <span>Flow, valves shut</span>
-          <p className="wf-shut" data-shut-flow data-tone={flowing ? "warn" : undefined}>
+          <p className="wf-shut" data-shut-flow data-tone={flowing ? "warn" : verdict === "clear" ? "ok" : undefined}>
             {shared
               ? "Another room’s zones run through this meter too: only the controller’s alert tells water with every valve shut."
               : blind.length

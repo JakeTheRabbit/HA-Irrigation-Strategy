@@ -88,7 +88,7 @@ await runParity({
     // Test shot: a short tap does nothing, a 1.6 s hold asks for it.
     const hold = blocked.locator(".hold-button");
     // The button's first line; its screen-reader words follow.
-    assert.match((await hold.innerText()).split("\n")[0], /^Run (\d+ s |a )test shot on Zone 2$/, `${label}: test shot label`);
+    assert.match((await hold.innerText()).split("\n")[0], /^Run \d+ s test shot on Zone 2$/, `${label}: test shot label`);
     await hold.scrollIntoViewIfNeeded();
     const box = await hold.boundingBox();
     const press = async (ms) => {
@@ -112,6 +112,7 @@ await runParity({
     await leak.locator("[data-leak-chip]").waitFor();
     assert.equal((await leak.locator("[data-leak-chip]").innerText()).trim(), "Clear today", `${label}: leak chip`);
     assert.match(await leak.locator("[data-shut-flow]").innerText(), /^0\.00 L in \d+ h \d{2} min watched$/, `${label}: shut flow`);
+    assert.equal(await leak.locator("[data-shut-flow]").getAttribute("data-tone"), "ok", `${label}: shut flow in the clear tone only when clear`);
     assert.ok((await leak.locator('[data-lane="valve"] span').count()) > 5, `${label}: valve lane`);
     assert.ok((await leak.locator('[data-lane="meter"] span').count()) > 5, `${label}: meter lane`);
     const span = new RegExp(`^\\d+ times, ${HHMM} to ${HHMM}$`);

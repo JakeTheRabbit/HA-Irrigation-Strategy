@@ -278,8 +278,10 @@
   padding: 2px 10px;
   border: 1px solid var(--border);
   border-radius: 4px;
-  color: var(--success);
   font-weight: 600;
+}
+.wf-shut[data-tone="ok"] {
+  color: var(--success);
 }
 .wf-shut[data-tone="warn"] {
   color: var(--warning);

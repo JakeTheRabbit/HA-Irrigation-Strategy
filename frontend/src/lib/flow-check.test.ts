@@ -7,8 +7,10 @@ import {
   leakVerdict,
   leakWatch,
   meterLitres,
+  meterRooms,
   meterShared,
   roomPump,
+  testShotSeconds,
   spanWords,
   trendWord,
   zoneFlow,
@@ -93,10 +95,19 @@ describe("leakIncidents", () => {
       event("alert.cleared", T0 + 2 * H, null, { key: "flow_idle_sensor.m" }, "CS-319"),
       event("alert.raised", T0 + 3 * H, null, { key: "flow_idle_sensor.m", title: "Water again", litres: 0.6 }, "CS-319"),
     ];
-    expect(leakIncidents(alerts)).toEqual([
+    expect(leakIncidents(alerts, "sensor.m")).toEqual([
       { at: T0, title: "Room A: water flows with no zone on (CS-319)", litres: null },
       { at: T0 + 3 * H, title: "Water again", litres: 0.6 },
     ]);
+  });
+  it("leakIncidents keeps only this meter's CS-319 (its entity_id, else its key)", () => {
+    const alerts = [
+      event("alert.raised", T0, 1, { key: "flow_idle_sensor.m", title: "Mine", entity_id: "sensor.m" }, "CS-319"),
+      event("alert.raised", T0 + H, 2, { key: "flow_idle_sensor.other", title: "Other meter", entity_id: "sensor.other" }, "CS-319"),
+      event("alert.raised", T0 + 2 * H, null, { key: "flow_idle_sensor.m", title: "Mine, keyed" }, "CS-319"),
+    ];
+    expect(leakIncidents(alerts, "sensor.m").map((i) => i.title)).toEqual(["Mine", "Mine, keyed"]);
+    expect(leakIncidents(alerts, "sensor.other").map((i) => i.title)).toEqual(["Other meter"]);
   });
 });
 
@@ -207,6 +218,11 @@ describe("leakVerdict", () => {
     expect(leakVerdict(watched, 0, false, true)).toBe("unwatched");
     expect(leakVerdict(watched, 1, false, true)).toBe("flowing");
   });
+  it("a few watched minutes are not a clear day: under an hour watched, no alert is all it says", () => {
+    expect(leakVerdict({ litres: 0, watchedMs: 2 * 60_000 }, 0, false)).toBe("no_alert");
+    expect(leakVerdict({ litres: 0, watchedMs: H - 1 }, 0, false)).toBe("no_alert");
+    expect(leakVerdict({ litres: 0, watchedMs: H }, 0, false)).toBe("clear");
+  });
   it("on a meter another room reads, only the controller's alert tells", () => {
     expect(leakVerdict({ litres: 3, watchedMs: 4 * H }, 0, true)).toBe("no_alert");
   });
@@ -233,6 +249,11 @@ describe("meterShared", () => {
     expect(meterShared(supply, rooms.slice(0, 1), "room:f2_", "sensor.main")).toBe(false);
     expect(meterShared(supply, [rooms[0], rooms[2]], "room:f2_", "sensor.main")).toBe(false);
   });
+  it("meterRooms lists every room whose zones read the meter: where the controller may journal its CS-319", () => {
+    expect(meterRooms(supply, rooms, "sensor.main")).toEqual(["room:f2_", "room:f1_"]);
+    expect(meterRooms(supply, rooms, "sensor.p1_meter")).toEqual(["room:f2_", "room:veg_"]);
+    expect(meterRooms(supply, rooms, "sensor.none")).toEqual([]);
+  });
 });
 
 describe("roomPump", () => {
@@ -253,11 +274,17 @@ describe("latestFlowEvent", () => {
     const a = { ...flow(T0, 1, 1), room_id: "room:f2_" };
     const b = { ...flow(T0 + H, 1, 1), room_id: "room:f1_" };
     const c = { ...flow(T0 + 2 * H, 2, 1), room_id: "room:f2_" };
-    expect(latestFlowEvent([a, b, c], "room:f2_")).toBe(c.id);
-    expect(latestFlowEvent([a, b], "room:f1_")).toBe(b.id);
-    expect(latestFlowEvent([event("shot.completed", T0, 1, {})], "room:")).toBeNull();
-    const leak = event("alert.raised", T0 + 3 * H, null, {}, "CS-319");
-    expect(latestFlowEvent([a, leak, event("alert.raised", T0 + 4 * H, null, {}, "CS-301")], "room:")).toBe(leak.id);
+    expect(latestFlowEvent([a, b, c], "room:f2_", "sensor.m")).toBe(c.id);
+    expect(latestFlowEvent([a, b], "room:f1_", "sensor.m")).toBe(b.id);
+    expect(latestFlowEvent([event("shot.completed", T0, 1, {})], "room:", "sensor.m")).toBeNull();
+    const leak = event("alert.raised", T0 + 3 * H, null, { entity_id: "sensor.m" }, "CS-319");
+    expect(latestFlowEvent([a, leak, event("alert.raised", T0 + 4 * H, null, {}, "CS-301")], "room:", "sensor.m")).toBe(leak.id);
+  });
+  it("takes this meter's CS-319 from any room (the controller journals it under the first reading room), no other meter's", () => {
+    const a = { ...flow(T0, 1, 1), room_id: "room:f2_" };
+    const theirs = { ...event("alert.raised", T0 + H, 1, { key: "flow_idle_sensor.m", entity_id: "sensor.m" }, "CS-319"), room_id: "room:f1_" };
+    const other = { ...event("alert.raised", T0 + 2 * H, 1, { key: "flow_idle_sensor.x", entity_id: "sensor.x" }, "CS-319"), room_id: "room:f2_" };
+    expect(latestFlowEvent([a, theirs, other], "room:f2_", "sensor.m")).toBe(theirs.id);
   });
 });
 
@@ -266,5 +293,17 @@ describe("spanWords", () => {
     expect(spanWords([], "UTC")).toBe("none today");
     expect(spanWords([{ start: T0, end: T0 + 60_000 }], "UTC")).toMatch(/^once, (08:00|8:00 am) to (08:01|8:01 am)$/);
     expect(spanWords([{ start: T0, end: T0 + 60_000 }, { start: T0 + H, end: T0 + 2 * H }], "UTC")).toMatch(/^2 times, (08:00|8:00 am) to (10:00|10:00 am)$/);
+  });
+});
+
+describe("testShotSeconds", () => {
+  it("names the seconds the controller runs: the zone's Manual shot length from 5 s, cut to whole seconds, else 10 s", () => {
+    expect(testShotSeconds("30")).toBe(30);
+    expect(testShotSeconds("12.7")).toBe(12);
+    expect(testShotSeconds("5")).toBe(5);
+    expect(testShotSeconds("4.9")).toBe(10);
+    expect(testShotSeconds("0")).toBe(10);
+    expect(testShotSeconds("unavailable")).toBe(10);
+    expect(testShotSeconds(undefined)).toBe(10);
   });
 });
