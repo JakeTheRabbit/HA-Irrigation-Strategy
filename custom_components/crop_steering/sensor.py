@@ -46,7 +46,12 @@ from .room import room_prefix, build_engine_config
 from . import stock
 from .calculations import ShotCalculator, ec_type_key, fuse_probes
 from .units import to_native
-from .zone_status import mirrored_status, status_app_entity
+from .zone_status import (
+    app_phase_entity,
+    mirrored_phase,
+    mirrored_status,
+    status_app_entity,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -233,9 +238,13 @@ async def async_setup_entry(
             CropSteeringZoneStatusSensor
             if re.fullmatch(r"zone_\d+_status", description.key)
             else (
-                CropSteeringProbeSensor
-                if re.fullmatch(r"(vwc|ec)_zone_\d+", description.key)
-                else CropSteeringSensor
+                CropSteeringCurrentPhaseSensor
+                if description.key == "current_phase"
+                else (
+                    CropSteeringProbeSensor
+                    if re.fullmatch(r"(vwc|ec)_zone_\d+", description.key)
+                    else CropSteeringSensor
+                )
             )
         )
         sensors.append(cls(entry, description, zones_config, hardware_config))
@@ -714,8 +723,6 @@ class CropSteeringSensor(SensorEntity):
             return self._calculate_avg_vwc()
         elif self.entity_description.key == "configured_avg_ec":
             return self._calculate_avg_ec()
-        elif self.entity_description.key == "current_phase":
-            return self._get_current_phase()
         else:
             # Other sensors return None (placeholder)
             return None
@@ -1173,27 +1180,6 @@ class CropSteeringSensor(SensorEntity):
         except Exception:
             return DEFAULT_EC_FALLBACK
 
-    def _get_current_phase(self) -> str:
-        """Get current irrigation phase from the engine sensor."""
-        try:
-            # Check if there's a sensor from the engine
-            phase_sensor = self.hass.states.get(
-                f"sensor.crop_steering_{self._prefix}app_current_phase"
-            )
-            if phase_sensor and phase_sensor.state not in ["unknown", "unavailable"]:
-                return phase_sensor.state
-
-            # Fallback to integration select entity
-            phase_select = self.hass.states.get(
-                f"select.crop_steering_{self._prefix}irrigation_phase"
-            )
-            if phase_select and phase_select.state not in ["unknown", "unavailable"]:
-                return phase_select.state
-
-            return "P2"  # Default to maintenance phase
-        except Exception:
-            return "P2"
-
     @property
     def available(self) -> bool:
         """Return if sensor is available."""
@@ -1280,6 +1266,59 @@ class CropSteeringZoneStatusSensor(CropSteeringSensor):
     def _current(self) -> tuple[str, dict]:
         if self._shown is None:
             self._shown = mirrored_status(
+                self.hass.states.get(self._source), dt_util.utcnow()
+            )
+        return self._shown
+
+    @property
+    def native_value(self) -> Any:
+        return self._current()[0]
+
+    @property
+    def extra_state_attributes(self) -> dict | None:
+        return dict(self._current()[1])
+
+
+class CropSteeringCurrentPhaseSensor(CropSteeringSensor):
+    """current_phase: the phase the CONTROLLER publishes on app_current_phase, mirrored.
+
+    Unknown, with a reason attribute, when the controller has not published or has stopped
+    reporting; never a default phase. Not polled: it follows app_current_phase and is checked once a
+    minute for a controller that has stopped.
+    """
+
+    _attr_should_poll = False
+
+    def __init__(self, entry, description, zones_config, hardware_config) -> None:
+        super().__init__(entry, description, zones_config, hardware_config)
+        self._source = app_phase_entity(self._prefix)
+        self._shown: tuple[str | None, dict] | None = None
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        self.async_on_remove(
+            async_track_state_change_event(
+                self.hass, [self._source], self._source_changed
+            )
+        )
+        self.async_on_remove(
+            async_track_time_interval(self.hass, self._refresh, timedelta(minutes=1))
+        )
+
+    @callback
+    def _source_changed(self, _event) -> None:
+        self._refresh(dt_util.utcnow())
+
+    @callback
+    def _refresh(self, now) -> None:
+        shown = mirrored_phase(self.hass.states.get(self._source), now)
+        if shown != self._shown:
+            self._shown = shown
+            self.async_write_ha_state()
+
+    def _current(self) -> tuple[str | None, dict]:
+        if self._shown is None:
+            self._shown = mirrored_phase(
                 self.hass.states.get(self._source), dt_util.utcnow()
             )
         return self._shown
