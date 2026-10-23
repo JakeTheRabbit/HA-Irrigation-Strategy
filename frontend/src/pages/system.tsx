@@ -49,10 +49,13 @@ export function SystemStatus({ controller }: PageProps) {
   const [acked, setAcked] = useState<Set<string>>(() => new Set());
   const [acks, setAcks] = useState<Record<string, Ack>>({});
   const [said, setSaid] = useState("");
+  // An integration without system_status_get has nothing to poll: the page follows the entities.
+  const missing = v2.state === "missing";
   useEffect(() => {
+    if (missing) return;
     const timer = setInterval(reload, POLL_MS);
     return () => clearInterval(timer);
-  }, [reload]);
+  }, [reload, missing]);
   useEffect(() => {
     if (!v2.data) return;
     setCheckedAt(Date.now());
@@ -60,7 +63,7 @@ export function SystemStatus({ controller }: PageProps) {
   }, [v2.data]);
 
   const now = Date.now();
-  const entityOnly = v2.state === "missing";
+  const entityOnly = missing;
   const status: Status | null = entityOnly
     ? statusFromEntities(controller.states, controller.rooms, now)
     : (v2.data ?? lastGood);
@@ -368,16 +371,19 @@ function Heartbeats({ rooms, entityOnly, now }: { rooms: { name: string; beat: R
         {entityOnly && <NeedsIntegration feature="Heartbeat history" compact />}
       </header>
       {rooms.map(({ name, beat }) => {
-        const { strip, missed, received } = heartbeatHour(beat.beats, beat.interval_s, now);
+        const { strip, missed, received, spanMin } = heartbeatHour(beat.beats, beat.interval_s, now);
+        const span = spanMin === null ? "the last hour" : `the last ${spanMin} min`;
+        const recorded = beat.beats.length > 0;
+        const last = instant(beat.last_beat);
         const readback = [...beat.beats].reverse().find((b) => b.readback_ms !== null)?.readback_ms ?? null;
         return (
           <div key={name} className="system-beat" data-heartbeat={name}>
             <div className="system-beat-head">
               <span>{name} controller</span>
               <span data-tone={beat.controller === "running" ? "ok" : "bad"}>
-                {beat.age_s === null
+                {last === null
                   ? "no heartbeat"
-                  : `beat ${duration(beat.age_s * 1000)} ago${beat.controller === "running" ? "" : ", not reporting"}`}
+                  : `beat ${duration(Math.max(0, now - last))} ago${beat.controller === "running" ? "" : ", not reporting"}`}
               </span>
             </div>
             {entityOnly ? (
@@ -387,14 +393,15 @@ function Heartbeats({ rooms, entityOnly, now }: { rooms: { name: string; beat: R
                 <div
                   className="system-strip"
                   role="img"
-                  aria-label={`${received} beats in the last hour, ${missed} missed`}
+                  aria-label={`${received} beats in ${span}, ${missed} missed`}
                 >
                   {strip.map((b) => (
                     <span key={b.at} data-missed={b.missed ? "" : undefined} style={{ flexGrow: b.weight }} />
                   ))}
                 </div>
                 <p className="system-beat-note">
-                  Every {beat.interval_s} s · {missed} missed in the last hour
+                  Every {beat.interval_s} s ·{" "}
+                  {recorded ? `${missed} missed in ${span}` : "no beats recorded since Home Assistant started"}
                   {readback !== null && ` · read-back ${readback / 1000} s`}
                 </p>
               </>

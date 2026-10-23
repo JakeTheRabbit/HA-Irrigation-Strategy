@@ -54,10 +54,10 @@ describe("healthSentence", () => {
       ],
     };
     expect(healthSentence(status, [alert("CS-102", 2), alert("CS-608", null), alert("CS-706", null)])).toBe(
-      "System health 94 %: 34 of 35 devices online, controller running, 3 open alerts, each shown below where it happens.",
+      "System health 94%: 34 of 35 devices online, controller running, 3 open alerts, each shown below where it happens.",
     );
     expect(healthSentence({ ...status, controller: "stale" }, [alert("CS-102", 2)])).toBe(
-      "System health 94 %: 34 of 35 devices online, controller not reporting, 1 open alert, shown below where it happens.",
+      "System health 94%: 34 of 35 devices online, controller not reporting, 1 open alert, shown below where it happens.",
     );
     expect(healthSentence({ ...status, controller: "absent", pct_online: null, rooms: [] }, [])).toBe(
       "System health not known: no mapped devices, no controller heartbeat, no open alerts.",
@@ -173,23 +173,47 @@ describe("heartbeatHour", () => {
     readback_ms: null,
     ...(gap_s === undefined ? {} : { gap_s }),
   });
+  /** A beat every minute from `from` to `to` minutes ago. */
+  const minutes = (from: number, to: number) => Array.from({ length: from - to + 1 }, (_, i) => beat((from - i) * 60));
   test("a 25-min outage counts every beat it missed and draws them as one wide bar", () => {
-    // Beats at -40 and -39 min, a 1500 s gap marker at -38 min, beats again from -14 min.
-    const beats = [beat(40 * 60), beat(39 * 60), beat(38 * 60, true, 1500), beat(14 * 60), beat(13 * 60)];
+    // Beats at -40 and -39 min, a 1500 s gap marker at -38 min, beats again every minute from -14 min.
+    const beats = [beat(40 * 60), beat(39 * 60), beat(38 * 60, true, 1500), ...minutes(14, 1)];
     const hour = heartbeatHour(beats, 60, NOW);
     expect(hour.missed).toBe(24);
-    expect(hour.received).toBe(4);
-    expect(hour.strip.map((b) => b.weight)).toEqual([1, 1, 24, 1, 1]);
+    expect(hour.received).toBe(16);
+    expect(hour.strip.map((b) => b.weight)).toEqual([1, 1, 24, ...Array(14).fill(1)]);
   });
   test("only the missed beats inside the hour count", () => {
     // The gap began 70 min ago and lasted 25 min: 15 of its 24 missed beats fall in the hour.
-    const beats = [beat(70 * 60), beat(69 * 60, true, 1500), beat(45 * 60)];
+    const beats = [beat(70 * 60), beat(69 * 60, true, 1500), ...minutes(45, 1)];
     const hour = heartbeatHour(beats, 60, NOW);
     expect(hour.missed).toBe(15);
-    expect(hour.received).toBe(1);
+    expect(hour.received).toBe(45);
   });
   test("a marker without gap_s is one missed beat", () => {
     expect(heartbeatHour([beat(120), beat(60, true)], 60, NOW).missed).toBe(1);
+  });
+  test("a controller silent since its last beat counts the beats it has missed since", () => {
+    // Beats every minute until 40 min ago, then nothing: the backend has no marker yet.
+    const beats = minutes(60, 40);
+    const hour = heartbeatHour(beats, 60, NOW);
+    expect(hour.received).toBe(21);
+    expect(hour.missed).toBe(39);
+    expect(hour.strip.at(-1)).toMatchObject({ missed: true, weight: 39 });
+    expect(hour.spanMin).toBeNull();
+  });
+  test("a trailing gap under two intervals is not missed", () => {
+    const hour = heartbeatHour([beat(150), beat(90)], 60, NOW);
+    expect(hour.missed).toBe(0);
+    expect(hour.strip.every((b) => !b.missed)).toBe(true);
+  });
+  test("a record that starts inside the hour says how many minutes it covers", () => {
+    // Home Assistant restarted 12 min ago: the ring holds beats from then only.
+    const beats = minutes(12, 1);
+    const hour = heartbeatHour(beats, 60, NOW);
+    expect(hour.spanMin).toBe(12);
+    expect(hour.missed).toBe(0);
+    expect(heartbeatHour([], 60, NOW).spanMin).toBe(0);
   });
 });
 
@@ -209,7 +233,7 @@ describe("healthSentence per room", () => {
       ],
     };
     expect(healthSentence(status, [])).toBe(
-      "System health 100 %: 2 of 2 devices online, controller not reporting in 1 of 2 rooms, no open alerts.",
+      "System health 100%: 2 of 2 devices online, controller not reporting in 1 of 2 rooms, no open alerts.",
     );
   });
 });
@@ -259,7 +283,7 @@ describe("statusFromEntities", () => {
     expect(status.addon_version).toBe("3.17.1");
     expect(room.heartbeat.beats).toEqual([]);
     expect(healthSentence(status, [])).toBe(
-      "System health 66.7 %: 4 of 6 devices online, controller running, no open alerts.",
+      "System health 66.7%: 4 of 6 devices online, controller running, no open alerts.",
     );
   });
 

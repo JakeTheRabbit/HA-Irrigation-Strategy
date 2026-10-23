@@ -54,7 +54,8 @@ export function demoSystemStatus(now: number): SystemStatus {
     entities.push(row("tank", `sensor.${ids}tank_level`, "Tank level", null, 30));
     entities.push(row("tank", `sensor.${ids}tank_temperature`, "Feed temperature", null, 5));
     const beats: StatusBeat[] = [];
-    for (let i = 59; i >= 0; i--) {
+    // The backend's ring holds the last 120 beats (2 h); the page shows the last hour.
+    for (let i = 119; i >= 0; i--) {
       const at = now - 18_000 - i * 60_000;
       if (roomB && i === 50) beats.push({ at: iso(at), missed: true, readback_ms: null, gap_s: 140 });
       else beats.push({ at: iso(at), missed: false, readback_ms: readback });

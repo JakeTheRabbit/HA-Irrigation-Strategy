@@ -53,12 +53,12 @@ const CONTROLLER_WORDS: Record<ControllerState, string> = {
   absent: "no controller heartbeat",
 };
 
-/** "System health 94 %: 34 of 35 devices online, controller running, 3 open alerts, each shown below
+/** "System health 94%: 34 of 35 devices online, controller running, 3 open alerts, each shown below
  * where it happens." */
 export function healthSentence(s: SystemStatus, alerts: OpenAlert[]): string {
   const rows = s.rooms.flatMap((room) => room.entities);
   const online = rows.filter((row) => row.ok).length;
-  const health = s.pct_online === null ? "System health not known" : `System health ${percent(s.pct_online)} %`;
+  const health = s.pct_online === null ? "System health not known" : `System health ${percent(s.pct_online)}%`;
   const devices = rows.length ? `${online} of ${rows.length} devices online` : "no mapped devices";
   const open =
     alerts.length === 0
@@ -106,7 +106,11 @@ export function rowWords(kind: string, ok: boolean, tone: "ok" | "warn" | "bad")
 
 /** The last hour of a room's heartbeat. The backend puts ONE missed marker per gap, carrying the
  * gap (gap_s): the beats it stands for are the gap's expected beats, last + k x interval, of which
- * only those inside the hour count. `weight` is how many beats a strip bar stands for. */
+ * only those inside the hour count. The backend adds a marker only when the next beat arrives, so a
+ * controller silent since its last beat gets its trailing gap here, once over 2 x interval: each
+ * expected beat more than one interval overdue. `weight` is how many beats a strip bar stands for.
+ * The record is in memory: `spanMin` is the minutes it covers when it starts inside the hour (after
+ * a Home Assistant restart), else null. */
 export function heartbeatHour(beats: StatusBeat[], interval_s: number, now: number) {
   const from = now - 3_600_000;
   const strip: { at: string; missed: boolean; weight: number }[] = [];
@@ -131,7 +135,21 @@ export function heartbeatHour(beats: StatusBeat[], interval_s: number, now: numb
       strip.push({ at: beat.at, missed: true, weight });
     }
   }
-  return { strip, missed, received };
+  const step = interval_s * 1000;
+  const lastBeat = beats.at(-1);
+  const last = lastBeat && !lastBeat.missed ? instant(lastBeat.at) : null;
+  if (last !== null && now - last > 2 * step) {
+    let weight = 0;
+    for (let k = 1; last + (k + 1) * step <= now; k++) if (last + k * step >= from) weight++;
+    if (weight) {
+      missed += weight;
+      strip.push({ at: new Date(last + step).toISOString(), missed: true, weight });
+    }
+  }
+  const head = beats[0] ? instant(beats[0].at) : null;
+  const start = head === null ? now : beats[0].missed ? head - step : head;
+  const spanMin = start > from ? Math.round((now - start) / 60_000) : null;
+  return { strip, missed, received, spanMin };
 }
 
 type PlaceRow = { entity_id: string; kind: string; zone: number | null; ok?: boolean };

@@ -5,7 +5,7 @@
  * The clock is pinned to today 14:02 local, so ages and "switched HH:MM" do not depend on the hour.
  *
  * Interactions asserted, at 1440 and 390 on both backends:
- * - the health line: the ring and "System health … %: N of M devices online, controller running,
+ * - the health line: the ring and "System health …%: N of M devices online, controller running,
  *   …" with "Checked HH:MM";
  * - Software lists the controller app, the integration, the dashboard cards, Home Assistant and the
  *   AI assistant; Heartbeat has one block per room;
@@ -42,7 +42,7 @@ await runParity({
     // Health line.
     assert.match(
       await health.locator(".system-health-line strong").innerText(),
-      /^System health [\d.]+ %: \d+ of \d+ devices online, controller running, (no open alerts|1 open alert, shown below where it happens|\d+ open alerts, each shown below where it happens)\.$/,
+      /^System health [\d.]+%: \d+ of \d+ devices online, controller running, (no open alerts|1 open alert, shown below where it happens|\d+ open alerts, each shown below where it happens)\.$/,
       `${label}: sentence`,
     );
     assert.match(await health.locator(".system-checked").innerText(), new RegExp(`^Checked ${HHMM}$`), `${label}: checked`);
