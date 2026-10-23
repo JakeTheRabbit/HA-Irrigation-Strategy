@@ -29,7 +29,7 @@ const server = createServer((req, res) => {
   res.writeHead(200, { "Content-Type": "text/html" });
   res.end(req.url.startsWith("/crop-steering") ? shell : html);
 });
-await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+await new Promise((resolve) => server.listen(Number(process.env.PORT ?? 0), "127.0.0.1", resolve));
 const origin = `http://127.0.0.1:${server.address().port}`;
 const browser = await chromium.launch({
   headless: true,
@@ -55,6 +55,12 @@ try {
     true,
   );
   assert.ok(await page.evaluate(() => events.some((e) => e[0] === "menu")));
+  // Inside the panel, Ctrl K opens the jump-to palette; Escape closes it and focus goes back.
+  await frame.locator("body").press("Control+k");
+  const palette = frame.getByRole("dialog", { name: "Jump to" });
+  await palette.waitFor();
+  await palette.getByRole("combobox").press("Escape");
+  await palette.waitFor({ state: "hidden" });
   await page.setViewportSize({ width: 390, height: 844 });
   await frame.getByRole("button", { name: "Open Home Assistant menu", exact: true }).click();
   assert.ok(await frame.locator("html").evaluate((el) => el.scrollWidth <= innerWidth + 1));
@@ -97,6 +103,7 @@ try {
           "iframe panel fallback",
           "temporary kiosk enabled",
           "desktop/mobile recovery button",
+          "Ctrl K opens the jump-to palette inside the panel",
           "leaving restores previous state",
           "preexisting kiosk preserved",
           "standalone unchanged",
@@ -107,7 +114,7 @@ try {
       2,
     ),
   );
-  console.log("7 HA shell browser checks passed.");
+  console.log("8 HA shell browser checks passed.");
 } finally {
   await browser.close();
   await new Promise((resolve) => server.close(resolve));
