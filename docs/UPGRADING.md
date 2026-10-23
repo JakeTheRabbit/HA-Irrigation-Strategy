@@ -1,5 +1,44 @@
 # Upgrading to 3.18
 
+**⚠️ THIS IS A MASSIVE UPGRADE. It is fucking huge.** Almost every page of the dashboard is new or
+rebuilt: timer programs, presets, alert rules, a new History section, feed and pump calibration, pump
+supply sharing, quiet hours and an Upgrade report.
+
+**If you are running this on a live grow, do NOT just click update** unless you have time for a big
+configuration session straight after. Watering will not stop, but there is a lot to set up and check.
+
+**Your settings come across as far as they can.** The update keeps every zone watering and dosing
+exactly as before, and carries your current settings into the new features wherever it can do that
+without guessing. Nothing new that waters or doses is switched on for you.
+
+- **Carried across:** every zone keeps watering by steering; each recipe stage you had edited is
+  copied as a preset; a "before 3.18 update" preset of your current settings is saved as a rollback
+  point; temperatures in °F if Home Assistant uses °F; every notification recipient; your pH up/down
+  pumps keep their role; your earlier setting changes, stock moves, calibrations and dosing records
+  are imported into History; a room with no feed EC probe keeps the old 3.0 mS/cm assumption so it
+  flushes as before.
+- **Needs you:** the irrigation supply (each pump's real flow, how many zones it feeds at once, its
+  flow meter: nothing is saved until you save it); the 2-point feed pH and EC probe calibration;
+  the solution and a pump calibration for each nutrient pump; ppm instead of mS/cm if that is how
+  you work; automations that still use a retired entity; grow-plan recipes saved only in your
+  browser (export them). Optional: alert rules, quiet hours, camera, CO2 and light panels, new
+  dashboards.
+- Each room's **Upgrade report** lists exactly what was carried and what needs you: Crop Steering →
+  Settings → System status, and a card in Home Assistant's Settings → Repairs.
+
+**Get your AI to configure it.** Point your AI assistant (Claude, ChatGPT, or any assistant connected
+through the Crop Steering MCP server) at the new documentation and have it work through the Upgrade
+report with you, one line at a time, asking you before each save:
+
+- This page: one section per Upgrade report line, written so an AI can follow it step by step.
+- [Configure Crop Steering through MCP](MCP.md): connect an assistant to your Home Assistant.
+- [User guide](USER_GUIDE.md), [AI assistant](AI_ASSISTANT.md) and the
+  [Crop Steering Academy](https://jaketherabbit.github.io/HA-Irrigation-Strategy/learn/).
+
+**Order:** update the integration first, restart Home Assistant, then update the controller app.
+
+A tour of the new pages, with pictures, is in the [changelog](../CHANGELOG.md#unreleased).
+
 3.18 is a big upgrade. The update keeps every zone watering and dosing exactly as before, carries your
 settings into the new features where it can do that without guessing, and lists the rest in each room's
 **Upgrade report** (Crop Steering → Settings → System status, and one card in Settings → Repairs, code CS-616).
