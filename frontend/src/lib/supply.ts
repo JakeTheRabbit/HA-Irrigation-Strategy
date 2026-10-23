@@ -29,8 +29,10 @@ export const flowUnit = () => (getDisplayUnits().volume === "gal" ? "gal/h" : "L
 export const digitsOf = (n: number) => (String(Number(n.toPrecision(12))).split(".")[1] ?? "").length;
 /** A flow at its own digits. */
 export const lphText = (n: number) => flowText(n, digitsOf(n));
-/** The same flow, give or take float noise (a gal/h value converted back to L/h). */
-const sameFlow = (a: number | null | undefined, b: number) => a != null && Math.abs(a - b) <= 1e-9 * Math.max(1, Math.abs(b));
+/** The same flow, give or take float noise (a gal/h value converted back to L/h); not set (null)
+ * is only the same as not set. */
+export const sameFlow = (a: number | null | undefined, b: number | null) =>
+  b === null ? a == null : a != null && Math.abs(a - b) <= 1e-9 * Math.max(1, Math.abs(b));
 /** A typed flow in the display unit, back to L/h; null when it is not a flow above 0. */
 export function parseFlow(text: string): number | null {
   const t = text.trim().replace(",", ".");
@@ -174,11 +176,11 @@ export function capacityRefusal(message: string): { text: string; suggest: numbe
   return { text: overCapacityText(Number(match[1]), suggest), suggest };
 }
 
-/** One zone's dripper flow edit, in L/h. */
+/** One zone's dripper flow edit, in L/h; null: not set. */
 export interface DripperEdit {
   zone: number;
-  before: number;
-  after: number;
+  before: number | null;
+  after: number | null;
   rowId: string;
 }
 /** `holds`: each zone's dripper flow the controller read back after the write (null: not read).
@@ -251,6 +253,8 @@ export async function applySupply(
   if ((unsaved.length || failed.length) && !notConfirmed.length)
     receipt.message = [
       pumpRows.length && !unsaved.length ? "Pump settings were saved." : "",
+      // What was written and read back first, then what was not.
+      ...rows.filter((r) => isDripper(r) && !left.has(r.id)).map((r) => `${line(r)} was saved.`),
       ...unsaved.map((f) => `${f.label} was not saved: this room has no pump mapped.`),
       ...failed.map((f) => `${f.label} was not: controller still holds ${f.holds}.`),
     ]
@@ -286,19 +290,28 @@ export async function undoSupply(io: SupplyApplyIo, edits: DripperEdit[]): Promi
 }
 
 /** What Undo puts back: the pump and groups as they were before `revision` (null: no supply save),
- * and the dripper edits run back. `partial`: that apply did not all take, so its receipt had no Undo. */
+ * and the dripper edits run back. `partial`: that apply did not all take, so its receipt had no Undo.
+ * `summary`: the rows written and read back that this Undo puts back. */
 export interface SupplyUndo {
   pumps: SupplyDoc["irrigation_pumps"];
   groups: SupplyDoc["zone_groups"];
   revision: number | null;
   edits: DripperEdit[];
   partial: boolean;
+  summary: string;
 }
 /** The Undo after an apply. A Try again after a partial apply (the rows left over, no new pump
- * change) carries the earlier one: its pump save and its dripper edits stay in this Undo. */
-export function nextUndo(prev: SupplyUndo | null, applied: SupplyUndo): SupplyUndo {
+ * change) carries the earlier one: its pump save, its dripper edits and its rows stay in this Undo.
+ * None when a dripper flow was not set before: setup_save cannot put "not set" back. */
+export function nextUndo(prev: SupplyUndo | null, applied: SupplyUndo): SupplyUndo | null {
+  if (applied.edits.some((e) => e.after === null)) return null;
   if (!prev?.partial || applied.revision !== null) return applied;
-  return { ...prev, edits: [...prev.edits, ...applied.edits], partial: applied.partial };
+  return {
+    ...prev,
+    edits: [...prev.edits, ...applied.edits],
+    partial: applied.partial,
+    summary: [prev.summary, applied.summary].filter(Boolean).join(" · "),
+  };
 }
 
 /** A write that may still have landed: nothing says what the controller holds. */

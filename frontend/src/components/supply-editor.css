@@ -109,24 +109,30 @@
   display: block;
   color: var(--destructive);
 }
+/* Wraps onto more lines when a room has many zones: every count stays reachable at phone width.
+ * Each button draws its own border; the -1px margins share the line between neighbours. */
 .supply-seg {
   display: inline-flex;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  overflow: hidden;
+  flex-wrap: wrap;
+  max-width: 100%;
+  padding: 1px 0 0 1px;
 }
 .supply-seg button {
   min-width: 44px;
   min-height: 40px;
   padding: 0 12px;
-  border: 0;
+  margin: -1px 0 0 -1px;
+  border: 1px solid var(--border);
   background: transparent;
   color: var(--foreground);
   font: inherit;
   cursor: pointer;
 }
-.supply-seg button + button {
-  border-left: 1px solid var(--border);
+.supply-seg button:first-child {
+  border-radius: 8px 0 0 8px;
+}
+.supply-seg button:last-child {
+  border-radius: 0 8px 8px 0;
 }
 .supply-seg button[aria-pressed="true"] {
   background: var(--primary);

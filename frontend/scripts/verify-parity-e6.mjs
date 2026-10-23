@@ -36,7 +36,8 @@ await runParity({
     const pinned = new Date();
     pinned.setHours(14, 10, 0, 0);
     await page.clock.setFixedTime(pinned);
-    await page.reload();
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await page.getByRole("heading", { level: 1, name: "Rooms and setup", exact: true }).waitFor();
 
     if (backend === "3.17") {
       const note = page.locator('[data-needs-integration="Pump capacity and exclusive groups"]');
@@ -61,6 +62,31 @@ await runParity({
     await editor.getByRole("heading", { name: "What can run together" }).waitFor();
     assert.equal(await editor.locator(".supply-together li").count(), 4, `${label}: 3 pairs and all three`);
     region("pump card");
+    // A room with many zones: every "Max zones at once" count stays reachable (the counts wrap).
+    // The demo rooms have three zones, so a copy of the real group holding twelve counts is
+    // measured under the page's own stylesheet, then removed.
+    const counts = await editor.getByRole("group", { name: "Max zones at once" }).evaluate((group) => {
+      const copy = group.cloneNode(true);
+      copy.removeAttribute("aria-labelledby");
+      copy.setAttribute("aria-hidden", "true");
+      const proto = copy.querySelector("button");
+      copy.replaceChildren(
+        ...Array.from({ length: 12 }, (_, i) => {
+          const b = proto.cloneNode(true);
+          b.textContent = String(i + 1);
+          return b;
+        }),
+      );
+      group.after(copy);
+      const card = group.closest(".supply-card").getBoundingClientRect();
+      const right = Math.min(card.right, document.documentElement.clientWidth);
+      const rects = [...copy.children].map((b) => b.getBoundingClientRect());
+      copy.remove();
+      return { lines: new Set(rects.map((r) => Math.round(r.top))).size, out: rects.filter((r) => r.right > right + 0.5).length };
+    });
+    assert.equal(counts.out, 0, `${label}: 12 zone counts all inside the pump card`);
+    if (width <= 720) assert.ok(counts.lines > 1, `${label}: 12 zone counts wrap at phone width`);
+    region("max zones at once, 12 zones");
     region("zone valves and drippers");
     region("what can run together");
 

@@ -21,6 +21,7 @@ import {
   overCapacityText,
   parseFlow,
   reviewChecks,
+  sameFlow,
   saveDripperFlows,
   togetherRows,
   togetherVerdict,
@@ -103,20 +104,26 @@ export function SupplyEditor({ controller, onDirtyChange }: { controller: Contro
   const maxInvalid = draft.maxFlow !== null && draft.maxFlow.trim() !== "" && maxLph === null;
   const conc = draft.concurrency ?? baseConc;
   const groupOf = (zone: number) => draft.groups[zone] ?? baseGroups[String(zone)] ?? "";
-  const dripperEdit = (zone: number, base: number) =>
-    draft.drippers[zone] === undefined ? null : flowEdit(draft.drippers[zone], base, Math.max(1, digitsOf(base)));
+  // A zone's saved dripper flow; null: not set.
+  const dripperBase = (zone: { dripper_flow_rate?: number }) => zone.dripper_flow_rate ?? null;
+  const dripperDigits = (base: number | null) => Math.max(1, base === null ? 0 : digitsOf(base));
+  const dripperEdit = (zone: number, base: number | null) =>
+    draft.drippers[zone] === undefined ? null : flowEdit(draft.drippers[zone], base, dripperDigits(base));
 
   // Each zone's demand: the integration's own (sensor.crop_steering_supply_config), else the
-  // setup's plants × drippers × flow; an edited dripper flow works its own out.
+  // setup's plants × drippers × flow; an edited dripper flow works its own out. A zone with no
+  // dripper flow set has no demand (never 0).
   const published = controller.states["sensor.crop_steering_supply_config"]?.attributes.zone_demand_lph as
     | Record<string, Record<string, number>>
     | undefined;
   const demand: Record<string, number> = {};
   for (const z of zones) {
-    const base = z.dripper_flow_rate ?? 0;
-    const flow = dripperEdit(z.id, base) ?? base;
+    const base = dripperBase(z);
+    const edited = dripperEdit(z.id, base);
+    const flow = edited ?? base;
     const own = published?.[roomId]?.[String(z.id)];
-    demand[String(z.id)] = dripperEdit(z.id, base) === null && typeof own === "number" ? own : z.plant_count * (z.drippers_per_plant ?? 1) * flow;
+    if (edited === null && typeof own === "number") demand[String(z.id)] = own;
+    else if (flow !== null) demand[String(z.id)] = z.plant_count * (z.drippers_per_plant ?? 1) * flow;
   }
   const groups = Object.fromEntries(zones.map((z) => [String(z.id), groupOf(z.id)]).filter(([, g]) => g));
 
@@ -152,17 +159,16 @@ export function SupplyEditor({ controller, onDirtyChange }: { controller: Contro
       });
   }
   for (const z of zones) {
-    const base = z.dripper_flow_rate;
-    if (base === undefined) continue;
+    const base = dripperBase(z);
     const after = dripperEdit(z.id, base);
     if (after === null) continue;
     const id = `dripper:${z.id}`;
-    const digits = Math.max(1, digitsOf(base), digitsOf(after));
+    const digits = Math.max(dripperDigits(base), digitsOf(after));
     edits.push({ zone: z.id, before: base, after, rowId: id });
     rows.push({
       id,
       label: `${z.name} dripper flow`,
-      before: flowText(base, digits),
+      before: base === null ? "not set" : flowText(base, digits),
       after: flowText(after, digits),
       undo: () => setDraft((d) => ({ ...d, drippers: Object.fromEntries(Object.entries(d.drippers).filter(([k]) => k !== String(z.id))) })),
     });
@@ -240,7 +246,7 @@ export function SupplyEditor({ controller, onDirtyChange }: { controller: Contro
       saveDrippers: async (list) => {
         const result = await saveDrippers(list);
         const why = result.reason;
-        if (why) setDripperReason(Object.fromEntries(list.filter((e) => result.holds[e.zone] !== e.after).map((e) => [String(e.zone), why])));
+        if (why) setDripperReason(Object.fromEntries(list.filter((e) => !sameFlow(result.holds[e.zone], e.after)).map((e) => [String(e.zone), why])));
         return result;
       },
     };
@@ -255,16 +261,18 @@ export function SupplyEditor({ controller, onDirtyChange }: { controller: Contro
         groups: Object.fromEntries(Object.entries(d.groups).filter(([zone]) => kept.has(`group:${zone}`))),
         drippers: Object.fromEntries(Object.entries(d.drippers).filter(([zone]) => kept.has(`dripper:${zone}`))),
       }));
-      // A partial apply shows no Undo: a Try again carries it into its own.
-      setLast((prev) =>
-        nextUndo(prev, {
-          pumps: before.irrigation_pumps,
-          groups: before.zone_groups,
-          revision: payload ? revision : null,
-          edits: edits.filter((e) => !kept.has(e.rowId)).map((e) => ({ ...e, before: e.after, after: e.before })),
-          partial: !receipt.ok,
-        }),
-      );
+      // A partial apply shows no Undo: a Try again carries it into its own, and its receipt lists
+      // every row that Undo puts back (the earlier pump save too).
+      const next = nextUndo(last, {
+        pumps: before.irrigation_pumps,
+        groups: before.zone_groups,
+        revision: payload ? revision : null,
+        edits: edits.filter((e) => !kept.has(e.rowId)).map((e) => ({ ...e, before: e.after, after: e.before })),
+        partial: !receipt.ok,
+        summary: receipt.summary,
+      });
+      setLast(next);
+      if (next && receipt.ok) return { ...receipt, summary: next.summary };
     }
     return receipt;
   };
@@ -438,11 +446,13 @@ export function SupplyEditor({ controller, onDirtyChange }: { controller: Contro
                   </thead>
                   <tbody>
                     {zones.map((z) => {
-                      const base = z.dripper_flow_rate ?? 0;
+                      const base = dripperBase(z);
                       const typed = draft.drippers[z.id];
                       const invalid = typed !== undefined && parseFlow(typed) === null;
                       const changed = dripperEdit(z.id, base) !== null;
-                      const share = maxLph ? (demand[String(z.id)] / maxLph) * 100 : null;
+                      const flow = demand[String(z.id)];
+                      const share = maxLph && flow !== undefined ? (flow / maxLph) * 100 : null;
+                      const shown = base === null ? "" : flowValue(base, dripperDigits(base));
                       const reason = dripperReason[String(z.id)];
                       const errorId = `supply-dripper-error-${z.id}`;
                       return (
@@ -464,7 +474,8 @@ export function SupplyEditor({ controller, onDirtyChange }: { controller: Contro
                                 aria-label={`${z.name} dripper flow`}
                                 aria-invalid={invalid || undefined}
                                 aria-describedby={invalid || reason ? errorId : undefined}
-                                value={typed ?? flowValue(base, Math.max(1, digitsOf(base)))}
+                                placeholder={base === null ? "not set" : undefined}
+                                value={typed ?? shown}
                                 onChange={(e) => {
                                   const value = e.target.value;
                                   setDripperReason((r) => Object.fromEntries(Object.entries(r).filter(([k]) => k !== String(z.id))));
@@ -473,17 +484,17 @@ export function SupplyEditor({ controller, onDirtyChange }: { controller: Contro
                               />
                               <span>{unit}</span>
                             </span>
-                            {changed && <small className="supply-was">was {flowValue(base, Math.max(1, digitsOf(base)))}</small>}
+                            {changed && <small className="supply-was">was {base === null ? "not set" : shown}</small>}
                             {(invalid || reason) && (
                               <small className="supply-error" id={errorId}>
                                 {invalid ? "Enter a flow above 0." : reason}
                               </small>
                             )}
                           </td>
-                          <td className="supply-num">{lphText(demand[String(z.id)])}</td>
+                          <td className="supply-num">{flow === undefined ? <span className="muted">not set</span> : lphText(flow)}</td>
                           <td>
                             {share === null ? (
-                              <span className="muted">Set max flow</span>
+                              <span className="muted">{flow === undefined ? "Set dripper flow" : "Set max flow"}</span>
                             ) : (
                               <span className="supply-share">
                                 <span className="supply-share-bar" aria-hidden>

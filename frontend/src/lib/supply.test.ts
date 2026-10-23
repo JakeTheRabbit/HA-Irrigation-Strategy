@@ -17,6 +17,7 @@ import {
   nextUndo,
   parseFlow,
   reviewChecks,
+  sameFlow,
   saveDripperFlows,
   supplyChecks,
   togetherRows,
@@ -370,7 +371,7 @@ describe("review round 2", () => {
     expect(receipt).toMatchObject({
       ok: false,
       failed: [{ id: "group:2", holds: "None", label: "Zone 2 exclusive group" }],
-      message: "Zone 2 exclusive group was not saved: this room has no pump mapped.",
+      message: "Zone 3 dripper flow 3.0 L/h → 4.0 L/h was saved. Zone 2 exclusive group was not saved: this room has no pump mapped.",
       summary: "Zone 3 dripper flow 3.0 L/h → 4.0 L/h",
     });
   });
@@ -400,19 +401,28 @@ describe("review round 2", () => {
   test("a retry after a partial failure keeps the pump in Undo", () => {
     const pumps = [{ entity_id: "switch.p", max_flow_lph: 1000, max_concurrent_zones: 1, flow_meter: null }];
     const edit = { zone: 3, before: 4, after: 3, rowId: "dripper:3" };
-    const first = nextUndo(null, { pumps, groups: {}, revision: 5, edits: [], partial: true });
-    const retry = nextUndo(first, { pumps: [], groups: {}, revision: null, edits: [edit], partial: false });
-    expect(retry).toEqual({ pumps, groups: {}, revision: 5, edits: [edit], partial: false });
+    const first = nextUndo(null, { pumps, groups: {}, revision: 5, edits: [], partial: true, summary: "Pump max flow 1000 L/h → 900 L/h" })!;
+    const retry = nextUndo(first, { pumps: [], groups: {}, revision: null, edits: [edit], partial: false, summary: "Zone 3 dripper flow 4.0 L/h → 3.0 L/h" });
+    // The merged receipt lists everything its Undo puts back.
+    expect(retry).toEqual({
+      pumps,
+      groups: {},
+      revision: 5,
+      edits: [edit],
+      partial: false,
+      summary: "Pump max flow 1000 L/h → 900 L/h · Zone 3 dripper flow 4.0 L/h → 3.0 L/h",
+    });
     // A new pump change after a partial apply is its own Undo.
-    const again = { pumps: [], groups: {}, revision: 6, edits: [], partial: false };
+    const again = { pumps: [], groups: {}, revision: 6, edits: [], partial: false, summary: "x" };
     expect(nextUndo(first, again)).toEqual(again);
     // A whole apply's Undo is its own: the next apply does not reach back past it.
-    expect(nextUndo({ ...first, partial: false }, { pumps: [], groups: {}, revision: null, edits: [edit], partial: false })).toEqual({
+    expect(nextUndo({ ...first, partial: false }, { pumps: [], groups: {}, revision: null, edits: [edit], partial: false, summary: "y" })).toEqual({
       pumps: [],
       groups: {},
       revision: null,
       edits: [edit],
       partial: false,
+      summary: "y",
     });
   });
   const room = (flow: number, revision = 7) =>
@@ -430,5 +440,51 @@ describe("review round 2", () => {
     expect(await saveDripperFlows(io(null, async () => room(4)), EDITS)).toEqual({ holds: { 3: null } });
     expect(await saveDripperFlows(io(room(3), async () => Promise.reject(new Error("timed out"))), EDITS)).toEqual({ holds: { 3: null }, reason: "timed out" });
     expect(await saveDripperFlows(io(room(3), async () => Promise.reject(new Error("pump must read OFF"))), EDITS)).toEqual({ holds: { 3: 3 }, reason: "pump must read OFF" });
+  });
+});
+
+describe("review round 3", () => {
+  test("a partial failure names the dripper rows that were written and read back", async () => {
+    const rows = [
+      row("max_flow", "Pump max flow", "1000 L/h", "900 L/h"),
+      row("dripper:2", "Zone 2 dripper flow", "4.0 L/h", "3.5 L/h"),
+      row("dripper:3", "Zone 3 dripper flow", "4.0 L/h", "3.0 L/h"),
+    ];
+    const edits: DripperEdit[] = [
+      { zone: 2, before: 4, after: 3.5, rowId: "dripper:2" },
+      { zone: 3, before: 4, after: 3, rowId: "dripper:3" },
+    ];
+    const receipt = await applySupply({ saveSupply: async () => saved, saveDrippers: async () => ({ holds: { 2: 3.5, 3: 4 }, reason: "x" }) }, rows, edits, AT);
+    expect(receipt).toMatchObject({
+      ok: false,
+      message:
+        "Pump settings were saved. Zone 2 dripper flow 4.0 L/h → 3.5 L/h was saved. Zone 3 dripper flow was not: controller still holds 4.0 L/h.",
+    });
+  });
+  test("sameFlow: float noise is the same flow; not set is only the same as not set", () => {
+    expect(sameFlow(3.0000000000001, 3)).toBe(true);
+    expect(sameFlow(3.1, 3)).toBe(false);
+    expect(sameFlow(null, 3)).toBe(false);
+    expect(sameFlow(null, null)).toBe(true);
+    expect(sameFlow(4, null)).toBe(false);
+  });
+  const bare = (flow?: number) =>
+    ({
+      entry_id: "e",
+      revision: 7,
+      room_name: "F2",
+      active: true,
+      zones: [{ id: 3, ...(flow === undefined ? {} : { dripper_flow_rate: flow }) }],
+      hardware: {},
+    }) as unknown as SetupRoom;
+  test("a dripper flow not set before can be written; a value set since is stale", async () => {
+    const edit: DripperEdit[] = [{ zone: 3, before: null, after: 4, rowId: "dripper:3" }];
+    const io = (fresh: SetupRoom) => ({ read: async () => fresh, save: async () => bare(4) });
+    expect(await saveDripperFlows(io(bare()), edit)).toEqual({ holds: { 3: 4 } });
+    expect(await saveDripperFlows(io(bare(5)), edit)).toEqual({ holds: { 3: 5 }, reason: "The dripper flow changed since you started editing." });
+  });
+  test("an apply that set a dripper flow not set before has no Undo: there is nothing to put back", () => {
+    const applied = { pumps: [], groups: {}, revision: null, edits: [{ zone: 3, before: 4, after: null, rowId: "dripper:3" }], partial: false, summary: "s" };
+    expect(nextUndo(null, applied)).toBeNull();
   });
 });
