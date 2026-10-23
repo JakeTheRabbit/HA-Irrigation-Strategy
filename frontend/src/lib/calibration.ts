@@ -22,6 +22,10 @@ export interface CalibrationRecord extends CalibrationResult {
   entity_id: string | null;
   at: string;
   note: string;
+  /** 3.18: the calibration in force on the probe (a guided calibration); a check is never applied. */
+  applied?: boolean;
+  due_days?: number;
+  superseded_by?: string | null;
 }
 export interface CalibrationDocument {
   schema_version: number;
@@ -135,6 +139,10 @@ export class CalibrationDemo {
     }
     document.sensors = { feed_ph: sensor("feed_ph_sensor"), feed_ec: sensor("feed_ec_sensor") };
     return document;
+  }
+  /** The room's stored document itself, for the demo's guided calibration (parity-demo/feed-calibration.ts). */
+  live(roomId: string): CalibrationDocument {
+    return this.document(roomId);
   }
   call(action: string, data: Record<string, unknown>): CalibrationDocument {
     const roomId = String(data.room_id);

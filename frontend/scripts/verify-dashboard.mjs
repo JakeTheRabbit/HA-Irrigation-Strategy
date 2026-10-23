@@ -285,7 +285,7 @@ try {
     ["equipment/stock", "Stock tanks · Room A"],
     ["equipment/dosing", "Feed & dosing · Room A"],
     ["equipment/pump-calibration", "Pump calibration"],
-    ["equipment/feed-calibration", "Feed pH/EC calibration"],
+    ["equipment/feed-calibration", "Calibrate feed pH probe"],
     ["equipment/setup", "Rooms and setup"],
     ["settings", "Dashboards & display"],
     ["settings/alerts", "Alert rules"],
