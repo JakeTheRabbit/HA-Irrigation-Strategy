@@ -422,12 +422,17 @@
 }
 .rc-add {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.5rem;
   font-size: var(--text-sm);
 }
 .rc-add input {
   width: 6rem;
+}
+.rc-kg-hint {
+  flex-basis: 100%;
+  color: var(--muted-foreground);
 }
 .rc-limit {
   margin: 0;

@@ -11,9 +11,9 @@ import {
   ComparisonChart,
   ComparisonSummary,
   format,
-  RunCompare,
   type Loaded,
 } from "./comparison-views";
+import { RunCompare } from "./run-compare";
 import { RunWeeks } from "./comparison-weeks";
 import { buildSetpointPreview } from "@/lib/setpoint-preview";
 import { buildComparisonTarget } from "@/lib/comparison-target";

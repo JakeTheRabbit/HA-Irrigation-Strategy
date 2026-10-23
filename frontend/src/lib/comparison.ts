@@ -307,13 +307,14 @@ export function runCallout(
   // Run days, not stage names: no flip date is recorded, so a stage on run days would be a guess.
   const span = days === to - from + 1 ? `on run days ${from}–${to}` : `on ${days} of run days ${from}–${to}`;
   const size = Math.abs(delta).toFixed(digits);
+  const pts = size === "1" ? "pt" : "pts";
   // The reference run's side of the gap, for the sentences it is the subject of.
   const ourDelta = -delta;
   const text =
     metric === "vwc"
-      ? `${run.name} sat ${size} pts ${delta > 0 ? "wetter" : "drier"} than ${ref} ${span}.`
+      ? `${run.name} sat ${size} ${pts} ${delta > 0 ? "wetter" : "drier"} than ${ref} ${span}.`
       : metric === "dryback"
-        ? `${Ref} dries back ${size} pts ${ourDelta > 0 ? "more" : "less"} than ${run.name} ${span}.`
+        ? `${Ref} dries back ${size} ${pts} ${ourDelta > 0 ? "more" : "less"} than ${run.name} ${span}.`
         : metric === "pore_ec"
           ? `${Ref} is ${formatEc(Math.abs(delta), digits)} ${ourDelta > 0 ? "higher" : "lower"} than ${run.name} ${span}.`
           : `${run.name} gave ${formatVolume(Math.abs(delta), digits)}${
@@ -357,7 +358,16 @@ export function comparedRun(run: RunRecord, growDays: GrowDay[], current: boolea
 }
 
 /** A calendar date ("2026-08-10") as "Mon 10 Aug". */
-const dateLabel = (date: string) => dayLabel(Date.parse(date + "T12:00:00Z"), "UTC");
+export const dateLabel = (date: string) => dayLabel(Date.parse(date + "T12:00:00Z"), "UTC");
+/** A weight in grams as kg, to the gram and no finer: 38400 reads "38.4 kg". */
+export const kgText = (grams: number) => `${Number((grams / 1000).toFixed(3))} kg`;
+/** A dry weight typed in kg, as grams: a decimal point or comma, to the gram. Null for anything
+ * else, including "1,234", which could be a thousands comma. */
+export function parseDryKg(text: string): number | null {
+  const t = text.trim();
+  if (!/^\d+([.,]\d{1,3})?$/.test(t) || /^\d{1,3},\d{3}$/.test(t)) return null;
+  return Math.round(Number(t.replace(",", ".")) * 1000);
+}
 
 /** What a run's card says it ended with: its harvest as recorded (dry weight in kg and g/m² only
  * where entered), else that none is; a run in progress, its planned harvest date if the plan has one.
@@ -381,7 +391,7 @@ export function runResult(
         ? `Ended ${dateLabel(run.end_date)}`
         : "Harvested",
   ];
-  if (figures.dryG !== null) parts.push(`${Number((figures.dryG / 1000).toFixed(3))} kg dry`);
+  if (figures.dryG !== null) parts.push(`${kgText(figures.dryG)} dry`);
   if (figures.gramsPerM2 !== null) parts.push(`${Math.round(figures.gramsPerM2)} g/m²`);
   return { text: parts.join(" · "), missing: false };
 }

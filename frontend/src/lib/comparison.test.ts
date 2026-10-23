@@ -7,10 +7,13 @@ import {
   comparedRun,
   comparisonRange,
   dailyStatistics,
+  dateLabel,
   downsample,
   harvestCleared,
   harvestResult,
+  kgText,
   midnight,
+  parseDryKg,
   runCallout,
   runResult,
   summarize,
@@ -317,7 +320,7 @@ describe("compare runs callouts", () => {
     expect(
       runCallout("vwc", [run("Run 15", true, { vwc: gappy }), run("Run 14", false, { vwc: series(1, 21, 61) })], stages)
         ?.text,
-    ).toBe("Run 14 sat 1 pts wetter than this run on 19 of run days 1–21.");
+    ).toBe("Run 14 sat 1 pt wetter than this run on 19 of run days 1–21.");
   });
 
   it("runCallout's water share is of this run's water on the days compared, and absent when that is zero", () => {
@@ -349,6 +352,9 @@ describe("compare runs callouts", () => {
     expect(pair("water", 0.2, 0.21)).toBeNull();
     // At the floor it speaks.
     expect(pair("vwc", 60, 60.5)?.text).toBe("Run 14 sat 0.5 pts wetter than this run on run days 1–21.");
+    // Whole-number readings: a gap of one point is "1 pt", never "1 pts".
+    expect(pair("dryback", 12, 13)?.text).toBe("This run dries back 1 pt less than Run 14 on run days 1–21.");
+    expect(pair("dryback", 12, 14)?.text).toBe("This run dries back 2 pts less than Run 14 on run days 1–21.");
     // One run, or fewer than three days in common, is not a comparison.
     expect(runCallout("vwc", [run("Run 15", true, { vwc: series(1, 21, 60) })], stages)).toBeNull();
     expect(
@@ -410,6 +416,24 @@ describe("compare runs callouts", () => {
     expect(() => harvestCleared(doc({ r: harvestResult(38_400) }), "r")).toThrow(
       "The harvest result is still stored. Reload and check before trying again.",
     );
+  });
+
+  it("reads a dry weight typed with a decimal point or comma, and nothing it would have to guess", () => {
+    expect(parseDryKg("38.4")).toBe(38_400);
+    expect(parseDryKg(" 38,4 ")).toBe(38_400);
+    expect(parseDryKg("41")).toBe(41_000);
+    expect(parseDryKg("0.125")).toBe(125);
+    // "1,234" could be a thousands comma: not read as 1.234 kg.
+    expect(parseDryKg("1,234")).toBeNull();
+    expect(parseDryKg("38.4 kg")).toBeNull();
+    expect(parseDryKg("0.0005")).toBeNull();
+    expect(parseDryKg("")).toBeNull();
+  });
+
+  it("names a weight in kg and a calendar date one way for cards and review rows", () => {
+    expect(kgText(38_400)).toBe("38.4 kg");
+    expect(kgText(125)).toBe("0.125 kg");
+    expect(dateLabel("2026-08-10")).toBe("Mon 10 Aug");
   });
 
   it("says what a run ended with, never more than was recorded", () => {
