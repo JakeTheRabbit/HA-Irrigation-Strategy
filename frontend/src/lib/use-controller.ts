@@ -24,6 +24,7 @@ import {
   emptyRoom,
   resolveRequestedRoom,
   validateChange,
+  waterLitres,
 } from "./model";
 import {
   createDemo,
@@ -48,7 +49,12 @@ import {
 } from "./live";
 import { roomProbeIds } from "./probes";
 import { TANK_KEYS } from "./tank-level";
-import { historySamples, type WaterRecord, type WaterRecordRequest } from "./water-use";
+import {
+  historySamples,
+  type CounterSample,
+  type WaterRecord,
+  type WaterRecordRequest,
+} from "./water-use";
 
 type Listener = () => void;
 const SESSION_KEY = "crop-steering-connection-tab";
@@ -748,12 +754,29 @@ export class ControllerStore {
       ? { source: "statistics", samples: await liveStatistics(this.live, request) }
       : {
           source: "history",
-          samples: historySamples(await this.client.timeline({ ...request, attributeIds: [] })),
+          samples: inLitres(
+            historySamples(await this.client.timeline({ ...request, attributeIds: [] })),
+            this.states,
+          ),
         };
     if (generation !== this.generation)
       throw new Error("Room or connection changed; water request cancelled.");
     return result;
   };
+}
+/** Recorded water counters in litres, by the unit each entity reports now (history carries none);
+ * a counter in a unit that cannot be converted is dropped, never shown as litres. */
+export function inLitres(
+  samples: Record<string, CounterSample[]>,
+  states: States,
+): Record<string, CounterSample[]> {
+  return Object.fromEntries(
+    Object.entries(samples).map(([id, list]) => {
+      if (!/_daily_water_/.test(id)) return [id, list];
+      const factor = waterLitres({ ...states[id], state: "1" });
+      return [id, factor === null ? [] : list.map((s) => ({ ...s, value: s.value * factor }))];
+    }),
+  );
 }
 function message(error: unknown): string {
   return error instanceof Error ? error.message : "Home Assistant request failed.";

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ControllerStore } from "./use-controller";
+import { ControllerStore, inLitres } from "./use-controller";
 import { HaClient, haTimeZone } from "./client";
 import { viewerTimeZone } from "./comparison";
 import { createDemo } from "./demo";
@@ -392,5 +392,31 @@ describe("Home Assistant's time zone", () => {
     const [, init] = fetch.mock.calls.find(([input]) => String(input).endsWith("/api/config"))!;
     expect(init?.headers).toMatchObject({ Authorization: "Bearer inherited" });
     stop();
+  });
+});
+
+describe("recorded water in litres", () => {
+  const counter = (unit: string) => ({
+    entity_id: "x",
+    state: "1",
+    attributes: unit ? { unit_of_measurement: unit } : {},
+  });
+  it("scales each water counter by its own unit and never passes gallons off as litres", () => {
+    const samples = {
+      "sensor.crop_steering_zone_1_daily_water_app": [{ time: 1, value: 10 }],
+      "sensor.crop_steering_zone_1_daily_water_usage": [{ time: 1, value: 2 }],
+      "sensor.crop_steering_zone_2_daily_water_usage": [{ time: 1, value: 2 }],
+      "sensor.crop_steering_zone_1_irrigation_count_app": [{ time: 1, value: 3 }],
+    };
+    const out = inLitres(samples, {
+      "sensor.crop_steering_zone_1_daily_water_app": counter("L"),
+      "sensor.crop_steering_zone_1_daily_water_usage": counter("gal"),
+      "sensor.crop_steering_zone_2_daily_water_usage": counter("bushels"),
+      "sensor.crop_steering_zone_1_irrigation_count_app": counter(""),
+    });
+    expect(out["sensor.crop_steering_zone_1_daily_water_app"][0].value).toBe(10);
+    expect(out["sensor.crop_steering_zone_1_daily_water_usage"][0].value).toBeCloseTo(7.570823568);
+    expect(out["sensor.crop_steering_zone_2_daily_water_usage"]).toEqual([]);
+    expect(out["sensor.crop_steering_zone_1_irrigation_count_app"][0].value).toBe(3);
   });
 });

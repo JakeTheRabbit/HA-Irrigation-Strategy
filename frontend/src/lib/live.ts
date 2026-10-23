@@ -132,6 +132,8 @@ export async function liveStatistics(
           statistic_ids: request.entityIds,
           period: "hour",
           types: ["state"],
+          // Litres, whatever display unit the counter has been given (never gallons beside litres).
+          units: { volume: "L" },
         }),
         deadline,
       ]),
