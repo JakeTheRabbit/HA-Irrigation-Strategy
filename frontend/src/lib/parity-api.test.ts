@@ -87,6 +87,7 @@ test("demo with backend=3.17 answers every parity action as missing", async () =
 });
 // The timer writes and preview need a program the demo can check, as the integration does.
 const DAY_TIMER = { id: DEMO_TIMER_PROGRAM_ID, name: "Zone 3 day timer", type: "recycle", zones: [3], duration_s: 60, interval_min: 45, window: { kind: "lights_on" } };
+const TANK_RULE = { room_id: "room:", source: "tank.level", op: "below", threshold: 25 };
 const ASKED: Partial<Record<string, Record<string, unknown>>> = {
   timer_program_set: { expected_revision: 1, program: DAY_TIMER },
   timer_program_preview: { program: DAY_TIMER },
@@ -95,6 +96,11 @@ const ASKED: Partial<Record<string, Record<string, unknown>>> = {
   preset_apply: { preset_id: DEMO_PRESET_IDS.roomB, to: [{ room_id: "room:" }], preview: true },
   preset_delete: { id: DEMO_PRESET_IDS.timer, expected_revision: 1 },
   copy_config: { from: { room_id: "room:" }, to: [{ room_id: "room:room_b_" }], sections: ["targets"], preview: true },
+  // The alert rules are checked as the integration checks them (parity-demo/settings.ts).
+  alert_rule_set: { expected_revision: 4, rule: TANK_RULE },
+  alert_rule_delete: { expected_revision: 4, id: "01JDEMRULE0000000000000002" },
+  alert_rule_test: { rule: TANK_RULE },
+  alert_rule_preview: { rule: TANK_RULE },
 };
 test("demo 3.18 answers every parity action ok", async () => {
   for (const a of PARITY_ACTIONS) expect([a, (await callV2(demoController("?demo=1"), a, ASKED[a] ?? {})).kind]).toEqual([a, "ok"]);

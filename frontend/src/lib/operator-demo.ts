@@ -34,6 +34,7 @@ import {
   resetDemoTargetWrites,
   settleDemoTargetWrite,
 } from "./parity-demo/targets";
+import { resetDemoAlertRules } from "./parity-demo/settings";
 import { resetDemoTimers } from "./parity-demo/timers";
 import { answerPresets, resetDemoPresets } from "./parity-demo/presets";
 import { sameValue } from "./utils";
@@ -71,6 +72,7 @@ export class OperatorDemo {
     // The demo Journal's own setpoint writes and timer programs belong to this demo and its backend only.
     resetDemoTargetWrites();
     resetDemoTimers();
+    resetDemoAlertRules();
     resetDemoPresets();
     this.whatsNewSeen =
       whatsNew === "unknown"

@@ -214,10 +214,17 @@ export interface AlertRule {
   active: boolean;
 }
 export interface AlertRuleListItem extends AlertRule {
+  /** The integration's own words for the rule: "Tell when F2 tank level stays below 30% for 10 min." */
+  summary_sentence: string;
   state: "draft" | "armed" | "pending" | "firing" | "acknowledged" | "muted";
   last_fired: string | null;
   firing_since: string | null;
   current_value: number | null;
+}
+/** `alert_rule_list`: `revision` is the site-wide one `alert_rule_set` takes as `expected_revision`. */
+export interface AlertRuleList {
+  rules: AlertRuleListItem[];
+  revision: number;
 }
 export interface AlertPreview {
   summary_sentence: string;
@@ -229,7 +236,7 @@ export interface AlertPreview {
   max: number | null;
   sentence: string;
   /** `alert_rule_test` with `send: true` only. */
-  delivery?: { service: string; ok: boolean; error: string | null }[];
+  delivery?: { service: string | null; ok: boolean; error: string | null }[];
 }
 
 // preset_* / copy_config (backend Task 22)

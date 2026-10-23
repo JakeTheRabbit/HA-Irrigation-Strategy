@@ -181,7 +181,7 @@ const timerProgram = (now: number): TimerProgramListItem => ({
 const rule = (data: Record<string, unknown>): AlertRuleListItem => ({
   id: "01JDEMORULETANKLOW0000000", kind: "threshold", room_id: "room:", source: "tank.level", op: "below",
   threshold: 30, unit: "%", window: { kind: "lights_on" }, min_duration_s: 600, severity: "warning", routing: "sensors",
-  active: true, state: "armed", last_fired: null, firing_since: null, current_value: 68,
+  active: true, summary_sentence: "Tell when Room A tank level stays below 30% for 10 min during lights-on.", state: "armed", last_fired: null, firing_since: null, current_value: 68,
   ...(isRecord(data.rule) ? data.rule : {}),
 });
 
