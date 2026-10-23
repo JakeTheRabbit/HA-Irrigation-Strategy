@@ -173,9 +173,15 @@ def _dose_event(slug, item, flow, by, batch_id):
     when = datetime.fromisoformat(at)
     outcome, code = _DOSE_ENDS.get(str(item.get("result") or "").split(";")[0], ("failed", "CS-806"))
     return "dose.completed", {
-        "now": when, "event_id": derived_id(when, f"dosing:{slug}:{at}:dose.completed"), "outcome": outcome,
+        "now": when, "event_id": derived_id(_id_time(when), f"dosing:{slug}:{at}:dose.completed"), "outcome": outcome,
         "code": code, "actor": _actor(by), "detail": by, "correlation": {"batch_id": batch_id},
         "data": {"pump": item.get("pump"), "ml": item.get("ml"), "given_ml": item.get("given"), "flow_ml_s": flow}}
+
+
+def _id_time(when):
+    """The time a derived event id is made from: aware as it is, else taken as UTC (a history row from before the runner
+    kept aware times), so an id never moves with the add-on's time zone."""
+    return when if when.tzinfo else when.replace(tzinfo=timezone.utc)
 
 
 def _failed(result, name, by, batch_id, codes=(), stopped=None):
@@ -206,7 +212,7 @@ def history_events(slug, history):
             except (KeyError, TypeError, ValueError):
                 ended = when
             kind, by = row.get("kind"), row.get("by")
-            batch_id = derived_id(when, f"dosing:{slug}:{at}:batch") if kind in ("batch", "correct") else None
+            batch_id = derived_id(_id_time(when), f"dosing:{slug}:{at}:batch") if kind in ("batch", "correct") else None
             events = [_dose_event(slug, item, None, by, batch_id) for item in row.get("dosed") or []
                       if isinstance(item, dict) and item.get("at")]
             if kind == "batch":
@@ -215,7 +221,7 @@ def history_events(slug, history):
                 kw = ({"actor": _actor(by), "detail": by, "correlation": {"batch_id": batch_id},
                        "data": {"step": "finish", "state": "done", "recipe": name}} if end == "batch.step"
                       else _failed(result, name, by, batch_id))
-                events.append((end, {**kw, "now": ended, "event_id": derived_id(when, f"dosing:{slug}:{at}:{end}")}))
+                events.append((end, {**kw, "now": ended, "event_id": derived_id(_id_time(when), f"dosing:{slug}:{at}:{end}")}))
         except (KeyError, TypeError, ValueError, AttributeError):
             continue
         out += events
