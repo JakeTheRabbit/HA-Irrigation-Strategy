@@ -254,7 +254,7 @@ const DETAILS: Record<string, SettingDetail> = {
   },
   p0_additional_dryback: {
     what: "How far moisture dries below its highest reading since lights-on before the first shot of the day, as a percentage of that reading: 3% of a 60% reading is 1.8 points.",
-    when: "In P0. The ramp starts once moisture is down by this much, or earlier at the latest first shot or the rescue floor. 0 turns it off, and P0 then waits for the P3 dryback target instead.",
+    when: "In P0. The ramp starts once moisture is down by this much, or earlier at the latest first shot or the rescue floor. 0 turns it off, and P0 then waits for the whole dryback target (the overnight percentage, here measured from the highest reading since lights-on), so in practice it ends at the maximum wait.",
     practice: "Commonly 1 to 5% after lights-on, before the first shot.",
   },
   p1_target_vwc: {
