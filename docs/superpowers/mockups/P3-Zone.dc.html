@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Phone — F2 Zone 2</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#4fc3f7;text-decoration:none}a:hover{color:#b3e5fc}
+</style>
+</helmet>
+<!-- PHONE SHELL: 390x844. Tokens: canvas #111111, surface #1c1c1c, raised #232323, border #2e2e2e, text #e1e1e1, muted #a4a4a4, faint #8a8a8a, primary #03a9f4, link #4fc3f7, success #81c995, warning #ffca5b, danger #f28b82. Phase P0 #6b7580, P1 #2f6fb5, P2 #6450b0, P3 #34405a. Font Roboto. Radius 12. -->
+<div style="width: 390px; height: 844px; box-sizing: border-box; background: #111111; color: #e1e1e1; font-family: Roboto, Arial, sans-serif; display: flex; flex-direction: column; overflow: hidden">
+
+<header style="height: 56px; flex-shrink: 0; display: flex; align-items: center; gap: 4px; padding: 0 8px; border-bottom: 1px solid #2e2e2e; background: #1c1c1c">
+<button type="button" aria-label="Open menu" style="width: 44px; height: 44px; border: 0; border-radius: 8px; background: transparent; color: #e1e1e1; display: flex; align-items: center; justify-content: center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="4" y1="6" x2="20" y2="6"></line><line x1="4" y1="12" x2="20" y2="12"></line><line x1="4" y1="18" x2="20" y2="18"></line></svg></button>
+<span style="display: flex; flex-direction: column"><b style="font-size: 17px; font-weight: 600">F2 · Zone 2</b><span style="font-size: 12px; color: #a4a4a4">Updated 12 s ago</span></span>
+<a href="P1-AllRooms.dc.html" style="margin-left: auto; display: flex; align-items: center; min-height: 44px; padding: 0 8px; font-size: 14px">All rooms</a>
+</header>
+
+<main style="flex: 1; min-height: 0; overflow: hidden; padding: 12px; display: flex; flex-direction: column; gap: 10px">
+
+<!-- Slab + chips -->
+<section style="display: flex; align-items: center; gap: 12px; padding: 8px 12px; background: #1c1c1c; border: 1px solid #2e2e2e; border-radius: 12px">
+<svg width="80" height="72" viewBox="0 0 100 100" aria-hidden="true" style="flex: none"><path d="M50 30 V14" stroke="#4c8c3a" stroke-width="2.5" stroke-linecap="round" fill="none"></path><path d="M50 18 C40 10 36 12 34 6 C42 6 48 10 50 18 Z" fill="#64a548"></path><path d="M50 15 C58 7 63 8 66 3 C58 3 52 7 50 15 Z" fill="#64a548"></path><rect x="31" y="22" width="38" height="16" rx="2" fill="#e8dfc8" stroke="#b5a684" stroke-width="1.5"></rect><rect x="4" y="36" width="92" height="56" rx="5" fill="#efe7d2"></rect><rect x="4" y="50.4" width="92" height="41.6" fill="#2f86c4" fill-opacity="0.6"></rect><rect x="4" y="36" width="92" height="56" rx="5" fill="none" stroke="#b5a684" stroke-width="2"></rect><line x1="4" x2="96" y1="47.3" y2="47.3" stroke="#1b4f72" stroke-width="1.5" stroke-dasharray="4 3"></line><circle cx="50" cy="60" r="6" fill="#81c995" stroke="#fff" stroke-width="1.5"></circle></svg>
+<span style="display: flex; flex-direction: column; gap: 6px; min-width: 0">
+<span style="display: flex; gap: 6px; flex-wrap: wrap"><span style="padding: 2px 7px; border-radius: 4px; background: #6450b0; color: #fff; font-size: 12px; font-weight: 700">P2 Maintenance</span><span style="display: flex; align-items: center; gap: 5px; padding: 0 8px; border: 1px solid #3a3a3a; border-radius: 11px; font-size: 12px; font-weight: 600"><span style="width: 7px; height: 7px; border-radius: 4px; background: #81c995"></span>Automated</span></span>
+<span style="font-size: 13px; color: #a4a4a4">Day 38 · 40 plants · <b style="color: #e1e1e1; font-weight: 600">7.9 L</b> today · 6 shots</span>
+</span>
+</section>
+
+<!-- Swipeable day chart -->
+<section aria-label="Today charts" style="background: #1c1c1c; border: 1px solid #2e2e2e; border-radius: 12px; padding: 10px 0 8px; display: flex; flex-direction: column; gap: 6px">
+<div style="display: flex; align-items: center; padding: 0 12px; font-size: 13px"><b style="font-size: 15px; font-weight: 600">Today</b><span style="margin-left: auto; color: #a4a4a4">Swipe: VWC · Pore EC</span></div>
+<div tabindex="0" aria-label="Swipe between VWC and pore EC charts" style="display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none">
+<div style="flex: none; width: 364px; scroll-snap-align: start; padding: 0 0 0 12px; box-sizing: border-box">
+<svg width="340" height="150" viewBox="0 0 340 150" role="img" aria-label="VWC today, now 59.4 percent, target band shaded per phase">
+<rect x="{{nA.x}}" y="10" width="{{nA.w}}" height="114" fill="#0d0d0d"></rect>
+<rect x="{{nB.x}}" y="10" width="{{nB.w}}" height="114" fill="#0d0d0d"></rect>
+<sc-for list="{{bands}}" as="b" hint-placeholder-count="5"><rect x="{{b.x}}" y="{{b.y}}" width="{{b.w}}" height="{{b.h}}" fill="{{b.fill}}" fill-opacity="0.45"></rect><text x="{{b.cx}}" y="8" text-anchor="middle" font-size="9" font-weight="700" fill="#b8b8b8" font-family="Roboto, Arial">{{b.ph}}</text></sc-for>
+<sc-for list="{{vTicks}}" as="t" hint-placeholder-count="3"><text x="24" y="{{t.ty}}" text-anchor="end" font-size="10" fill="#8a8a8a" font-family="Roboto, Arial">{{t.label}}</text></sc-for>
+<polyline points="{{projPts}}" fill="none" stroke="#e1e1e1" stroke-width="1.5" stroke-dasharray="4 3" stroke-opacity="0.7"></polyline>
+<polyline points="{{vwcPts}}" fill="none" stroke="#e1e1e1" stroke-width="2" stroke-linejoin="round"></polyline>
+<sc-for list="{{shots}}" as="s" hint-placeholder-count="6"><circle cx="{{s.x}}" cy="{{s.y}}" r="3.5" fill="#03a9f4" stroke="#fff" stroke-width="1"></circle></sc-for>
+<line x1="{{nowX}}" x2="{{nowX}}" y1="10" y2="124" stroke="#e1e1e1" stroke-width="1.5"></line>
+<text x="{{nowTx}}" y="{{nowTy}}" font-size="12" font-weight="700" fill="#e1e1e1" font-family="Roboto, Arial">59.4%</text>
+<sc-for list="{{xTicks}}" as="t" hint-placeholder-count="5"><text x="{{t.x}}" y="140" text-anchor="middle" font-size="10" fill="#8a8a8a" font-family="Roboto, Arial">{{t.label}}</text></sc-for>
+</svg>
+</div>
+<div style="flex: none; width: 364px; scroll-snap-align: start; padding: 0 0 0 12px; box-sizing: border-box">
+<svg width="340" height="150" viewBox="0 0 340 150" role="img" aria-label="Pore EC today, 6.6, over the 4.5 to 6.0 band since 12:24">
+<rect x="{{nA.x}}" y="10" width="{{nA.w}}" height="114" fill="#0d0d0d"></rect>
+<rect x="{{nB.x}}" y="10" width="{{nB.w}}" height="114" fill="#0d0d0d"></rect>
+<rect x="28" y="{{ecBand.y}}" width="308" height="{{ecBand.h}}" fill="rgba(129,201,149,.22)"></rect>
+<sc-for list="{{eTicks}}" as="t" hint-placeholder-count="3"><text x="24" y="{{t.ty}}" text-anchor="end" font-size="10" fill="#8a8a8a" font-family="Roboto, Arial">{{t.label}}</text></sc-for>
+<polyline points="{{ecOkPts}}" fill="none" stroke="#e1e1e1" stroke-width="2"></polyline>
+<polyline points="{{ecHiPts}}" fill="none" stroke="#ffca5b" stroke-width="2"></polyline>
+<polyline points="{{ecProjPts}}" fill="none" stroke="{{ecProjInk}}" stroke-width="1.5" stroke-dasharray="4 3"></polyline>
+<line x1="{{nowX}}" x2="{{nowX}}" y1="10" y2="124" stroke="#e1e1e1" stroke-width="1.5"></line>
+<text x="{{nowX}}" y="{{ecNowTy}}" dx="-36" font-size="12" font-weight="700" fill="#ffca5b" font-family="Roboto, Arial">6.6</text>
+<sc-for list="{{xTicks}}" as="t" hint-placeholder-count="5"><text x="{{t.x}}" y="140" text-anchor="middle" font-size="10" fill="#8a8a8a" font-family="Roboto, Arial">{{t.label}}</text></sc-for>
+</svg>
+</div>
+</div>
+<div aria-hidden="true" style="display: flex; justify-content: center; gap: 6px"><span style="width: 16px; height: 6px; border-radius: 3px; background: #4fc3f7"></span><span style="width: 6px; height: 6px; border-radius: 3px; background: #5a5a5a"></span></div>
+</section>
+
+<!-- Gauges -->
+<section aria-label="Gauges" style="background: #1c1c1c; border: 1px solid #2e2e2e; border-radius: 12px; padding: 10px 12px; display: grid; grid-template-columns: 82px minmax(0, 1fr) 48px; gap: 9px 10px; align-items: center; font-size: 13px">
+<sc-for list="{{gauges}}" as="g" hint-placeholder-count="3">
+<span style="color: #a4a4a4">{{g.label}}<span style="display: block; font-size: 11px; color: #8a8a8a">{{g.band}}</span></span>
+<span style="position: relative; height: 8px; border-radius: 4px; background: #333333"><span style="position: absolute; left: {{g.bandL}}; width: {{g.bandW}}; top: 0; bottom: 0; background: rgba(129,201,149,.45); border-radius: 4px"></span><span style="position: absolute; left: {{g.pos}}; top: -5px; bottom: -5px; width: 3px; background: {{g.ink}}; border-radius: 2px"></span></span>
+<b style="text-align: right; font-size: 15px; font-weight: 600; color: {{g.ink}}">{{g.val}}</b>
+</sc-for>
+</section>
+
+<!-- Problem card in place, under the pore EC gauge -->
+<sc-if value="{{fixOpen}}" hint-placeholder-val="{{true}}">
+<section aria-label="Pore EC problem" style="background: rgba(255,202,91,.10); border: 1px solid #ffca5b; border-radius: 12px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; font-size: 14px; line-height: 1.4">
+<b style="font-weight: 600">Pore EC 6.6 is over the 4.5–6.0 band and rising.</b>
+<span style="color: #b8b8b8">AI assistant suggests: <b style="color: #e1e1e1">Dilute next 2 shots (EC 1.6)</b>. Expected back to about 5.8 by lights-off.</span>
+<span style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px">
+<button type="button" onClick="{{applyFix}}" style="height: 44px; border: 0; border-radius: 8px; background: #03a9f4; color: #0b1d27; font: inherit; font-size: 15px; font-weight: 700">Apply</button>
+<button type="button" onClick="{{dismissFix}}" style="height: 44px; border: 1px solid #3a3a3a; border-radius: 8px; background: transparent; color: #e1e1e1; font: inherit; font-size: 15px; font-weight: 600">Dismiss</button>
+</span>
+</section>
+</sc-if>
+<sc-if value="{{fixDone}}" hint-placeholder-val="{{false}}">
+<section style="background: #1c1c1c; border: 1px solid #2e2e2e; border-radius: 12px; padding: 6px 6px 6px 12px; display: flex; align-items: center; gap: 10px; font-size: 13px; line-height: 1.4">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="{{fixIconInk}}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: none"><polyline points="4 12 10 18 20 6"></polyline></svg>
+<span>{{fixMsg}}</span>
+<button type="button" onClick="{{undoFix}}" style="margin-left: auto; flex: none; height: 44px; padding: 0 14px; border: 0; border-radius: 8px; background: transparent; color: #4fc3f7; font: inherit; font-size: 15px; font-weight: 600">Undo</button>
+</section>
+</sc-if>
+
+<!-- Next action -->
+<section aria-label="Next action" style="background: #1c1c1c; border-left: 3px solid #03a9f4; border-radius: 0 12px 12px 0; padding: 10px 12px; font-size: 14px; line-height: 1.45">
+<b style="font-weight: 600">Next:</b> maintenance shot when VWC falls under 58% (now 59.4%), about 14:55{{nextNote}}. P3 dryback from 16:00.
+</section>
+</main>
+
+<nav aria-label="Sections" style="height: 64px; flex-shrink: 0; display: grid; grid-template-columns: repeat(5, 1fr); border-top: 1px solid #2e2e2e; background: #1c1c1c">
+<a href="P1-AllRooms.dc.html" aria-current="page" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; color: #4fc3f7; font-size: 11px; font-weight: 600; box-shadow: inset 0 2px 0 #03a9f4"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>Status</a>
+<a href="I1-Timeline.dc.html" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; color: #b8b8b8; font-size: 11px; font-weight: 500"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.7l5.7 5.7a8 8 0 1 1-11.3 0z"></path></svg>Irrigation</a>
+<a href="H1-Explorer.dc.html" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; color: #b8b8b8; font-size: 11px; font-weight: 500"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><polyline points="12 7 12 12 15 14"></polyline></svg>History</a>
+<a href="E1-Probes.dc.html" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; color: #b8b8b8; font-size: 11px; font-weight: 500"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"></path></svg>Equipment</a>
+<a href="T1-AlertRules.dc.html" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; color: #b8b8b8; font-size: 11px; font-weight: 500"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="4" y1="7" x2="20" y2="7"></line><line x1="4" y1="17" x2="20" y2="17"></line><circle cx="9" cy="7" r="2.5"></circle><circle cx="15" cy="17" r="2.5"></circle></svg>Settings</a>
+</nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+var PH = { P0: '#6b7580', P1: '#2f6fb5', P2: '#6450b0', P3: '#34405a' };
+var X0 = 28, X1 = 336, NOW = 14 + 10 / 60;
+function xs(h) { return +(X0 + h / 24 * (X1 - X0)).toFixed(1); }
+function yv(v) { return +(124 - (v - 48) / 20 * 114).toFixed(1); }
+function ye(v) { return +(124 - (v - 3) / 5 * 114).toFixed(1); }
+function pts(arr, fy) { return arr.map(function (p) { return xs(p[0]) + ',' + fy(p[1]); }).join(' '); }
+var VWC = [[0, 61.0], [3, 57.6], [6, 54.6], [7.25, 53.4], [7.27, 56.6], [7.75, 55.9], [7.77, 59.0], [8.25, 58.4], [8.27, 61.4], [8.75, 60.9], [8.78, 63.8], [9.5, 62.7], [11.33, 58.0], [11.35, 60.9], [13.08, 58.0], [13.1, 60.8], [NOW, 59.4]];
+var PROJ = [[NOW, 59.4], [14.92, 58.0], [14.94, 60.8], [16, 59.4], [18, 57.4], [24, 53.6]];
+var SHOTS = [7.25, 7.75, 8.25, 8.75, 11.33, 13.08];
+var BANDS = [[0, 6, 'P3', 52, 60], [6, 7.25, 'P0', 52, 58], [7.25, 8.8, 'P1', 58, 66], [8.8, 16, 'P2', 58, 64], [16, 24, 'P3', 50, 60]];
+var EC = [[0, 5.6], [6, 5.8], [7.25, 5.9], [8.75, 5.4], [11.33, 5.8], [12.4, 6.0]];
+var ECHI = [[12.4, 6.0], [13.08, 6.3], [NOW, 6.6]];
+function pct(v, lo, hi) { return Math.max(1, Math.min(98, (v - lo) / (hi - lo) * 100)).toFixed(1) + '%'; }
+function gauge(label, band, v, lo, hi, bLo, bHi, unit, warn) {
+  return { label: label, band: band, val: v + unit, pos: pct(v, lo, hi), bandL: pct(bLo, lo, hi), bandW: ((bHi - bLo) / (hi - lo) * 100).toFixed(1) + '%', ink: warn ? '#ffca5b' : '#e1e1e1' };
+}
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { fix: 'open' }; }
+  renderVals() {
+    var self = this, applied = this.state.fix === 'applied';
+    var bands = BANDS.map(function (b) {
+      return { x: xs(b[0]), w: +(xs(b[1]) - xs(b[0])).toFixed(1), cx: +((xs(b[0]) + xs(b[1])) / 2).toFixed(1), ph: b[2], y: yv(b[4]), h: +(yv(b[3]) - yv(b[4])).toFixed(1), fill: PH[b[2]] };
+    });
+    var shots = SHOTS.map(function (h) { var p = VWC.filter(function (q) { return q[0] >= h; })[0]; return { x: xs(h), y: yv(p[1]) }; });
+    var ecProj = applied ? [[NOW, 6.6], [14.92, 6.2], [15.5, 5.9], [18, 5.8]] : [[NOW, 6.6], [14.92, 6.9], [15.5, 7.1], [18, 7.2]];
+    return {
+      nA: { x: xs(0), w: xs(6) - xs(0) }, nB: { x: xs(18), w: xs(24) - xs(18) },
+      bands: bands, shots: shots,
+      vTicks: [50, 60].map(function (v) { return { ty: yv(v) + 4, label: v + '%' }; }),
+      eTicks: [4, 6, 8].map(function (v) { return { ty: ye(v) + 4, label: v.toFixed(0) }; }),
+      xTicks: [0, 6, 12, 18, 24].map(function (h) { return { x: xs(h), label: (h < 10 ? '0' : '') + h }; }),
+      vwcPts: pts(VWC, yv), projPts: pts(PROJ, yv),
+      nowX: xs(NOW), nowTx: xs(NOW) + 5, nowTy: yv(59.4) - 8,
+      ecBand: { y: ye(6.0), h: +(ye(4.5) - ye(6.0)).toFixed(1) }, ecNowTy: ye(6.6) - 4,
+      ecOkPts: pts(EC, ye), ecHiPts: pts(ECHI, ye), ecProjPts: pts(ecProj, ye), ecProjInk: applied ? '#81c995' : '#ffca5b',
+      gauges: [gauge('VWC', 'P2 band 58–64%', 59.4, 45, 70, 58, 64, '%'), gauge('Dryback', 'since peak 3–6%', 4.4, 0, 10, 3, 6, '%'), gauge('Pore EC', 'band 4.5–6.0', 6.6, 3, 8, 4.5, 6.0, '', true)],
+      fixOpen: this.state.fix === 'open', fixDone: this.state.fix !== 'open',
+      fixMsg: applied ? 'Next 2 shots at EC 1.6. Written and read back 14:12.' : 'Dismissed. EC stays flagged until back in band.',
+      fixIconInk: applied ? '#81c995' : '#a4a4a4',
+      nextNote: applied ? ', diluted to EC 1.6' : '',
+      applyFix: function () { self.setState({ fix: 'applied' }); },
+      dismissFix: function () { self.setState({ fix: 'dismissed' }); },
+      undoFix: function () { self.setState({ fix: 'open' }); }
+    };
+  }
+}
+</script>
+</body>
+</html>

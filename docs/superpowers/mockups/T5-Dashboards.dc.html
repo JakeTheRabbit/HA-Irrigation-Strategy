@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Settings — Dashboards &amp; display</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+select,input{color-scheme:dark}
+button{cursor:pointer}
+a{color:#4fc3f7;text-decoration:none}a:hover{color:#b3e5fc}
+</style>
+</helmet>
+<!-- SHELL: 1440x1000 frame. Tokens: canvas #111111, surface #1c1c1c, raised #232323, border #2e2e2e, text #e1e1e1, muted #a4a4a4, faint #8a8a8a, primary #03a9f4, link #4fc3f7, success #81c995, warning #ffca5b, danger #f28b82. Phase P0 #6b7580, P1 #2f6fb5, P2 #6450b0, P3 #34405a. Font Roboto; sizes 12/14/15/17/20/24. Radius 12. -->
+<div style="width: 1440px; height: 1000px; box-sizing: border-box; background: #111111; color: #e1e1e1; font-family: Roboto, Arial, sans-serif; display: flex; overflow: hidden">
+
+<!-- SHELL: menu (sections + live room tree) -->
+<aside style="width: 248px; flex-shrink: 0; background: #1c1c1c; border-right: 1px solid #2e2e2e; padding: 22px 12px 16px; box-sizing: border-box; display: flex; flex-direction: column; gap: 4px">
+<div style="display: flex; align-items: center; gap: 10px; padding: 0 8px 18px">
+<span style="width: 36px; height: 36px; border-radius: 10px; background: #03a9f4; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0b1d27" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.7l5.7 5.7a8 8 0 1 1-11.3 0z"></path></svg></span>
+<span style="display: flex; flex-direction: column"><b style="font-size: 16px; font-weight: 600">Crop Steering</b><span style="font-size: 12px; color: #a4a4a4">Irrigation control</span></span>
+</div>
+<nav aria-label="Main navigation" style="display: flex; flex-direction: column; gap: 1px">
+<a href="S1-AllRooms.dc.html" style="display: flex; align-items: center; gap: 12px; min-height: 38px; padding: 0 12px; border-radius: 8px; color: #b8b8b8; font-weight: 500; font-size: 15px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>Status</a>
+<button type="button" aria-expanded="false" style="display: flex; align-items: center; gap: 12px; min-height: 38px; padding: 0 12px; border: 0; border-radius: 8px; background: transparent; color: #b8b8b8; font: inherit; font-size: 15px; font-weight: 500; text-align: left; cursor: pointer"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.7l5.7 5.7a8 8 0 1 1-11.3 0z"></path></svg>Irrigation<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="margin-left: auto"><polyline points="9 6 15 12 9 18"></polyline></svg></button>
+<button type="button" aria-expanded="false" style="display: flex; align-items: center; gap: 12px; min-height: 38px; padding: 0 12px; border: 0; border-radius: 8px; background: transparent; color: #b8b8b8; font: inherit; font-size: 15px; font-weight: 500; text-align: left; cursor: pointer"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><polyline points="12 7 12 12 15 14"></polyline></svg>History<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="margin-left: auto"><polyline points="9 6 15 12 9 18"></polyline></svg></button>
+<button type="button" aria-expanded="false" style="display: flex; align-items: center; gap: 12px; min-height: 38px; padding: 0 12px; border: 0; border-radius: 8px; background: transparent; color: #b8b8b8; font: inherit; font-size: 15px; font-weight: 500; text-align: left; cursor: pointer"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"></path></svg>Equipment<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="margin-left: auto"><polyline points="9 6 15 12 9 18"></polyline></svg></button>
+<button type="button" aria-expanded="true" style="display: flex; align-items: center; gap: 12px; min-height: 38px; padding: 0 12px; margin-top: 10px; border: 0; border-radius: 8px; background: transparent; color: #e1e1e1; font: inherit; font-size: 15px; font-weight: 600; text-align: left; cursor: pointer"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="4" y1="7" x2="20" y2="7"></line><line x1="4" y1="17" x2="20" y2="17"></line><circle cx="9" cy="7" r="2.5"></circle><circle cx="15" cy="17" r="2.5"></circle></svg>Settings<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="margin-left: auto"><polyline points="6 9 12 15 18 9"></polyline></svg></button>
+<div style="display: flex; flex-direction: column; gap: 1px; margin: 0 0 4px 21px; padding-left: 10px; border-left: 1px solid #333">
+<a href="T1-AlertRules.dc.html" style="display: flex; align-items: center; min-height: 32px; padding: 0 10px; border-radius: 6px; color: #b8b8b8; font-size: 14px">Alert rules</a>
+<a href="T2-Notifications.dc.html" style="display: flex; align-items: center; min-height: 32px; padding: 0 10px; border-radius: 6px; color: #b8b8b8; font-size: 14px">Notifications</a>
+<a href="T3-System.dc.html" style="display: flex; align-items: center; min-height: 32px; padding: 0 10px; border-radius: 6px; color: #b8b8b8; font-size: 14px">System status</a>
+<a href="T4-AI.dc.html" style="display: flex; align-items: center; min-height: 32px; padding: 0 10px; border-radius: 6px; color: #b8b8b8; font-size: 14px">AI assistant</a>
+<a href="T5-Dashboards.dc.html" aria-current="page" style="display: flex; align-items: center; min-height: 32px; padding: 0 10px; border-radius: 6px; background: #2a2a2a; box-shadow: inset 2px 0 0 #03a9f4; color: #4fc3f7; font-size: 14px; font-weight: 600">Dashboards &amp; display</a>
+</div>
+</nav>
+<nav aria-label="Rooms" style="display: flex; flex-direction: column; gap: 1px; margin-top: 16px">
+<span style="padding: 0 12px 6px; font-size: 12px; font-weight: 600; letter-spacing: .06em; color: #a4a4a4">ROOMS</span>
+<sc-for list="{{rooms}}" as="r" hint-placeholder-count="3">
+<a href="S2-Room.dc.html" style="display: flex; align-items: center; gap: 8px; min-height: 36px; padding: 0 10px; margin-top: 6px; border-radius: 8px; color: #e1e1e1; font-size: 14px; font-weight: 500"><span style="width: 8px; height: 8px; border-radius: 4px; background: {{r.dot}}"></span>{{r.name}}<span style="margin-left: auto; font-size: 12px; color: #a4a4a4; font-weight: 400">{{r.state}}</span></a>
+<sc-for list="{{r.zones}}" as="z" hint-placeholder-count="3">
+<a href="S3-Zone.dc.html" style="display: flex; align-items: center; gap: 8px; min-height: 30px; padding: 0 10px 0 24px; border-radius: 8px; color: #b8b8b8; font-size: 13px"><span style="min-width: 22px; padding: 0 4px; border-radius: 4px; background: {{z.phColor}}; color: #fff; font-size: 11px; font-weight: 700; text-align: center">{{z.ph}}</span>{{z.name}}<span style="margin-left: auto; font-size: 12px; color: #a4a4a4">{{z.vwc}}</span></a>
+</sc-for>
+</sc-for>
+</nav>
+<div style="margin-top: auto; padding: 0 8px; font-size: 12px; color: #8a8a8a">Integration 3.17.1 · Controller 3.17.1</div>
+</aside>
+
+<div style="flex: 1; min-width: 0; display: flex; flex-direction: column">
+<!-- SHELL: top bar (no room chips on desktop: the tree is the picker) -->
+<header style="height: 56px; flex-shrink: 0; border-bottom: 1px solid #2e2e2e; display: flex; align-items: center; justify-content: flex-end; gap: 12px; padding: 0 24px">
+<span style="font-size: 13px; color: #a4a4a4">Updated 12 s ago</span>
+<span style="display: flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border: 1px solid #2e2e2e; border-radius: 15px; font-size: 13px; font-weight: 600"><span style="width: 7px; height: 7px; border-radius: 4px; background: #81c995"></span>AI acting</span>
+<button type="button" aria-label="Search, Ctrl K" style="display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 12px; border: 1px solid #2e2e2e; border-radius: 8px; background: #1c1c1c; color: #a4a4a4; font: inherit; font-size: 13px">Jump to… <span style="border: 1px solid #3a3a3a; border-radius: 4px; padding: 0 5px; font-size: 11px">Ctrl K</span></button>
+<span style="font-size: 13px; color: #a4a4a4">F2</span>
+<button type="button" style="height: 34px; padding: 0 14px; border: 1px solid #2e2e2e; border-radius: 8px; background: #1c1c1c; color: #e1e1e1; font: inherit; font-size: 14px; font-weight: 600"><span style="display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 4px; background: #81c995"></span>Watering on</button>
+<button type="button" style="height: 34px; padding: 0 14px; border: 1px solid #f28b82; border-radius: 8px; background: transparent; color: #f28b82; font: inherit; font-size: 14px; font-weight: 600">Stop all</button>
+</header>
+
+<main style="flex: 1; min-height: 0; overflow: hidden; padding: 18px 28px 22px; display: flex; flex-direction: column; gap: 16px">
+<div style="display: flex; align-items: stretch; gap: 22px; height: 44px; flex-shrink: 0; border-bottom: 1px solid #2e2e2e">
+<h1 style="margin: 0; align-self: center; font-size: 20px; font-weight: 600">Dashboards &amp; display</h1>
+</div>
+<div style="display: grid; grid-template-columns: minmax(0, 1fr) 400px; gap: 16px">
+<section aria-labelledby="u-h" style="background: #1c1c1c; border: 1px solid #2e2e2e; border-radius: 12px; padding: 14px 18px; display: flex; flex-direction: column; gap: 4px">
+<div style="display: flex; align-items: baseline; gap: 10px; padding-bottom: 6px"><h2 id="u-h" style="margin: 0; font-size: 17px; font-weight: 600">Units</h2><span style="font-size: 13px; color: #a4a4a4">Shown on every page and phone for this Home Assistant user</span></div>
+<sc-for list="{{units}}" as="u" hint-placeholder-count="4">
+<div style="display: grid; grid-template-columns: 110px auto minmax(0, 1fr); align-items: center; gap: 16px; min-height: 56px; border-top: 1px solid #2e2e2e">
+<span style="font-size: 15px; font-weight: 500">{{u.name}}</span>
+<span role="group" aria-label="{{u.name}} unit" style="display: flex; padding: 3px; border: 1px solid #2e2e2e; border-radius: 10px; background: #111111">
+<sc-for list="{{u.opts}}" as="o" hint-placeholder-count="3"><button type="button" aria-pressed="{{o.pressed}}" onClick="{{o.pick}}" style="min-width: 86px; height: 36px; padding: 0 12px; border: 0; border-radius: 8px; background: {{o.bg}}; color: {{o.ink}}; font: inherit; font-size: 14px; font-weight: 600">{{o.name}}</button></sc-for>
+</span>
+<span aria-live="polite" style="font-size: 14px; color: #b8b8b8">{{u.sampleLabel}} <b style="font-size: 17px; color: #e1e1e1; font-weight: 600">{{u.sample}}</b> <span style="color: #a4a4a4">· {{u.sample2}}</span></span>
+</div>
+</sc-for>
+<p style="margin: 6px 0 0; font-size: 13px; color: #a4a4a4">Display only. Readings stay stored in mS/cm, °C and litres, so switching back shows exactly the same numbers.</p>
+</section>
+<section aria-labelledby="l-h" style="background: #1c1c1c; border: 1px solid #2e2e2e; border-radius: 12px; padding: 14px 18px; display: flex; flex-direction: column; gap: 14px">
+<h2 id="l-h" style="margin: 0; font-size: 17px; font-weight: 600">Where the app opens</h2>
+<label style="display: flex; flex-direction: column; gap: 6px; font-size: 14px; color: #b8b8b8">On a computer<select value="{{landDesk}}" onChange="{{setDesk}}" style="height: 40px; padding: 0 10px; border: 1px solid #3a3a3a; border-radius: 8px; background: #232323; color: #e1e1e1; font: inherit; font-size: 15px; font-weight: 600"><option value="S1">Status › All rooms</option><option value="S2">Status › Room F2</option><option value="I1">Irrigation › Timeline</option><option value="H1">History › Explorer</option></select></label>
+<label style="display: flex; flex-direction: column; gap: 6px; font-size: 14px; color: #b8b8b8">On a phone<select value="{{landPhone}}" onChange="{{setPhone}}" style="height: 40px; padding: 0 10px; border: 1px solid #3a3a3a; border-radius: 8px; background: #232323; color: #e1e1e1; font: inherit; font-size: 15px; font-weight: 600"><option value="S1">Status › All rooms</option><option value="S2">Status › Room F2</option><option value="I1">Irrigation › Timeline</option><option value="H1">History › Explorer</option></select></label>
+<span aria-live="polite" style="font-size: 13px; color: #81c995">{{landMsg}}</span>
+<p style="margin: auto 0 0; font-size: 13px; color: #a4a4a4; line-height: 1.45">A wall screen or tablet opens its own dashboard instead. Make one below.</p>
+</section>
+</div>
+<section aria-labelledby="g-h" style="display: flex; flex-direction: column; gap: 10px">
+<div style="display: flex; align-items: baseline; gap: 10px"><h2 id="g-h" style="margin: 0; font-size: 17px; font-weight: 600">Wall and tablet dashboards</h2><span style="font-size: 13px; color: #a4a4a4">Each button writes a normal Home Assistant dashboard from our card pack. Change it later in Home Assistant's own editor.</span></div>
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px">
+<article style="background: #1c1c1c; border: 1px solid #2e2e2e; border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 10px">
+<svg width="340" height="180" viewBox="0 0 340 180" role="img" aria-label="Facility wall preview: both rooms side by side with zone slabs and feed tanks" style="display: block; border-radius: 8px"><rect width="340" height="180" fill="#0d0d0d"></rect><rect width="340" height="16" fill="#1c1c1c"></rect><text x="8" y="12" fill="#a4a4a4" font-size="9" font-family="Roboto, Arial, sans-serif">Crop Steering · Facility</text><text x="332" y="12" fill="#a4a4a4" font-size="9" text-anchor="end" font-family="Roboto, Arial, sans-serif">14:02</text><rect x="8" y="24" width="158" height="148" rx="6" fill="#1c1c1c" stroke="#2e2e2e"></rect><text x="16" y="38" fill="#e1e1e1" font-size="10" font-weight="700" font-family="Roboto, Arial, sans-serif">F2 · day 38</text><rect x="16" y="48" width="30" height="40" rx="2" fill="#efe7d2"></rect><rect x="16" y="63.2" width="30" height="24.8" fill="#2f86c4" fill-opacity="0.65"></rect><rect x="16" y="48" width="30" height="40" rx="2" fill="none" stroke="#b5a684" stroke-width="1.2"></rect><text x="31" y="100" fill="#a4a4a4" font-size="8" text-anchor="middle" font-family="Roboto, Arial, sans-serif">Z1</text><rect x="52" y="48" width="30" height="40" rx="2" fill="#efe7d2"></rect><rect x="52" y="64.8" width="30" height="23.2" fill="#2f86c4" fill-opacity="0.65"></rect><rect x="52" y="48" width="30" height="40" rx="2" fill="none" stroke="#ffca5b" stroke-width="1.2"></rect><text x="67" y="100" fill="#a4a4a4" font-size="8" text-anchor="middle" font-family="Roboto, Arial, sans-serif">Z2</text><rect x="88" y="48" width="30" height="40" rx="2" fill="#efe7d2"></rect><rect x="88" y="62.8" width="30" height="25.2" fill="#2f86c4" fill-opacity="0.65"></rect><rect x="88" y="48" width="30" height="40" rx="2" fill="none" stroke="#b5a684" stroke-width="1.2"></rect><text x="103" y="100" fill="#a4a4a4" font-size="8" text-anchor="middle" font-family="Roboto, Arial, sans-serif">Z3</text><rect x="126" y="48" width="30" height="52" rx="4" fill="#26343c" stroke="#8a8a8a"></rect><rect x="126" y="70" width="30" height="30" fill="#2f86c4" fill-opacity="0.75"></rect><rect x="16" y="112" width="142" height="6" rx="3" fill="#333333"></rect><rect x="16" y="112" width="85" height="6" rx="3" fill="#03a9f4"></rect><rect x="16" y="128" width="30" height="34" rx="4" fill="#232323"></rect><rect x="52" y="128" width="30" height="34" rx="4" fill="#232323"></rect><rect x="88" y="128" width="30" height="34" rx="4" fill="#232323"></rect><rect x="124" y="128" width="30" height="34" rx="4" fill="#232323"></rect><rect x="174" y="24" width="158" height="148" rx="6" fill="#1c1c1c" stroke="#2e2e2e"></rect><text x="182" y="38" fill="#e1e1e1" font-size="10" font-weight="700" font-family="Roboto, Arial, sans-serif">F1 · day 12</text><rect x="182" y="48" width="30" height="40" rx="2" fill="#efe7d2"></rect><rect x="182" y="61.6" width="30" height="26.4" fill="#2f86c4" fill-opacity="0.65"></rect><rect x="182" y="48" width="30" height="40" rx="2" fill="none" stroke="#b5a684" stroke-width="1.2"></rect><text x="197" y="100" fill="#a4a4a4" font-size="8" text-anchor="middle" font-family="Roboto, Arial, sans-serif">Z1</text><rect x="218" y="48" width="30" height="40" rx="2" fill="#efe7d2"></rect><rect x="218" y="62.0" width="30" height="26.0" fill="#2f86c4" fill-opacity="0.65"></rect><rect x="218" y="48" width="30" height="40" rx="2" fill="none" stroke="#b5a684" stroke-width="1.2"></rect><text x="233" y="100" fill="#a4a4a4" font-size="8" text-anchor="middle" font-family="Roboto, Arial, sans-serif">Z2</text><rect x="254" y="48" width="30" height="40" rx="2" fill="#efe7d2"></rect><rect x="254" y="72.0" width="30" height="16.0" fill="#2f86c4" fill-opacity="0.65"></rect><rect x="254" y="48" width="30" height="40" rx="2" fill="none" stroke="#b5a684" stroke-width="1.2"></rect><text x="269" y="100" fill="#a4a4a4" font-size="8" text-anchor="middle" font-family="Roboto, Arial, sans-serif">Z3</text><rect x="292" y="48" width="30" height="52" rx="4" fill="#26343c" stroke="#8a8a8a"></rect><rect x="292" y="78" width="30" height="22" fill="#2f86c4" fill-opacity="0.75"></rect><rect x="182" y="112" width="142" height="6" rx="3" fill="#333333"></rect><rect x="182" y="112" width="27" height="6" rx="3" fill="#03a9f4"></rect><rect x="182" y="128" width="30" height="34" rx="4" fill="#232323"></rect><rect x="218" y="128" width="30" height="34" rx="4" fill="#232323"></rect><rect x="254" y="128" width="30" height="34" rx="4" fill="#232323"></rect><rect x="290" y="128" width="30" height="34" rx="4" fill="#232323"></rect></svg>
+<span style="display: flex; align-items: baseline; gap: 8px"><b style="font-size: 17px; font-weight: 600">Facility wall</b><span style="margin-left: auto; font-size: 12px; color: #a4a4a4">TV · 1920×1080</span></span>
+<span style="font-size: 13px; color: #b8b8b8; line-height: 1.4">Every room at a glance: zone slabs, phase, drink so far, feed tank and stock. Readable from across the room.</span>
+<span style="display: flex; align-items: center; gap: 8px; margin-top: auto">
+<sc-for list="{{wall.rooms}}" as="rl" hint-placeholder-count="2"><button type="button" aria-pressed="{{rl.pressed}}" aria-label="{{rl.label}}" onClick="{{rl.toggle}}" style="min-width: 50px; height: 32px; padding: 0 10px; border-radius: 16px; font: inherit; font-size: 13px; font-weight: 600; border: 1px solid {{rl.edge}}; background: {{rl.bg}}; color: {{rl.ink}}">{{rl.name}}</button></sc-for>
+<button type="button" onClick="{{wall.create}}" aria-disabled="{{wall.disabled}}" style="height: 40px; padding: 0 18px; border: 0; border-radius: 8px; background: #03a9f4; color: #0b1d27; font: inherit; font-size: 14px; font-weight: 700; margin-left: auto; opacity: {{wall.opacity}}">{{wall.btn}}</button>
+</span>
+<span aria-live="polite" style="min-height: 18px; font-size: 12px; color: {{wall.msgInk}}">{{wall.msg}}</span>
+</article>
+<article style="background: #1c1c1c; border: 1px solid #2e2e2e; border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 10px">
+<svg width="340" height="180" viewBox="0 0 340 180" role="img" aria-label="Room tablet preview: three zone gauges and a day timeline" style="display: block; border-radius: 8px"><rect width="340" height="180" fill="#0d0d0d"></rect><rect width="340" height="16" fill="#1c1c1c"></rect><text x="8" y="12" fill="#a4a4a4" font-size="9" font-family="Roboto, Arial, sans-serif">F2 · Flower bulk · day 38</text><path d="M22 92 A38 38 0 0 1 98 92" fill="none" stroke="#333333" stroke-width="9" stroke-linecap="round"></path><path d="M22 92 A38 38 0 0 1 98 92" fill="none" stroke="rgba(129,201,149,.35)" stroke-width="9" stroke-dasharray="0 52 30 200"></path><path d="M22 92 A38 38 0 0 1 98 92" fill="none" stroke="#4fc3f7" stroke-width="3" stroke-dasharray="74 200"></path><text x="60" y="88" fill="#e1e1e1" font-size="15" font-weight="700" text-anchor="middle" font-family="Roboto, Arial, sans-serif">59.4%</text><text x="60" y="108" fill="#81c995" font-size="9" text-anchor="middle" font-family="Roboto, Arial, sans-serif">Zone 1 · P2</text><path d="M132 92 A38 38 0 0 1 208 92" fill="none" stroke="#333333" stroke-width="9" stroke-linecap="round"></path><path d="M132 92 A38 38 0 0 1 208 92" fill="none" stroke="rgba(129,201,149,.35)" stroke-width="9" stroke-dasharray="0 52 30 200"></path><path d="M132 92 A38 38 0 0 1 208 92" fill="none" stroke="#4fc3f7" stroke-width="3" stroke-dasharray="69 200"></path><text x="170" y="88" fill="#e1e1e1" font-size="15" font-weight="700" text-anchor="middle" font-family="Roboto, Arial, sans-serif">58.1%</text><text x="170" y="108" fill="#ffca5b" font-size="9" text-anchor="middle" font-family="Roboto, Arial, sans-serif">Zone 2 · P2</text><path d="M242 92 A38 38 0 0 1 318 92" fill="none" stroke="#333333" stroke-width="9" stroke-linecap="round"></path><path d="M242 92 A38 38 0 0 1 318 92" fill="none" stroke="rgba(129,201,149,.35)" stroke-width="9" stroke-dasharray="0 52 30 200"></path><path d="M242 92 A38 38 0 0 1 318 92" fill="none" stroke="#4fc3f7" stroke-width="3" stroke-dasharray="76 200"></path><text x="280" y="88" fill="#e1e1e1" font-size="15" font-weight="700" text-anchor="middle" font-family="Roboto, Arial, sans-serif">60.2%</text><text x="280" y="108" fill="#81c995" font-size="9" text-anchor="middle" font-family="Roboto, Arial, sans-serif">Zone 3 · P2</text><rect x="10" y="128" width="320" height="40" rx="6" fill="#1c1c1c"></rect><rect x="14" y="134" width="40" height="10" fill="#6b7580"></rect><rect x="54" y="134" width="50" height="10" fill="#2f6fb5"></rect><rect x="104" y="134" width="150" height="10" fill="#6450b0"></rect><rect x="254" y="134" width="60" height="10" fill="#34405a"></rect><rect x="110" y="150" width="4" height="12" fill="#4fc3f7"></rect><rect x="126" y="150" width="4" height="12" fill="#4fc3f7"></rect><rect x="142" y="150" width="4" height="12" fill="#4fc3f7"></rect><rect x="158" y="150" width="4" height="12" fill="#4fc3f7"></rect><rect x="174" y="150" width="4" height="12" fill="#4fc3f7"></rect><rect x="190" y="150" width="4" height="12" fill="#4fc3f7"></rect><rect x="206" y="150" width="4" height="12" fill="#4fc3f7"></rect><rect x="222" y="150" width="4" height="12" fill="#4fc3f7"></rect><rect x="238" y="150" width="4" height="12" fill="#4fc3f7"></rect><line x1="188" x2="188" y1="130" y2="166" stroke="#e1e1e1" stroke-width="1.5"></line></svg>
+<span style="display: flex; align-items: baseline; gap: 8px"><b style="font-size: 17px; font-weight: 600">Room tablet</b><span style="margin-left: auto; font-size: 12px; color: #a4a4a4">Tablet · 1280×800</span></span>
+<span style="font-size: 13px; color: #b8b8b8; line-height: 1.4">One room at the door: big zone gauges with the target band, and today's timeline of shots.</span>
+<span style="display: flex; align-items: center; gap: 8px; margin-top: auto">
+<sc-for list="{{tablet.rooms}}" as="rl" hint-placeholder-count="2"><button type="button" aria-pressed="{{rl.pressed}}" aria-label="{{rl.label}}" onClick="{{rl.toggle}}" style="min-width: 50px; height: 32px; padding: 0 10px; border-radius: 16px; font: inherit; font-size: 13px; font-weight: 600; border: 1px solid {{rl.edge}}; background: {{rl.bg}}; color: {{rl.ink}}">{{rl.name}}</button></sc-for>
+<button type="button" onClick="{{tablet.create}}" aria-disabled="{{tablet.disabled}}" style="height: 40px; padding: 0 18px; border: 0; border-radius: 8px; background: #03a9f4; color: #0b1d27; font: inherit; font-size: 14px; font-weight: 700; margin-left: auto; opacity: {{tablet.opacity}}">{{tablet.btn}}</button>
+</span>
+<span aria-live="polite" style="min-height: 18px; font-size: 12px; color: {{tablet.msgInk}}">{{tablet.msg}}</span>
+</article>
+<article style="background: #1c1c1c; border: 1px solid #2e2e2e; border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 10px">
+<svg width="340" height="180" viewBox="0 0 340 180" role="img" aria-label="Dosing station preview: feed tank, four stock bottles, pH and EC" style="display: block; border-radius: 8px"><rect width="340" height="180" fill="#0d0d0d"></rect><rect width="340" height="16" fill="#1c1c1c"></rect><text x="8" y="12" fill="#a4a4a4" font-size="9" font-family="Roboto, Arial, sans-serif">F2 dosing station</text><rect x="16" y="32" width="80" height="132" rx="10" fill="#26343c" stroke="#8a8a8a" stroke-width="1.5"></rect><rect x="16" y="74" width="80" height="90" fill="#2f86c4" fill-opacity="0.75"></rect><text x="56" y="120" fill="#ffffff" font-size="16" font-weight="700" text-anchor="middle" font-family="Roboto, Arial, sans-serif">68%</text><rect x="116" y="44" width="24" height="70" rx="5" fill="#26343c" stroke="#8a8a8a"></rect><rect x="116" y="69" width="24" height="45" fill="#2f86c4"></rect><rect x="122" y="36" width="12" height="8" rx="2" fill="#5a5a5a"></rect><text x="128" y="128" fill="#a4a4a4" font-size="9" text-anchor="middle" font-family="Roboto, Arial, sans-serif">A</text><rect x="150" y="44" width="24" height="70" rx="5" fill="#26343c" stroke="#8a8a8a"></rect><rect x="150" y="95" width="24" height="19" fill="#ffca5b"></rect><rect x="156" y="36" width="12" height="8" rx="2" fill="#5a5a5a"></rect><text x="162" y="128" fill="#a4a4a4" font-size="9" text-anchor="middle" font-family="Roboto, Arial, sans-serif">B</text><rect x="184" y="44" width="24" height="70" rx="5" fill="#26343c" stroke="#8a8a8a"></rect><rect x="184" y="71" width="24" height="43" fill="#2f86c4"></rect><rect x="190" y="36" width="12" height="8" rx="2" fill="#5a5a5a"></rect><text x="196" y="128" fill="#a4a4a4" font-size="9" text-anchor="middle" font-family="Roboto, Arial, sans-serif">CM</text><rect x="218" y="44" width="24" height="70" rx="5" fill="#26343c" stroke="#8a8a8a"></rect><rect x="218" y="61" width="24" height="53" fill="#2f86c4"></rect><rect x="224" y="36" width="12" height="8" rx="2" fill="#5a5a5a"></rect><text x="230" y="128" fill="#a4a4a4" font-size="9" text-anchor="middle" font-family="Roboto, Arial, sans-serif">pH-</text><rect x="254" y="36" width="76" height="58" rx="6" fill="#1c1c1c"></rect><text x="262" y="52" fill="#a4a4a4" font-size="9" font-family="Roboto, Arial, sans-serif">pH</text><text x="262" y="78" fill="#e1e1e1" font-size="20" font-weight="700" font-family="Roboto, Arial, sans-serif">5.84</text><rect x="254" y="104" width="76" height="58" rx="6" fill="#1c1c1c"></rect><text x="262" y="120" fill="#a4a4a4" font-size="9" font-family="Roboto, Arial, sans-serif">EC</text><text x="262" y="146" fill="#e1e1e1" font-size="20" font-weight="700" font-family="Roboto, Arial, sans-serif">2.4</text><rect x="116" y="140" width="126" height="22" rx="6" fill="#1c1c1c"></rect><rect x="122" y="148" width="80" height="6" rx="3" fill="#81c995"></rect></svg>
+<span style="display: flex; align-items: baseline; gap: 8px"><b style="font-size: 17px; font-weight: 600">Dosing station</b><span style="margin-left: auto; font-size: 12px; color: #a4a4a4">Tablet · 800×1280</span></span>
+<span style="font-size: 13px; color: #b8b8b8; line-height: 1.4">Next to the tanks: feed tank, stock bottles, pH and EC, and the last batch check.</span>
+<span style="display: flex; align-items: center; gap: 8px; margin-top: auto">
+<sc-for list="{{dosing.rooms}}" as="rl" hint-placeholder-count="2"><button type="button" aria-pressed="{{rl.pressed}}" aria-label="{{rl.label}}" onClick="{{rl.toggle}}" style="min-width: 50px; height: 32px; padding: 0 10px; border-radius: 16px; font: inherit; font-size: 13px; font-weight: 600; border: 1px solid {{rl.edge}}; background: {{rl.bg}}; color: {{rl.ink}}">{{rl.name}}</button></sc-for>
+<button type="button" onClick="{{dosing.create}}" aria-disabled="{{dosing.disabled}}" style="height: 40px; padding: 0 18px; border: 0; border-radius: 8px; background: #03a9f4; color: #0b1d27; font: inherit; font-size: 14px; font-weight: 700; margin-left: auto; opacity: {{dosing.opacity}}">{{dosing.btn}}</button>
+</span>
+<span aria-live="polite" style="min-height: 18px; font-size: 12px; color: {{dosing.msgInk}}">{{dosing.msg}}</span>
+</article>
+</div>
+</section>
+</main>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1000}}'>
+var PH = { P0: '#6b7580', P1: '#2f6fb5', P2: '#6450b0', P3: '#34405a' };
+function tz(name, ph, vwc) { return { name: name, ph: ph, phColor: PH[ph], vwc: vwc + '%' }; }
+var ROOMS = [
+  { name: 'F2', dot: '#03a9f4', state: 'Watering', zones: [tz('Zone 1', 'P2', 59.4), tz('Zone 2', 'P2', 58.1), tz('Zone 3', 'P2', 60.2)] },
+  { name: 'F1', dot: '#81c995', state: 'Holding', zones: [tz('Zone 1', 'P1', 63.8), tz('Zone 2', 'P1', 62.9), tz('Zone 3', 'P1', 64.4)] }
+];
+function sw(on) { return { onStr: on ? 'true' : 'false', track: on ? '#03a9f4' : '#4a4a4a', knob: on ? '20px' : '0px' }; }
+
+var UNITS = [
+  { id: 'ec', name: 'EC', opts: [['ms', 'mS/cm'], ['p500', 'PPM 500'], ['p700', 'PPM 700']], label: 'Feed EC',
+    fmt: function (u) { var f = function (v) { return u === 'ms' ? v + ' mS/cm' : Math.round(v * (u === 'p500' ? 500 : 700)) + ' ppm'; }; return [f(2.4), 'pore EC ' + f(5.2)]; } },
+  { id: 't', name: 'Temperature', opts: [['c', '°C'], ['f', '°F']], label: 'Root zone',
+    fmt: function (u) { var f = function (v) { return u === 'c' ? v + ' °C' : (v * 1.8 + 32).toFixed(2).replace(/0$/, '') + ' °F'; }; return [f(21.4), 'feed ' + f(19.8)]; } },
+  { id: 'v', name: 'Volume', opts: [['l', 'Litres'], ['g', 'US gallons']], label: 'F2 drank today',
+    fmt: function (u) { var f = function (v) { return u === 'l' ? v + ' L' : (v / 3.78541).toFixed(2) + ' gal'; }; return [f(24.8), 'tank ' + f(310) + ' usable']; } },
+  { id: 'c', name: 'Clock', opts: [['24', '24 h'], ['12', '12 h']], label: 'Next shot',
+    fmt: function (u) { var f = function (h, m) { return u === '24' ? (h < 10 ? '0' : '') + h + ':' + m : ((h + 11) % 12 + 1) + ':' + m + (h < 12 ? ' am' : ' pm'); }; return [f(14, '35'), 'lights off ' + f(18, '00')]; } }
+];
+var NAMES = { S1: 'Status › All rooms', S2: 'Status › Room F2', I1: 'Irrigation › Timeline', H1: 'History › Explorer' };
+var DASH = { wall: { name: 'Facility wall', path: '/crop-wall' }, tablet: { name: 'Room tablet', path: '/crop-tablet' }, dosing: { name: 'Dosing station', path: '/crop-dosing' } };
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { u: { ec: 'ms', t: 'c', v: 'l', c: '24' }, desk: 'S1', phone: 'S1', landMsg: 'Saved and read back 13:48',
+      rooms: { wall: { F2: true, F1: true }, tablet: { F2: true, F1: false }, dosing: { F2: true, F1: false } },
+      made: { wall: 'Created Tue 16:20 as /crop-wall · cards ?v=3171 · showing on the TV in the corridor' } };
+  }
+  renderVals() {
+    var self = this, st = this.state, out = { rooms: ROOMS };
+    out.units = UNITS.map(function (u) {
+      var cur = st.u[u.id], s = u.fmt(cur);
+      return { name: u.name, sampleLabel: u.label, sample: s[0], sample2: s[1],
+        opts: u.opts.map(function (o) { var on = o[0] === cur; return { name: o[1], pressed: on ? 'true' : 'false', bg: on ? '#03a9f4' : 'transparent', ink: on ? '#0b1d27' : '#e1e1e1', pick: function () { var n = Object.assign({}, self.state.u); n[u.id] = o[0]; self.setState({ u: n }); } }; }) };
+    });
+    out.landDesk = st.desk; out.landPhone = st.phone; out.landMsg = st.landMsg;
+    out.setDesk = function (e) { self.setState({ desk: e.target.value, landMsg: 'Computers now open on ' + NAMES[e.target.value] + ' · read back 14:02' }); };
+    out.setPhone = function (e) { self.setState({ phone: e.target.value, landMsg: 'Phones now open on ' + NAMES[e.target.value] + ' · read back 14:02' }); };
+    Object.keys(DASH).forEach(function (k) {
+      var r = st.rooms[k], none = !r.F2 && !r.F1, made = st.made[k];
+      out[k] = {
+        rooms: ['F2', 'F1'].map(function (n) { return { name: n, pressed: r[n] ? 'true' : 'false', label: DASH[k].name + ': room ' + n, edge: r[n] ? '#03a9f4' : '#3a3a3a', bg: r[n] ? 'rgba(3,169,244,.18)' : 'transparent', ink: r[n] ? '#e1e1e1' : '#a4a4a4',
+          toggle: function () { var all = JSON.parse(JSON.stringify(self.state.rooms)); all[k][n] = !all[k][n]; self.setState({ rooms: all }); } }; }),
+        btn: made ? 'Create again' : 'Create in Home Assistant', disabled: none ? 'true' : 'false', opacity: none ? 0.45 : 1,
+        msg: none ? 'Pick at least one room.' : made || '', msgInk: none ? '#f28b82' : '#81c995',
+        create: function () { if (none) return; var m = Object.assign({}, self.state.made); m[k] = 'Created 14:02 as ' + DASH[k].path + ' for ' + (r.F2 && r.F1 ? 'F2 and F1' : r.F2 ? 'F2' : 'F1') + ' · cards ?v=3171 · open it from the Home Assistant sidebar'; self.setState({ made: m }); }
+      };
+    });
+    return out;
+  }
+}
+
+</script>
+</body>
+</html>

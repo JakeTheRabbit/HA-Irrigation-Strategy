@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Crop Steering — every page</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#4fc3f7;text-decoration:none}a:hover{color:#b3e5fc}
+</style>
+</helmet>
+<div style="width: 1440px; height: 1000px; box-sizing: border-box; padding: 64px 72px; background: #111111; color: #e1e1e1; font-family: Roboto, Arial, sans-serif; display: flex; flex-direction: column; gap: 36px">
+<header style="display: flex; flex-direction: column; gap: 10px">
+<div style="display: flex; align-items: center; gap: 12px">
+<span style="width: 40px; height: 40px; border-radius: 10px; background: #03a9f4; display: flex; align-items: center; justify-content: center">
+<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0b1d27" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.7l5.7 5.7a8 8 0 1 1-11.3 0z"></path></svg>
+</span>
+<span style="font-size: 15px; font-weight: 600; color: #a4a4a4; letter-spacing: .04em">CROP STEERING · HOME ASSISTANT</span>
+</div>
+<h1 style="margin: 0; font-size: 44px; font-weight: 700; letter-spacing: -0.5px">Every page, one system</h1>
+<p style="margin: 0; max-width: 900px; font-size: 17px; line-height: 1.55; color: #b8b8b8">Mockups of the whole app after the Growlink / AROYA parity work. Each page keeps the same frame: the menu with five sections, the live room tree, problems shown where they are, and every fact once. New pages carry their backlog number (G1–G17). Click any page to open it.</p>
+</header>
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px">
+<section style="background: #1c1c1c; border: 1px solid #2e2e2e; border-radius: 14px; padding: 20px 22px; display: flex; flex-direction: column; gap: 10px">
+<h2 style="margin: 0; font-size: 13px; font-weight: 600; letter-spacing: .08em; color: #a4a4a4">STATUS</h2>
+<a href="S1-AllRooms.dc.html" style="font-size: 17px">All rooms</a>
+<a href="S2-Room.dc.html" style="font-size: 17px">Room</a>
+<a href="S3-Zone.dc.html" style="font-size: 17px">Zone</a>
+</section>
+<section style="background: #1c1c1c; border: 1px solid #2e2e2e; border-radius: 14px; padding: 20px 22px; display: flex; flex-direction: column; gap: 10px">
+<h2 style="margin: 0; font-size: 13px; font-weight: 600; letter-spacing: .08em; color: #a4a4a4">IRRIGATION</h2>
+<a href="I1-Timeline.dc.html" style="font-size: 17px">Timeline <span style="color: #a4a4a4; font-size: 13px">G5 · new</span></a>
+<a href="I2-CurrentDay.dc.html" style="font-size: 17px">Current day</a>
+<a href="I3-Timers.dc.html" style="font-size: 17px">Timer programs <span style="color: #a4a4a4; font-size: 13px">G7 · new</span></a>
+<a href="I4-GrowPlan.dc.html" style="font-size: 17px">Grow plan &amp; presets <span style="color: #a4a4a4; font-size: 13px">G10</span></a>
+</section>
+<section style="background: #1c1c1c; border: 1px solid #2e2e2e; border-radius: 14px; padding: 20px 22px; display: flex; flex-direction: column; gap: 10px">
+<h2 style="margin: 0; font-size: 13px; font-weight: 600; letter-spacing: .08em; color: #a4a4a4">HISTORY</h2>
+<a href="H1-Explorer.dc.html" style="font-size: 17px">Explorer</a>
+<a href="H2-WaterFlow.dc.html" style="font-size: 17px">Water &amp; flow check <span style="color: #a4a4a4; font-size: 13px">G4 · new</span></a>
+<a href="H3-Compare.dc.html" style="font-size: 17px">Compare runs</a>
+<a href="H4-Changes.dc.html" style="font-size: 17px">Changes <span style="color: #a4a4a4; font-size: 13px">G8 · new</span></a>
+</section>
+<section style="background: #1c1c1c; border: 1px solid #2e2e2e; border-radius: 14px; padding: 20px 22px; display: flex; flex-direction: column; gap: 10px">
+<h2 style="margin: 0; font-size: 13px; font-weight: 600; letter-spacing: .08em; color: #a4a4a4">EQUIPMENT</h2>
+<a href="E1-Probes.dc.html" style="font-size: 17px">Probes &amp; offsets <span style="color: #a4a4a4; font-size: 13px">G9 G14</span></a>
+<a href="E2-Dosing.dc.html" style="font-size: 17px">Feed &amp; dosing</a>
+<a href="E3-PumpWizard.dc.html" style="font-size: 17px">Pump prime &amp; calibrate <span style="color: #a4a4a4; font-size: 13px">G3 · new</span></a>
+<a href="E4-FeedCal.dc.html" style="font-size: 17px">Feed pH/EC calibration <span style="color: #a4a4a4; font-size: 13px">G2 · new</span></a>
+<a href="E5-Stock.dc.html" style="font-size: 17px">Stock tanks</a>
+<a href="E6-Setup.dc.html" style="font-size: 17px">Setup: pumps &amp; valves <span style="color: #a4a4a4; font-size: 13px">G1 · new</span></a>
+</section>
+<section style="background: #1c1c1c; border: 1px solid #2e2e2e; border-radius: 14px; padding: 20px 22px; display: flex; flex-direction: column; gap: 10px">
+<h2 style="margin: 0; font-size: 13px; font-weight: 600; letter-spacing: .08em; color: #a4a4a4">SETTINGS</h2>
+<a href="T1-AlertRules.dc.html" style="font-size: 17px">Alert rules <span style="color: #a4a4a4; font-size: 13px">G6 · new</span></a>
+<a href="T2-Notifications.dc.html" style="font-size: 17px">Notifications</a>
+<a href="T3-System.dc.html" style="font-size: 17px">System status <span style="color: #a4a4a4; font-size: 13px">G17 · new</span></a>
+<a href="T4-AI.dc.html" style="font-size: 17px">AI assistant</a>
+<a href="T5-Dashboards.dc.html" style="font-size: 17px">Dashboards &amp; display <span style="color: #a4a4a4; font-size: 13px">G11 G15</span></a>
+</section>
+<section style="background: #1c1c1c; border: 1px solid #2e2e2e; border-radius: 14px; padding: 20px 22px; display: flex; flex-direction: column; gap: 10px">
+<h2 style="margin: 0; font-size: 13px; font-weight: 600; letter-spacing: .08em; color: #a4a4a4">PHONE</h2>
+<a href="P1-AllRooms.dc.html" style="font-size: 17px">All rooms</a>
+<a href="P2-Timeline.dc.html" style="font-size: 17px">Timeline</a>
+<a href="P3-Zone.dc.html" style="font-size: 17px">Zone</a>
+<a href="P4-Rule.dc.html" style="font-size: 17px">New alert rule</a>
+<a href="P5-Calibrate.dc.html" style="font-size: 17px">Calibrate pH</a>
+</section>
+</div>
+<p style="margin: 0; font-size: 13px; color: #8a8a8a">Sample data only. Out of scope here and owned by AiGrow: users and roles, tasks, IPM, compliance, climate and lighting control.</p>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1000}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

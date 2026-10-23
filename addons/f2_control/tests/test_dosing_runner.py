@@ -1214,3 +1214,35 @@ def test_every_dosing_code_goes_out_through_the_alert_list():
     assert c._dosing_alert(c.rooms[0], "CS-801", "a title", "it reads off now",
                            "balance_2026_09_28t02") is True
     assert fake.calls[-1][2]["message"].startswith("it reads off now")
+
+
+# ------------------------------------------------------------------- P1 M5: dosing event ids never move with the TZ
+_IDS = r"""
+import json, sys
+sys.path.insert(0, sys.argv[1])
+import dosing_runner
+row = {"kind": "batch", "at": "2026-10-20T08:00:00", "ended_at": "2026-10-20T08:20:00", "result": "finished",
+       "name": "Week 3", "by": "Ben",
+       "dosed": [{"pump": "a", "ml": 10.0, "given": 10.0, "at": "2026-10-20T08:01:00", "result": "done"}]}
+backfill = [kw["event_id"] for _kind, kw in dosing_runner.history_events("f2", [row])]
+live = dosing_runner._dose_event("f2", row["dosed"][0], None, "Ben", None)[1]["event_id"]
+print(json.dumps({"backfill": backfill, "live": live}))
+"""
+
+
+def test_dosing_event_ids_from_a_zoneless_time_are_the_same_in_every_time_zone():
+    """A history row from before the runner kept aware times ("at" with no zone): its events' ids are taken as UTC, so
+    the add-on's TZ changing never makes the live dose and its backfill two events, nor moves either."""
+    import json
+    import os
+    import subprocess
+    import sys
+
+    pkg = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "f2_control"))
+    seen = []
+    for tz in ("UTC0", "EST5", "NZST-12"):
+        out = subprocess.run([sys.executable, "-c", _IDS, pkg], capture_output=True, text=True, check=True,
+                             env={**os.environ, "TZ": tz})
+        seen.append(json.loads(out.stdout))
+    assert seen[0] == seen[1] == seen[2]
+    assert seen[0]["live"] == seen[0]["backfill"][0]  # the live dose and its backfill are one event

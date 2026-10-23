@@ -1,0 +1,6975 @@
+{
+ "loop/daily_cap": {
+  "calls": {
+   "n": 5,
+   "sha256": "aa70ca875859b1352a25d08aa7023d849daa824d718080ac012fb4e9ff56e479"
+  },
+  "journal": [
+   {
+    "actor": "engine",
+    "code": "CS-907",
+    "data": {
+     "key": "feed_unknown_default",
+     "title": "EC flushing is off: the feed EC is unknown (CS-907)"
+    },
+    "detail": null,
+    "kind": "alert.raised",
+    "outcome": "ok",
+    "zone": null
+   },
+   {
+    "actor": "engine",
+    "code": "CS-205",
+    "data": {
+     "key": "block_default_z1",
+     "title": "Zone 1: daily water limit reached (CS-205)"
+    },
+    "detail": null,
+    "kind": "alert.raised",
+    "outcome": "ok",
+    "zone": 1
+   },
+   {
+    "actor": "engine",
+    "code": null,
+    "data": {
+     "reason": "BLOCK daily-cap (0.00 L left)",
+     "would": "P2 top-up VWC 40.0 < 45.0"
+    },
+    "detail": null,
+    "kind": "intent.held",
+    "outcome": "held",
+    "zone": 1
+   },
+   {
+    "actor": "engine",
+    "code": "CS-402",
+    "data": {
+     "key": "defaulted_setpoints",
+     "title": "Settings missing, the controller uses built-in values (CS-402)"
+    },
+    "detail": null,
+    "kind": "alert.raised",
+    "outcome": "ok",
+    "zone": null
+   }
+  ],
+  "log": {
+   "n": 12,
+   "sha256": "9ec9f1e0f9932827987a294e243a6bbdbef86e0d884d9c57b687af1d1e28c546"
+  },
+  "reads": {
+   "n": 404,
+   "sha256": "3b0d7c324d65846d4b5cb020e9e1f34516244ad50b84500a5981412fe5c8ac18"
+  },
+  "result": [
+   1,
+   1,
+   1
+  ],
+  "state": {
+   "batch_invalid": false,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 1,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 999.0,
+    "last_shot": null,
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 59,
+   "sha256": "68b671f9b17783ce0429348dc1e4083228d15a1dfd082dbf155387c804cddc8c"
+  }
+ },
+ "loop/feed_ec_drifts": {
+  "calls": {
+   "n": 4,
+   "sha256": "01db699566847d2600898da59b5e0de8c1f01740c0e6dd5f2f324ce071aa7611"
+  },
+  "journal": [
+   {
+    "actor": "engine",
+    "code": "CS-207",
+    "data": {
+     "key": "wd_default_z1",
+     "title": "Zone 1: URGENT, the zone is dry and gets no shots (CS-207)"
+    },
+    "detail": null,
+    "kind": "alert.raised",
+    "outcome": "ok",
+    "zone": 1
+   },
+   {
+    "actor": "engine",
+    "code": null,
+    "data": {
+     "reason": "source-water EC 2.5 out of [1,2]",
+     "would": "P2 top-up VWC 40.0 < 45.0"
+    },
+    "detail": null,
+    "kind": "intent.held",
+    "outcome": "held",
+    "zone": 1
+   },
+   {
+    "actor": "engine",
+    "code": "CS-402",
+    "data": {
+     "key": "defaulted_setpoints",
+     "title": "Settings missing, the controller uses built-in values (CS-402)"
+    },
+    "detail": null,
+    "kind": "alert.raised",
+    "outcome": "ok",
+    "zone": null
+   }
+  ],
+  "log": {
+   "n": 13,
+   "sha256": "1d362c032708dc9a6e663754cf6d62832cb739d6ef5ef61f8fba44bfa09f09df"
+  },
+  "reads": {
+   "n": 893,
+   "sha256": "b08e0ce355be4524921db31c2822d0a595978a15d23412cbd15bd21cab20f4f4"
+  },
+  "result": [
+   1,
+   1,
+   1,
+   1,
+   1,
+   1
+  ],
+  "state": {
+   "batch_invalid": false,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 1,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.0,
+    "last_shot": null,
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 116,
+   "sha256": "b7eb64fc5fa0fa1c9919c0fc240aa1c2a578e6ed5c46e7fe16d9353e729df9de"
+  }
+ },
+ "loop/fires": {
+  "calls": {
+   "n": 9,
+   "sha256": "117ab7e9639f5195a04dbf3d65422de213f2de8ab5fc577b6ac8c7e7b6f7a039"
+  },
+  "journal": [
+   {
+    "actor": "engine",
+    "code": "CS-907",
+    "data": {
+     "key": "feed_unknown_default",
+     "title": "EC flushing is off: the feed EC is unknown (CS-907)"
+    },
+    "detail": null,
+    "kind": "alert.raised",
+    "outcome": "ok",
+    "zone": null
+   },
+   {
+    "actor": "engine",
+    "code": null,
+    "data": {
+     "commanded_l": 0.1,
+     "duration_s": 5,
+     "kind": "p2_topup",
+     "phase": "P2",
+     "reason": "maintenance shot: P2 top-up VWC 40.0 < 45.0",
+     "size_pct": 2.0,
+     "vwc_before": 40.0,
+     "vwc_expected": null
+    },
+    "detail": null,
+    "kind": "shot.started",
+    "outcome": "ok",
+    "zone": 1
+   },
+   {
+    "actor": "engine",
+    "code": null,
+    "data": {
+     "commanded_l": 0.1,
+     "ec_before": 3.0,
+     "elapsed_s": 5.0,
+     "metered_l": null,
+     "vwc_before": 40.0
+    },
+    "detail": null,
+    "kind": "shot.completed",
+    "outcome": "ok",
+    "zone": 1
+   }
+  ],
+  "log": {
+   "n": 6,
+   "sha256": "db341d1ab3e8cc3847b232bf4bfea691ba3b695d50858d466e09c647f402fee9"
+  },
+  "reads": {
+   "n": 205,
+   "sha256": "d37073f7253b2f153d490705d891c3f976700d9caab948685af847dd6ac85380"
+  },
+  "result": [
+   0
+  ],
+  "state": {
+   "batch_invalid": false,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 0,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.1,
+    "last_shot": "<ts>",
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 22,
+   "sha256": "c0bf5ea6923caa76605aabf5cd0c88c4609091fd3db14a1c7c10347bf5d9e39b"
+  }
+ },
+ "loop/inflight": {
+  "calls": {
+   "n": 4,
+   "sha256": "7f8f4bd2ac697166480ceef5aa92dd96dbb9fa418a59080c7a8182a5e55bbf1e"
+  },
+  "journal": [
+   {
+    "actor": "engine",
+    "code": "CS-309",
+    "data": {
+     "key": "inflight_default",
+     "title": "Zone 2: the hardware of an interrupted shot can still be ON (CS-309)"
+    },
+    "detail": null,
+    "kind": "alert.raised",
+    "outcome": "ok",
+    "zone": 2
+   },
+   {
+    "actor": "engine",
+    "code": "CS-907",
+    "data": {
+     "key": "feed_unknown_default",
+     "title": "EC flushing is off: the feed EC is unknown (CS-907)"
+    },
+    "detail": null,
+    "kind": "alert.raised",
+    "outcome": "ok",
+    "zone": null
+   },
+   {
+    "actor": "engine",
+    "code": null,
+    "data": {
+     "reason": "an interrupted shot's hardware is not accounted for yet",
+     "would": "maintenance shot: P2 top-up VWC 40.0 < 45.0"
+    },
+    "detail": null,
+    "kind": "intent.held",
+    "outcome": "held",
+    "zone": 1
+   }
+  ],
+  "log": {
+   "n": 11,
+   "sha256": "dc1ae4dd67e88d2e8db927ea7ac0ed252c75c32479188709b2a2d5f12619f8d4"
+  },
+  "reads": {
+   "n": 320,
+   "sha256": "757620cf49c258aedf54fe7a1acd52c3c4db4854ec637ff63234f01bcc86d49b"
+  },
+  "result": [
+   1,
+   1
+  ],
+  "state": {
+   "batch_invalid": false,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 1,
+   "inflight": {
+    "mainline": null,
+    "pump": null,
+    "valve": "switch.v9",
+    "zone": 2
+   },
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.0,
+    "last_shot": null,
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 40,
+   "sha256": "1a6fca527032e1cc58ddf5b705ccddaad69f9e7a6c441f3c7bc000dd0bad5779"
+  }
+ },
+ "loop/kill_off_40_passes": {
+  "calls": {
+   "n": 8,
+   "sha256": "82e40f2d4fb5d5e57f8e37a78242f6ef39cb8b75fd581f1aebf30e19aa1bd90a"
+  },
+  "journal": [
+   {
+    "actor": "engine",
+    "code": "CS-907",
+    "data": {
+     "key": "feed_unknown_default",
+     "title": "EC flushing is off: the feed EC is unknown (CS-907)"
+    },
+    "detail": null,
+    "kind": "alert.raised",
+    "outcome": "ok",
+    "zone": null
+   },
+   {
+    "actor": "engine",
+    "code": "CS-207",
+    "data": {
+     "key": "wd_default_z1",
+     "title": "Zone 1: URGENT, the zone is dry and gets no shots (CS-207)"
+    },
+    "detail": null,
+    "kind": "alert.raised",
+    "outcome": "ok",
+    "zone": 1
+   },
+   {
+    "actor": "engine",
+    "code": null,
+    "data": {
+     "reason": "Crop Steering Controller disabled (kill switch off)",
+     "would": "P2 top-up VWC 40.0 < 45.0"
+    },
+    "detail": null,
+    "kind": "intent.held",
+    "outcome": "held",
+    "zone": 1
+   },
+   {
+    "actor": "engine",
+    "code": "CS-402",
+    "data": {
+     "key": "defaulted_setpoints",
+     "title": "Settings missing, the controller uses built-in values (CS-402)"
+    },
+    "detail": null,
+    "kind": "alert.raised",
+    "outcome": "ok",
+    "zone": null
+   },
+   {
+    "actor": "engine",
+    "code": "CS-402",
+    "data": {
+     "key": "defaulted_setpoints",
+     "title": "Settings missing, the controller uses built-in values (CS-402)"
+    },
+    "detail": null,
+    "kind": "alert.raised",
+    "outcome": "ok",
+    "zone": null
+   },
+   {
+    "actor": "engine",
+    "code": "CS-101",
+    "data": {
+     "entity_id": "sensor.crop_steering_vwc_zone_1",
+     "key": "blind_default_z1",
+     "title": "Zone 1: moisture reading has not changed (CS-101)"
+    },
+    "detail": null,
+    "kind": "alert.raised",
+    "outcome": "ok",
+    "zone": 1
+   },
+   {
+    "actor": "engine",
+    "code": null,
+    "data": {
+     "reason": "Crop Steering Controller disabled (kill switch off)",
+     "would": "FALLBACK schedule (no live probe)"
+    },
+    "detail": null,
+    "kind": "intent.held",
+    "outcome": "held",
+    "zone": 1
+   }
+  ],
+  "log": {
+   "n": 53,
+   "sha256": "1d5c66c5f85f568980ccee58f127d776ba7f6b7ee971e20e83115a22463d3533"
+  },
+  "reads": {
+   "n": 5002,
+   "sha256": "5768c54eaad72be8f383baa426d76673bf583ff5e41ce5f04b8dd5ec6fcf14b7"
+  },
+  "result": [
+   1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   2,
+   2,
+   2,
+   2
+  ],
+  "state": {
+   "batch_invalid": false,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 1,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.0,
+    "last_shot": null,
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 744,
+   "sha256": "ffea64e1221e957e4d2a770bc2d581a64fae826372886ae4cde91efd4deb2912"
+  }
+ },
+ "loop/tank_min_then_refilled": {
+  "calls": {
+   "n": 19,
+   "sha256": "3806f60883c464b955e8eddb7e692d7ee9ca1967f0cc7ba58ddb711a702daf61"
+  },
+  "journal": [
+   {
+    "actor": "engine",
+    "code": "CS-907",
+    "data": {
+     "key": "feed_unknown_default",
+     "title": "EC flushing is off: the feed EC is unknown (CS-907)"
+    },
+    "detail": null,
+    "kind": "alert.raised",
+    "outcome": "ok",
+    "zone": null
+   },
+   {
+    "actor": "engine",
+    "code": "CS-901",
+    "data": {
+     "key": "tank_low_default",
+     "title": "The tank is at its minimum, no shots (CS-901)"
+    },
+    "detail": null,
+    "kind": "alert.raised",
+    "outcome": "ok",
+    "zone": null
+   },
+   {
+    "actor": "engine",
+    "code": "CS-207",
+    "data": {
+     "key": "wd_default_z1",
+     "title": "Zone 1: URGENT, the zone is dry and gets no shots (CS-207)"
+    },
+    "detail": null,
+    "kind": "alert.raised",
+    "outcome": "ok",
+    "zone": 1
+   },
+   {
+    "actor": "engine",
+    "code": null,
+    "data": {
+     "reason": "tank at its minimum (reads 8.0 %)",
+     "would": "P2 top-up VWC 40.0 < 45.0"
+    },
+    "detail": null,
+    "kind": "intent.held",
+    "outcome": "held",
+    "zone": 1
+   },
+   {
+    "actor": "engine",
+    "code": "CS-402",
+    "data": {
+     "key": "defaulted_setpoints",
+     "title": "Settings missing, the controller uses built-in values (CS-402)"
+    },
+    "detail": null,
+    "kind": "alert.raised",
+    "outcome": "ok",
+    "zone": null
+   },
+   {
+    "actor": "engine",
+    "code": null,
+    "data": {
+     "key": "tank_low_default"
+    },
+    "detail": null,
+    "kind": "alert.cleared",
+    "outcome": "ok",
+    "zone": null
+   },
+   {
+    "actor": "engine",
+    "code": null,
+    "data": {
+     "commanded_l": 0.1,
+     "duration_s": 5,
+     "kind": "p2_topup",
+     "phase": "P2",
+     "reason": "maintenance shot: P2 top-up VWC 40.0 < 45.0",
+     "size_pct": 2.0,
+     "vwc_before": 40.0,
+     "vwc_expected": null
+    },
+    "detail": null,
+    "kind": "shot.started",
+    "outcome": "ok",
+    "zone": 1
+   },
+   {
+    "actor": "engine",
+    "code": null,
+    "data": {
+     "commanded_l": 0.1,
+     "ec_before": 3.0,
+     "elapsed_s": 5.0,
+     "metered_l": null,
+     "vwc_before": 40.0
+    },
+    "detail": null,
+    "kind": "shot.completed",
+    "outcome": "ok",
+    "zone": 1
+   },
+   {
+    "actor": "engine",
+    "code": null,
+    "data": {
+     "commanded_l": 0.1,
+     "duration_s": 5,
+     "kind": "p2_topup",
+     "phase": "P2",
+     "reason": "maintenance shot: P2 top-up VWC 40.0 < 45.0",
+     "size_pct": 2.0,
+     "vwc_before": 40.0,
+     "vwc_expected": null
+    },
+    "detail": null,
+    "kind": "shot.started",
+    "outcome": "ok",
+    "zone": 1
+   },
+   {
+    "actor": "engine",
+    "code": null,
+    "data": {
+     "commanded_l": 0.1,
+     "ec_before": 3.0,
+     "elapsed_s": 5.0,
+     "metered_l": null,
+     "vwc_before": 40.0
+    },
+    "detail": null,
+    "kind": "shot.completed",
+    "outcome": "ok",
+    "zone": 1
+   }
+  ],
+  "log": {
+   "n": 16,
+   "sha256": "ecf517e781b3343575da5b93946e9b1542e550449ea8e06c0507ef394debd43d"
+  },
+  "reads": {
+   "n": 815,
+   "sha256": "da2c0acb81d6e5ef9cf123436a6bc501d4307bd2f0981d1358911ddb9c8086f6"
+  },
+  "result": [
+   1,
+   1,
+   1,
+   1,
+   1
+  ],
+  "state": {
+   "batch_invalid": false,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 0,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": [
+    90.0,
+    null
+   ],
+   "tank_round": {
+    "1": 0.1
+   },
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.2,
+    "last_shot": "<ts>",
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 104,
+   "sha256": "abfee8802c705629f74420eda17a785388bd373db0c56535789b26a762f0c102"
+  }
+ },
+ "loop/waste_open": {
+  "calls": {
+   "n": 6,
+   "sha256": "51aaebfb70010a97a80f9952bc24d3bb0c69d71ec436bd7aecbd2c5324e77b14"
+  },
+  "journal": [
+   {
+    "actor": "engine",
+    "code": "CS-907",
+    "data": {
+     "key": "feed_unknown_default",
+     "title": "EC flushing is off: the feed EC is unknown (CS-907)"
+    },
+    "detail": null,
+    "kind": "alert.raised",
+    "outcome": "ok",
+    "zone": null
+   },
+   {
+    "actor": "engine",
+    "code": "CS-316",
+    "data": {
+     "key": "waste_default",
+     "title": "The waste valve is not closed, no shots (CS-316)"
+    },
+    "detail": null,
+    "kind": "alert.raised",
+    "outcome": "ok",
+    "zone": null
+   },
+   {
+    "actor": "engine",
+    "code": "CS-207",
+    "data": {
+     "key": "wd_default_z1",
+     "title": "Zone 1: URGENT, the zone is dry and gets no shots (CS-207)"
+    },
+    "detail": null,
+    "kind": "alert.raised",
+    "outcome": "ok",
+    "zone": 1
+   },
+   {
+    "actor": "engine",
+    "code": null,
+    "data": {
+     "reason": "waste valve switch.waste reads on",
+     "would": "P2 top-up VWC 40.0 < 45.0"
+    },
+    "detail": null,
+    "kind": "intent.held",
+    "outcome": "held",
+    "zone": 1
+   },
+   {
+    "actor": "engine",
+    "code": "CS-402",
+    "data": {
+     "key": "defaulted_setpoints",
+     "title": "Settings missing, the controller uses built-in values (CS-402)"
+    },
+    "detail": null,
+    "kind": "alert.raised",
+    "outcome": "ok",
+    "zone": null
+   }
+  ],
+  "log": {
+   "n": 14,
+   "sha256": "7be92e27b6a16ca65d7dcee32703c38ef0b27f1e91287e3a19ca714224191840"
+  },
+  "reads": {
+   "n": 428,
+   "sha256": "51ad2045a6397a006ad07c33955404dd5a059e7b35c5f746ee70da30061bbd1a"
+  },
+  "result": [
+   1,
+   1,
+   1
+  ],
+  "state": {
+   "batch_invalid": false,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 1,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": "Check closed",
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.0,
+    "last_shot": null,
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 59,
+   "sha256": "6aa71d1383844475ecc3d695fa84cbc820af213fc9d12dbdd2917b7d84ccca44"
+  }
+ },
+ "loop/zone_off_then_unreadable_then_kill": {
+  "calls": {
+   "n": 10,
+   "sha256": "a0162a9acc90a1fc441ed9c5e11d1a4a35145052acd1b0380d02ce72b41e0ad8"
+  },
+  "journal": [
+   {
+    "actor": "engine",
+    "code": "CS-907",
+    "data": {
+     "key": "feed_unknown_default",
+     "title": "EC flushing is off: the feed EC is unknown (CS-907)"
+    },
+    "detail": null,
+    "kind": "alert.raised",
+    "outcome": "ok",
+    "zone": null
+   },
+   {
+    "actor": "engine",
+    "code": null,
+    "data": {
+     "commanded_l": 0.1,
+     "duration_s": 5,
+     "kind": "p2_topup",
+     "phase": "P2",
+     "reason": "maintenance shot: P2 top-up VWC 40.0 < 45.0",
+     "size_pct": 2.0,
+     "vwc_before": 40.0,
+     "vwc_expected": null
+    },
+    "detail": null,
+    "kind": "shot.started",
+    "outcome": "ok",
+    "zone": 1
+   },
+   {
+    "actor": "engine",
+    "code": null,
+    "data": {
+     "commanded_l": 0.1,
+     "ec_before": 3.0,
+     "elapsed_s": 5.0,
+     "metered_l": null,
+     "vwc_before": 40.0
+    },
+    "detail": null,
+    "kind": "shot.completed",
+    "outcome": "ok",
+    "zone": 1
+   },
+   {
+    "actor": "engine",
+    "code": null,
+    "data": {
+     "reason": "zone disabled",
+     "would": "P2 top-up VWC 40.0 < 45.0"
+    },
+    "detail": null,
+    "kind": "intent.held",
+    "outcome": "held",
+    "zone": 1
+   },
+   {
+    "actor": "engine",
+    "code": null,
+    "data": {
+     "reason": "switch.crop_steering_zone_1_enabled unreadable (reads neither on nor off)",
+     "would": "P2 top-up VWC 40.0 < 45.0"
+    },
+    "detail": null,
+    "kind": "intent.held",
+    "outcome": "held",
+    "zone": 1
+   },
+   {
+    "actor": "engine",
+    "code": "CS-402",
+    "data": {
+     "key": "defaulted_setpoints",
+     "title": "Settings missing, the controller uses built-in values (CS-402)"
+    },
+    "detail": null,
+    "kind": "alert.raised",
+    "outcome": "ok",
+    "zone": null
+   },
+   {
+    "actor": "engine",
+    "code": null,
+    "data": {
+     "reason": "Crop Steering Controller disabled (kill switch off)",
+     "would": "P2 top-up VWC 40.0 < 45.0"
+    },
+    "detail": null,
+    "kind": "intent.held",
+    "outcome": "held",
+    "zone": 1
+   }
+  ],
+  "log": {
+   "n": 12,
+   "sha256": "44f03aa7a83f10507c3273bd674934c263f3847ad4248c8690efa7ea0db5847d"
+  },
+  "reads": {
+   "n": 739,
+   "sha256": "b66c3719e6cd9189139e9e5e83a25e7e511a854a3e654d1c570192553a0425fe"
+  },
+  "result": [
+   0,
+   1,
+   2,
+   3,
+   3
+  ],
+  "state": {
+   "batch_invalid": false,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 1,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.1,
+    "last_shot": "<ts>",
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 102,
+   "sha256": "ea3c1baf357f749cc6c83ddc4cd41f4bf0345545ec1f9fcbe3fdb6c772079179"
+  }
+ },
+ "pass/archived": {
+  "calls": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "journal": [],
+  "log": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "reads": {
+   "n": 8,
+   "sha256": "fc2573938aa4b524b8e77e27105622d8c603bbea9280ce13e5edaf8b41b6ee14"
+  },
+  "result": [
+   "Room archived in integration setup",
+   null
+  ],
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 0,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.0,
+    "last_shot": null,
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "pass/batch_running": {
+  "calls": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "journal": [],
+  "log": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "reads": {
+   "n": 9,
+   "sha256": "ed330ead047250503b1afb55696cc8343bc62856999bff1cd6953bfc33880df9"
+  },
+  "result": [
+   "making a batch",
+   null
+  ],
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 0,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.0,
+    "last_shot": null,
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "pass/clear": {
+  "calls": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "journal": [],
+  "log": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "reads": {
+   "n": 8,
+   "sha256": "fc2573938aa4b524b8e77e27105622d8c603bbea9280ce13e5edaf8b41b6ee14"
+  },
+  "result": null,
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 0,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.0,
+    "last_shot": null,
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "pass/ec_and_ph_unset_bands": {
+  "calls": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "journal": [],
+  "log": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "reads": {
+   "n": 15,
+   "sha256": "42af0f71af508c37cc0b6bf1b6928d2cbca6000412cc53b38d84589784e6bc31"
+  },
+  "result": null,
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    true,
+    false
+   ],
+   "held_keys": 0,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.0,
+    "last_shot": null,
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "pass/ec_in_grace_then_ph_out": {
+  "calls": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "journal": [],
+  "log": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "reads": {
+   "n": 13,
+   "sha256": "63ca6924afe1b6e40249a4133d5ff6f4cb86278fe6afac10134c77610f4083c7"
+  },
+  "result": "source-water pH 7.00 out of [5.5,6.5]",
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    true,
+    false
+   ],
+   "held_keys": 0,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.0,
+    "last_shot": null,
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "pass/external_hold": {
+  "calls": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "journal": [],
+  "log": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "reads": {
+   "n": 13,
+   "sha256": "45f5b9e8796e7bb98bc0b6bfc88467893a951dd32c7b470081506eb89fe7f2e2"
+  },
+  "result": [
+   "external hold (flush)",
+   null
+  ],
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 0,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.0,
+    "last_shot": null,
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "pass/feed_ec_band_absent": {
+  "calls": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "journal": [],
+  "log": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "reads": {
+   "n": 13,
+   "sha256": "eb3e46f7430020e3ae81921f6478e5a2c3dd892f267682d134f57f7e1feebe66"
+  },
+  "result": null,
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    true,
+    false
+   ],
+   "held_keys": 0,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.0,
+    "last_shot": null,
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "pass/feed_ec_band_nonsense": {
+  "calls": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "journal": [],
+  "log": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "reads": {
+   "n": 10,
+   "sha256": "3efdec2c92e662c81466e924f756106b220a7b1651b6529250baf70985cd4a18"
+  },
+  "result": "source-water EC band unreadable (number.crop_steering_irrigation_ec_max) — holding (fail-closed)",
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 0,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.0,
+    "last_shot": null,
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "pass/feed_ec_band_unavailable": {
+  "calls": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "journal": [],
+  "log": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "reads": {
+   "n": 10,
+   "sha256": "3efdec2c92e662c81466e924f756106b220a7b1651b6529250baf70985cd4a18"
+  },
+  "result": "source-water EC band unreadable (number.crop_steering_irrigation_ec_max) — holding (fail-closed)",
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 0,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.0,
+    "last_shot": null,
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "pass/feed_ec_dead_p2_topup_off": {
+  "calls": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "journal": [],
+  "log": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "reads": {
+   "n": 8,
+   "sha256": "72bf6e25a9f0a7728ba985220438a85f8f5bb5158342ee939dde0a295fa82e73"
+  },
+  "result": [
+   "source-water EC dead >30min — holding (fail-closed)",
+   true
+  ],
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 0,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.0,
+    "last_shot": null,
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "pass/feed_ec_dead_p2_topup_on": {
+  "calls": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "journal": [],
+  "log": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "reads": {
+   "n": 8,
+   "sha256": "72bf6e25a9f0a7728ba985220438a85f8f5bb5158342ee939dde0a295fa82e73"
+  },
+  "result": [
+   "source-water EC dead >30min — holding (fail-closed)",
+   true
+  ],
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 0,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.0,
+    "last_shot": null,
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "pass/feed_ec_dead_p3_emergency_off": {
+  "calls": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "journal": [],
+  "log": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "reads": {
+   "n": 9,
+   "sha256": "113296589c20d9671cd0ce815df391362db5868aa33678e015601639489aad48"
+  },
+  "result": [
+   "source-water EC dead >30min — holding (fail-closed)",
+   true
+  ],
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 0,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.0,
+    "last_shot": null,
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "pass/feed_ec_dead_p3_emergency_on": {
+  "calls": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "journal": [],
+  "log": {
+   "n": 1,
+   "sha256": "9bd05c342893105ad981d1df3c5364cded66d700b758032e26057b1af1e27177"
+  },
+  "reads": {
+   "n": 12,
+   "sha256": "586f1797174e36c35a0126b46cca36f049c17269a8f8de3b5b249eb0926f0054"
+  },
+  "result": [
+   null,
+   true
+  ],
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 0,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.0,
+    "last_shot": null,
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "pass/feed_ec_out": {
+  "calls": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "journal": [],
+  "log": {
+   "n": 1,
+   "sha256": "df439ed8e35b1df3ed83e4562e287780b3cddb6c44b28c156f96d5f6180436b6"
+  },
+  "reads": {
+   "n": 18,
+   "sha256": "75a28ee38b736d71d1833f311ccfe313d0a011f72736827027ac9be9b0ac6fac"
+  },
+  "result": [
+   "source-water EC 4.0 out of [0,1]",
+   null
+  ],
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 0,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.0,
+    "last_shot": null,
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "pass/feed_ec_reads_0.1": {
+  "calls": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "journal": [],
+  "log": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "reads": {
+   "n": 10,
+   "sha256": "3efdec2c92e662c81466e924f756106b220a7b1651b6529250baf70985cd4a18"
+  },
+  "result": "source-water EC 0.1 out of [0.5,2]",
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 0,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.0,
+    "last_shot": null,
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "pass/feed_ec_reads_1.0": {
+  "calls": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "journal": [],
+  "log": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "reads": {
+   "n": 13,
+   "sha256": "eb3e46f7430020e3ae81921f6478e5a2c3dd892f267682d134f57f7e1feebe66"
+  },
+  "result": null,
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    true,
+    false
+   ],
+   "held_keys": 0,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.0,
+    "last_shot": null,
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "pass/feed_ec_reads_6.0": {
+  "calls": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "journal": [],
+  "log": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "reads": {
+   "n": 10,
+   "sha256": "3efdec2c92e662c81466e924f756106b220a7b1651b6529250baf70985cd4a18"
+  },
+  "result": "source-water EC 6.0 out of [0.5,2]",
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 0,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.0,
+    "last_shot": null,
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "pass/feed_ec_reads_9.9": {
+  "calls": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "journal": [],
+  "log": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "reads": {
+   "n": 10,
+   "sha256": "3efdec2c92e662c81466e924f756106b220a7b1651b6529250baf70985cd4a18"
+  },
+  "result": "source-water EC 9.9 out of [0.5,2]",
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 0,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.0,
+    "last_shot": null,
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "pass/feed_path_offline": {
+  "calls": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "journal": [],
+  "log": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "reads": {
+   "n": 16,
+   "sha256": "0a97196b22e547f5aab7634e830c3f316c9593d4ab889ea15974fb5ba12ec234"
+  },
+  "result": [
+   "switch.m offline (reads neither on nor off)",
+   null
+  ],
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 0,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.0,
+    "last_shot": null,
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "pass/feed_ph_band_absent": {
+  "calls": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "journal": [],
+  "log": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "reads": {
+   "n": 13,
+   "sha256": "e31f4a320a387faaf3f6097b67ec73c36f0d698af02d58e46d29a6f6938c96b3"
+  },
+  "result": null,
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    true
+   ],
+   "held_keys": 0,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.0,
+    "last_shot": null,
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "pass/feed_ph_band_nonsense": {
+  "calls": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "journal": [],
+  "log": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "reads": {
+   "n": 7,
+   "sha256": "cf65ef5c0e43444011c168b8004b8034cead1c8d4c83af78758849f4931d3026"
+  },
+  "result": "source-water pH band unreadable (number.crop_steering_irrigation_ph_max) — holding (fail-closed)",
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 0,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.0,
+    "last_shot": null,
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "pass/feed_ph_band_unavailable": {
+  "calls": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "journal": [],
+  "log": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "reads": {
+   "n": 7,
+   "sha256": "cf65ef5c0e43444011c168b8004b8034cead1c8d4c83af78758849f4931d3026"
+  },
+  "result": "source-water pH band unreadable (number.crop_steering_irrigation_ph_max) — holding (fail-closed)",
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 0,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.0,
+    "last_shot": null,
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "pass/feed_ph_dead": {
+  "calls": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "journal": [],
+  "log": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "reads": {
+   "n": 16,
+   "sha256": "fcb9f4856ff64648f1faa4b9df9e84d53b4db884c572059da31a1274aa4b44ec"
+  },
+  "result": [
+   "source-water pH probe dead >30min — holding (fail-closed)",
+   null
+  ],
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 0,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.0,
+    "last_shot": null,
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "pass/feed_ph_dead_p2_topup_off": {
+  "calls": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "journal": [],
+  "log": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "reads": {
+   "n": 8,
+   "sha256": "5912e8286dd38b7166da5a947cc1d67c5adf94366731873038528e71bb59e3f4"
+  },
+  "result": [
+   "source-water pH probe dead >30min — holding (fail-closed)",
+   true
+  ],
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 0,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.0,
+    "last_shot": null,
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "pass/feed_ph_dead_p2_topup_on": {
+  "calls": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "journal": [],
+  "log": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "reads": {
+   "n": 8,
+   "sha256": "5912e8286dd38b7166da5a947cc1d67c5adf94366731873038528e71bb59e3f4"
+  },
+  "result": [
+   "source-water pH probe dead >30min — holding (fail-closed)",
+   true
+  ],
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 0,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.0,
+    "last_shot": null,
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "pass/feed_ph_dead_p3_emergency_off": {
+  "calls": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "journal": [],
+  "log": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "reads": {
+   "n": 9,
+   "sha256": "bcb3fee97e8d48362ca51ae681cea07fc55f77f63c908b8e8c526bd48f67096c"
+  },
+  "result": [
+   "source-water pH probe dead >30min — holding (fail-closed)",
+   true
+  ],
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 0,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.0,
+    "last_shot": null,
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "pass/feed_ph_dead_p3_emergency_on": {
+  "calls": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "journal": [],
+  "log": {
+   "n": 1,
+   "sha256": "5ea365517a609f7b0ff74f8c2f5c3c592b272a451b2cff5d2ae634c57af7db8b"
+  },
+  "reads": {
+   "n": 12,
+   "sha256": "538bb02660ded914cb87960b072ad4f576bfb9e9c6f23db7006bce48ce1e935e"
+  },
+  "result": [
+   null,
+   true
+  ],
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 0,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.0,
+    "last_shot": null,
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "pass/feed_ph_reads_0.1": {
+  "calls": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "journal": [],
+  "log": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "reads": {
+   "n": 10,
+   "sha256": "b1e4a28a189aa847a548c9c4f0ce74ce62be2d4e6d9793cba49795b855aa1a9c"
+  },
+  "result": "source-water pH 0.10 out of [5.5,6.5]",
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 0,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.0,
+    "last_shot": null,
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "pass/feed_ph_reads_1.0": {
+  "calls": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "journal": [],
+  "log": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "reads": {
+   "n": 10,
+   "sha256": "b1e4a28a189aa847a548c9c4f0ce74ce62be2d4e6d9793cba49795b855aa1a9c"
+  },
+  "result": "source-water pH 1.00 out of [5.5,6.5]",
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 0,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.0,
+    "last_shot": null,
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "pass/feed_ph_reads_6.0": {
+  "calls": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "journal": [],
+  "log": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "reads": {
+   "n": 13,
+   "sha256": "e31f4a320a387faaf3f6097b67ec73c36f0d698af02d58e46d29a6f6938c96b3"
+  },
+  "result": null,
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    true
+   ],
+   "held_keys": 0,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.0,
+    "last_shot": null,
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "pass/feed_ph_reads_9.9": {
+  "calls": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "journal": [],
+  "log": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "reads": {
+   "n": 10,
+   "sha256": "b1e4a28a189aa847a548c9c4f0ce74ce62be2d4e6d9793cba49795b855aa1a9c"
+  },
+  "result": "source-water pH 9.90 out of [5.5,6.5]",
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 0,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.0,
+    "last_shot": null,
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "pass/hardware_fault": {
+  "calls": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "journal": [],
+  "log": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "reads": {
+   "n": 9,
+   "sha256": "ed330ead047250503b1afb55696cc8343bc62856999bff1cd6953bfc33880df9"
+  },
+  "result": [
+   "hardware fault (CS-301): unconfirmed hardware close",
+   null
+  ],
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 0,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.0,
+    "last_shot": null,
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "pass/hold_missing": {
+  "calls": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "journal": [],
+  "log": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "reads": {
+   "n": 5,
+   "sha256": "df87ac8fe9edd8b642ce16439af5d773eb43f7b818a7b43d9b1d5ae05060e1dc"
+  },
+  "result": "Hold entity input_boolean.flush does not exist in Home Assistant. Remove it from the app's hold entities, or create it.",
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 0,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.0,
+    "last_shot": null,
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "pass/hold_unreadable": {
+  "calls": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "journal": [],
+  "log": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "reads": {
+   "n": 5,
+   "sha256": "df87ac8fe9edd8b642ce16439af5d773eb43f7b818a7b43d9b1d5ae05060e1dc"
+  },
+  "result": "external hold input_boolean.flush unreadable (reads neither on nor off)",
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 0,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.0,
+    "last_shot": null,
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "pass/kill_off": {
+  "calls": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "journal": [],
+  "log": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "reads": {
+   "n": 10,
+   "sha256": "dff27c25523d3f548db04b3562aa6f78e870691d50ca440e6eae302c1e92c779"
+  },
+  "result": [
+   "Crop Steering Controller disabled (kill switch off)",
+   null
+  ],
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 0,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.0,
+    "last_shot": null,
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "pass/kill_zone_tank": {
+  "calls": {
+   "n": 2,
+   "sha256": "cbb2c36b9c3bed91d8e55b53b29a607ba0df2ec671ede04197178fc857c73903"
+  },
+  "journal": [
+   {
+    "actor": "engine",
+    "code": "CS-901",
+    "data": {
+     "key": "tank_low_default",
+     "title": "The tank is at its minimum, no shots (CS-901)"
+    },
+    "detail": null,
+    "kind": "alert.raised",
+    "outcome": "ok",
+    "zone": null
+   },
+   {
+    "actor": "engine",
+    "code": null,
+    "data": {
+     "key": "tank_low_default"
+    },
+    "detail": null,
+    "kind": "alert.cleared",
+    "outcome": "ok",
+    "zone": null
+   }
+  ],
+  "log": {
+   "n": 2,
+   "sha256": "7b3679245dde7e3e0cb7c5b64a66db6f8df139405f3c0701bf7650b16cb81d2a"
+  },
+  "reads": {
+   "n": 21,
+   "sha256": "d483098b6e9565a70ffb879c97a5cc352d14c38863ab2c9bfa36f66f74650ec8"
+  },
+  "result": [
+   "Crop Steering Controller disabled (kill switch off)",
+   "zone disabled",
+   "tank at its minimum (reads 8.0 %)",
+   null
+  ],
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 0,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": [
+    60.0,
+    null
+   ],
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.0,
+    "last_shot": null,
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "pass/manual_override": {
+  "calls": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "journal": [],
+  "log": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "reads": {
+   "n": 12,
+   "sha256": "cea9351ca67216d0747a12118c3e3096ac58a34bec678640c4c516a61d939d55"
+  },
+  "result": [
+   "manual override",
+   null
+  ],
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 0,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.0,
+    "last_shot": null,
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "pass/max_run_latched": {
+  "calls": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "journal": [],
+  "log": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "reads": {
+   "n": 10,
+   "sha256": "630a3dfff57a5c27f83c35b214b1116e022e4009f5aa07a785b32e1a9db48cc6"
+  },
+  "result": [
+   "max-run latch: 3 shots in a row cut to the longest allowed shot; fix its Repairs card (CS-312) to water again",
+   null
+  ],
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 0,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.0,
+    "last_shot": null,
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "pass/max_run_released_by_off": {
+  "calls": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "journal": [],
+  "log": {
+   "n": 1,
+   "sha256": "32dfb952b36070c49b6344249dd6eed88bc8829e4d13d0624ce544482a1df498"
+  },
+  "reads": {
+   "n": 9,
+   "sha256": "dc81a63f2e0805daf0c95942b9611d861ac2c17eb8cb96ff10082c695a2cddae"
+  },
+  "result": [
+   null,
+   null,
+   0
+  ],
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 0,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.0,
+    "last_shot": null,
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "pass/max_run_released_by_reset": {
+  "calls": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "journal": [],
+  "log": {
+   "n": 1,
+   "sha256": "987d4f88e790f55ae5180c4790fa841a0479d0b34451289a58747330a6b307da"
+  },
+  "reads": {
+   "n": 9,
+   "sha256": "dc81a63f2e0805daf0c95942b9611d861ac2c17eb8cb96ff10082c695a2cddae"
+  },
+  "result": [
+   null,
+   null
+  ],
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 0,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.0,
+    "last_shot": null,
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "pass/max_run_unreadable_holds": {
+  "calls": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "journal": [],
+  "log": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "reads": {
+   "n": 2,
+   "sha256": "c339a2afdc8906a20826a6ca9be253f9eedd9f933c0c63049946ed7b80fd4145"
+  },
+  "result": "max-run latch: 3 shots in a row cut to the longest allowed shot; fix its Repairs card (CS-312) to water again",
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 0,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.0,
+    "last_shot": null,
+    "max_run_latch": {
+     "resets": 0
+    },
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "pass/no_hardware": {
+  "calls": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "journal": [],
+  "log": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "reads": {
+   "n": 9,
+   "sha256": "ed330ead047250503b1afb55696cc8343bc62856999bff1cd6953bfc33880df9"
+  },
+  "result": [
+   "no hardware mapped — set this zone's valve (and the pump and mainline, if the room has them) in the Crop Steering integration (or the add-on `hardware` option)",
+   null
+  ],
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 0,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.0,
+    "last_shot": null,
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "pass/no_valve_stops_reading": {
+  "calls": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "journal": [],
+  "log": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "reads": {
+   "n": 1,
+   "sha256": "7118f6a20a881f3e04da7ac11586a2e4416e17292ebe2b271c074e6234750c05"
+  },
+  "result": "no hardware mapped — set this zone's valve (and the pump and mainline, if the room has them) in the Crop Steering integration (or the add-on `hardware` option)",
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 0,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.0,
+    "last_shot": null,
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "pass/plan_hold": {
+  "calls": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "journal": [],
+  "log": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "reads": {
+   "n": 9,
+   "sha256": "ed330ead047250503b1afb55696cc8343bc62856999bff1cd6953bfc33880df9"
+  },
+  "result": [
+   "Strategy hold: plan unreadable",
+   null
+  ],
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 0,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.0,
+    "last_shot": null,
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "pass/plan_hold_blind_copy_rescue": {
+  "calls": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "journal": [],
+  "log": {
+   "n": 1,
+   "sha256": "68bb1e2ac40049ab0e019660e656d9e1fb82495aefe478d26910d788e02bb4d8"
+  },
+  "reads": {
+   "n": 8,
+   "sha256": "fc2573938aa4b524b8e77e27105622d8c603bbea9280ce13e5edaf8b41b6ee14"
+  },
+  "result": null,
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 0,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.0,
+    "last_shot": null,
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "pass/plan_hold_blind_fallback": {
+  "calls": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "journal": [],
+  "log": {
+   "n": 1,
+   "sha256": "c25957ddf92d3789c57328d76a78b0166d9b118ac2cbab630161d409682b7c07"
+  },
+  "reads": {
+   "n": 8,
+   "sha256": "fc2573938aa4b524b8e77e27105622d8c603bbea9280ce13e5edaf8b41b6ee14"
+  },
+  "result": null,
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 0,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.0,
+    "last_shot": null,
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "pass/plan_hold_min_daily": {
+  "calls": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "journal": [],
+  "log": {
+   "n": 1,
+   "sha256": "d1c8b8e3954f788797870167ecb0468242fce0f66c8b8bffbc092854fcb1ffc7"
+  },
+  "reads": {
+   "n": 8,
+   "sha256": "fc2573938aa4b524b8e77e27105622d8c603bbea9280ce13e5edaf8b41b6ee14"
+  },
+  "result": null,
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 0,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.0,
+    "last_shot": null,
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "pass/plan_hold_p2_topup": {
+  "calls": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "journal": [],
+  "log": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "reads": {
+   "n": 1,
+   "sha256": "7118f6a20a881f3e04da7ac11586a2e4416e17292ebe2b271c074e6234750c05"
+  },
+  "result": "Strategy hold: plan unreadable",
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 0,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.0,
+    "last_shot": null,
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "pass/plan_hold_p3_emergency": {
+  "calls": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "journal": [],
+  "log": {
+   "n": 1,
+   "sha256": "14086ceeab0b37a784bcabdb27ed0212d2e5dbea6b35be6e80f0b1c43586a2fd"
+  },
+  "reads": {
+   "n": 8,
+   "sha256": "fc2573938aa4b524b8e77e27105622d8c603bbea9280ce13e5edaf8b41b6ee14"
+  },
+  "result": null,
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 0,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.0,
+    "last_shot": null,
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "pass/plan_hold_test_shot": {
+  "calls": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "journal": [],
+  "log": {
+   "n": 1,
+   "sha256": "74afebc8d04688ac7e1ba65b7600960891bf0c3313ba8d987a6c09d306aa2a66"
+  },
+  "reads": {
+   "n": 8,
+   "sha256": "fc2573938aa4b524b8e77e27105622d8c603bbea9280ce13e5edaf8b41b6ee14"
+  },
+  "result": null,
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 0,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.0,
+    "last_shot": null,
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "pass/plan_hold_watchdog": {
+  "calls": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "journal": [],
+  "log": {
+   "n": 1,
+   "sha256": "337fee7f4a3d7466a90069cbdb899e6c4f924e562dea82388912c012d456b81f"
+  },
+  "reads": {
+   "n": 8,
+   "sha256": "fc2573938aa4b524b8e77e27105622d8c603bbea9280ce13e5edaf8b41b6ee14"
+  },
+  "result": null,
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 0,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.0,
+    "last_shot": null,
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "pass/plan_zone_paused": {
+  "calls": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "journal": [],
+  "log": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "reads": {
+   "n": 1,
+   "sha256": "7118f6a20a881f3e04da7ac11586a2e4416e17292ebe2b271c074e6234750c05"
+  },
+  "result": "Strategy zone paused",
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 0,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.0,
+    "last_shot": null,
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "pass/plumbing": {
+  "calls": {
+   "n": 1,
+   "sha256": "6f56055511136a2d131d27512ddfed073c56f2da84ef509cf8fdcbc4a2c56cc7"
+  },
+  "journal": [
+   {
+    "actor": "engine",
+    "code": "CS-202",
+    "data": {
+     "key": "plumbing_default",
+     "title": "Plumbing and switches do not agree, no shots (CS-202)"
+    },
+    "detail": null,
+    "kind": "alert.raised",
+    "outcome": "ok",
+    "zone": null
+   }
+  ],
+  "log": {
+   "n": 2,
+   "sha256": "f917ce754bf5debf8e88eedcd578654922986e3154a97428a6a3674a144470a5"
+  },
+  "reads": {
+   "n": 10,
+   "sha256": "2cccf6ec5883aa138dd0a42c8445ab8dea160ec3001dbe85e77c5a8db3f1ac69"
+  },
+  "result": [
+   "setup says this room has no main-line valve, but a main-line valve switch is mapped (switch.m) - not watering until they agree; clear it, or change the room's plumbing",
+   null
+  ],
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 0,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.0,
+    "last_shot": null,
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "pass/plumbing_alert_and_undrivable_alert": {
+  "calls": {
+   "n": 2,
+   "sha256": "c90995a699ea163c90d140ed4b85e2e66ff42ca59a771ba5e16665368ef4e82f"
+  },
+  "journal": [
+   {
+    "actor": "engine",
+    "code": "CS-202",
+    "data": {
+     "key": "plumbing_default",
+     "title": "Plumbing and switches do not agree, no shots (CS-202)"
+    },
+    "detail": null,
+    "kind": "alert.raised",
+    "outcome": "ok",
+    "zone": null
+   },
+   {
+    "actor": "engine",
+    "code": "CS-313",
+    "data": {
+     "key": "actuator_default_z1",
+     "title": "Zone 1: a valve or pump the controller cannot switch, no shots (CS-313)"
+    },
+    "detail": null,
+    "kind": "alert.raised",
+    "outcome": "ok",
+    "zone": 1
+   }
+  ],
+  "log": {
+   "n": 4,
+   "sha256": "8baaa1ec7994c4056e40246cbaab1fc27c3a9a67024733e6d6423dda23191e22"
+  },
+  "reads": {
+   "n": 3,
+   "sha256": "50bb110b0d1097659dbfbac19003aa93d8c90a2e9cc905ccb2a26f70a29bc90e"
+  },
+  "result": [
+   "setup says this room has no main-line valve, but a main-line valve switch is mapped (switch.m) - not watering until they agree; clear it, or change the room's plumbing",
+   "light.v1 can't be switched (a zone valve, main line or pump must be a switch, input_boolean or valve)"
+  ],
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 0,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.0,
+    "last_shot": null,
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "pass/retired_switch": {
+  "calls": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "journal": [],
+  "log": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "reads": {
+   "n": 10,
+   "sha256": "dff27c25523d3f548db04b3562aa6f78e870691d50ca440e6eae302c1e92c779"
+  },
+  "result": [
+   "switch.old_engine off: engine switch switched off in its place",
+   null
+  ],
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 0,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.0,
+    "last_shot": null,
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "pass/room_off": {
+  "calls": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "journal": [],
+  "log": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "reads": {
+   "n": 9,
+   "sha256": "ed330ead047250503b1afb55696cc8343bc62856999bff1cd6953bfc33880df9"
+  },
+  "result": [
+   "Room off (nothing growing)",
+   null
+  ],
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 0,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.0,
+    "last_shot": null,
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "pass/settings_loading": {
+  "calls": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "journal": [],
+  "log": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "reads": {
+   "n": 13,
+   "sha256": "45f5b9e8796e7bb98bc0b6bfc88467893a951dd32c7b470081506eb89fe7f2e2"
+  },
+  "result": [
+   "waiting for its settings to load (number.crop_steering_p1_target_vwc)",
+   null
+  ],
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 0,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.0,
+    "last_shot": null,
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "pass/settings_unread": {
+  "calls": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "journal": [],
+  "log": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "reads": {
+   "n": 6,
+   "sha256": "d1ed28e0cef3bce851f52f7736ab8919c905ec425243ba87bbf0a9bcf28f061e"
+  },
+  "result": "not watering: number.crop_steering_max_daily_volume not read since the controller started, and it sizes this zone's water (CS-402)",
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 0,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.0,
+    "last_shot": null,
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "pass/setup_pending": {
+  "calls": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "journal": [],
+  "log": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "reads": {
+   "n": 8,
+   "sha256": "fc2573938aa4b524b8e77e27105622d8c603bbea9280ce13e5edaf8b41b6ee14"
+  },
+  "result": [
+   "Invalid setup descriptor: no valves",
+   null
+  ],
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 0,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.0,
+    "last_shot": null,
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "pass/stacked": {
+  "calls": {
+   "n": 4,
+   "sha256": "e174af17e913d414b2f17761b7c077ac453c0743f3b197b716962f9697e4cd3a"
+  },
+  "journal": [
+   {
+    "actor": "engine",
+    "code": "CS-202",
+    "data": {
+     "key": "plumbing_default",
+     "title": "Plumbing and switches do not agree, no shots (CS-202)"
+    },
+    "detail": null,
+    "kind": "alert.raised",
+    "outcome": "ok",
+    "zone": null
+   },
+   {
+    "actor": "engine",
+    "code": "CS-313",
+    "data": {
+     "key": "actuator_default_z1",
+     "title": "Zone 1: a valve or pump the controller cannot switch, no shots (CS-313)"
+    },
+    "detail": null,
+    "kind": "alert.raised",
+    "outcome": "ok",
+    "zone": 1
+   },
+   {
+    "actor": "engine",
+    "code": "CS-316",
+    "data": {
+     "key": "waste_default",
+     "title": "The waste valve is not closed, no shots (CS-316)"
+    },
+    "detail": null,
+    "kind": "alert.raised",
+    "outcome": "ok",
+    "zone": null
+   },
+   {
+    "actor": "engine",
+    "code": "CS-901",
+    "data": {
+     "key": "tank_low_default",
+     "title": "The tank is at its minimum, no shots (CS-901)"
+    },
+    "detail": null,
+    "kind": "alert.raised",
+    "outcome": "ok",
+    "zone": null
+   }
+  ],
+  "log": {
+   "n": 9,
+   "sha256": "167550982c32e1930b8036f012e3b91f3b4097508b33de1fb913366a7400da27"
+  },
+  "reads": {
+   "n": 78,
+   "sha256": "1942acf326ec0a7549a192bec0b5e9e6aecb43475604b38eb2394c881cee74df"
+  },
+  "result": [
+   "Invalid setup descriptor: no valves",
+   "Room archived in integration setup",
+   "Room off (nothing growing)",
+   "making a batch",
+   "Strategy hold: plan unreadable",
+   "hardware fault (CS-301): unconfirmed hardware close",
+   "max-run latch: 3 shots in a row cut to the longest allowed shot; fix its Repairs card (CS-312) to water again",
+   "no hardware mapped — set this zone's valve (and the pump and mainline, if the room has them) in the Crop Steering integration (or the add-on `hardware` option)",
+   "setup says this room has no main-line valve, but a main-line valve switch is mapped (switch.m) - not watering until they agree; clear it, or change the room's plumbing",
+   "light.p can't be switched (a zone valve, main line or pump must be a switch, input_boolean or valve)",
+   "Crop Steering Controller disabled (kill switch off)",
+   "switch.old_engine off: engine switch switched off in its place",
+   "switch.crop_steering_zone_1_enabled unreadable (reads neither on nor off)",
+   "manual override",
+   "external hold (flush)",
+   "waste valve switch.waste reads on",
+   "waiting for its settings to load (number.crop_steering_p1_target_vwc)",
+   "tank at its minimum (reads 8.0 %)",
+   "source-water EC 4.0 out of [0,1]",
+   "source-water pH probe dead >30min — holding (fail-closed)",
+   "switch.m offline (reads neither on nor off)",
+   null
+  ],
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 0,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": [
+    8.0,
+    null
+   ],
+   "tank_round": {},
+   "waste_rule_known": "Check closed",
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.0,
+    "last_shot": null,
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "pass/tank_min": {
+  "calls": {
+   "n": 1,
+   "sha256": "f16c21fc6887dac0f98dde1044c0f91676cb1f5c45454b5861fdf709d506ebb5"
+  },
+  "journal": [
+   {
+    "actor": "engine",
+    "code": "CS-901",
+    "data": {
+     "key": "tank_low_default",
+     "title": "The tank is at its minimum, no shots (CS-901)"
+    },
+    "detail": null,
+    "kind": "alert.raised",
+    "outcome": "ok",
+    "zone": null
+   }
+  ],
+  "log": {
+   "n": 2,
+   "sha256": "7b3679245dde7e3e0cb7c5b64a66db6f8df139405f3c0701bf7650b16cb81d2a"
+  },
+  "reads": {
+   "n": 15,
+   "sha256": "86bcdf0ff11d2dded512b271d025a8fed5c9661cb6033354d077711c1d50547c"
+  },
+  "result": [
+   "tank at its minimum (reads 8.0 %)",
+   null
+  ],
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 0,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": [
+    8.0,
+    null
+   ],
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.0,
+    "last_shot": null,
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "pass/tank_unknown": {
+  "calls": {
+   "n": 1,
+   "sha256": "9cfd419d11fdb4e0caa91a1ae5b4f2db13312701e1dce42c15b4cc0ed6f48226"
+  },
+  "journal": [
+   {
+    "actor": "engine",
+    "code": "CS-902",
+    "data": {
+     "key": "tank_unknown_default",
+     "title": "The tank level is not readable, no shots (CS-902)"
+    },
+    "detail": null,
+    "kind": "alert.raised",
+    "outcome": "ok",
+    "zone": null
+   }
+  ],
+  "log": {
+   "n": 2,
+   "sha256": "e89045233ef78b7e9d19f6314aa6a2e4c619b07d28dc5a09f0d31bade09af579"
+  },
+  "reads": {
+   "n": 7,
+   "sha256": "09c89d99d9cbac4716bcad3d7061d6966ae3e652531074083cc43f85eb47a236"
+  },
+  "result": "tank level unknown (sensor.tank_distance)",
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 0,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": [
+    null,
+    null
+   ],
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.0,
+    "last_shot": null,
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "pass/undrivable": {
+  "calls": {
+   "n": 1,
+   "sha256": "a6b39cc6f66df0267ee520514cc4af72178a996684c780a45184024591a16125"
+  },
+  "journal": [
+   {
+    "actor": "engine",
+    "code": "CS-313",
+    "data": {
+     "key": "actuator_default_z1",
+     "title": "Zone 1: a valve or pump the controller cannot switch, no shots (CS-313)"
+    },
+    "detail": null,
+    "kind": "alert.raised",
+    "outcome": "ok",
+    "zone": 1
+   }
+  ],
+  "log": {
+   "n": 2,
+   "sha256": "e087bcad3c9abd0f1a0ed4392efa0c492718f48fa0885c3343c7122d4e1c44da"
+  },
+  "reads": {
+   "n": 10,
+   "sha256": "2cccf6ec5883aa138dd0a42c8445ab8dea160ec3001dbe85e77c5a8db3f1ac69"
+  },
+  "result": [
+   "light.p can't be switched (a zone valve, main line or pump must be a switch, input_boolean or valve)",
+   null
+  ],
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 0,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.0,
+    "last_shot": null,
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "pass/valve_offline": {
+  "calls": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "journal": [],
+  "log": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "reads": {
+   "n": 8,
+   "sha256": "fc2573938aa4b524b8e77e27105622d8c603bbea9280ce13e5edaf8b41b6ee14"
+  },
+  "result": "switch.p, switch.v1 offline (reads neither on nor off)",
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 0,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.0,
+    "last_shot": null,
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "pass/waste_rule_absent": {
+  "calls": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "journal": [],
+  "log": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "reads": {
+   "n": 9,
+   "sha256": "8e21e23fbece7ae44e3abcdcfcf695ed906c7a5ecf5a7c384de22a744c601a36"
+  },
+  "result": null,
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 0,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.0,
+    "last_shot": null,
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "pass/waste_valve": {
+  "calls": {
+   "n": 1,
+   "sha256": "aa92fff8f9f21b11357a38c714a7cc1203a9a5189cc8edaca8559b767508fa88"
+  },
+  "journal": [
+   {
+    "actor": "engine",
+    "code": "CS-316",
+    "data": {
+     "key": "waste_default",
+     "title": "The waste valve is not closed, no shots (CS-316)"
+    },
+    "detail": null,
+    "kind": "alert.raised",
+    "outcome": "ok",
+    "zone": null
+   }
+  ],
+  "log": {
+   "n": 2,
+   "sha256": "21a77fb56a897f951df055b5a9eea00979a98857b371f0adaeb427b711a5e96d"
+  },
+  "reads": {
+   "n": 16,
+   "sha256": "112ae7a21e6baa355208bb0d2ce204a8650cd201fa4cae5664a8ce409263aebb"
+  },
+  "result": [
+   "waste valve switch.waste reads on",
+   null
+  ],
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 0,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": "Check closed",
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.0,
+    "last_shot": null,
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "pass/waste_variants": {
+  "calls": {
+   "n": 5,
+   "sha256": "a31fbda6126219e10957e483be7dff0ee7b07f67af0ee04b0bbaf60abed693ab"
+  },
+  "journal": [
+   {
+    "actor": "engine",
+    "code": "CS-316",
+    "data": {
+     "key": "waste_default",
+     "title": "The waste valve is not closed, no shots (CS-316)"
+    },
+    "detail": null,
+    "kind": "alert.raised",
+    "outcome": "ok",
+    "zone": null
+   },
+   {
+    "actor": "engine",
+    "code": null,
+    "data": {
+     "key": "waste_default"
+    },
+    "detail": null,
+    "kind": "alert.cleared",
+    "outcome": "ok",
+    "zone": null
+   },
+   {
+    "actor": "engine",
+    "code": "CS-316",
+    "data": {
+     "key": "waste_default",
+     "title": "The waste valve is not closed, no shots (CS-316)"
+    },
+    "detail": null,
+    "kind": "alert.raised",
+    "outcome": "ok",
+    "zone": null
+   },
+   {
+    "actor": "engine",
+    "code": null,
+    "data": {
+     "key": "waste_default"
+    },
+    "detail": null,
+    "kind": "alert.cleared",
+    "outcome": "ok",
+    "zone": null
+   },
+   {
+    "actor": "engine",
+    "code": "CS-316",
+    "data": {
+     "key": "waste_default",
+     "title": "The waste valve is not closed, no shots (CS-316)"
+    },
+    "detail": null,
+    "kind": "alert.raised",
+    "outcome": "ok",
+    "zone": null
+   }
+  ],
+  "log": {
+   "n": 6,
+   "sha256": "45d33427254d8c91d16f3d636d37e4b0de22838f706e0f0607de3d38cfc09b1e"
+  },
+  "reads": {
+   "n": 51,
+   "sha256": "479f373a42cea6a9dc7173318a9a6a834fbe030fc632605ecac984e34e5fb343"
+  },
+  "result": [
+   "waste valve switch.waste offline (reads neither on nor off)",
+   null,
+   "waste valve rule unreadable (no shot until its policy can be confirmed)",
+   null,
+   null,
+   "waste valve light.waste can't be switched by the controller",
+   "Close for each shot"
+  ],
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 0,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": "Close for each shot",
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.0,
+    "last_shot": null,
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "pass/zone_off": {
+  "calls": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "journal": [],
+  "log": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "reads": {
+   "n": 11,
+   "sha256": "c76713ec04b391137f6de48914b9066750423e6f27889cec17226a709caf843c"
+  },
+  "result": [
+   "zone disabled",
+   null
+  ],
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 0,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.0,
+    "last_shot": null,
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "pass/zone_unreadable": {
+  "calls": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "journal": [],
+  "log": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "reads": {
+   "n": 11,
+   "sha256": "c76713ec04b391137f6de48914b9066750423e6f27889cec17226a709caf843c"
+  },
+  "result": [
+   "switch.crop_steering_zone_1_enabled unreadable (reads neither on nor off)",
+   null
+  ],
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 0,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.0,
+    "last_shot": null,
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "preopen/backoff": {
+  "calls": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "journal": [
+   {
+    "actor": "engine",
+    "code": null,
+    "data": {
+     "reason": "its pump, main line or valve did not switch on 3 shots in a row; next try at <hh:mm>",
+     "would": "P2 top-up"
+    },
+    "detail": null,
+    "kind": "intent.held",
+    "outcome": "held",
+    "zone": 1
+   }
+  ],
+  "log": {
+   "n": 1,
+   "sha256": "457f26a0d31f595a008364d3fadaa478b40e559ed0e8d436eab31268bc30a377"
+  },
+  "reads": {
+   "n": 1,
+   "sha256": "eb4181298b0cfa6daeb086406211834b5117dae05b208d3973ffafb47cbdad4f"
+  },
+  "result": [
+   null,
+   false
+  ],
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 1,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.0,
+    "last_shot": null,
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "preopen/backoff_past_its_retry": {
+  "calls": {
+   "n": 6,
+   "sha256": "fd6f98e227626773d167e6c7e7e9be9902c7736f51320aaac059c96160fc7b5c"
+  },
+  "journal": [
+   {
+    "actor": "engine",
+    "code": null,
+    "data": {
+     "commanded_l": 100.0,
+     "duration_s": 10,
+     "kind": null,
+     "phase": "P2",
+     "reason": "P2 top-up",
+     "size_pct": 5,
+     "vwc_before": null,
+     "vwc_expected": null
+    },
+    "detail": null,
+    "kind": "shot.started",
+    "outcome": "ok",
+    "zone": 1
+   },
+   {
+    "actor": "engine",
+    "code": null,
+    "data": {
+     "commanded_l": 100.0,
+     "ec_before": null,
+     "elapsed_s": 10.0,
+     "metered_l": null,
+     "vwc_before": null
+    },
+    "detail": null,
+    "kind": "shot.completed",
+    "outcome": "ok",
+    "zone": 1
+   }
+  ],
+  "log": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "reads": {
+   "n": 61,
+   "sha256": "eded81af34f02699e3b20763141310f7af5d07e4ce0171756b21b1d24828b242"
+  },
+  "result": null,
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 0,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 100.0,
+    "last_shot": "<ts>",
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "preopen/backoff_spares_a_test_shot": {
+  "calls": {
+   "n": 6,
+   "sha256": "fd6f98e227626773d167e6c7e7e9be9902c7736f51320aaac059c96160fc7b5c"
+  },
+  "journal": [
+   {
+    "actor": "engine",
+    "code": null,
+    "data": {
+     "commanded_l": 100.0,
+     "duration_s": 10,
+     "kind": null,
+     "phase": "P2",
+     "reason": "P2 top-up",
+     "size_pct": 5,
+     "vwc_before": null,
+     "vwc_expected": null
+    },
+    "detail": null,
+    "kind": "shot.started",
+    "outcome": "ok",
+    "zone": 1
+   },
+   {
+    "actor": "engine",
+    "code": null,
+    "data": {
+     "commanded_l": 100.0,
+     "ec_before": null,
+     "elapsed_s": 10.0,
+     "metered_l": null,
+     "vwc_before": null
+    },
+    "detail": null,
+    "kind": "shot.completed",
+    "outcome": "ok",
+    "zone": 1
+   }
+  ],
+  "log": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "reads": {
+   "n": 61,
+   "sha256": "eded81af34f02699e3b20763141310f7af5d07e4ce0171756b21b1d24828b242"
+  },
+  "result": null,
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 0,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 100.0,
+    "last_shot": "<ts>",
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "preopen/batch_running": {
+  "calls": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "journal": [
+   {
+    "actor": "engine",
+    "code": null,
+    "data": {
+     "reason": "making a batch",
+     "would": "P2 top-up"
+    },
+    "detail": null,
+    "kind": "intent.held",
+    "outcome": "held",
+    "zone": 1
+   }
+  ],
+  "log": {
+   "n": 1,
+   "sha256": "f0c3c63afd1dc56609efa1ddb1131f1d57404b74541e56a20bdc9bcdc55c046c"
+  },
+  "reads": {
+   "n": 1,
+   "sha256": "eb4181298b0cfa6daeb086406211834b5117dae05b208d3973ffafb47cbdad4f"
+  },
+  "result": [
+   null,
+   false
+  ],
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 1,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.0,
+    "last_shot": null,
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "preopen/clear_shot": {
+  "calls": {
+   "n": 6,
+   "sha256": "fd6f98e227626773d167e6c7e7e9be9902c7736f51320aaac059c96160fc7b5c"
+  },
+  "journal": [
+   {
+    "actor": "engine",
+    "code": null,
+    "data": {
+     "commanded_l": 100.0,
+     "duration_s": 10,
+     "kind": null,
+     "phase": "P2",
+     "reason": "P2 top-up",
+     "size_pct": 5,
+     "vwc_before": null,
+     "vwc_expected": null
+    },
+    "detail": null,
+    "kind": "shot.started",
+    "outcome": "ok",
+    "zone": 1
+   },
+   {
+    "actor": "engine",
+    "code": null,
+    "data": {
+     "commanded_l": 100.0,
+     "ec_before": null,
+     "elapsed_s": 10.0,
+     "metered_l": null,
+     "vwc_before": null
+    },
+    "detail": null,
+    "kind": "shot.completed",
+    "outcome": "ok",
+    "zone": 1
+   }
+  ],
+  "log": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "reads": {
+   "n": 61,
+   "sha256": "eded81af34f02699e3b20763141310f7af5d07e4ce0171756b21b1d24828b242"
+  },
+  "result": null,
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 0,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 100.0,
+    "last_shot": "<ts>",
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "preopen/fault_is_silent": {
+  "calls": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "journal": [],
+  "log": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "reads": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "result": null,
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": {
+    "entities": [
+     "switch.v1"
+    ],
+    "reason": "unconfirmed hardware close",
+    "switches": []
+   },
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 0,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.0,
+    "last_shot": null,
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "preopen/hardware_fault": {
+  "calls": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "journal": [],
+  "log": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "reads": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "result": [
+   null,
+   false
+  ],
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 0,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.0,
+    "last_shot": null,
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "preopen/inflight": {
+  "calls": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "journal": [
+   {
+    "actor": "engine",
+    "code": null,
+    "data": {
+     "reason": "an interrupted shot's hardware is not accounted for yet",
+     "would": "P2 top-up"
+    },
+    "detail": null,
+    "kind": "intent.held",
+    "outcome": "held",
+    "zone": 1
+   }
+  ],
+  "log": {
+   "n": 1,
+   "sha256": "4f474b98e6d1338faa53dcac14d791ab7ee6eb57644510424d5af978464e3160"
+  },
+  "reads": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "result": [
+   null,
+   false
+  ],
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 1,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.0,
+    "last_shot": null,
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "preopen/litres_from_the_substrate": {
+  "calls": {
+   "n": 6,
+   "sha256": "fd6f98e227626773d167e6c7e7e9be9902c7736f51320aaac059c96160fc7b5c"
+  },
+  "journal": [
+   {
+    "actor": "engine",
+    "code": null,
+    "data": {
+     "commanded_l": 0.25,
+     "duration_s": 10,
+     "kind": null,
+     "phase": "P2",
+     "reason": "P2 top-up",
+     "size_pct": 5,
+     "vwc_before": null,
+     "vwc_expected": null
+    },
+    "detail": null,
+    "kind": "shot.started",
+    "outcome": "ok",
+    "zone": 1
+   },
+   {
+    "actor": "engine",
+    "code": null,
+    "data": {
+     "commanded_l": 0.25,
+     "ec_before": null,
+     "elapsed_s": 10.0,
+     "metered_l": null,
+     "vwc_before": null
+    },
+    "detail": null,
+    "kind": "shot.completed",
+    "outcome": "ok",
+    "zone": 1
+   }
+  ],
+  "log": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "reads": {
+   "n": 65,
+   "sha256": "59cb56166cb2e674368d5ebc06b868a8f70da3568662bce40c1bf18cf9a67756"
+  },
+  "result": null,
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 0,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": [
+    9.0,
+    null
+   ],
+   "tank_round": {
+    "1": 0.25
+   },
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.25,
+    "last_shot": "<ts>",
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "preopen/plan_exempt": {
+  "calls": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "journal": [
+   {
+    "actor": "engine",
+    "code": null,
+    "data": {
+     "reason": "making a batch",
+     "would": "P2 top-up"
+    },
+    "detail": null,
+    "kind": "intent.held",
+    "outcome": "held",
+    "zone": 1
+   }
+  ],
+  "log": {
+   "n": 1,
+   "sha256": "f0c3c63afd1dc56609efa1ddb1131f1d57404b74541e56a20bdc9bcdc55c046c"
+  },
+  "reads": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "result": null,
+  "state": {
+   "batch_invalid": true,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 1,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.0,
+    "last_shot": null,
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "preopen/plumbing": {
+  "calls": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "journal": [
+   {
+    "actor": "engine",
+    "code": null,
+    "data": {
+     "reason": "setup says this room has no main-line valve, but a main-line valve switch is mapped (switch.m) - not watering until they agree; clear it, or change the room's plumbing",
+     "would": "P2 top-up"
+    },
+    "detail": null,
+    "kind": "intent.held",
+    "outcome": "held",
+    "zone": 1
+   }
+  ],
+  "log": {
+   "n": 1,
+   "sha256": "bb6227856348a8122314df3656a6be4933c25f4d800e663d96d94b0b327b2f2f"
+  },
+  "reads": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "result": [
+   null,
+   false
+  ],
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 1,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.0,
+    "last_shot": null,
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "preopen/plumbing_then_undrivable": {
+  "calls": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "journal": [
+   {
+    "actor": "engine",
+    "code": null,
+    "data": {
+     "reason": "setup says this room has no main-line valve, but a main-line valve switch is mapped (switch.m) - not watering until they agree; clear it, or change the room's plumbing",
+     "would": "P2 top-up"
+    },
+    "detail": null,
+    "kind": "intent.held",
+    "outcome": "held",
+    "zone": 1
+   },
+   {
+    "actor": "engine",
+    "code": null,
+    "data": {
+     "reason": "light.p can't be switched",
+     "would": "P2 top-up"
+    },
+    "detail": null,
+    "kind": "intent.held",
+    "outcome": "held",
+    "zone": 1
+   }
+  ],
+  "log": {
+   "n": 2,
+   "sha256": "920718a073d1e73d5743b5f2fa65cb9366c013509f3fd793e741e199c0e7f202"
+  },
+  "reads": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "result": null,
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 2,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.0,
+    "last_shot": null,
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "preopen/stacked": {
+  "calls": {
+   "n": 7,
+   "sha256": "8b061927486da7dad1e4136bb3d8cced3d623a2bee21d1379e8a71e681f8c128"
+  },
+  "journal": [
+   {
+    "actor": "engine",
+    "code": null,
+    "data": {
+     "reason": "Home Assistant refuses this controller's token",
+     "would": "P2 top-up"
+    },
+    "detail": null,
+    "kind": "intent.held",
+    "outcome": "held",
+    "zone": 1
+   },
+   {
+    "actor": "engine",
+    "code": null,
+    "data": {
+     "reason": "an interrupted shot's hardware is not accounted for yet",
+     "would": "P2 top-up"
+    },
+    "detail": null,
+    "kind": "intent.held",
+    "outcome": "held",
+    "zone": 1
+   },
+   {
+    "actor": "engine",
+    "code": null,
+    "data": {
+     "reason": "setup says this room has no main-line valve, but a main-line valve switch is mapped (switch.m) - not watering until they agree; clear it, or change the room's plumbing",
+     "would": "P2 top-up"
+    },
+    "detail": null,
+    "kind": "intent.held",
+    "outcome": "held",
+    "zone": 1
+   },
+   {
+    "actor": "engine",
+    "code": null,
+    "data": {
+     "reason": "light.p can't be switched",
+     "would": "P2 top-up"
+    },
+    "detail": null,
+    "kind": "intent.held",
+    "outcome": "held",
+    "zone": 1
+   },
+   {
+    "actor": "engine",
+    "code": null,
+    "data": {
+     "reason": "Strategy changed or held; recompute the irrigation batch on the next loop",
+     "would": "P2 top-up"
+    },
+    "detail": null,
+    "kind": "intent.held",
+    "outcome": "held",
+    "zone": 1
+   },
+   {
+    "actor": "engine",
+    "code": null,
+    "data": {
+     "reason": "its pump, main line or valve did not switch on 3 shots in a row; next try at <hh:mm>",
+     "would": "P2 top-up"
+    },
+    "detail": null,
+    "kind": "intent.held",
+    "outcome": "held",
+    "zone": 1
+   },
+   {
+    "actor": "engine",
+    "code": null,
+    "data": {
+     "reason": "this 100.0 L shot would take the tank from 9.0 % to 6.5 %, at or below its 8 % minimum",
+     "would": "P2 top-up"
+    },
+    "detail": null,
+    "kind": "intent.held",
+    "outcome": "held",
+    "zone": 1
+   },
+   {
+    "actor": "engine",
+    "code": "CS-316",
+    "data": {
+     "key": "waste_default",
+     "title": "The waste valve is not closed, no shots (CS-316)"
+    },
+    "detail": null,
+    "kind": "alert.raised",
+    "outcome": "ok",
+    "zone": null
+   },
+   {
+    "actor": "engine",
+    "code": null,
+    "data": {
+     "reason": "the waste valve did not close",
+     "would": "P2 top-up"
+    },
+    "detail": null,
+    "kind": "intent.held",
+    "outcome": "held",
+    "zone": 1
+   },
+   {
+    "actor": "engine",
+    "code": null,
+    "data": {
+     "reason": "making a batch",
+     "would": "P2 top-up"
+    },
+    "detail": null,
+    "kind": "intent.held",
+    "outcome": "held",
+    "zone": 1
+   },
+   {
+    "actor": "engine",
+    "code": null,
+    "data": {
+     "commanded_l": 100.0,
+     "duration_s": 10,
+     "kind": null,
+     "phase": "P2",
+     "reason": "P2 top-up",
+     "size_pct": 5,
+     "vwc_before": null,
+     "vwc_expected": null
+    },
+    "detail": null,
+    "kind": "shot.started",
+    "outcome": "ok",
+    "zone": 1
+   },
+   {
+    "actor": "engine",
+    "code": null,
+    "data": {
+     "commanded_l": 100.0,
+     "ec_before": null,
+     "elapsed_s": 10.0,
+     "metered_l": null,
+     "vwc_before": null
+    },
+    "detail": null,
+    "kind": "shot.completed",
+    "outcome": "ok",
+    "zone": 1
+   }
+  ],
+  "log": {
+   "n": 11,
+   "sha256": "f73bca30d73a5656b54ba728ad0d85346717356a86c99fc71020fc9228f058d5"
+  },
+  "reads": {
+   "n": 69,
+   "sha256": "52bc4f129542bd7572a7049206ddd7b35712b60b6870f8a4d16745ba9ebf573e"
+  },
+  "result": null,
+  "state": {
+   "batch_invalid": false,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 9,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": [
+    9.0,
+    null
+   ],
+   "tank_round": {
+    "1": 100.0
+   },
+   "waste_rule_known": "Check closed",
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 100.0,
+    "last_shot": "<ts>",
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "preopen/strategy": {
+  "calls": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "journal": [
+   {
+    "actor": "engine",
+    "code": null,
+    "data": {
+     "reason": "Strategy changed or held; recompute the irrigation batch on the next loop",
+     "would": "P2 top-up"
+    },
+    "detail": null,
+    "kind": "intent.held",
+    "outcome": "held",
+    "zone": 1
+   }
+  ],
+  "log": {
+   "n": 1,
+   "sha256": "df3b04ecff68f1d2ad96047ffe8c04c59f1f4e23a9a626b65ac304601eb25b6c"
+  },
+  "reads": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "result": [
+   null,
+   false
+  ],
+  "state": {
+   "batch_invalid": false,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 1,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.0,
+    "last_shot": null,
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "preopen/tank_short": {
+  "calls": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "journal": [
+   {
+    "actor": "engine",
+    "code": null,
+    "data": {
+     "reason": "this 100.0 L shot would take the tank from 9.0 % to 6.5 %, at or below its 8 % minimum",
+     "would": "P2 top-up"
+    },
+    "detail": null,
+    "kind": "intent.held",
+    "outcome": "held",
+    "zone": 1
+   }
+  ],
+  "log": {
+   "n": 1,
+   "sha256": "76599814165e9c681aa890548495ea0d251fff2d4ee8687fa81125eb07873746"
+  },
+  "reads": {
+   "n": 1,
+   "sha256": "eb4181298b0cfa6daeb086406211834b5117dae05b208d3973ffafb47cbdad4f"
+  },
+  "result": [
+   null,
+   false
+  ],
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 1,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": [
+    9.0,
+    null
+   ],
+   "tank_round": {
+    "1": 100.0
+   },
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.0,
+    "last_shot": null,
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "preopen/tank_short_passes": {
+  "calls": {
+   "n": 6,
+   "sha256": "fd6f98e227626773d167e6c7e7e9be9902c7736f51320aaac059c96160fc7b5c"
+  },
+  "journal": [
+   {
+    "actor": "engine",
+    "code": null,
+    "data": {
+     "commanded_l": 100.0,
+     "duration_s": 10,
+     "kind": null,
+     "phase": "P2",
+     "reason": "P2 top-up",
+     "size_pct": 5,
+     "vwc_before": null,
+     "vwc_expected": null
+    },
+    "detail": null,
+    "kind": "shot.started",
+    "outcome": "ok",
+    "zone": 1
+   },
+   {
+    "actor": "engine",
+    "code": null,
+    "data": {
+     "commanded_l": 100.0,
+     "ec_before": null,
+     "elapsed_s": 10.0,
+     "metered_l": null,
+     "vwc_before": null
+    },
+    "detail": null,
+    "kind": "shot.completed",
+    "outcome": "ok",
+    "zone": 1
+   }
+  ],
+  "log": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "reads": {
+   "n": 61,
+   "sha256": "eded81af34f02699e3b20763141310f7af5d07e4ce0171756b21b1d24828b242"
+  },
+  "result": null,
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 0,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": [
+    60.0,
+    null
+   ],
+   "tank_round": {
+    "1": 100.0
+   },
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 100.0,
+    "last_shot": "<ts>",
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "preopen/token_refused": {
+  "calls": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "journal": [
+   {
+    "actor": "engine",
+    "code": null,
+    "data": {
+     "reason": "Home Assistant refuses this controller's token",
+     "would": "P2 top-up"
+    },
+    "detail": null,
+    "kind": "intent.held",
+    "outcome": "held",
+    "zone": 1
+   }
+  ],
+  "log": {
+   "n": 1,
+   "sha256": "4894b5439270913f51f4f1ddfcc15010294de51411ae21f3280352dfa1ff51ba"
+  },
+  "reads": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "result": [
+   null,
+   false
+  ],
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 1,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.0,
+    "last_shot": null,
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "preopen/undrivable": {
+  "calls": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "journal": [
+   {
+    "actor": "engine",
+    "code": null,
+    "data": {
+     "reason": "light.p can't be switched",
+     "would": "P2 top-up"
+    },
+    "detail": null,
+    "kind": "intent.held",
+    "outcome": "held",
+    "zone": 1
+   }
+  ],
+  "log": {
+   "n": 1,
+   "sha256": "553ca8a4c498f5319886be7a949667b9e77af43c2e698aefc05fbe99d61a3319"
+  },
+  "reads": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "result": [
+   null,
+   false
+  ],
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 1,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.0,
+    "last_shot": null,
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "preopen/waste_closed_for_the_shot": {
+  "calls": {
+   "n": 7,
+   "sha256": "ebd2fb134bfa28273bdac641bb71d2b3aef981cff577e51096dc5f4ab52bcb9e"
+  },
+  "journal": [
+   {
+    "actor": "engine",
+    "code": null,
+    "data": {
+     "commanded_l": 100.0,
+     "duration_s": 10,
+     "kind": null,
+     "phase": "P2",
+     "reason": "P2 top-up",
+     "size_pct": 5,
+     "vwc_before": null,
+     "vwc_expected": null
+    },
+    "detail": null,
+    "kind": "shot.started",
+    "outcome": "ok",
+    "zone": 1
+   },
+   {
+    "actor": "engine",
+    "code": null,
+    "data": {
+     "commanded_l": 100.0,
+     "ec_before": null,
+     "elapsed_s": 10.0,
+     "metered_l": null,
+     "vwc_before": null
+    },
+    "detail": null,
+    "kind": "shot.completed",
+    "outcome": "ok",
+    "zone": 1
+   }
+  ],
+  "log": {
+   "n": 1,
+   "sha256": "70a9cd6227affd7e278471050b8a29c8a56ff0649477bc8127effa48a45f4974"
+  },
+  "reads": {
+   "n": 78,
+   "sha256": "bb588e46c83038cbb7d1ac1a564625c9671008ca81dd447fbf965b3b5c330d27"
+  },
+  "result": null,
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 0,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": "Close for each shot",
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 100.0,
+    "last_shot": "<ts>",
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "preopen/waste_not_closed": {
+  "calls": {
+   "n": 1,
+   "sha256": "aa92fff8f9f21b11357a38c714a7cc1203a9a5189cc8edaca8559b767508fa88"
+  },
+  "journal": [
+   {
+    "actor": "engine",
+    "code": "CS-316",
+    "data": {
+     "key": "waste_default",
+     "title": "The waste valve is not closed, no shots (CS-316)"
+    },
+    "detail": null,
+    "kind": "alert.raised",
+    "outcome": "ok",
+    "zone": null
+   },
+   {
+    "actor": "engine",
+    "code": null,
+    "data": {
+     "reason": "the waste valve did not close",
+     "would": "P2 top-up"
+    },
+    "detail": null,
+    "kind": "intent.held",
+    "outcome": "held",
+    "zone": 1
+   }
+  ],
+  "log": {
+   "n": 3,
+   "sha256": "90f87a6a7b6a2393d2d5f8a958986001f741be393c90c8503a4aaa23c7e18863"
+  },
+  "reads": {
+   "n": 5,
+   "sha256": "f3ad75cd818a73add1a893657861b08611c5a57fee790f685588ce573c6959df"
+  },
+  "result": [
+   null,
+   false
+  ],
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 1,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": "Check closed",
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.0,
+    "last_shot": null,
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "sized/cap_exempt": {
+  "calls": {
+   "n": 6,
+   "sha256": "fd6f98e227626773d167e6c7e7e9be9902c7736f51320aaac059c96160fc7b5c"
+  },
+  "journal": [
+   {
+    "actor": "engine",
+    "code": null,
+    "data": {
+     "commanded_l": 0.5,
+     "duration_s": 5,
+     "kind": "p3_emergency",
+     "phase": "P2",
+     "reason": "rescue shot: P3 rescue",
+     "size_pct": 10.0,
+     "vwc_before": null,
+     "vwc_expected": null
+    },
+    "detail": null,
+    "kind": "shot.started",
+    "outcome": "ok",
+    "zone": 1
+   },
+   {
+    "actor": "engine",
+    "code": null,
+    "data": {
+     "commanded_l": 0.5,
+     "ec_before": null,
+     "elapsed_s": 5.0,
+     "metered_l": null,
+     "vwc_before": null
+    },
+    "detail": null,
+    "kind": "shot.completed",
+    "outcome": "ok",
+    "zone": 1
+   }
+  ],
+  "log": {
+   "n": 1,
+   "sha256": "df92d48a69d81d8df05198ceb96373a9b50be38dfdbb48f75d35665432912ed4"
+  },
+  "reads": {
+   "n": 43,
+   "sha256": "6026ed3f98c68f613e33c8b83f4e2f467b4a30299336fc7891cd668904f75130"
+  },
+  "result": null,
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 0,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 60.5,
+    "last_shot": "<ts>",
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "sized/cap_unreadable": {
+  "calls": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "journal": [
+   {
+    "actor": "engine",
+    "code": "CS-203",
+    "data": {
+     "reason": "maximum shot length not valid",
+     "would": "P2 top-up"
+    },
+    "detail": null,
+    "kind": "intent.held",
+    "outcome": "held",
+    "zone": 1
+   }
+  ],
+  "log": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "reads": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "result": null,
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 1,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.0,
+    "last_shot": null,
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "sized/cut_to_the_cap": {
+  "calls": {
+   "n": 6,
+   "sha256": "fd6f98e227626773d167e6c7e7e9be9902c7736f51320aaac059c96160fc7b5c"
+  },
+  "journal": [
+   {
+    "actor": "engine",
+    "code": null,
+    "data": {
+     "commanded_l": 1.5,
+     "duration_s": 15,
+     "kind": "p2_topup",
+     "phase": "P2",
+     "reason": "maintenance shot: P2 top-up",
+     "size_pct": 50.0,
+     "vwc_before": null,
+     "vwc_expected": null
+    },
+    "detail": null,
+    "kind": "shot.started",
+    "outcome": "ok",
+    "zone": 1
+   },
+   {
+    "actor": "engine",
+    "code": null,
+    "data": {
+     "commanded_l": 1.5,
+     "ec_before": null,
+     "elapsed_s": 15.0,
+     "metered_l": null,
+     "vwc_before": null
+    },
+    "detail": null,
+    "kind": "shot.completed",
+    "outcome": "ok",
+    "zone": 1
+   }
+  ],
+  "log": {
+   "n": 1,
+   "sha256": "01197177a4c19fce55e1383801c1cf8b75ffb98736f9c7a65dd0fb6e6f9918aa"
+  },
+  "reads": {
+   "n": 73,
+   "sha256": "3105be513b6990c8d5d1057a9af480973d9793bf5f228479fc782ed42391ff89"
+  },
+  "result": null,
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 0,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 1.5,
+    "last_shot": "<ts>",
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "sized/daily_cap_clips": {
+  "calls": {
+   "n": 6,
+   "sha256": "fd6f98e227626773d167e6c7e7e9be9902c7736f51320aaac059c96160fc7b5c"
+  },
+  "journal": [
+   {
+    "actor": "engine",
+    "code": null,
+    "data": {
+     "commanded_l": 0.5,
+     "duration_s": 5,
+     "kind": "p2_topup",
+     "phase": "P2",
+     "reason": "maintenance shot: P2 top-up",
+     "size_pct": 10.0,
+     "vwc_before": null,
+     "vwc_expected": null
+    },
+    "detail": null,
+    "kind": "shot.started",
+    "outcome": "ok",
+    "zone": 1
+   },
+   {
+    "actor": "engine",
+    "code": null,
+    "data": {
+     "commanded_l": 0.5,
+     "ec_before": null,
+     "elapsed_s": 5.0,
+     "metered_l": null,
+     "vwc_before": null
+    },
+    "detail": null,
+    "kind": "shot.completed",
+    "outcome": "ok",
+    "zone": 1
+   }
+  ],
+  "log": {
+   "n": 1,
+   "sha256": "163de121e075132354015cecd487517dcf41a626192824c41f2962e6d111bd39"
+  },
+  "reads": {
+   "n": 43,
+   "sha256": "5813cda2349f1662258f5f3bf38183dc8eec0f411fb07c8afee414b6e65fb9f3"
+  },
+  "result": null,
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 0,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 48.5,
+    "last_shot": "<ts>",
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "sized/daily_cap_holds": {
+  "calls": {
+   "n": 1,
+   "sha256": "97ab61c2165209f0c6f13c0ee7c8836a591890d2cb88b2a67d6fe1605a60e523"
+  },
+  "journal": [
+   {
+    "actor": "engine",
+    "code": "CS-205",
+    "data": {
+     "key": "block_default_z1",
+     "title": "Zone 1: daily water limit reached (CS-205)"
+    },
+    "detail": null,
+    "kind": "alert.raised",
+    "outcome": "ok",
+    "zone": 1
+   },
+   {
+    "actor": "engine",
+    "code": null,
+    "data": {
+     "reason": "BLOCK daily-cap (0.10 L left)",
+     "would": "P2 top-up"
+    },
+    "detail": null,
+    "kind": "intent.held",
+    "outcome": "held",
+    "zone": 1
+   }
+  ],
+  "log": {
+   "n": 3,
+   "sha256": "bb1277973ab5c9f550878bd6d879b0591f81f560d754e7068f2737dee51e586b"
+  },
+  "reads": {
+   "n": 1,
+   "sha256": "664f22a30f336569880e51a351457d4f41d0f5884f5e156844b824efac853e38"
+  },
+  "result": [
+   false,
+   0.0,
+   "BLOCK daily-cap (0.10 L left)"
+  ],
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 1,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 49.9,
+    "last_shot": null,
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "sized/daily_cap_holds_blind_and_with_a_snapshot": {
+  "calls": {
+   "n": 1,
+   "sha256": "e82e20607d0ad11a0f121907b2f892d84203174c241388b295fb82e56232c3e5"
+  },
+  "journal": [
+   {
+    "actor": "engine",
+    "code": "CS-205",
+    "data": {
+     "key": "block_default_z1",
+     "title": "Zone 1: daily water limit reached (CS-205)"
+    },
+    "detail": null,
+    "kind": "alert.raised",
+    "outcome": "ok",
+    "zone": 1
+   },
+   {
+    "actor": "engine",
+    "code": null,
+    "data": {
+     "reason": "BLOCK daily-cap (0.00 L left)",
+     "would": "P2 top-up"
+    },
+    "detail": null,
+    "kind": "intent.held",
+    "outcome": "held",
+    "zone": 1
+   }
+  ],
+  "log": {
+   "n": 4,
+   "sha256": "66e3223a8382b1f0f6088301727094e230596c5af0f13d66b904fdf5a5e30109"
+  },
+  "reads": {
+   "n": 1,
+   "sha256": "664f22a30f336569880e51a351457d4f41d0f5884f5e156844b824efac853e38"
+  },
+  "result": [
+   [
+    false,
+    0.0,
+    "BLOCK daily-cap (0.00 L left)"
+   ],
+   [
+    false,
+    0.0,
+    "BLOCK daily-cap (0.00 L left)"
+   ]
+  ],
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 1,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 60.0,
+    "last_shot": null,
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "sized/daily_cap_then_unsized_then_fires": {
+  "calls": {
+   "n": 8,
+   "sha256": "adfa4c87625c03e13097805f4fb537853db83c5fffc4d6a67d049c3861aa8e2f"
+  },
+  "journal": [
+   {
+    "actor": "engine",
+    "code": "CS-205",
+    "data": {
+     "key": "block_default_z1",
+     "title": "Zone 1: daily water limit reached (CS-205)"
+    },
+    "detail": null,
+    "kind": "alert.raised",
+    "outcome": "ok",
+    "zone": 1
+   },
+   {
+    "actor": "engine",
+    "code": null,
+    "data": {
+     "reason": "BLOCK daily-cap (0.10 L left)",
+     "would": "P2 top-up"
+    },
+    "detail": null,
+    "kind": "intent.held",
+    "outcome": "held",
+    "zone": 1
+   },
+   {
+    "actor": "engine",
+    "code": "CS-204",
+    "data": {
+     "key": "sizing_default_z1",
+     "title": "Zone 1: shot size cannot be calculated, no shots (CS-204)"
+    },
+    "detail": null,
+    "kind": "alert.raised",
+    "outcome": "ok",
+    "zone": 1
+   },
+   {
+    "actor": "engine",
+    "code": "CS-204",
+    "data": {
+     "reason": "shot size cannot be calculated",
+     "would": "P2 top-up"
+    },
+    "detail": null,
+    "kind": "intent.held",
+    "outcome": "held",
+    "zone": 1
+   },
+   {
+    "actor": "engine",
+    "code": null,
+    "data": {
+     "commanded_l": 0.5,
+     "duration_s": 5,
+     "kind": "p2_topup",
+     "phase": "P2",
+     "reason": "maintenance shot: P2 top-up",
+     "size_pct": 10.0,
+     "vwc_before": null,
+     "vwc_expected": null
+    },
+    "detail": null,
+    "kind": "shot.started",
+    "outcome": "ok",
+    "zone": 1
+   },
+   {
+    "actor": "engine",
+    "code": null,
+    "data": {
+     "commanded_l": 0.5,
+     "ec_before": null,
+     "elapsed_s": 5.0,
+     "metered_l": null,
+     "vwc_before": null
+    },
+    "detail": null,
+    "kind": "shot.completed",
+    "outcome": "ok",
+    "zone": 1
+   }
+  ],
+  "log": {
+   "n": 6,
+   "sha256": "8dcd6cf65b113898363d6498c4029893a5884e70fce7fd65006f93de76badaa3"
+  },
+  "reads": {
+   "n": 44,
+   "sha256": "a102bd5d600d0bbc7644b4939752e8e42ef3ec0f02de5838b154c2994272fb19"
+  },
+  "result": [
+   [
+    false,
+    0.0,
+    "BLOCK daily-cap (0.10 L left)"
+   ],
+   null,
+   null
+  ],
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 2,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.5,
+    "last_shot": "<ts>",
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "sized/fire_and_block": {
+  "calls": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "journal": [
+   {
+    "actor": "engine",
+    "code": null,
+    "data": {
+     "reason": "zone disabled",
+     "would": "P2 top-up"
+    },
+    "detail": null,
+    "kind": "intent.held",
+    "outcome": "held",
+    "zone": 1
+   }
+  ],
+  "log": {
+   "n": 1,
+   "sha256": "d61f8e59e4666b1edd8a12891cafa3443862c8e38b0062c3007e2530d12b591c"
+  },
+  "reads": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  "result": null,
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 1,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.0,
+    "last_shot": null,
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "sized/fires": {
+  "calls": {
+   "n": 6,
+   "sha256": "fd6f98e227626773d167e6c7e7e9be9902c7736f51320aaac059c96160fc7b5c"
+  },
+  "journal": [
+   {
+    "actor": "engine",
+    "code": null,
+    "data": {
+     "commanded_l": 0.5,
+     "duration_s": 5,
+     "kind": "p2_topup",
+     "phase": "P2",
+     "reason": "maintenance shot: P2 top-up",
+     "size_pct": 10.0,
+     "vwc_before": null,
+     "vwc_expected": null
+    },
+    "detail": null,
+    "kind": "shot.started",
+    "outcome": "ok",
+    "zone": 1
+   },
+   {
+    "actor": "engine",
+    "code": null,
+    "data": {
+     "commanded_l": 0.5,
+     "ec_before": null,
+     "elapsed_s": 5.0,
+     "metered_l": null,
+     "vwc_before": null
+    },
+    "detail": null,
+    "kind": "shot.completed",
+    "outcome": "ok",
+    "zone": 1
+   }
+  ],
+  "log": {
+   "n": 1,
+   "sha256": "163de121e075132354015cecd487517dcf41a626192824c41f2962e6d111bd39"
+  },
+  "reads": {
+   "n": 43,
+   "sha256": "5813cda2349f1662258f5f3bf38183dc8eec0f411fb07c8afee414b6e65fb9f3"
+  },
+  "result": null,
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 0,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.5,
+    "last_shot": "<ts>",
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "sized/no_params": {
+  "calls": {
+   "n": 6,
+   "sha256": "fd6f98e227626773d167e6c7e7e9be9902c7736f51320aaac059c96160fc7b5c"
+  },
+  "journal": [
+   {
+    "actor": "engine",
+    "code": null,
+    "data": {
+     "commanded_l": 0.5,
+     "duration_s": 5,
+     "kind": "p2_topup",
+     "phase": "P2",
+     "reason": "maintenance shot: P2 top-up",
+     "size_pct": 10.0,
+     "vwc_before": null,
+     "vwc_expected": null
+    },
+    "detail": null,
+    "kind": "shot.started",
+    "outcome": "ok",
+    "zone": 1
+   },
+   {
+    "actor": "engine",
+    "code": null,
+    "data": {
+     "commanded_l": 0.5,
+     "ec_before": null,
+     "elapsed_s": 5.0,
+     "metered_l": null,
+     "vwc_before": null
+    },
+    "detail": null,
+    "kind": "shot.completed",
+    "outcome": "ok",
+    "zone": 1
+   }
+  ],
+  "log": {
+   "n": 1,
+   "sha256": "163de121e075132354015cecd487517dcf41a626192824c41f2962e6d111bd39"
+  },
+  "reads": {
+   "n": 43,
+   "sha256": "5813cda2349f1662258f5f3bf38183dc8eec0f411fb07c8afee414b6e65fb9f3"
+  },
+  "result": null,
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 0,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 60.5,
+    "last_shot": "<ts>",
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "sized/not_fire_daily_cap_text": {
+  "calls": {
+   "n": 1,
+   "sha256": "67332ea2d9a9db07cfb4c26b2594c6a9a5f0eec380b0ffc6aee8b0db94efee86"
+  },
+  "journal": [
+   {
+    "actor": "engine",
+    "code": "CS-205",
+    "data": {
+     "key": "block_default_z1",
+     "title": "Zone 1: daily water limit reached (CS-205)"
+    },
+    "detail": null,
+    "kind": "alert.raised",
+    "outcome": "ok",
+    "zone": 1
+   }
+  ],
+  "log": {
+   "n": 3,
+   "sha256": "3cc1de4cecbf7a9382a24c222d8fcf1df4021fa5831877e893f61e5f23f358bd"
+  },
+  "reads": {
+   "n": 1,
+   "sha256": "664f22a30f336569880e51a351457d4f41d0f5884f5e156844b824efac853e38"
+  },
+  "result": null,
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 0,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.0,
+    "last_shot": null,
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "sized/not_fire_ec_block": {
+  "calls": {
+   "n": 1,
+   "sha256": "8267e245a1e8116e9f30a25b0cdc367d1f4096e9a726200a633ac6ba60ad7594"
+  },
+  "journal": [
+   {
+    "actor": "engine",
+    "code": "CS-206",
+    "data": {
+     "key": "block_default_z1",
+     "title": "Zone 1: zone EC too high, no shots (CS-206)"
+    },
+    "detail": null,
+    "kind": "alert.raised",
+    "outcome": "ok",
+    "zone": 1
+   }
+  ],
+  "log": {
+   "n": 3,
+   "sha256": "ae7fc3573e68ed3a4a86f1cb29b343486c5377dbe0fb6b74a24d5f3842d6cde1"
+  },
+  "reads": {
+   "n": 1,
+   "sha256": "664f22a30f336569880e51a351457d4f41d0f5884f5e156844b824efac853e38"
+  },
+  "result": null,
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 0,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.0,
+    "last_shot": null,
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "sized/substrate_nan": {
+  "calls": {
+   "n": 1,
+   "sha256": "4d33cf05219dc39f9d9465b4d540f05039839fbaaf317ba893f10545266067ee"
+  },
+  "journal": [
+   {
+    "actor": "engine",
+    "code": "CS-204",
+    "data": {
+     "key": "sizing_default_z1",
+     "title": "Zone 1: shot size cannot be calculated, no shots (CS-204)"
+    },
+    "detail": null,
+    "kind": "alert.raised",
+    "outcome": "ok",
+    "zone": 1
+   },
+   {
+    "actor": "engine",
+    "code": "CS-204",
+    "data": {
+     "reason": "shot size cannot be calculated",
+     "would": "P2 top-up"
+    },
+    "detail": null,
+    "kind": "intent.held",
+    "outcome": "held",
+    "zone": 1
+   }
+  ],
+  "log": {
+   "n": 2,
+   "sha256": "642f9ab69408e5e16101bea0a3dbbdbf46c3b6f0820624fabe3a0d8f8b586234"
+  },
+  "reads": {
+   "n": 1,
+   "sha256": "664f22a30f336569880e51a351457d4f41d0f5884f5e156844b824efac853e38"
+  },
+  "result": null,
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 1,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.0,
+    "last_shot": null,
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "sized/test_shot": {
+  "calls": {
+   "n": 6,
+   "sha256": "fd6f98e227626773d167e6c7e7e9be9902c7736f51320aaac059c96160fc7b5c"
+  },
+  "journal": [
+   {
+    "actor": "manual",
+    "code": null,
+    "data": {
+     "commanded_l": 1.2,
+     "duration_s": 12,
+     "kind": "test_shot",
+     "phase": "P2",
+     "reason": "shot: TEST shot 12 s (asked for)",
+     "size_pct": 10.0,
+     "vwc_before": null,
+     "vwc_expected": null
+    },
+    "detail": null,
+    "kind": "shot.started",
+    "outcome": "ok",
+    "zone": 1
+   },
+   {
+    "actor": "engine",
+    "code": null,
+    "data": {
+     "commanded_l": 1.2,
+     "ec_before": null,
+     "elapsed_s": 12.0,
+     "metered_l": null,
+     "vwc_before": null
+    },
+    "detail": null,
+    "kind": "shot.completed",
+    "outcome": "ok",
+    "zone": 1
+   }
+  ],
+  "log": {
+   "n": 1,
+   "sha256": "c2e14510084d9a22553628ee01fedb28a0b8d95c147283ed677203775d62c5b2"
+  },
+  "reads": {
+   "n": 66,
+   "sha256": "417336fc65e2308759270c9833bf20e1093a19bd216a319974aa9b66de299377"
+  },
+  "result": null,
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 0,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 1.2,
+    "last_shot": "<ts>",
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ },
+ "sized/unsized": {
+  "calls": {
+   "n": 1,
+   "sha256": "4d33cf05219dc39f9d9465b4d540f05039839fbaaf317ba893f10545266067ee"
+  },
+  "journal": [
+   {
+    "actor": "engine",
+    "code": "CS-204",
+    "data": {
+     "key": "sizing_default_z1",
+     "title": "Zone 1: shot size cannot be calculated, no shots (CS-204)"
+    },
+    "detail": null,
+    "kind": "alert.raised",
+    "outcome": "ok",
+    "zone": 1
+   },
+   {
+    "actor": "engine",
+    "code": "CS-204",
+    "data": {
+     "reason": "shot size cannot be calculated",
+     "would": "P2 top-up"
+    },
+    "detail": null,
+    "kind": "intent.held",
+    "outcome": "held",
+    "zone": 1
+   }
+  ],
+  "log": {
+   "n": 2,
+   "sha256": "642f9ab69408e5e16101bea0a3dbbdbf46c3b6f0820624fabe3a0d8f8b586234"
+  },
+  "reads": {
+   "n": 1,
+   "sha256": "664f22a30f336569880e51a351457d4f41d0f5884f5e156844b824efac853e38"
+  },
+  "result": null,
+  "state": {
+   "batch_invalid": null,
+   "busy": false,
+   "fault": null,
+   "feed_good": [
+    false,
+    false
+   ],
+   "held_keys": 1,
+   "inflight": null,
+   "shot_room": false,
+   "tank_reading": null,
+   "tank_round": {},
+   "waste_rule_known": null,
+   "zone": {
+    "capped_in_a_row": 0,
+    "daily_vol": 0.0,
+    "last_shot": null,
+    "max_run_latch": null,
+    "on_failures": null,
+    "phase": "P2",
+    "shots_today": null
+   }
+  },
+  "writes": {
+   "n": 0,
+   "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  }
+ }
+}

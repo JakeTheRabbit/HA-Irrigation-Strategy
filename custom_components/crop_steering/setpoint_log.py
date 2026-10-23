@@ -7,20 +7,30 @@ without the log) reads as an empty log; nothing is written until a setting moves
 
 Who: Home Assistant sees only the controller app's token, so the controller names the writer of
 each of its writes first, with the `crop_steering_setpoint_write` event (the learner, the AI brain,
-or the brain's safety put-back). A claim names one write: that write consumes it, and the controller
+or the brain's safety put-back). A brain write also names the AI ledger row it carries out
+(`ledger_id`), which its target.changed carries in correlation.ledger_id: that row's ai.outcome finds
+the change by it (changes.py). A claim names one write: that write consumes it, and the controller
 takes it back (`crop_steering_setpoint_claim_cancel`) when its write did not land. A write it has not
 named is the operator's when a signed-in person made it, and Home Assistant's own (an automation or a
 script) otherwise.
+
+Switches and selects (toggle()): a zone's enable switch, the room's kill switch, and the growth stage,
+P2 mode and watering-by selects journal target.changed with who moved them, from the state change
+itself: a signed-in person is manual with their user id, the controller app (a system user) the
+engine, and nothing else the system. Only the journal: the log keeps numbers. A write a caller
+journals itself (`quiet`) is not journaled again.
 """
 
 from __future__ import annotations
 
 import asyncio
+import re
 import time
 from copy import deepcopy
 
 from .const import DOMAIN
-from .room import room_prefix
+from .journal_api import note
+from .room import default_gate, room_gate, room_prefix
 
 MAX_CHANGES = 2000
 CLAIM_EVENT = f"{DOMAIN}_setpoint_write"
@@ -29,22 +39,39 @@ CANCEL_EVENT = f"{DOMAIN}_setpoint_claim_cancel"
 CLAIM_S = 120
 CONTROLLER_WRITERS = ("learner", "brain", "safety")
 SERVICE = "setpoint_log_get"
+# The log's `who` -> the journal's source.actor.
+ACTORS = {
+    "operator": "manual",
+    "home_assistant": "automation",
+    "learner": "learner",
+    "brain": "ai",
+    "safety": "safety",
+}
+# A zone's switch or select journaled by toggle(): its name after the room prefix -> its key.
+ZONE_TOGGLES = re.compile(r"zone_(\d+)_(enabled|p2_mode|irrigation_mode)")
+UNREAD = ("unknown", "unavailable")
 
 
 class SetpointLog:
     def __init__(self, hass, entry, store=None):
         self.hass, self.entry = hass, entry
-        self.room_id = "room:" + room_prefix(entry)
+        self.prefix = room_prefix(entry)
+        self.room_id = "room:" + self.prefix
         self._store = store
         self._lock = asyncio.Lock()
         # entity_id -> (value, who, monotonic seconds, expires or None, reason or None, expected or None,
-        # claim_id or None: a controller from before CTL-035 sends none)
+        # claim_id or None: a controller from before CTL-035 sends none, ledger_id or None)
         self._claims = {}
         self._reasons = (
             {}
         )  # entity_id -> (reason, expected) the last named write gave, for record()
+        # entity_id -> the AI ledger row the last named write gave, for record()
+        self._ledger_ids = {}
         self.changes = []
         self.error = None
+        # ids of the contexts whose writes a caller journals itself, with their readback
+        # (presets.write_numbers); a write in any other context is journaled here as always
+        self.quiet = set()
 
     async def async_init(self):
         try:
@@ -90,6 +117,7 @@ class SetpointLog:
                 reason,
                 expected,
                 data.get("claim_id"),
+                str(data["ledger_id"]) if data.get("ledger_id") is not None else None,
             )
 
     def cancel(self, data):
@@ -118,6 +146,8 @@ class SetpointLog:
         ):
             if claim[4] or claim[5]:
                 self._reasons[entity_id] = (claim[4], claim[5])
+            if claim[7]:
+                self._ledger_ids[entity_id] = claim[7]
             return claim[1], claim[3]
         user_id = getattr(context, "user_id", None)
         user = await self.hass.auth.async_get_user(user_id) if user_id else None
@@ -132,8 +162,10 @@ class SetpointLog:
         from homeassistant.util import dt as dt_util
 
         self._reasons.pop(entity_id, None)
+        self._ledger_ids.pop(entity_id, None)
         who, expires = await self.who(entity_id, new, context)
         reason, expected = self._reasons.pop(entity_id, None) or (None, None)
+        ledger_id = self._ledger_ids.pop(entity_id, None)
         if self.error is not None or old == new:
             return who, expires
         row = {
@@ -153,7 +185,91 @@ class SetpointLog:
             self.changes.append(row)
             del self.changes[:-MAX_CHANGES]
             await self._store.async_save({"changes": self.changes})
+        if getattr(context, "id", None) in self.quiet:
+            return who, expires
+        note(
+            self.hass,
+            self.room_id,
+            "target.changed",
+            zone=zone,
+            actor=ACTORS.get(who, "system"),
+            user_id=getattr(context, "user_id", None) if who == "operator" else None,
+            data={
+                "key": field,
+                "scope": "room" if zone is None else f"zone:{zone}",
+                # A brain write that runs out by itself is an AI overlay (overlays.py).
+                "layer": "overlay" if who == "brain" and expires else "base",
+                "old": old,
+                "new": new,
+                "expires": expires,
+                "reason": reason,
+                "expected": expected,
+                "entity_id": entity_id,
+            },
+            **({"correlation": {"ledger_id": ledger_id}} if ledger_id else {}),
+        )
         return who, expires
+
+    def _toggle_key(self, entity_id):
+        """-> (key, zone or None) of a switch or select toggle() journals, else None."""
+        domain, _, name = entity_id.partition(".")
+        own = f"{DOMAIN}_{self.prefix}"
+        if domain in ("switch", "select") and name.startswith(own):
+            rest = name[len(own) :]
+            zone = ZONE_TOGGLES.fullmatch(rest)
+            if zone is not None and (domain == "switch") == (zone[2] == "enabled"):
+                return zone[2], int(zone[1])
+            if domain == "select" and rest == "growth_stage":
+                return "growth_stage", None
+        if domain in ("switch", "input_boolean") and entity_id in (
+            default_gate(self.prefix),
+            room_gate(self.hass, self.prefix),
+        ):
+            return "engine_enabled", None
+        return None
+
+    def toggle(self, entity_id, old_state, new_state, context):
+        """A state change of one of the room's journaled switches and selects -> what journal_toggle()
+        records, or None. Synchronous, so a caller's `quiet` context is still marked."""
+        if old_state is None or new_state is None or old_state.state == new_state.state:
+            return None
+        if new_state.state in UNREAD or getattr(context, "id", None) in self.quiet:
+            return None
+        found = self._toggle_key(entity_id)
+        if found is None:
+            return None
+        # A pick from a value that read nothing has no old value to put back.
+        old = None if old_state.state in UNREAD else old_state.state
+        return {
+            "entity_id": entity_id,
+            "key": found[0],
+            "zone": found[1],
+            "old": old,
+            "new": new_state.state,
+        }
+
+    async def journal_toggle(self, change, context):
+        """target.changed for a toggle(): a signed-in person is manual, with their user id."""
+        user_id = getattr(context, "user_id", None)
+        user = await self.hass.auth.async_get_user(user_id) if user_id else None
+        person = user is not None and not user.system_generated
+        zone = change["zone"]
+        note(
+            self.hass,
+            self.room_id,
+            "target.changed",
+            zone=zone,
+            actor="manual" if person else "engine" if user is not None else "system",
+            user_id=user_id if person else None,
+            data={
+                "key": change["key"],
+                "scope": "room" if zone is None else f"zone:{zone}",
+                "layer": "base",
+                "old": change["old"],
+                "new": change["new"],
+                "entity_id": change["entity_id"],
+            },
+        )
 
     def response(self):
         return {
@@ -171,8 +287,11 @@ def log_for(hass, entry_id):
 
 async def async_setup_setpoint_log(hass, entry):
     import voluptuous as vol
+    from homeassistant.const import EVENT_STATE_CHANGED
     from homeassistant.core import SupportsResponse, callback
     from homeassistant.exceptions import HomeAssistantError
+
+    from .api_v2 import fields, wrap
 
     log = SetpointLog(hass, entry)
     await log.async_init()
@@ -190,6 +309,20 @@ async def async_setup_setpoint_log(hass, entry):
     entry.async_on_unload(hass.bus.async_listen(CLAIM_EVENT, claimed))
     entry.async_on_unload(hass.bus.async_listen(CANCEL_EVENT, cancelled))
 
+    @callback
+    def changed(event):
+        data = event.data
+        change = log.toggle(
+            data["entity_id"],
+            data.get("old_state"),
+            data.get("new_state"),
+            event.context,
+        )
+        if change is not None:
+            hass.async_create_task(log.journal_toggle(change, event.context))
+
+    entry.async_on_unload(hass.bus.async_listen(EVENT_STATE_CHANGED, changed))
+
     async def handle(call):
         # Reading only: anyone who may look at the room may read who changed what.
         matches = [
@@ -202,8 +335,8 @@ async def async_setup_setpoint_log(hass, entry):
     hass.services.async_register(
         DOMAIN,
         SERVICE,
-        handle,
-        schema=vol.Schema({vol.Required("room_id"): str}),
+        wrap(handle),
+        schema=vol.Schema(fields({vol.Required("room_id"): str})),
         supports_response=SupportsResponse.ONLY,
     )
 

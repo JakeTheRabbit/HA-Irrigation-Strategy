@@ -362,10 +362,26 @@ def resolve_days(hass, room_id):
     return matches[0]
 
 
+def _rows_refused(call, result):
+    """API v2: grow-days the record refused as not well formed (the others are stored)."""
+    from .api_v2 import failure
+
+    refused = result.get("refused") or []
+    if not refused:
+        return None
+    return failure(
+        "invalid",
+        f"{len(refused)} grow-day row(s) refused, {result.get('taken', 0)} stored: "
+        + "; ".join(refused),
+    )
+
+
 async def async_setup_grow_days(hass, entry):
     import voluptuous as vol
     from homeassistant.core import SupportsResponse
     from homeassistant.exceptions import HomeAssistantError
+
+    from .api_v2 import fields, wrap
 
     manager = GrowDayStore(hass, entry)
     await manager.async_init()
@@ -427,8 +443,10 @@ async def async_setup_grow_days(hass, entry):
         hass.services.async_register(
             DOMAIN,
             service,
-            handle,
-            schema=vol.Schema({vol.Required("room_id"): str, **schemas[service]}),
+            wrap(handle, error_of={"grow_day_record": _rows_refused}),
+            schema=vol.Schema(
+                fields({vol.Required("room_id"): str, **schemas[service]})
+            ),
             # The controller app sends grow_day_record over REST, asking for the answer.
             supports_response=(
                 SupportsResponse.OPTIONAL

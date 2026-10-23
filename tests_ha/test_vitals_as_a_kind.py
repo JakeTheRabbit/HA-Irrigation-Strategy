@@ -129,9 +129,12 @@ async def test_a_3_11_1_sites_phone_routes_are_unchanged_and_none_gains_vitals(
     assert hass.states.get(SWITCH).state == "on"
     doc = await _call(hass, hass_admin_user, "notify_get")
     assert doc["error"] is None
-    # As saved, beside the digest each phone now has (off) and the site's mutes (none).
+    # As saved, beside the digest (off) and quiet hours (none) each phone now has and the site's mutes (none).
     config = {key: doc["config"][key] for key in store["data"]}
-    assert config == {**store["data"], "recipients": [dict(r, digest=False) for r in store["data"]["recipients"]]}
+    assert config == {
+        **store["data"],
+        "recipients": [dict(r, digest=False, quiet_hours=None) for r in store["data"]["recipients"]],
+    }
     assert "vitals" in [kind["id"] for kind in doc["kinds"]]
     sensor = hass.states.get("sensor.crop_steering_notify_config")
     assert (sensor.state, sensor.attributes["recipients"], sensor.attributes["idle_hours"]) == ("3", 2, 2)

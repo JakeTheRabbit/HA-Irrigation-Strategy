@@ -1,0 +1,2410 @@
+{
+ "batch/dose_refused": {
+  "calls": [
+   [
+    "input_boolean",
+    "turn_on",
+    {
+     "entity_id": "input_boolean.tank_hold"
+    }
+   ],
+   [
+    "switch",
+    "turn_off",
+    {
+     "entity_id": "switch.row1"
+    }
+   ],
+   [
+    "switch",
+    "turn_off",
+    {
+     "entity_id": "switch.main_line"
+    }
+   ],
+   [
+    "switch",
+    "turn_off",
+    {
+     "entity_id": "switch.main_pump"
+    }
+   ],
+   [
+    "switch",
+    "turn_off",
+    {
+     "entity_id": "switch.room_b_feed"
+    }
+   ],
+   [
+    "switch",
+    "turn_on",
+    {
+     "entity_id": "switch.tank_fill"
+    }
+   ],
+   [
+    "switch",
+    "turn_off",
+    {
+     "entity_id": "switch.tank_fill"
+    }
+   ],
+   [
+    "switch",
+    "turn_on",
+    {
+     "entity_id": "switch.mix_valve"
+    }
+   ],
+   [
+    "switch",
+    "turn_on",
+    {
+     "entity_id": "switch.tank_mixer"
+    }
+   ],
+   [
+    "switch",
+    "turn_off",
+    {
+     "entity_id": "switch.balance_power"
+    }
+   ],
+   [
+    "switch",
+    "turn_off",
+    {
+     "entity_id": "switch.bloom_power"
+    }
+   ],
+   [
+    "switch",
+    "turn_off",
+    {
+     "entity_id": "switch.tank_fill"
+    }
+   ],
+   [
+    "switch",
+    "turn_off",
+    {
+     "entity_id": "switch.tank_mixer"
+    }
+   ],
+   [
+    "switch",
+    "turn_off",
+    {
+     "entity_id": "switch.mix_valve"
+    }
+   ],
+   [
+    "input_boolean",
+    "turn_off",
+    {
+     "entity_id": "input_boolean.tank_hold"
+    }
+   ],
+   [
+    "persistent_notification",
+    "create",
+    {
+     "message": "The batch stopped in its dose step: Balance: refused: Balance already reads dosing. The controller set the power of each dosing pump, the fill valve, the mix pump and the mix valves to off and released the hold. The rooms that it held get water again. Dosed before the stop: nothing. Check the tank before the next batch.\n\nCode CS-806. What it means and what to do: Crop Steering \u2192 Help & tools \u2192 Error codes.",
+     "notification_id": "f2_dosing_default_806_2026_09_28t01_00_00_00_00",
+     "title": "A batch stopped (CS-806)"
+    }
+   ]
+  ],
+  "history": [
+   "stopped: dose: Balance: refused: Balance already reads dosing"
+  ],
+  "inflight": null,
+  "journal": [
+   [
+    "batch.step",
+    "ok",
+    null,
+    {
+     "recipe": "",
+     "state": "running",
+     "step": "hold"
+    }
+   ],
+   [
+    "batch.step",
+    "ok",
+    null,
+    {
+     "recipe": "",
+     "state": "done",
+     "step": "hold"
+    }
+   ],
+   [
+    "batch.step",
+    "ok",
+    null,
+    {
+     "recipe": "",
+     "state": "running",
+     "step": "close"
+    }
+   ],
+   [
+    "batch.step",
+    "ok",
+    null,
+    {
+     "recipe": "",
+     "state": "done",
+     "step": "close"
+    }
+   ],
+   [
+    "batch.step",
+    "ok",
+    null,
+    {
+     "recipe": "",
+     "state": "running",
+     "step": "fill"
+    }
+   ],
+   [
+    "batch.step",
+    "ok",
+    null,
+    {
+     "recipe": "",
+     "state": "done",
+     "step": "fill"
+    }
+   ],
+   [
+    "batch.step",
+    "ok",
+    null,
+    {
+     "recipe": "",
+     "state": "running",
+     "step": "mix"
+    }
+   ],
+   [
+    "batch.step",
+    "ok",
+    null,
+    {
+     "recipe": "",
+     "state": "done",
+     "step": "mix"
+    }
+   ],
+   [
+    "batch.step",
+    "ok",
+    null,
+    {
+     "recipe": "",
+     "state": "running",
+     "step": "premix"
+    }
+   ],
+   [
+    "batch.step",
+    "ok",
+    null,
+    {
+     "recipe": "",
+     "state": "done",
+     "step": "premix"
+    }
+   ],
+   [
+    "batch.step",
+    "ok",
+    null,
+    {
+     "recipe": "",
+     "state": "running",
+     "step": "dose"
+    }
+   ],
+   [
+    "alert.raised",
+    "ok",
+    "CS-806",
+    {
+     "key": "dosing_default_806_2026_09_28t01_00_00_00_00",
+     "title": "A batch stopped (CS-806)"
+    }
+   ],
+   [
+    "batch.failed",
+    "failed",
+    "CS-806",
+    {
+     "reason": "Balance: refused: Balance already reads dosing",
+     "recipe": "",
+     "step": "dose"
+    }
+   ]
+  ],
+  "logs": [
+   2,
+   "888c77dbe7ba4fc9e65a9247f472099271ffde4ec08b98fb3d9ba426b8a037ad"
+  ],
+  "ph": null,
+  "reads": [
+   191,
+   "00e89edd936f2b99bb5816d4049e1abfda72e37132feac26bef0d99f6d5e70de"
+  ],
+  "result": "stopped: dose: Balance: refused: Balance already reads dosing"
+ },
+ "batch/fault": {
+  "calls": [],
+  "history": [],
+  "inflight": null,
+  "journal": [],
+  "logs": [
+   1,
+   "02b341fb1813c433a17e7cace6baab0bbb44e24f0e42cddcb887cef982f40471"
+  ],
+  "ph": null,
+  "reads": [
+   6,
+   "dbbc77ab8f54d019a96e767389c483399528f3d6f22b9c56ed8c6b3db3c240fe"
+  ],
+  "result": "refused: the room has a hardware fault latched"
+ },
+ "batch/full_dead": {
+  "calls": [],
+  "history": [],
+  "inflight": null,
+  "journal": [],
+  "logs": [
+   1,
+   "c1bce54237470745b731c4833603a94917d15a7c293f544dc9d446326b06b33f"
+  ],
+  "ph": null,
+  "reads": [
+   8,
+   "214cc3900947456ebf93b2388c7f31283940d9e51e068f7fc5bdbab694db3e76"
+  ],
+  "result": "refused: the tank's full sensor can't be read"
+ },
+ "batch/hold_dead": {
+  "calls": [],
+  "history": [],
+  "inflight": null,
+  "journal": [],
+  "logs": [
+   1,
+   "076273915d651c3c394bf72110c9788a77d89525afae23b5025441811015fab3"
+  ],
+  "ph": null,
+  "reads": [
+   7,
+   "69dd6563fb61b8683827150709ca240da460cc852e30f6f37cad59387f5352ce"
+  ],
+  "result": "refused: input_boolean.tank_hold can't be read"
+ },
+ "batch/hold_on": {
+  "calls": [],
+  "history": [],
+  "inflight": null,
+  "journal": [],
+  "logs": [
+   1,
+   "430d01d6ad6251fd56d0d3d0615db479335407651ed4a380aeb01de3c3cfa381"
+  ],
+  "ph": null,
+  "reads": [
+   7,
+   "69dd6563fb61b8683827150709ca240da460cc852e30f6f37cad59387f5352ce"
+  ],
+  "result": "refused: input_boolean.tank_hold is on already: something else is dosing"
+ },
+ "batch/mix_power_no_sensor": {
+  "calls": [],
+  "history": [],
+  "inflight": null,
+  "journal": [],
+  "logs": [
+   1,
+   "c366c92affb93d0e2a5e98c0ecae52f7596482ddf9b2f504fd22b620679c7f76"
+  ],
+  "ph": null,
+  "reads": [
+   8,
+   "214cc3900947456ebf93b2388c7f31283940d9e51e068f7fc5bdbab694db3e76"
+  ],
+  "result": "refused: the mix pump has a minimum power but no power sensor to read it"
+ },
+ "batch/ok": {
+  "calls": [
+   [
+    "input_boolean",
+    "turn_on",
+    {
+     "entity_id": "input_boolean.tank_hold"
+    }
+   ],
+   [
+    "switch",
+    "turn_off",
+    {
+     "entity_id": "switch.row1"
+    }
+   ],
+   [
+    "switch",
+    "turn_off",
+    {
+     "entity_id": "switch.main_line"
+    }
+   ],
+   [
+    "switch",
+    "turn_off",
+    {
+     "entity_id": "switch.main_pump"
+    }
+   ],
+   [
+    "switch",
+    "turn_off",
+    {
+     "entity_id": "switch.room_b_feed"
+    }
+   ],
+   [
+    "switch",
+    "turn_on",
+    {
+     "entity_id": "switch.tank_fill"
+    }
+   ],
+   [
+    "switch",
+    "turn_off",
+    {
+     "entity_id": "switch.tank_fill"
+    }
+   ],
+   [
+    "switch",
+    "turn_on",
+    {
+     "entity_id": "switch.mix_valve"
+    }
+   ],
+   [
+    "switch",
+    "turn_on",
+    {
+     "entity_id": "switch.tank_mixer"
+    }
+   ],
+   [
+    "number",
+    "set_value",
+    {
+     "entity_id": "number.balance_volume",
+     "value": 300
+    }
+   ],
+   [
+    "button",
+    "press",
+    {
+     "entity_id": "button.balance_start"
+    }
+   ],
+   [
+    "number",
+    "set_value",
+    {
+     "entity_id": "number.balance_volume",
+     "value": 25.0
+    }
+   ],
+   [
+    "input_number",
+    "set_value",
+    {
+     "entity_id": "input_number.bloom_volume",
+     "value": 150
+    }
+   ],
+   [
+    "script",
+    "turn_on",
+    {
+     "entity_id": "script.bloom_start"
+    }
+   ],
+   [
+    "switch",
+    "turn_off",
+    {
+     "entity_id": "switch.tank_mixer"
+    }
+   ],
+   [
+    "switch",
+    "turn_off",
+    {
+     "entity_id": "switch.mix_valve"
+    }
+   ],
+   [
+    "input_datetime",
+    "set_datetime",
+    {
+     "entity_id": "input_datetime.tank_filled",
+     "timestamp": 1790557751.0
+    }
+   ],
+   [
+    "input_boolean",
+    "turn_off",
+    {
+     "entity_id": "input_boolean.tank_hold"
+    }
+   ]
+  ],
+  "history": [
+   "finished"
+  ],
+  "inflight": null,
+  "journal": [
+   [
+    "batch.step",
+    "ok",
+    null,
+    {
+     "recipe": "",
+     "state": "running",
+     "step": "hold"
+    }
+   ],
+   [
+    "batch.step",
+    "ok",
+    null,
+    {
+     "recipe": "",
+     "state": "done",
+     "step": "hold"
+    }
+   ],
+   [
+    "batch.step",
+    "ok",
+    null,
+    {
+     "recipe": "",
+     "state": "running",
+     "step": "close"
+    }
+   ],
+   [
+    "batch.step",
+    "ok",
+    null,
+    {
+     "recipe": "",
+     "state": "done",
+     "step": "close"
+    }
+   ],
+   [
+    "batch.step",
+    "ok",
+    null,
+    {
+     "recipe": "",
+     "state": "running",
+     "step": "fill"
+    }
+   ],
+   [
+    "batch.step",
+    "ok",
+    null,
+    {
+     "recipe": "",
+     "state": "done",
+     "step": "fill"
+    }
+   ],
+   [
+    "batch.step",
+    "ok",
+    null,
+    {
+     "recipe": "",
+     "state": "running",
+     "step": "mix"
+    }
+   ],
+   [
+    "batch.step",
+    "ok",
+    null,
+    {
+     "recipe": "",
+     "state": "done",
+     "step": "mix"
+    }
+   ],
+   [
+    "batch.step",
+    "ok",
+    null,
+    {
+     "recipe": "",
+     "state": "running",
+     "step": "premix"
+    }
+   ],
+   [
+    "batch.step",
+    "ok",
+    null,
+    {
+     "recipe": "",
+     "state": "done",
+     "step": "premix"
+    }
+   ],
+   [
+    "batch.step",
+    "ok",
+    null,
+    {
+     "recipe": "",
+     "state": "running",
+     "step": "dose"
+    }
+   ],
+   [
+    "dose.completed",
+    "ok",
+    null,
+    {
+     "flow_ml_s": 10.0,
+     "given_ml": 300,
+     "ml": 300,
+     "pump": "balance"
+    }
+   ],
+   [
+    "dose.completed",
+    "ok",
+    null,
+    {
+     "flow_ml_s": 5.0,
+     "given_ml": 150,
+     "ml": 150,
+     "pump": "bloom"
+    }
+   ],
+   [
+    "batch.step",
+    "ok",
+    null,
+    {
+     "recipe": "",
+     "state": "done",
+     "step": "dose"
+    }
+   ],
+   [
+    "batch.step",
+    "ok",
+    null,
+    {
+     "recipe": "",
+     "state": "running",
+     "step": "postmix"
+    }
+   ],
+   [
+    "batch.step",
+    "ok",
+    null,
+    {
+     "recipe": "",
+     "state": "done",
+     "step": "postmix"
+    }
+   ],
+   [
+    "batch.step",
+    "ok",
+    null,
+    {
+     "recipe": "",
+     "state": "running",
+     "step": "finish"
+    }
+   ],
+   [
+    "batch.step",
+    "ok",
+    null,
+    {
+     "recipe": "",
+     "state": "done",
+     "step": "finish"
+    }
+   ]
+  ],
+  "logs": [
+   1,
+   "9c30e5339b419b05359afff1c267c37a52180ade7d7bacbca8ea301ba9113d20"
+  ],
+  "ph": null,
+  "reads": [
+   494,
+   "cb492884d39a977ab66f530042bf0c4b8b95589d116688bbde2c61410d64e5ac"
+  ],
+  "result": "finished"
+ },
+ "batch/recipe_ml_dead": {
+  "calls": [],
+  "history": [],
+  "inflight": null,
+  "journal": [],
+  "logs": [
+   1,
+   "800e42cc65f8e1661d4e3a42122138b0ac938293ccea4840745837df12bc0219"
+  ],
+  "ph": null,
+  "reads": [
+   11,
+   "2efde0322c8a1dda4842bd239d87f355ddcbf6b0e93de17163073048afdefa3b"
+  ],
+  "result": "refused: the recipe amount for Bloom can't be read"
+ },
+ "batch/recipe_over_max": {
+  "calls": [],
+  "history": [],
+  "inflight": null,
+  "journal": [],
+  "logs": [
+   1,
+   "232af93ac735bf5053eacc9c8787df0c4b252e7aa16d7b98243318a018a05b72"
+  ],
+  "ph": null,
+  "reads": [
+   11,
+   "2efde0322c8a1dda4842bd239d87f355ddcbf6b0e93de17163073048afdefa3b"
+  ],
+  "result": "refused: 5000 mL of Bloom is more than its 2000 mL"
+ },
+ "batch/recipe_skips_zero_never_reads_its_flow": {
+  "calls": [
+   [
+    "input_boolean",
+    "turn_on",
+    {
+     "entity_id": "input_boolean.tank_hold"
+    }
+   ],
+   [
+    "switch",
+    "turn_off",
+    {
+     "entity_id": "switch.row1"
+    }
+   ],
+   [
+    "switch",
+    "turn_off",
+    {
+     "entity_id": "switch.main_line"
+    }
+   ],
+   [
+    "switch",
+    "turn_off",
+    {
+     "entity_id": "switch.main_pump"
+    }
+   ],
+   [
+    "switch",
+    "turn_off",
+    {
+     "entity_id": "switch.room_b_feed"
+    }
+   ],
+   [
+    "switch",
+    "turn_on",
+    {
+     "entity_id": "switch.tank_fill"
+    }
+   ],
+   [
+    "switch",
+    "turn_off",
+    {
+     "entity_id": "switch.tank_fill"
+    }
+   ],
+   [
+    "switch",
+    "turn_on",
+    {
+     "entity_id": "switch.mix_valve"
+    }
+   ],
+   [
+    "switch",
+    "turn_on",
+    {
+     "entity_id": "switch.tank_mixer"
+    }
+   ],
+   [
+    "number",
+    "set_value",
+    {
+     "entity_id": "number.balance_volume",
+     "value": 300
+    }
+   ],
+   [
+    "button",
+    "press",
+    {
+     "entity_id": "button.balance_start"
+    }
+   ],
+   [
+    "number",
+    "set_value",
+    {
+     "entity_id": "number.balance_volume",
+     "value": 25.0
+    }
+   ],
+   [
+    "switch",
+    "turn_off",
+    {
+     "entity_id": "switch.tank_mixer"
+    }
+   ],
+   [
+    "switch",
+    "turn_off",
+    {
+     "entity_id": "switch.mix_valve"
+    }
+   ],
+   [
+    "input_datetime",
+    "set_datetime",
+    {
+     "entity_id": "input_datetime.tank_filled",
+     "timestamp": 1790557720.0
+    }
+   ],
+   [
+    "input_boolean",
+    "turn_off",
+    {
+     "entity_id": "input_boolean.tank_hold"
+    }
+   ]
+  ],
+  "history": [
+   "finished"
+  ],
+  "inflight": null,
+  "journal": [
+   [
+    "batch.step",
+    "ok",
+    null,
+    {
+     "recipe": "",
+     "state": "running",
+     "step": "hold"
+    }
+   ],
+   [
+    "batch.step",
+    "ok",
+    null,
+    {
+     "recipe": "",
+     "state": "done",
+     "step": "hold"
+    }
+   ],
+   [
+    "batch.step",
+    "ok",
+    null,
+    {
+     "recipe": "",
+     "state": "running",
+     "step": "close"
+    }
+   ],
+   [
+    "batch.step",
+    "ok",
+    null,
+    {
+     "recipe": "",
+     "state": "done",
+     "step": "close"
+    }
+   ],
+   [
+    "batch.step",
+    "ok",
+    null,
+    {
+     "recipe": "",
+     "state": "running",
+     "step": "fill"
+    }
+   ],
+   [
+    "batch.step",
+    "ok",
+    null,
+    {
+     "recipe": "",
+     "state": "done",
+     "step": "fill"
+    }
+   ],
+   [
+    "batch.step",
+    "ok",
+    null,
+    {
+     "recipe": "",
+     "state": "running",
+     "step": "mix"
+    }
+   ],
+   [
+    "batch.step",
+    "ok",
+    null,
+    {
+     "recipe": "",
+     "state": "done",
+     "step": "mix"
+    }
+   ],
+   [
+    "batch.step",
+    "ok",
+    null,
+    {
+     "recipe": "",
+     "state": "running",
+     "step": "premix"
+    }
+   ],
+   [
+    "batch.step",
+    "ok",
+    null,
+    {
+     "recipe": "",
+     "state": "done",
+     "step": "premix"
+    }
+   ],
+   [
+    "batch.step",
+    "ok",
+    null,
+    {
+     "recipe": "",
+     "state": "running",
+     "step": "dose"
+    }
+   ],
+   [
+    "dose.completed",
+    "ok",
+    null,
+    {
+     "flow_ml_s": 10.0,
+     "given_ml": 300,
+     "ml": 300,
+     "pump": "balance"
+    }
+   ],
+   [
+    "batch.step",
+    "ok",
+    null,
+    {
+     "recipe": "",
+     "state": "done",
+     "step": "dose"
+    }
+   ],
+   [
+    "batch.step",
+    "ok",
+    null,
+    {
+     "recipe": "",
+     "state": "running",
+     "step": "postmix"
+    }
+   ],
+   [
+    "batch.step",
+    "ok",
+    null,
+    {
+     "recipe": "",
+     "state": "done",
+     "step": "postmix"
+    }
+   ],
+   [
+    "batch.step",
+    "ok",
+    null,
+    {
+     "recipe": "",
+     "state": "running",
+     "step": "finish"
+    }
+   ],
+   [
+    "batch.step",
+    "ok",
+    null,
+    {
+     "recipe": "",
+     "state": "done",
+     "step": "finish"
+    }
+   ]
+  ],
+  "logs": [
+   1,
+   "9c30e5339b419b05359afff1c267c37a52180ade7d7bacbca8ea301ba9113d20"
+  ],
+  "ph": null,
+  "reads": [
+   435,
+   "c015d16a363af382e5e7e10df6e47162d281ff0eab3f87cd9f2e88db853465fb"
+  ],
+  "result": "finished"
+ },
+ "batch/recipe_too_long": {
+  "calls": [],
+  "history": [],
+  "inflight": null,
+  "journal": [],
+  "logs": [
+   1,
+   "09907e1730d790b84049a130475a553ff26803a93733af4b887200a340e7e31b"
+  ],
+  "ph": null,
+  "reads": [
+   10,
+   "9f791909b1c455e14045d6a8878b96998e783fbc5a6185310c535fdad02c28c4"
+  ],
+  "result": "refused: 300 mL of Balance would take 25.0 min at 0.2 mL/s, more than 20 min"
+ },
+ "batch/recipe_uncalibrated": {
+  "calls": [],
+  "history": [],
+  "inflight": null,
+  "journal": [],
+  "logs": [
+   1,
+   "ba173b13a6c288e30c038c015b5a911161a1394ad7f036d2da05b182478a177d"
+  ],
+  "ph": null,
+  "reads": [
+   12,
+   "07af6a4a14c774511ddeeb273e2e09ca736764deb8b2433f696cb5fadaa4cbce"
+  ],
+  "result": "refused: Bloom is not calibrated (flow 0)"
+ },
+ "batch/recipe_unknown_pump": {
+  "calls": [],
+  "history": [],
+  "inflight": null,
+  "journal": [],
+  "logs": [
+   1,
+   "f6b1f0b991a37ae004c8a57c908e2957d9874dff76e3c9d78a5f06c282e377b6"
+  ],
+  "ph": null,
+  "reads": [
+   8,
+   "214cc3900947456ebf93b2388c7f31283940d9e51e068f7fc5bdbab694db3e76"
+  ],
+  "result": "refused: the recipe doses nope, which is not set up"
+ },
+ "dose/already_dosing": {
+  "calls": [],
+  "history": [],
+  "inflight": null,
+  "journal": [],
+  "logs": [
+   1,
+   "a24a88164b7fccc1e5c92bf7d7fe0fcb30c6acb76d617180ba2613ccaea7ee38"
+  ],
+  "ph": null,
+  "reads": [
+   7,
+   "157cc30317b59ac22ff1f58a596d4787e2d9c51c0e00a0f0baa49dc6c189a562"
+  ],
+  "result": "refused: Balance already reads dosing"
+ },
+ "dose/amount_over": {
+  "calls": [],
+  "history": [],
+  "inflight": null,
+  "journal": [],
+  "logs": [
+   1,
+   "270ed3e7e2d8e9eeaa1a72032b31f05ae1c0e0b073906d465205a5358e4629ea"
+  ],
+  "ph": null,
+  "reads": [
+   6,
+   "fbf18b13c4e8d57b10998132a9a0e935bf731f040879ec90716c65d91323ac6f"
+  ],
+  "result": "refused: 5000 mL is not more than 0 and at most 2000 mL"
+ },
+ "dose/amount_zero": {
+  "calls": [],
+  "history": [],
+  "inflight": null,
+  "journal": [],
+  "logs": [
+   1,
+   "1a6abb0937843bffd5ce50abd8a6d7170b3d12c9a0c3bbe69306fd13347e801c"
+  ],
+  "ph": null,
+  "reads": [
+   6,
+   "fbf18b13c4e8d57b10998132a9a0e935bf731f040879ec90716c65d91323ac6f"
+  ],
+  "result": "refused: 0 mL is not more than 0 and at most 2000 mL"
+ },
+ "dose/by_hand": {
+  "calls": [],
+  "history": [],
+  "inflight": null,
+  "journal": [],
+  "logs": [
+   1,
+   "b2ae00b3a3b68446ffddcebd63194357a97ca7fd24a31dd7af2ce1ae74b902bf"
+  ],
+  "ph": null,
+  "reads": [
+   8,
+   "314a7ca8512665cac42d52ce5113c0099ed5792c696afbc1b12ad6459f1d3d23"
+  ],
+  "result": "refused: Balance is running by hand"
+ },
+ "dose/dosing_unreadable": {
+  "calls": [],
+  "history": [],
+  "inflight": null,
+  "journal": [],
+  "logs": [
+   1,
+   "259c270dc4fc52e2b51cb2187c0c62055382245c6ad44b82e2900fccc95b082a"
+  ],
+  "ph": null,
+  "reads": [
+   7,
+   "157cc30317b59ac22ff1f58a596d4787e2d9c51c0e00a0f0baa49dc6c189a562"
+  ],
+  "result": "refused: Balance's dosing state (binary_sensor.balance_dosing) can't be read"
+ },
+ "dose/ml_bool": {
+  "calls": [],
+  "history": [],
+  "inflight": null,
+  "journal": [],
+  "logs": [
+   1,
+   "c521f717522c330f9436a44ec4f54dafb0b49ef4ca273eef4e84ff1f11f194b8"
+  ],
+  "ph": null,
+  "reads": [
+   6,
+   "fbf18b13c4e8d57b10998132a9a0e935bf731f040879ec90716c65d91323ac6f"
+  ],
+  "result": "refused: 1 mL is not more than 0 and at most 2000 mL"
+ },
+ "dose/ml_nan": {
+  "calls": [],
+  "history": [],
+  "inflight": null,
+  "journal": [],
+  "logs": [
+   1,
+   "540c0ec05fa3cd00f095145a687ed37b3ff193acb42e26955d41a657fed29095"
+  ],
+  "ph": null,
+  "reads": [
+   6,
+   "fbf18b13c4e8d57b10998132a9a0e935bf731f040879ec90716c65d91323ac6f"
+  ],
+  "result": "refused: nan mL is not more than 0 and at most 2000 mL"
+ },
+ "dose/ml_text": {
+  "calls": [],
+  "history": [],
+  "inflight": null,
+  "journal": [],
+  "logs": [
+   1,
+   "9fe818d5c21b2fece25b0cad5cfb00b5629ebc8269578593f8c4de7d8a668307"
+  ],
+  "ph": null,
+  "reads": [
+   6,
+   "fbf18b13c4e8d57b10998132a9a0e935bf731f040879ec90716c65d91323ac6f"
+  ],
+  "result": "refused: 50 mL is not more than 0 and at most 2000 mL"
+ },
+ "dose/ok": {
+  "calls": [
+   [
+    "number",
+    "set_value",
+    {
+     "entity_id": "number.balance_volume",
+     "value": 50
+    }
+   ],
+   [
+    "button",
+    "press",
+    {
+     "entity_id": "button.balance_start"
+    }
+   ],
+   [
+    "number",
+    "set_value",
+    {
+     "entity_id": "number.balance_volume",
+     "value": 25.0
+    }
+   ]
+  ],
+  "history": [
+   "finished"
+  ],
+  "inflight": null,
+  "journal": [
+   [
+    "dose.completed",
+    "ok",
+    null,
+    {
+     "flow_ml_s": 10.0,
+     "given_ml": 50,
+     "ml": 50,
+     "pump": "balance"
+    }
+   ]
+  ],
+  "logs": [
+   1,
+   "f3c4db8e8ae6ae6998056442f2b1dc60660e874652178c156b46dd830281c7d2"
+  ],
+  "ph": null,
+  "reads": [
+   24,
+   "38211c2b52efa6c95cf64635917ef52eaa8d2802ccb36a29eb40f3fafa97fdcb"
+  ],
+  "result": "finished"
+ },
+ "dose/too_long": {
+  "calls": [],
+  "history": [],
+  "inflight": null,
+  "journal": [],
+  "logs": [
+   1,
+   "6d5cdc5acc88332b0023e0c07e23c13dbc1a7b83769d0b171f3edc58f3525f41"
+  ],
+  "ph": null,
+  "reads": [
+   6,
+   "fbf18b13c4e8d57b10998132a9a0e935bf731f040879ec90716c65d91323ac6f"
+  ],
+  "result": "refused: 1500 mL of Balance would take 25.0 min at 1 mL/s, more than 20 min"
+ },
+ "dose/uncalibrated_missing": {
+  "calls": [],
+  "history": [],
+  "inflight": null,
+  "journal": [],
+  "logs": [
+   1,
+   "3b3db75903a421b2f1bea97f88d028484b7dba60ab55780af02590eb7831b8d7"
+  ],
+  "ph": null,
+  "reads": [
+   5,
+   "45a066c9e7bcd8de1ddf73c51edcee0f314c012d8aa53a04026f6cdb696d0bfe"
+  ],
+  "result": "refused: Balance is not calibrated (flow missing)"
+ },
+ "dose/uncalibrated_zero": {
+  "calls": [],
+  "history": [],
+  "inflight": null,
+  "journal": [],
+  "logs": [
+   1,
+   "32bad5673d2f441f62ab601a8d1bb6057d4c0180af55cb6fd56864b88c367d69"
+  ],
+  "ph": null,
+  "reads": [
+   5,
+   "45a066c9e7bcd8de1ddf73c51edcee0f314c012d8aa53a04026f6cdb696d0bfe"
+  ],
+  "result": "refused: Balance is not calibrated (flow 0)"
+ },
+ "ph/daily_used": {
+  "calls": [
+   [
+    "persistent_notification",
+    "create",
+    {
+     "message": "The batch tank reads pH 5.6, outside the feed pH band of the room (5.8 to 6.5). pH auto-correct is on, but it did not dose: the 3 doses a day it may give are used. While the feed pH is outside its band, the source-water gate holds the shots of the room. Correct the tank by hand, or fix the reason. This alert comes again tomorrow while it lasts.\n\nCode CS-809. What it means and what to do: Crop Steering \u2192 Help & tools \u2192 Error codes.",
+     "notification_id": "f2_dosing_default_809_ph_refused_2026_09_28",
+     "title": "PH auto-correct can't correct the batch tank (CS-809)"
+    }
+   ]
+  ],
+  "history": [],
+  "inflight": null,
+  "journal": [
+   [
+    "alert.raised",
+    "ok",
+    "CS-809",
+    {
+     "key": "dosing_default_809_ph_refused_2026_09_28",
+     "title": "PH auto-correct can't correct the batch tank (CS-809)"
+    }
+   ]
+  ],
+  "logs": [
+   1,
+   "9e95ef353271479ff9315d70277218e9d68f2508d95c4daf48560275e380a0f3"
+  ],
+  "ph": {
+   "day": "2026-09-28",
+   "doses": 3,
+   "latch": null,
+   "told": {
+    "the 3 doses a day it may give are used": "2026-09-28"
+   }
+  },
+  "reads": [
+   82,
+   "e45c74f7fc05a2244ca1cdc0eaa8a54b06be6bb47147ea7f128e6daf8bc9d00e"
+  ],
+  "result": null
+ },
+ "ph/dose_under_1_ml": {
+  "calls": [
+   [
+    "persistent_notification",
+    "create",
+    {
+     "message": "The batch tank reads pH 5.6, outside the feed pH band of the room (5.8 to 6.5). pH auto-correct is on, but it did not dose: a 5 s dose of Balance is less than 1 mL. While the feed pH is outside its band, the source-water gate holds the shots of the room. Correct the tank by hand, or fix the reason. This alert comes again tomorrow while it lasts.\n\nCode CS-809. What it means and what to do: Crop Steering \u2192 Help & tools \u2192 Error codes.",
+     "notification_id": "f2_dosing_default_809_ph_refused_2026_09_28",
+     "title": "PH auto-correct can't correct the batch tank (CS-809)"
+    }
+   ]
+  ],
+  "history": [],
+  "inflight": null,
+  "journal": [
+   [
+    "alert.raised",
+    "ok",
+    "CS-809",
+    {
+     "key": "dosing_default_809_ph_refused_2026_09_28",
+     "title": "PH auto-correct can't correct the batch tank (CS-809)"
+    }
+   ]
+  ],
+  "logs": [
+   1,
+   "cffffcca9b6dffb62cbbe01ea8d0d2604d7c4a84aa275367d6debd713564f79e"
+  ],
+  "ph": {
+   "day": null,
+   "doses": 0,
+   "latch": null,
+   "told": {
+    "a 5 s dose of Balance is less than 1 mL": "2026-09-28"
+   }
+  },
+  "reads": [
+   84,
+   "66b73ae33559e70d04a99af365e992bb74c1057bb357c78007bc8088a73e15b0"
+  ],
+  "result": null
+ },
+ "ph/down": {
+  "calls": [
+   [
+    "input_boolean",
+    "turn_on",
+    {
+     "entity_id": "input_boolean.tank_hold"
+    }
+   ],
+   [
+    "switch",
+    "turn_off",
+    {
+     "entity_id": "switch.row1"
+    }
+   ],
+   [
+    "switch",
+    "turn_off",
+    {
+     "entity_id": "switch.main_line"
+    }
+   ],
+   [
+    "switch",
+    "turn_off",
+    {
+     "entity_id": "switch.main_pump"
+    }
+   ],
+   [
+    "switch",
+    "turn_off",
+    {
+     "entity_id": "switch.room_b_feed"
+    }
+   ],
+   [
+    "switch",
+    "turn_on",
+    {
+     "entity_id": "switch.mix_valve"
+    }
+   ],
+   [
+    "switch",
+    "turn_on",
+    {
+     "entity_id": "switch.tank_mixer"
+    }
+   ],
+   [
+    "number",
+    "set_value",
+    {
+     "entity_id": "number.acid_volume",
+     "value": 50
+    }
+   ],
+   [
+    "button",
+    "press",
+    {
+     "entity_id": "button.acid_start"
+    }
+   ],
+   [
+    "number",
+    "set_value",
+    {
+     "entity_id": "number.acid_volume",
+     "value": 0.0
+    }
+   ],
+   [
+    "switch",
+    "turn_off",
+    {
+     "entity_id": "switch.tank_mixer"
+    }
+   ],
+   [
+    "switch",
+    "turn_off",
+    {
+     "entity_id": "switch.mix_valve"
+    }
+   ],
+   [
+    "input_boolean",
+    "turn_off",
+    {
+     "entity_id": "input_boolean.tank_hold"
+    }
+   ]
+  ],
+  "history": [
+   "finished: the tank is inside its band"
+  ],
+  "inflight": null,
+  "journal": [
+   [
+    "batch.step",
+    "ok",
+    null,
+    {
+     "recipe": "pH correction",
+     "state": "running",
+     "step": "hold"
+    }
+   ],
+   [
+    "batch.step",
+    "ok",
+    null,
+    {
+     "recipe": "pH correction",
+     "state": "done",
+     "step": "hold"
+    }
+   ],
+   [
+    "batch.step",
+    "ok",
+    null,
+    {
+     "recipe": "pH correction",
+     "state": "running",
+     "step": "close"
+    }
+   ],
+   [
+    "batch.step",
+    "ok",
+    null,
+    {
+     "recipe": "pH correction",
+     "state": "done",
+     "step": "close"
+    }
+   ],
+   [
+    "batch.step",
+    "ok",
+    null,
+    {
+     "recipe": "pH correction",
+     "state": "running",
+     "step": "mix"
+    }
+   ],
+   [
+    "batch.step",
+    "ok",
+    null,
+    {
+     "recipe": "pH correction",
+     "state": "done",
+     "step": "mix"
+    }
+   ],
+   [
+    "batch.step",
+    "ok",
+    null,
+    {
+     "recipe": "pH correction",
+     "state": "running",
+     "step": "dose"
+    }
+   ],
+   [
+    "dose.completed",
+    "ok",
+    null,
+    {
+     "flow_ml_s": 10.0,
+     "given_ml": 50,
+     "ml": 50,
+     "pump": "acid"
+    }
+   ],
+   [
+    "batch.step",
+    "ok",
+    null,
+    {
+     "recipe": "pH correction",
+     "state": "done",
+     "step": "dose"
+    }
+   ],
+   [
+    "batch.step",
+    "ok",
+    null,
+    {
+     "recipe": "pH correction",
+     "state": "running",
+     "step": "postmix"
+    }
+   ],
+   [
+    "batch.step",
+    "ok",
+    null,
+    {
+     "recipe": "pH correction",
+     "state": "done",
+     "step": "postmix"
+    }
+   ],
+   [
+    "batch.step",
+    "ok",
+    null,
+    {
+     "recipe": "pH correction",
+     "state": "running",
+     "step": "finish"
+    }
+   ],
+   [
+    "batch.step",
+    "ok",
+    null,
+    {
+     "recipe": "pH correction",
+     "state": "done",
+     "step": "finish"
+    }
+   ]
+  ],
+  "logs": [
+   2,
+   "726d08e31c8ea3bdac5f12440253565b6ad61a6dd1f8855fd690470eb1b57311"
+  ],
+  "ph": {
+   "day": "2026-09-28",
+   "doses": 1,
+   "latch": null,
+   "told": {}
+  },
+  "reads": [
+   323,
+   "fddec9d31508609593e567e43e7e159a61d9c191c8e620a94ac70d4f16cd11c9"
+  ],
+  "result": null
+ },
+ "ph/duplicate": {
+  "calls": [],
+  "history": [],
+  "inflight": null,
+  "journal": [],
+  "logs": [
+   0,
+   "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  ],
+  "ph": null,
+  "reads": [
+   71,
+   "a3b1819e3dd32a0162c7008c1be8b72290b36a1301bfdad07bb474913a886680"
+  ],
+  "result": null
+ },
+ "ph/fault": {
+  "calls": [],
+  "history": [],
+  "inflight": null,
+  "journal": [],
+  "logs": [
+   0,
+   "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  ],
+  "ph": null,
+  "reads": [
+   71,
+   "a3b1819e3dd32a0162c7008c1be8b72290b36a1301bfdad07bb474913a886680"
+  ],
+  "result": null
+ },
+ "ph/hold_dead": {
+  "calls": [],
+  "history": [],
+  "inflight": null,
+  "journal": [],
+  "logs": [
+   0,
+   "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  ],
+  "ph": null,
+  "reads": [
+   69,
+   "2a5ece49b6159955d9d26962e1fd2790cdfa15ed68cc2cfde06a1df29eded26c"
+  ],
+  "result": null
+ },
+ "ph/hold_on": {
+  "calls": [],
+  "history": [],
+  "inflight": null,
+  "journal": [],
+  "logs": [
+   0,
+   "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  ],
+  "ph": null,
+  "reads": [
+   69,
+   "2a5ece49b6159955d9d26962e1fd2790cdfa15ed68cc2cfde06a1df29eded26c"
+  ],
+  "result": null
+ },
+ "ph/latched": {
+  "calls": [],
+  "history": [],
+  "inflight": null,
+  "journal": [],
+  "logs": [
+   0,
+   "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  ],
+  "ph": null,
+  "reads": [
+   65,
+   "3e7a93fb76e1b8c6afa97fed0b552b205d394227f1e32f7cbfebe9aaade218d4"
+  ],
+  "result": null
+ },
+ "ph/latched_fill_unavailable": {
+  "calls": [],
+  "history": [],
+  "inflight": null,
+  "journal": [],
+  "logs": [
+   0,
+   "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  ],
+  "ph": null,
+  "reads": [
+   65,
+   "3e7a93fb76e1b8c6afa97fed0b552b205d394227f1e32f7cbfebe9aaade218d4"
+  ],
+  "result": null
+ },
+ "ph/latched_then_filled": {
+  "calls": [
+   [
+    "input_boolean",
+    "turn_on",
+    {
+     "entity_id": "input_boolean.tank_hold"
+    }
+   ],
+   [
+    "switch",
+    "turn_off",
+    {
+     "entity_id": "switch.row1"
+    }
+   ],
+   [
+    "switch",
+    "turn_off",
+    {
+     "entity_id": "switch.main_line"
+    }
+   ],
+   [
+    "switch",
+    "turn_off",
+    {
+     "entity_id": "switch.main_pump"
+    }
+   ],
+   [
+    "switch",
+    "turn_off",
+    {
+     "entity_id": "switch.room_b_feed"
+    }
+   ],
+   [
+    "switch",
+    "turn_on",
+    {
+     "entity_id": "switch.mix_valve"
+    }
+   ],
+   [
+    "switch",
+    "turn_on",
+    {
+     "entity_id": "switch.tank_mixer"
+    }
+   ],
+   [
+    "number",
+    "set_value",
+    {
+     "entity_id": "number.balance_volume",
+     "value": 50
+    }
+   ],
+   [
+    "button",
+    "press",
+    {
+     "entity_id": "button.balance_start"
+    }
+   ],
+   [
+    "number",
+    "set_value",
+    {
+     "entity_id": "number.balance_volume",
+     "value": 25.0
+    }
+   ],
+   [
+    "switch",
+    "turn_off",
+    {
+     "entity_id": "switch.tank_mixer"
+    }
+   ],
+   [
+    "switch",
+    "turn_off",
+    {
+     "entity_id": "switch.mix_valve"
+    }
+   ],
+   [
+    "input_boolean",
+    "turn_off",
+    {
+     "entity_id": "input_boolean.tank_hold"
+    }
+   ]
+  ],
+  "history": [
+   "finished: the tank is inside its band"
+  ],
+  "inflight": null,
+  "journal": [
+   [
+    "batch.step",
+    "ok",
+    null,
+    {
+     "recipe": "pH correction",
+     "state": "running",
+     "step": "hold"
+    }
+   ],
+   [
+    "batch.step",
+    "ok",
+    null,
+    {
+     "recipe": "pH correction",
+     "state": "done",
+     "step": "hold"
+    }
+   ],
+   [
+    "batch.step",
+    "ok",
+    null,
+    {
+     "recipe": "pH correction",
+     "state": "running",
+     "step": "close"
+    }
+   ],
+   [
+    "batch.step",
+    "ok",
+    null,
+    {
+     "recipe": "pH correction",
+     "state": "done",
+     "step": "close"
+    }
+   ],
+   [
+    "batch.step",
+    "ok",
+    null,
+    {
+     "recipe": "pH correction",
+     "state": "running",
+     "step": "mix"
+    }
+   ],
+   [
+    "batch.step",
+    "ok",
+    null,
+    {
+     "recipe": "pH correction",
+     "state": "done",
+     "step": "mix"
+    }
+   ],
+   [
+    "batch.step",
+    "ok",
+    null,
+    {
+     "recipe": "pH correction",
+     "state": "running",
+     "step": "dose"
+    }
+   ],
+   [
+    "dose.completed",
+    "ok",
+    null,
+    {
+     "flow_ml_s": 10.0,
+     "given_ml": 50,
+     "ml": 50,
+     "pump": "balance"
+    }
+   ],
+   [
+    "batch.step",
+    "ok",
+    null,
+    {
+     "recipe": "pH correction",
+     "state": "done",
+     "step": "dose"
+    }
+   ],
+   [
+    "batch.step",
+    "ok",
+    null,
+    {
+     "recipe": "pH correction",
+     "state": "running",
+     "step": "postmix"
+    }
+   ],
+   [
+    "batch.step",
+    "ok",
+    null,
+    {
+     "recipe": "pH correction",
+     "state": "done",
+     "step": "postmix"
+    }
+   ],
+   [
+    "batch.step",
+    "ok",
+    null,
+    {
+     "recipe": "pH correction",
+     "state": "running",
+     "step": "finish"
+    }
+   ],
+   [
+    "batch.step",
+    "ok",
+    null,
+    {
+     "recipe": "pH correction",
+     "state": "done",
+     "step": "finish"
+    }
+   ]
+  ],
+  "logs": [
+   3,
+   "26a0ca183104e2390e9a3fef17fcd65567c0b3aae2d4b74ee241c6c8c7730c19"
+  ],
+  "ph": {
+   "day": "2026-09-28",
+   "doses": 1,
+   "latch": null,
+   "told": {}
+  },
+  "reads": [
+   289,
+   "bb97f519d7de96266e9782dd5e5b198e7431b72b077230115e46758aa911bb8c"
+  ],
+  "result": null
+ },
+ "ph/mix_power_no_sensor": {
+  "calls": [
+   [
+    "persistent_notification",
+    "create",
+    {
+     "message": "The batch tank reads pH 5.6, outside the feed pH band of the room (5.8 to 6.5). pH auto-correct is on, but it did not dose: the mixing pump has a minimum power but no power sensor to read it. While the feed pH is outside its band, the source-water gate holds the shots of the room. Correct the tank by hand, or fix the reason. This alert comes again tomorrow while it lasts.\n\nCode CS-809. What it means and what to do: Crop Steering \u2192 Help & tools \u2192 Error codes.",
+     "notification_id": "f2_dosing_default_809_ph_refused_2026_09_28",
+     "title": "PH auto-correct can't correct the batch tank (CS-809)"
+    }
+   ]
+  ],
+  "history": [],
+  "inflight": null,
+  "journal": [
+   [
+    "alert.raised",
+    "ok",
+    "CS-809",
+    {
+     "key": "dosing_default_809_ph_refused_2026_09_28",
+     "title": "PH auto-correct can't correct the batch tank (CS-809)"
+    }
+   ]
+  ],
+  "logs": [
+   1,
+   "945d59b3cafc6b16455585b8f6db69b0299ec45703dec7e452d25e4c0d45e500"
+  ],
+  "ph": {
+   "day": null,
+   "doses": 0,
+   "latch": null,
+   "told": {
+    "the mixing pump has a minimum power but no power sensor to read it": "2026-09-28"
+   }
+  },
+  "reads": [
+   66,
+   "08626f9ac4cf71b011989acb7e843d98534a9725be638c73932d90804fae7331"
+  ],
+  "result": null
+ },
+ "ph/mixing": {
+  "calls": [],
+  "history": [],
+  "inflight": null,
+  "journal": [],
+  "logs": [
+   0,
+   "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  ],
+  "ph": null,
+  "reads": [
+   71,
+   "a3b1819e3dd32a0162c7008c1be8b72290b36a1301bfdad07bb474913a886680"
+  ],
+  "result": null
+ },
+ "ph/no_mix_pump": {
+  "calls": [
+   [
+    "persistent_notification",
+    "create",
+    {
+     "message": "The batch tank reads pH 5.6, outside the feed pH band of the room (5.8 to 6.5). pH auto-correct is on, but it did not dose: the batch tank has no mixing pump set up, and a dose is never made into a tank that is not mixed. While the feed pH is outside its band, the source-water gate holds the shots of the room. Correct the tank by hand, or fix the reason. This alert comes again tomorrow while it lasts.\n\nCode CS-809. What it means and what to do: Crop Steering \u2192 Help & tools \u2192 Error codes.",
+     "notification_id": "f2_dosing_default_809_ph_refused_2026_09_28",
+     "title": "PH auto-correct can't correct the batch tank (CS-809)"
+    }
+   ]
+  ],
+  "history": [],
+  "inflight": null,
+  "journal": [
+   [
+    "alert.raised",
+    "ok",
+    "CS-809",
+    {
+     "key": "dosing_default_809_ph_refused_2026_09_28",
+     "title": "PH auto-correct can't correct the batch tank (CS-809)"
+    }
+   ]
+  ],
+  "logs": [
+   1,
+   "6d05009dd2d47c59225673cffacdb9e94782ee95c4ffa3306d7dbc681508ca35"
+  ],
+  "ph": {
+   "day": null,
+   "doses": 0,
+   "latch": null,
+   "told": {
+    "the batch tank has no mixing pump set up, and a dose is never made into a tank that is not mixed": "2026-09-28"
+   }
+  },
+  "reads": [
+   66,
+   "08626f9ac4cf71b011989acb7e843d98534a9725be638c73932d90804fae7331"
+  ],
+  "result": null
+ },
+ "ph/no_role": {
+  "calls": [
+   [
+    "persistent_notification",
+    "create",
+    {
+     "message": "The batch tank reads pH 5.6, outside the feed pH band of the room (5.8 to 6.5). pH auto-correct is on, but it did not dose: no dosing pump has the pH up role (Equipment > Dosing, Dosing setup). While the feed pH is outside its band, the source-water gate holds the shots of the room. Correct the tank by hand, or fix the reason. This alert comes again tomorrow while it lasts.\n\nCode CS-809. What it means and what to do: Crop Steering \u2192 Help & tools \u2192 Error codes.",
+     "notification_id": "f2_dosing_default_809_ph_refused_2026_09_28",
+     "title": "PH auto-correct can't correct the batch tank (CS-809)"
+    }
+   ]
+  ],
+  "history": [],
+  "inflight": null,
+  "journal": [
+   [
+    "alert.raised",
+    "ok",
+    "CS-809",
+    {
+     "key": "dosing_default_809_ph_refused_2026_09_28",
+     "title": "PH auto-correct can't correct the batch tank (CS-809)"
+    }
+   ]
+  ],
+  "logs": [
+   1,
+   "501f8ee334b9f97284540c92bcf28a65f7c108eff376a3a9c281bc4af3c4cd5e"
+  ],
+  "ph": {
+   "day": null,
+   "doses": 0,
+   "latch": null,
+   "told": {
+    "no dosing pump has the pH up role (Equipment > Dosing, Dosing setup)": "2026-09-28"
+   }
+  },
+  "reads": [
+   66,
+   "08626f9ac4cf71b011989acb7e843d98534a9725be638c73932d90804fae7331"
+  ],
+  "result": null
+ },
+ "ph/ok": {
+  "calls": [
+   [
+    "input_boolean",
+    "turn_on",
+    {
+     "entity_id": "input_boolean.tank_hold"
+    }
+   ],
+   [
+    "switch",
+    "turn_off",
+    {
+     "entity_id": "switch.row1"
+    }
+   ],
+   [
+    "switch",
+    "turn_off",
+    {
+     "entity_id": "switch.main_line"
+    }
+   ],
+   [
+    "switch",
+    "turn_off",
+    {
+     "entity_id": "switch.main_pump"
+    }
+   ],
+   [
+    "switch",
+    "turn_off",
+    {
+     "entity_id": "switch.room_b_feed"
+    }
+   ],
+   [
+    "switch",
+    "turn_on",
+    {
+     "entity_id": "switch.mix_valve"
+    }
+   ],
+   [
+    "switch",
+    "turn_on",
+    {
+     "entity_id": "switch.tank_mixer"
+    }
+   ],
+   [
+    "number",
+    "set_value",
+    {
+     "entity_id": "number.balance_volume",
+     "value": 50
+    }
+   ],
+   [
+    "button",
+    "press",
+    {
+     "entity_id": "button.balance_start"
+    }
+   ],
+   [
+    "number",
+    "set_value",
+    {
+     "entity_id": "number.balance_volume",
+     "value": 25.0
+    }
+   ],
+   [
+    "switch",
+    "turn_off",
+    {
+     "entity_id": "switch.tank_mixer"
+    }
+   ],
+   [
+    "switch",
+    "turn_off",
+    {
+     "entity_id": "switch.mix_valve"
+    }
+   ],
+   [
+    "input_boolean",
+    "turn_off",
+    {
+     "entity_id": "input_boolean.tank_hold"
+    }
+   ]
+  ],
+  "history": [
+   "finished: the tank is inside its band"
+  ],
+  "inflight": null,
+  "journal": [
+   [
+    "batch.step",
+    "ok",
+    null,
+    {
+     "recipe": "pH correction",
+     "state": "running",
+     "step": "hold"
+    }
+   ],
+   [
+    "batch.step",
+    "ok",
+    null,
+    {
+     "recipe": "pH correction",
+     "state": "done",
+     "step": "hold"
+    }
+   ],
+   [
+    "batch.step",
+    "ok",
+    null,
+    {
+     "recipe": "pH correction",
+     "state": "running",
+     "step": "close"
+    }
+   ],
+   [
+    "batch.step",
+    "ok",
+    null,
+    {
+     "recipe": "pH correction",
+     "state": "done",
+     "step": "close"
+    }
+   ],
+   [
+    "batch.step",
+    "ok",
+    null,
+    {
+     "recipe": "pH correction",
+     "state": "running",
+     "step": "mix"
+    }
+   ],
+   [
+    "batch.step",
+    "ok",
+    null,
+    {
+     "recipe": "pH correction",
+     "state": "done",
+     "step": "mix"
+    }
+   ],
+   [
+    "batch.step",
+    "ok",
+    null,
+    {
+     "recipe": "pH correction",
+     "state": "running",
+     "step": "dose"
+    }
+   ],
+   [
+    "dose.completed",
+    "ok",
+    null,
+    {
+     "flow_ml_s": 10.0,
+     "given_ml": 50,
+     "ml": 50,
+     "pump": "balance"
+    }
+   ],
+   [
+    "batch.step",
+    "ok",
+    null,
+    {
+     "recipe": "pH correction",
+     "state": "done",
+     "step": "dose"
+    }
+   ],
+   [
+    "batch.step",
+    "ok",
+    null,
+    {
+     "recipe": "pH correction",
+     "state": "running",
+     "step": "postmix"
+    }
+   ],
+   [
+    "batch.step",
+    "ok",
+    null,
+    {
+     "recipe": "pH correction",
+     "state": "done",
+     "step": "postmix"
+    }
+   ],
+   [
+    "batch.step",
+    "ok",
+    null,
+    {
+     "recipe": "pH correction",
+     "state": "running",
+     "step": "finish"
+    }
+   ],
+   [
+    "batch.step",
+    "ok",
+    null,
+    {
+     "recipe": "pH correction",
+     "state": "done",
+     "step": "finish"
+    }
+   ]
+  ],
+  "logs": [
+   2,
+   "de5f0e6d493bef182b45ddbf422c372e1d144d047fe5e74302efe8048d105f70"
+  ],
+  "ph": {
+   "day": "2026-09-28",
+   "doses": 1,
+   "latch": null,
+   "told": {}
+  },
+  "reads": [
+   289,
+   "bb97f519d7de96266e9782dd5e5b198e7431b72b077230115e46758aa911bb8c"
+  ],
+  "result": null
+ },
+ "ph/uncalibrated": {
+  "calls": [
+   [
+    "persistent_notification",
+    "create",
+    {
+     "message": "The batch tank reads pH 5.6, outside the feed pH band of the room (5.8 to 6.5). pH auto-correct is on, but it did not dose: Balance is not calibrated (flow 0). While the feed pH is outside its band, the source-water gate holds the shots of the room. Correct the tank by hand, or fix the reason. This alert comes again tomorrow while it lasts.\n\nCode CS-809. What it means and what to do: Crop Steering \u2192 Help & tools \u2192 Error codes.",
+     "notification_id": "f2_dosing_default_809_ph_refused_2026_09_28",
+     "title": "PH auto-correct can't correct the batch tank (CS-809)"
+    }
+   ]
+  ],
+  "history": [],
+  "inflight": null,
+  "journal": [
+   [
+    "alert.raised",
+    "ok",
+    "CS-809",
+    {
+     "key": "dosing_default_809_ph_refused_2026_09_28",
+     "title": "PH auto-correct can't correct the batch tank (CS-809)"
+    }
+   ]
+  ],
+  "logs": [
+   1,
+   "0f648f89ecaf265083a59b3e8febe55c853d4ac50779471473b9350ab211a6b6"
+  ],
+  "ph": {
+   "day": null,
+   "doses": 0,
+   "latch": null,
+   "told": {
+    "Balance is not calibrated (flow 0)": "2026-09-28"
+   }
+  },
+  "reads": [
+   68,
+   "360ceb1f24741e3b61dd1a7bc68527b3fae891deb3a94556396b53e1fb7861a2"
+  ],
+  "result": null
+ }
+}

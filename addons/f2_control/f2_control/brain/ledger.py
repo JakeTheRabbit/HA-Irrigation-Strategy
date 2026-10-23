@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import os
 import threading
+from collections.abc import Callable
 from datetime import datetime
 
 MAX_ENTRIES = 2000  # kept in memory and on disk; the oldest go first
@@ -22,6 +23,9 @@ class Ledger:
         self.entries: list[dict] = []
         self._lock = threading.Lock()
         self._seq = 0
+        # listener(what, entry): told of each entry recorded ("record") and each check written back ("resolve"), after
+        # it is saved (brain_bridge.journal_ledger mirrors them into the journal). What it raises is never ours.
+        self.listener: Callable[[str, dict], None] | None = None
         if path and os.path.exists(path):
             try:
                 with open(path, encoding="utf-8") as fh:
@@ -47,7 +51,8 @@ class Ledger:
             }
             self.entries.append(entry)
             self._trim_and_save()
-            return entry["id"]
+        self._tell("record", entry)
+        return entry["id"]
 
     def due(self, now):
         """Entries whose outcome check is due and not yet done."""
@@ -58,11 +63,23 @@ class Ledger:
     def resolve(self, entry_id, outcome, good, at=None):
         """Write a check's result back. `at` is when it was known (older entries have none: read check_at)."""
         with self._lock:
+            resolved = []
             for e in self.entries:
                 if e["id"] == entry_id:
                     e["outcome"] = {"what": outcome, "good": bool(good),
                                     "at": (at or datetime.now()).isoformat(timespec="seconds")}
+                    resolved.append(e)
             self._trim_and_save()
+        for e in resolved:
+            self._tell("resolve", e)
+
+    def _tell(self, what, entry):
+        if self.listener is None:
+            return
+        try:
+            self.listener(what, json.loads(json.dumps(entry, default=str)))  # a copy: the listener keeps nothing of ours
+        except Exception:  # noqa: BLE001 - a journal is never worth a verdict
+            pass
 
     def track(self, judge, room, zone, label=None, last=3):
         """Their last `last` resolved calls for this judge and zone, in one sentence (or "")."""

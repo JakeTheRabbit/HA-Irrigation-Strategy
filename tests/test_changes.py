@@ -1,0 +1,604 @@
+"""History › Changes (G8): changes.fold_changes over journal events, and history_changes /
+history_revert (journal_api.py) against the stubs and a real journal file.
+
+`ai.outcome` comes from the controller's ledger (brain_bridge.ledger_events): {kind: ai.outcome,
+correlation.ledger_id: <the ledger row's id>, data.good: bool}. The AI's own write names the same row in its claim,
+so its target.changed carries correlation.ledger_id too; the end-to-end test drives the real add-on code."""
+
+import asyncio
+import sys
+import types
+from datetime import datetime, timedelta
+from pathlib import Path
+from types import SimpleNamespace
+
+import pytest
+
+from custom_components.crop_steering.changes import (
+    GOOD,
+    NOT_YET,
+    TOO_SOON,
+    fold_changes,
+)
+from custom_components.crop_steering.generated.ids import new_id
+
+from .test_journal_api import _rig
+
+F2, F1 = "room:f2_", "room:f1_"
+SINCE = "2026-10-01T00:00:00+00:00"
+
+
+def _ev(
+    kind, ts, *, room=F2, zone=None, actor="manual", user_id=None, detail=None, **data
+):
+    return {
+        "v": 1,
+        "id": new_id(),
+        "room_id": room,
+        "ts": ts,
+        "kind": kind,
+        "zone": zone,
+        "outcome": "ok",
+        "source": {"actor": actor, "user_id": user_id, "detail": detail},
+        "correlation": {
+            "causation_id": data.pop("causation_id", None),
+            "ledger_id": data.pop("ledger_id", None),
+        },
+        "data": data,
+    }
+
+
+def _target(ts, key="p2_shot_size", old=5.0, new=6.0, zone=1, **kw):
+    return _ev(
+        "target.changed",
+        ts,
+        zone=zone,
+        key=key,
+        scope=f"zone:{zone}",
+        layer=kw.pop("layer", "base"),
+        old=old,
+        new=new,
+        reason=kw.pop("reason", None),
+        entity_id=f"number.crop_steering_f2_zone_{zone}_{key}",
+        **kw,
+    )
+
+
+# ------------------------------------------------------------------ the fold
+def test_a_learner_nudge_and_a_manual_edit_both_appear_attributed():
+    learner = _target(
+        "2026-10-20T06:00:00+00:00", "p1_target_vwc", 30.0, 31.0, actor="learner"
+    )
+    manual = _target("2026-10-20T09:00:00+00:00", user_id="u-ben")
+    rows = fold_changes([learner, manual], {})
+    assert [(r["id"], r["actor"], r["user_id"]) for r in rows] == [
+        (manual["id"], "manual", "u-ben"),
+        (learner["id"], "learner", None),
+    ]
+    assert rows[0]["outcome"] is None and rows[0]["limits"] is None
+
+
+def test_rows_carry_id_kind_outcome_and_limits():
+    learner = _target(
+        "2026-10-20T06:00:00+00:00", "dryback_target", 10.0, 12.0, actor="learner"
+    )
+    (row,) = fold_changes([learner], {F2: {"step_scope": "Auto setpoints and AI"}})
+    assert row["id"] == row["event_id"] == learner["id"]
+    assert (row["kind"], row["key"], row["scope"], row["old"], row["new"]) == (
+        "setpoint",
+        "dryback_target",
+        "zone:1",
+        10.0,
+        12.0,
+    )
+    assert row["outcome"] == "Too soon to judge — check after the next lights-on."
+    assert row["limits"] == {
+        "writer": "learner",
+        "min": 2.0,
+        "max": 60.0,
+        "step_scope": "Auto setpoints and AI",
+    }
+    assert row["revertible"] is True
+    # An AI write: writer "brain"; an unknown step scope reads as the default.
+    ai = _target("2026-10-20T07:00:00+00:00", "p2_shot_size", actor="ai")
+    (row,) = fold_changes([ai], {F2: {"step_scope": "nonsense"}})
+    assert row["limits"] == {
+        "writer": "brain",
+        "min": 0.5,
+        "max": 20.0,
+        "step_scope": "Auto setpoints",
+    }
+    # A key the engine has no bounds for: no invented limits.
+    odd = _target("2026-10-20T07:00:00+00:00", "lights_on_hour", actor="learner")
+    (row,) = fold_changes([odd], {})
+    assert (row["limits"]["min"], row["limits"]["max"]) == (None, None)
+
+
+def test_the_outcome_line_follows_the_matching_ai_outcome():
+    good = _target("2026-10-20T06:00:00+00:00", actor="ai", ledger_id="4")
+    flat = _target("2026-10-20T06:30:00+00:00", actor="ai", ledger_id="5")
+    later = _target("2026-10-21T06:30:00+00:00", actor="learner")
+    other = _target("2026-10-20T06:00:00+00:00", actor="ai", room=F1, ledger_id="4")
+    outcomes = [
+        _ev(
+            "ai.outcome",
+            "2026-10-21T06:00:00+00:00",
+            actor="ai",
+            ledger_id="4",
+            good=True,
+        ),
+        _ev(
+            "ai.outcome",
+            "2026-10-21T06:00:00+00:00",
+            actor="ai",
+            ledger_id="5",
+            good=False,
+        ),
+    ]
+    rows = fold_changes([good, flat, later, other, *outcomes], {})
+    by_id = {r["id"]: r for r in rows}
+    assert len(by_id) == 4  # ai.outcome is read, never listed
+    assert by_id[good["id"]]["outcome"] == GOOD == "Dryback came back to target."
+    assert by_id[flat["id"]]["outcome"] == NOT_YET == "No change in dryback yet."
+    assert by_id[later["id"]]["outcome"] == TOO_SOON
+    assert by_id[other["id"]]["outcome"] == TOO_SOON  # a ledger id is one room's
+
+
+def test_an_outcome_from_before_the_change_is_not_its_outcome():
+    """A ledger that was damaged starts its ids again: an older row's outcome never judges a newer change."""
+    change = _target("2026-10-20T06:00:00+00:00", actor="ai", ledger_id="4")
+    old = _ev(
+        "ai.outcome", "2026-10-10T06:00:00+00:00", actor="ai", ledger_id="4", good=True
+    )
+    (row,) = fold_changes([old, change], {})
+    assert row["outcome"] == TOO_SOON
+
+
+def test_kinds_and_what_can_be_put_back():
+    events = [
+        _ev(
+            "plan.activated",
+            "2026-10-20T06:00:00+00:00",
+            actor="plan",
+            revision=3,
+            status="active",
+        ),
+        _target("2026-10-20T06:01:00+00:00", detail="preset Mothers"),
+        _ev(
+            "config.changed",
+            "2026-10-20T06:02:00+00:00",
+            store="timers",
+            section="programs",
+            old=[],
+            new=[{"id": "p"}],
+        ),
+        _ev(
+            "config.changed",
+            "2026-10-20T06:03:00+00:00",
+            store="site",
+            section="alert_rules",
+            old=[],
+            new=[{"id": "r"}],
+        ),
+        _ev(
+            "config.changed",
+            "2026-10-20T06:04:00+00:00",
+            store="setup",
+            section="room",
+            old=None,
+            new={"room_name": "F2"},
+        ),
+        _ev(
+            "calibration.committed",
+            "2026-10-20T06:05:00+00:00",
+            probe="feed_ph",
+            record_id="a",
+            applied=True,
+        ),
+        _ev(
+            "calibration.committed",
+            "2026-10-20T06:06:00+00:00",
+            probe="feed_ec",
+            record_id="b",
+            applied=True,
+        ),
+        _ev(
+            "calibration.reverted",
+            "2026-10-20T06:07:00+00:00",
+            probe="feed_ph",
+            record_id=None,
+        ),
+        _ev(
+            "pump.calibrated",
+            "2026-10-20T06:08:00+00:00",
+            pump="a3",
+            ml_min=50.0,
+            previous_ml_min=48.0,
+        ),
+        _target("2026-10-20T06:09:00+00:00", detail="backfill", old=None),
+        _target(
+            "2026-10-20T06:10:00+00:00",
+            actor="ai",
+            layer="overlay",
+            new=None,
+            reason="undone",
+        ),
+        _ev("shot.completed", "2026-10-20T06:11:00+00:00", actor="engine"),
+    ]
+    rows = list(reversed(fold_changes(events, {})))
+    assert [(r["kind"], r["revertible"]) for r in rows] == [
+        ("plan", False),  # a plan activation
+        ("recipe", True),
+        ("setup", True),  # timers
+        ("alerts", False),  # no save path for alert rules yet
+        ("setup", False),  # a create: nothing before it
+        ("calibration", False),  # feed_ph, superseded by the revert after it
+        ("calibration", True),  # feed_ec, still applied
+        ("calibration", False),
+        ("calibration", False),
+        ("setpoint", False),  # a legacy row without old
+        ("setpoint", False),  # an overlay undo marker
+    ]
+    assert rows[0]["reason"] == "activated" and rows[0]["section"] == "plan"
+    assert rows[3]["scope"] == "site"
+
+
+def test_a_site_change_journaled_in_two_rooms_is_one_row():
+    shared = new_id()
+    both = [
+        _ev(
+            "config.changed",
+            "2026-10-20T06:00:00+00:00",
+            room=room,
+            store="site",
+            section="supply",
+            old={"irrigation_pumps": []},
+            new={"irrigation_pumps": [{"entity_id": "switch.p"}]},
+            causation_id=shared,
+        )
+        for room in (F1, F2)
+    ]
+    assert len(fold_changes(both, {})) == 1
+
+
+def test_the_fold_orders_by_ts_not_by_seq():
+    late_but_first = _target("2026-10-19T06:00:00+00:00")
+    late_but_first["seq"] = 99  # a backfilled row
+    live = _target("2026-10-20T06:00:00+00:00")
+    live["seq"] = 1
+    assert [r["id"] for r in fold_changes([live, late_but_first], {})] == [
+        live["id"],
+        late_but_first["id"],
+    ]
+
+
+# ------------------------------------------------------------------ the services
+class _Users:
+    def __init__(self, users):
+        self.users = users
+        self.asked = []
+
+    async def async_get_user(self, user_id):
+        self.asked.append(user_id)
+        return self.users.get(user_id)
+
+
+def _site(monkeypatch, tmp_path, users=None, entries=("f2_", "f1_")):
+    from tests import ha_stubs
+
+    hass, api = _rig(monkeypatch, tmp_path)
+    hass.auth = _Users(users or {})
+    hass.config_entries = ha_stubs.FakeConfigEntries(
+        [
+            ha_stubs.FakeEntry({"room_prefix": p}, entry_id=p.rstrip("_"))
+            for p in entries
+        ]
+    )
+    return hass, api
+
+
+async def _hub(api, hass, tmp_path, events_by_room):
+    hub = api.JournalHub(hass, str(tmp_path / "journal.db"))
+    await hub.async_init()
+    for room, events in events_by_room.items():
+        await hub.append(
+            room, [{k: v for k, v in e.items() if k != "room_id"} for e in events]
+        )
+    hass.data.setdefault("crop_steering", {})["_journal"] = hub
+    return hub
+
+
+def test_manual_rows_name_the_user_and_automation_rows_do_not(tmp_path, monkeypatch):
+    ben = SimpleNamespace(name="Ben")
+    hass, api = _site(monkeypatch, tmp_path, {"u-ben": ben})
+    rows = [
+        _target("2026-10-20T06:00:00+00:00", user_id="u-ben"),
+        _target("2026-10-20T07:00:00+00:00", user_id="u-ben", key="p1_target_vwc"),
+        _target("2026-10-20T08:00:00+00:00", user_id="u-gone"),  # a deleted user
+        _target("2026-10-20T09:00:00+00:00", actor="automation"),
+    ]
+
+    async def go():
+        hub = await _hub(api, hass, tmp_path, {F2: rows})
+        return await api.history_changes(hass, hub, {"room_id": F2, "since": SINCE})
+
+    out = asyncio.run(go())["changes"]
+    assert [(r["user_id"], r["user_name"]) for r in out] == [
+        (None, None),
+        ("u-gone", None),
+        ("u-ben", "Ben"),
+        ("u-ben", "Ben"),
+    ]
+    assert hass.auth.asked == ["u-gone", "u-ben"]  # each user looked up once per call
+
+
+def test_until_bounds_the_range_and_no_room_merges_all_rooms(tmp_path, monkeypatch):
+    hass, api = _site(monkeypatch, tmp_path)
+    f2_early = _target("2026-10-20T06:00:00+00:00")
+    f2_late = _target("2026-10-22T06:00:00+00:00")
+    f1_mid = _target("2026-10-21T06:00:00+00:00", room=F1, zone=2)
+    hass.states.set(
+        "select.crop_steering_f1_setpoint_step_limit_applies_to",
+        "Auto setpoints and AI",
+    )
+    f1_learner = _target("2026-10-21T07:00:00+00:00", room=F1, zone=2, actor="learner")
+
+    async def go():
+        hub = await _hub(
+            api, hass, tmp_path, {F2: [f2_early, f2_late], F1: [f1_mid, f1_learner]}
+        )
+        bounded = await api.history_changes(
+            hass,
+            hub,
+            {"room_id": F2, "since": SINCE, "until": "2026-10-21T00:00:00+00:00"},
+        )
+        merged = await api.history_changes(hass, hub, {"since": SINCE})
+        zone_2 = await api.history_changes(hass, hub, {"since": SINCE, "zone": 2})
+        return bounded, merged, zone_2
+
+    bounded, merged, zone_2 = asyncio.run(go())
+    assert [r["id"] for r in bounded["changes"]] == [f2_early["id"]]
+    assert [(r["id"], r["room_id"]) for r in merged["changes"]] == [
+        (f2_late["id"], F2),
+        (f1_learner["id"], F1),
+        (f1_mid["id"], F1),
+        (f2_early["id"], F2),
+    ]
+    assert merged["changes"][1]["limits"]["step_scope"] == "Auto setpoints and AI"
+    assert [r["id"] for r in zone_2["changes"]] == [f1_learner["id"], f1_mid["id"]]
+
+
+def test_revert_refuses_when_the_value_moved_since(tmp_path, monkeypatch):
+    from custom_components.crop_steering.api_v2 import StaleRevision
+    from homeassistant.exceptions import HomeAssistantError
+
+    from custom_components.crop_steering import presets
+
+    hass, api = _site(monkeypatch, tmp_path)
+    change = _target("2026-10-20T06:00:00+00:00", old=5.0, new=6.0)
+    entity_id = change["data"]["entity_id"]
+    hass.states.set(entity_id, "7.0")  # someone moved it again since
+    writes = []
+
+    async def no_write(*args, **kw):
+        writes.append(args)
+        return []
+
+    monkeypatch.setattr(presets, "write_numbers", no_write)
+    call = SimpleNamespace(
+        data={"event_id": change["id"]}, context=SimpleNamespace(user_id=None)
+    )
+
+    async def go():
+        hub = await _hub(api, hass, tmp_path, {F2: [change]})
+        return await api.history_revert(hass, hub, call)
+
+    with pytest.raises(HomeAssistantError, match="has changed since") as raised:
+        asyncio.run(go())
+    assert isinstance(raised.value.__cause__, StaleRevision)
+    assert writes == []
+
+
+def test_revert_refuses_a_change_that_cannot_be_put_back(tmp_path, monkeypatch):
+    from homeassistant.exceptions import HomeAssistantError
+
+    hass, api = _site(monkeypatch, tmp_path)
+    activation = _ev(
+        "plan.activated", "2026-10-20T06:00:00+00:00", actor="plan", status="active"
+    )
+    call = SimpleNamespace(
+        data={"event_id": activation["id"]}, context=SimpleNamespace(user_id=None)
+    )
+
+    async def go():
+        hub = await _hub(api, hass, tmp_path, {F2: [activation]})
+        return await api.history_revert(hass, hub, call)
+
+    with pytest.raises(HomeAssistantError, match="This change can't be put back"):
+        asyncio.run(go())
+
+
+def test_history_changes_caps_at_2000_newest_first_and_folds_off_the_loop(
+    tmp_path, monkeypatch
+):
+    from custom_components.crop_steering import changes
+
+    assert api_cap() == 2000
+    hass, api = _site(monkeypatch, tmp_path)
+    monkeypatch.setattr(api, "MAX_CHANGES", 3)
+    rows = [_target(f"2026-10-20T0{h}:00:00+00:00") for h in range(5)]
+    busy = {"executor": False, "folded_in_executor": None}
+    real_job, real_fold = hass.async_add_executor_job, changes.fold_changes
+
+    def job(fn, *a):
+        busy["executor"] = True
+        try:
+            return real_job(fn, *a)
+        finally:
+            busy["executor"] = False
+
+    def fold(*a, **kw):
+        busy["folded_in_executor"] = busy["executor"]
+        return real_fold(*a, **kw)
+
+    hass.async_add_executor_job = job
+    monkeypatch.setattr(changes, "fold_changes", fold)
+
+    async def go():
+        hub = await _hub(api, hass, tmp_path, {F2: rows})
+        capped = await api.history_changes(hass, hub, {"room_id": F2, "since": SINCE})
+        whole = await api.history_changes(
+            hass, hub, {"room_id": F2, "since": "2026-10-20T03:00:00+00:00"}
+        )
+        return capped, whole
+
+    capped, whole = asyncio.run(go())
+    assert [r["id"] for r in capped["changes"]] == [r["id"] for r in rows[:1:-1]]
+    assert capped["truncated"] is True
+    assert len(whole["changes"]) == 2 and "truncated" not in whole
+    assert busy["folded_in_executor"] is True
+
+
+def api_cap():
+    from custom_components.crop_steering import journal_api
+
+    return journal_api.MAX_CHANGES
+
+
+def test_a_type_error_in_a_put_back_is_a_refusal_not_a_crash(tmp_path, monkeypatch):
+    from homeassistant.exceptions import HomeAssistantError
+
+    hass, api = _site(monkeypatch, tmp_path)
+    change = _target("2026-10-20T06:00:00+00:00")
+
+    async def broken(*a, **kw):
+        raise TypeError("zones must be a list")
+
+    monkeypatch.setattr(api, "_put_back", broken)
+    call = SimpleNamespace(
+        data={"event_id": change["id"]}, context=SimpleNamespace(user_id=None)
+    )
+
+    async def go():
+        hub = await _hub(api, hass, tmp_path, {F2: [change]})
+        return await api.history_revert(hass, hub, call)
+
+    with pytest.raises(HomeAssistantError, match="zones must be a list"):
+        asyncio.run(go())
+
+
+# ------------------------------------------------------------------ end to end, with the add-on's own code
+ADDON = Path(__file__).resolve().parents[1] / "addons" / "f2_control" / "f2_control"
+
+
+def _addon():
+    """The controller app's modules (controller.py imports `requests`, only in its container: stubbed when absent)."""
+    if "requests" not in sys.modules:
+        stub = types.ModuleType("requests")
+        stub.Session = lambda: SimpleNamespace(get=None, post=None, headers={})
+        sys.modules["requests"] = stub
+    if str(ADDON) not in sys.path:
+        sys.path.insert(0, str(ADDON))
+    import brain_bridge
+    import controller
+    import journal_out
+
+    return brain_bridge, controller, journal_out
+
+
+@pytest.mark.parametrize("good, line", [(True, GOOD), (False, NOT_YET)])
+def test_an_ai_setpoint_write_shows_its_outcome_end_to_end(
+    tmp_path, monkeypatch, good, line
+):
+    """A ledger row -> the brain's setpoint write, whose claim names the row -> the integration's setpoint log
+    journals target.changed -> the row's check is written back as ai.outcome -> history_changes shows the outcome line
+    on that change."""
+    brain_bridge, controller, journal_out = _addon()
+    from brain.envelope import Directive
+    from brain.journal import Journal
+    from brain.ledger import Ledger
+    from brain.setpoint_memory import SetpointMemory
+
+    from custom_components.crop_steering.setpoint_log import SetpointLog
+    from tests import ha_stubs
+
+    from .test_journal_producers import MemoryStore
+
+    hass, api = _site(monkeypatch, tmp_path)
+    claims = []
+    monkeypatch.setattr(controller, "ha_get", lambda entity, **k: ("50", {}, None))
+    monkeypatch.setattr(controller, "ha_call", lambda *a, **k: True)
+    monkeypatch.setattr(controller, "log", lambda *a: None)
+    monkeypatch.setattr(
+        controller, "ha_fire", lambda event, data, **k: claims.append((event, data))
+    )
+    room = SimpleNamespace(
+        slug="f2", prefix="f2_", state={3: {"phase": "P3"}}, lights_on_hour=10
+    )
+    c = SimpleNamespace(
+        journal=journal_out.Outbox(str(tmp_path / "journal_outbox.jsonl")),
+        jev=SimpleNamespace(
+            ledger=Ledger(None), setpoints=SetpointMemory(None), journal=Journal(None)
+        ),
+        rooms=[room],
+        _activity=[],
+        _grow_day_start=lambda room, local: local.date(),
+        _notify_event=lambda *a: None,
+    )
+    c._auto_write = types.MethodType(controller.Controller._auto_write, c)
+    brain_bridge.journal_ledger(c)
+    at = datetime.now().replace(microsecond=0) - timedelta(hours=1)
+    row = c.jev.ledger.record("setpoints", "f2", 3, "later_rewater", "setpoint", at=at)
+    move = {
+        "suffix": "p2_vwc_threshold",
+        "from": 50.0,
+        "to": 49.0,
+        "words": "re-water at 49",
+        "choice": "later_rewater",
+    }
+    brain_bridge.apply_setpoint(
+        c,
+        room,
+        3,
+        Directive("setpoints", "setpoint", move, "why", at + timedelta(hours=1)),
+        SimpleNamespace(setpoints={}),
+        at,
+    )
+    ((event, claim),) = claims
+    assert (event, claim["who"], claim["ledger_id"]) == (
+        "crop_steering_setpoint_write",
+        "brain",
+        str(row),
+    )
+
+    async def go():
+        hub = await _hub(api, hass, tmp_path, {})
+        log = SetpointLog(
+            hass,
+            ha_stubs.FakeEntry(data={"room_prefix": "f2_"}, entry_id="f2"),
+            MemoryStore(),
+        )
+        await log.async_init()
+        log.claim(claim)
+        entity = "number.crop_steering_f2_zone_3_p2_vwc_threshold"
+        await log.record(entity, "p2_vwc_threshold", 3, 50.0, 49.0, None)
+        await asyncio.gather(*list(hub._tasks))
+        c.jev.ledger.resolve(
+            row, "the dryback", good, at=datetime.now() + timedelta(minutes=1)
+        )
+        sent = [
+            {k: v for k, v in e.items() if k != "room_id"} for e in c.journal.pending()
+        ]
+        assert {e["kind"] for e in sent} == {"ai.judgement", "ai.outcome"}
+        out = await hub.append(F2, sent)
+        assert out["rejected"] == [] and len(out["accepted"]) == 2
+        return await api.history_changes(hass, hub, {"room_id": F2, "since": SINCE})
+
+    (change,) = asyncio.run(go())["changes"]
+    assert (change["actor"], change["key"], change["old"], change["new"]) == (
+        "ai",
+        "p2_vwc_threshold",
+        50.0,
+        49.0,
+    )
+    assert change["outcome"] == line

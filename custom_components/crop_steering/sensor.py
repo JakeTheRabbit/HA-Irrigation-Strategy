@@ -42,6 +42,7 @@ from .const import (
 from .room import room_prefix, build_engine_config
 from . import stock
 from .calculations import ec_type_key, fuse_probes
+from .probe_offsets import read as read_probe
 from .generated.defaults import CONTROLLER_FALLBACKS
 from .generated.shot_length import (
     DEFAULT_MAX_SHOT_S,
@@ -279,6 +280,10 @@ async def async_setup_entry(
     sensors.append(CropSteeringBrainQuestionsSensor(entry))
     sensors.append(CropSteeringBrainPromptConfigSensor(entry))
     sensors.append(CropSteeringDisplaySensor(entry))
+    sensors.extend(
+        CropSteeringFeedCorrectedSensor(entry, probe)
+        for probe in ("feed_ph", "feed_ec")
+    )
 
     async_add_entities(sensors)
 
@@ -309,6 +314,10 @@ class CropSteeringEngineConfigSensor(SensorEntity):
         self._substrate_select = f"select.{DOMAIN}_{self._prefix}substrate"
 
     async def async_added_to_hass(self) -> None:
+        from homeassistant.helpers.dispatcher import async_dispatcher_connect
+
+        from .calibration import SIGNAL as CALIBRATION_SIGNAL
+
         await super().async_added_to_hass()
         # Republish when the room's substrate is chosen, so the controller is told.
         self.async_on_remove(
@@ -316,6 +325,41 @@ class CropSteeringEngineConfigSensor(SensorEntity):
                 self.hass, [self._substrate_select], self._substrate_changed
             )
         )
+        # ... and when a feed probe calibration is applied or reverted (feed_calibration).
+        self.async_on_remove(
+            async_dispatcher_connect(
+                self.hass,
+                f"{CALIBRATION_SIGNAL}_{self._entry.entry_id}",
+                self.async_write_ha_state,
+            )
+        )
+        # ... and when the upgrade keeps the old feed EC assumption (legacy_feed_ec_fallback).
+        from .migration import SIGNAL as MIGRATION_SIGNAL
+
+        self.async_on_remove(
+            async_dispatcher_connect(
+                self.hass,
+                f"{MIGRATION_SIGNAL}_{self._entry.entry_id}",
+                self.async_write_ha_state,
+            )
+        )
+
+    def _feed_calibration(self) -> dict:
+        hass = getattr(self, "hass", None)
+        manager = (
+            hass.data.get(DOMAIN, {}).get("_calibration", {}).get(self._entry.entry_id)
+            if hass
+            else None
+        )
+        return manager.feed_calibration() if manager is not None else {}
+
+    def _legacy_feed_ec(self):
+        hass = getattr(self, "hass", None)
+        if hass is None:
+            return None
+        from .migration import fallback_for
+
+        return fallback_for(hass, self._entry)
 
     @callback
     def _substrate_changed(self, _event) -> None:
@@ -356,6 +400,8 @@ class CropSteeringEngineConfigSensor(SensorEntity):
             integration_version=SOFTWARE_VERSION,
             entry_id=self._entry.entry_id,
             substrate=self._substrate(),
+            feed_calibration=self._feed_calibration(),
+            legacy_feed_ec_fallback=self._legacy_feed_ec(),
         )
 
 
@@ -491,11 +537,38 @@ class CropSteeringDosingConfigSensor(SensorEntity):
 
         from .dosing_api import SIGNAL
 
+        self._pump_sensors: set[str] = set()
+
+        @callback
+        def changed() -> None:
+            self.async_write_ha_state()
+            self._publish_pumps()
+
         self.async_on_remove(
             async_dispatcher_connect(
-                self.hass, f"{SIGNAL}_{self._entry.entry_id}", self.async_write_ha_state
+                self.hass, f"{SIGNAL}_{self._entry.entry_id}", changed
             )
         )
+        self.async_on_remove(self._remove_pumps)
+        self._publish_pumps()
+
+    @callback
+    def _publish_pumps(self) -> None:
+        """Each dosing pump's sensor.crop_steering_<prefix>dosing_pump_<id>_ml_min and _last_calibrated
+        (G3), set from the dosing store; a pump no longer set up loses its two."""
+        manager = self._manager()
+        sensors = manager.pump_sensors() if manager is not None else {}
+        for entity_id in self._pump_sensors - set(sensors):
+            self.hass.states.async_remove(entity_id)
+        for entity_id, (state, attributes) in sensors.items():
+            self.hass.states.async_set(entity_id, str(state), attributes)
+        self._pump_sensors = set(sensors)
+
+    @callback
+    def _remove_pumps(self) -> None:
+        for entity_id in self._pump_sensors:
+            self.hass.states.async_remove(entity_id)
+        self._pump_sensors = set()
 
 
 class CropSteeringBrainQuestionsSensor(SensorEntity):
@@ -647,6 +720,135 @@ class CropSteeringDisplaySensor(SensorEntity):
         )
 
 
+class CropSteeringFeedCorrectedSensor(SensorEntity, RestoreEntity):
+    """The room's feed pH or EC reading corrected by the probe's applied calibration (calibration.py):
+    sensor.crop_steering_<prefix>feed_ph_corrected / feed_ec_corrected. Unknown while no calibration is
+    applied, or the raw sensor has no number; the raw sensor itself is never touched. Written again on
+    each change of the raw sensor or of the room's descriptor, and when a calibration is applied or
+    reverted.
+
+    After a restart its last value stands in only until the raw sensor first reports, and for 2 min at
+    most, so a probe that never comes back is never hidden behind an old reading."""
+
+    _attr_should_poll = False
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_icon = "mdi:tune-vertical"
+
+    def __init__(self, entry, probe):
+        self._entry = entry
+        self._probe = probe
+        self._prefix = room_prefix(entry)
+        quantity = "pH" if probe == "feed_ph" else "EC"
+        self._attr_unique_id = f"{DOMAIN}_{entry.entry_id}_{probe}_corrected"
+        self._attr_name = f"Feed {quantity} corrected"
+        self._attr_object_id = f"{DOMAIN}_{self._prefix}{probe}_corrected"
+        # Home Assistant ignores _attr_object_id; the controller finds the reading by THIS id.
+        self.entity_id = f"sensor.{self._attr_object_id}"
+        self._descriptor = f"sensor.{DOMAIN}_{self._prefix}engine_config"
+        self._value = None
+        self._attributes = {}
+        self._restored = None
+        self._source = None
+        self._unsub_source = None
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        return DeviceInfo(
+            identifiers={(DOMAIN, self._entry.entry_id)},
+            name="Crop Steering System",
+            manufacturer="Home Assistant Community",
+            model="Professional Irrigation Controller",
+            sw_version=SOFTWARE_VERSION,
+        )
+
+    @property
+    def native_value(self) -> Any:
+        return self._value
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        return self._attributes
+
+    def _manager(self):
+        return (
+            self.hass.data.get(DOMAIN, {})
+            .get("_calibration", {})
+            .get(self._entry.entry_id)
+        )
+
+    def _raw_not_reported(self, source) -> bool:
+        state = self.hass.states.get(source) if source else None
+        return state is None or bool(state.attributes.get("restored"))
+
+    def _refresh(self) -> None:
+        manager = self._manager()
+        if manager is None:
+            value, attributes = None, {"source": None, "applied": False}
+        else:
+            value, attributes = manager.corrected(self._probe)
+        source = attributes.get("source")
+        if (
+            value is None
+            and self._restored is not None
+            and attributes.get("applied")
+            and self._raw_not_reported(source)
+        ):
+            value = self._restored
+            attributes = {**attributes, "restored": True}  # not a live reading yet
+        elif source and not self._raw_not_reported(source):
+            self._restored = None  # the probe has reported: its own reading from now on
+        self._value, self._attributes = value, attributes
+        if source != self._source:
+            self._stop_source()
+            self._source = source
+            if source:
+                self._unsub_source = async_track_state_change_event(
+                    self.hass, [source], self._changed
+                )
+
+    @callback
+    def _stop_source(self) -> None:
+        if self._unsub_source:
+            self._unsub_source()
+            self._unsub_source = None
+
+    @callback
+    def _changed(self, _event=None) -> None:
+        self._refresh()
+        self.async_write_ha_state()
+
+    @callback
+    def _end_restore(self, _now=None) -> None:
+        self._restored = None
+        self._changed()
+
+    async def async_added_to_hass(self) -> None:
+        from homeassistant.helpers.dispatcher import async_dispatcher_connect
+        from homeassistant.helpers.event import async_call_later
+
+        from .calibration import SIGNAL
+
+        await super().async_added_to_hass()
+        last = await self.async_get_last_state()
+        try:
+            restored = float(last.state) if last is not None else None
+        except (TypeError, ValueError):
+            restored = None
+        if restored is not None and math.isfinite(restored):
+            self._restored = restored
+            self.async_on_remove(async_call_later(self.hass, 120, self._end_restore))
+        self.async_on_remove(
+            async_dispatcher_connect(
+                self.hass, f"{SIGNAL}_{self._entry.entry_id}", self._changed
+            )
+        )
+        self.async_on_remove(
+            async_track_state_change_event(self.hass, [self._descriptor], self._changed)
+        )
+        self.async_on_remove(self._stop_source)
+        self._refresh()
+
+
 class CropSteeringSensor(SensorEntity):
     """Crop Steering sensor."""
 
@@ -677,6 +879,9 @@ class CropSteeringSensor(SensorEntity):
         self._probe_offsets: dict[str, float] = {}
         self._offsets_at: str | None = None
         self._fusion: dict | None = None
+        # The offset and curve each moisture probe was last read under (probe_offsets.py), so a change
+        # moves what fusion learned of the probe by the same step.
+        self._applied_fix: dict[str, tuple] = {}
 
         # Extract zone number from key if this is a zone sensor.
         # Regex matches BOTH `vwc_zone_3` and `zone_3_status`-style keys; the prior
@@ -954,6 +1159,25 @@ class CropSteeringSensor(SensorEntity):
                 pass
         return None
 
+    def _user_corrections(self) -> dict:
+        """{probe: (offset, curve)} the grower set for the room's moisture probes (calibration.py)."""
+        manager = (
+            self.hass.data.get(DOMAIN, {})
+            .get("_calibration", {})
+            .get(self._entry.entry_id)
+        )
+        return manager.user_corrections() if manager is not None else {}
+
+    def _unreadable_offsets(self, sensor_ids) -> bool:
+        """Whether the stored probe offsets of any of these probes cannot be read (calibration.py), so
+        they read without them."""
+        manager = (
+            self.hass.data.get(DOMAIN, {})
+            .get("_calibration", {})
+            .get(self._entry.entry_id)
+        )
+        return manager is not None and bool(manager.affected_probes() & set(sensor_ids))
+
     def _probe_readings(
         self, sensor_ids: list[str], kind: str | None = None
     ) -> list[tuple[str, float | None, float | None]]:
@@ -965,6 +1189,7 @@ class CropSteeringSensor(SensorEntity):
         """
         readings = []
         self._unit_set_aside = {}
+        fixes = self._user_corrections() if kind == "vwc" else {}
         for sensor_id in sensor_ids:
             if not sensor_id:
                 continue
@@ -979,7 +1204,16 @@ class CropSteeringSensor(SensorEntity):
                         unit = (getattr(state, "attributes", None) or {}).get(
                             "unit_of_measurement"
                         )
-                        value, aside = to_native(kind, unit, value, sensor_id)
+                        raw = value
+                        fix = fixes.get(sensor_id)
+                        if fix:
+                            _base, value, aside = read_probe(
+                                raw, unit, fix[0], fix[1], sensor_id
+                            )
+                        else:
+                            value, aside = to_native(kind, unit, raw, sensor_id)
+                        if kind == "vwc":
+                            self._follow_fix(sensor_id, raw, unit, fix, value)
                         if aside:
                             self._unit_set_aside[sensor_id] = unit or ""
                     # last_reported moves on every report, last_updated only on a change.
@@ -992,6 +1226,19 @@ class CropSteeringSensor(SensorEntity):
                 _LOGGER.debug(f"Could not parse sensor value for {sensor_id}: {e}")
             readings.append((sensor_id, value, age))
         return readings
+
+    def _follow_fix(self, sensor_id, raw, unit, fix, value) -> None:
+        """A probe's offset or curve changed since it was last read: what fusion learned of the probe
+        (its offset against the zone) moves by the same step, so a later pass with a probe missing
+        does not step the reading."""
+        fix = fix or (0.0, None)
+        before = self._applied_fix.get(sensor_id)
+        self._applied_fix[sensor_id] = fix
+        if before is None or before == fix or sensor_id not in self._probe_offsets:
+            return
+        _base, was, _aside = read_probe(raw, unit, before[0], before[1], sensor_id)
+        if was is not None and value is not None:
+            self._probe_offsets[sensor_id] += value - was
 
     def _probe_method_entity(self, kind: str) -> str:
         """The zone's select of how its probes become its `kind` reading (select.py)."""
@@ -1056,6 +1303,8 @@ class CropSteeringSensor(SensorEntity):
             )
             self._fusion["unit_set_aside"] = aside
         self._fusion["excluded"].update(dict.fromkeys(sorted(unused), "not counted"))
+        if kind == "vwc" and self._unreadable_offsets(sensor_ids):
+            self._fusion["user_offsets"] = "unreadable"
         primary = zone.get(f"{kind}_primary")
         self._fusion["primary"] = (
             primary if primary in sensor_ids and primary not in unused else None
@@ -1114,6 +1363,18 @@ class CropSteeringProbeSensor(CropSteeringSensor, RestoreEntity):
                 self.hass, [self._probe_method_entity(kind)], self._method_changed
             )
         )
+        if kind == "vwc":  # a probe's new offset or curve shows at once
+            from homeassistant.helpers.dispatcher import async_dispatcher_connect
+
+            from .calibration import SIGNAL as CALIBRATION_SIGNAL
+
+            self.async_on_remove(
+                async_dispatcher_connect(
+                    self.hass,
+                    f"{CALIBRATION_SIGNAL}_{self._entry.entry_id}",
+                    self.async_write_ha_state,
+                )
+            )
 
     @callback
     def _method_changed(self, _event) -> None:

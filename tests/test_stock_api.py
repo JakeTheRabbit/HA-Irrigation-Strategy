@@ -499,3 +499,15 @@ def test_a_store_from_before_this_loads_and_its_linked_tank_follows_its_pump(tra
     assert store._store.value["history"][0]["source"] == "pump"
     assert len(store._store.value["history"]) == 30
     assert store._store.value["revision"] == 42
+
+
+def test_a_pump_with_no_flow_entity_draws_at_its_calibrated_flow(tracker):
+    calibrated = {
+        **{k: v for k, v in PUMP.items() if k != "flow_entity"},
+        "flow_entity": None,
+        "calibrated_ml_min": 600,
+    }
+    hass, store = pumped(pumps=[calibrated])
+    report(hass, store, 0, {POWER: "on"})
+    report(hass, store, 10, {POWER: "off"})
+    assert store.data["history"][0]["draw_ml"] == {"balance": 100.0}

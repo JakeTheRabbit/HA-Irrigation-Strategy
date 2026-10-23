@@ -43,6 +43,8 @@ class Router:
         self.status, self.answer, self.calls = status, answer, []
 
     def __call__(self, domain, service, data, timeout=12):
+        if service == "journal_append":  # the journal's flush after the pass (Task 8): not a notification
+            return None, None
         self.calls.append((domain, service, dict(data), timeout))
         return self.status, self.answer
 

@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Phone — All rooms</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#4fc3f7;text-decoration:none}a:hover{color:#b3e5fc}
+</style>
+</helmet>
+<!-- PHONE SHELL: 390x844. Tokens: canvas #111111, surface #1c1c1c, raised #232323, border #2e2e2e, text #e1e1e1, muted #a4a4a4, faint #8a8a8a, primary #03a9f4, link #4fc3f7, success #81c995, warning #ffca5b, danger #f28b82. Phase P0 #6b7580, P1 #2f6fb5, P2 #6450b0, P3 #34405a. Font Roboto. Radius 12. -->
+<div style="width: 390px; height: 844px; box-sizing: border-box; background: #111111; color: #e1e1e1; font-family: Roboto, Arial, sans-serif; display: flex; flex-direction: column; overflow: hidden">
+
+<header style="height: 56px; flex-shrink: 0; display: flex; align-items: center; gap: 6px; padding: 0 8px; border-bottom: 1px solid #2e2e2e; background: #1c1c1c">
+<button type="button" aria-label="Open menu" style="width: 44px; height: 44px; border: 0; border-radius: 8px; background: transparent; color: #e1e1e1; display: flex; align-items: center; justify-content: center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="4" y1="6" x2="20" y2="6"></line><line x1="4" y1="12" x2="20" y2="12"></line><line x1="4" y1="18" x2="20" y2="18"></line></svg></button>
+<span style="display: flex; flex-direction: column"><b style="font-size: 17px; font-weight: 600">All rooms</b><span style="font-size: 12px; color: #a4a4a4">Updated 12 s ago · AI acting</span></span>
+</header>
+
+<main style="flex: 1; min-height: 0; overflow: hidden; padding: 12px; display: flex; flex-direction: column; gap: 12px">
+<sc-for list="{{rooms}}" as="r" hint-placeholder-count="2">
+<section style="background: #1c1c1c; border: 1px solid #2e2e2e; border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 8px">
+<div style="display: flex; align-items: center; gap: 8px">
+<span style="width: 10px; height: 10px; border-radius: 5px; background: {{r.dot}}"></span>
+<b style="font-size: 20px; font-weight: 600">{{r.name}}</b>
+<span style="font-size: 13px; color: #a4a4a4">{{r.state}}</span>
+<span style="margin-left: auto; font-size: 14px">Day <b>{{r.day}}</b><span style="color: #a4a4a4">/63</span></span>
+</div>
+<div style="position: relative; height: 8px; border-radius: 4px; background: #333333"><span style="position: absolute; left: 0; top: 0; bottom: 0; width: {{r.runPct}}; border-radius: 4px; background: #03a9f4"></span></div>
+<span style="font-size: 13px; color: #a4a4a4">Drunk today <b style="font-size: 15px; color: #e1e1e1; font-weight: 600">{{r.perPlant}}</b> per plant · {{r.roomL}}</span>
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px">
+<sc-for list="{{r.zones}}" as="z" hint-placeholder-count="3">
+<a href="P3-Zone.dc.html" style="display: flex; flex-direction: column; gap: 4px; padding: 8px; min-height: 44px; border: 1px solid {{z.edge}}; border-radius: 10px; background: {{z.bg}}; color: #e1e1e1">
+<span style="display: flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 600">{{z.name}}<span style="margin-left: auto; padding: 0 4px; border-radius: 4px; background: {{z.phColor}}; color: #fff; font-size: 11px; font-weight: 700">{{z.ph}}</span></span>
+<svg width="88" height="44" viewBox="0 30 100 64" aria-hidden="true" style="opacity: {{z.op}}"><rect x="4" y="36" width="92" height="56" rx="5" fill="#efe7d2"></rect><rect x="4" y="{{z.waterY}}" width="92" height="{{z.waterH}}" fill="#2f86c4" fill-opacity="0.6"></rect><rect x="4" y="36" width="92" height="56" rx="5" fill="none" stroke="#b5a684" stroke-width="2"></rect><rect x="33" y="30" width="34" height="8" rx="2" fill="#e8dfc8" stroke="#b5a684" stroke-width="1.5"></rect><circle cx="{{z.s1x}}" cy="50" r="6" fill="#81c995" stroke="#fff" stroke-width="1.5"></circle><sc-if value="{{z.two}}" hint-placeholder-val="{{false}}"><circle cx="70" cy="50" r="6" fill="{{z.s2}}" stroke="{{z.s2ring}}" stroke-width="1.5" stroke-dasharray="{{z.s2dash}}"></circle></sc-if></svg>
+<span style="display: flex; justify-content: space-between; align-items: baseline"><b style="font-size: 17px; font-weight: 600">{{z.vwc}}</b><span style="font-size: 12px; color: {{z.ecInk}}; font-weight: {{z.ecW}}">EC {{z.ec}}</span></span>
+<span style="display: flex; align-items: center; gap: 5px; font-size: 12px; color: #b8b8b8"><span style="width: 7px; height: 7px; border-radius: 4px; background: {{z.modeDot}}"></span>{{z.mode}}</span>
+<sc-if value="{{z.hasFlag}}" hint-placeholder-val="{{false}}"><span style="font-size: 11px; line-height: 1.3; color: #ffca5b">{{z.flag}}</span></sc-if>
+</a>
+</sc-for>
+</div>
+<a href="E2-Dosing.dc.html" style="display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 4px 8px; border-radius: 10px; background: #151515; color: #e1e1e1; font-size: 13px">
+<svg width="26" height="34" viewBox="0 0 80 100" aria-hidden="true" style="flex: none"><rect x="12" y="14" width="56" height="78" rx="8" fill="#26343c"></rect><rect x="12" y="{{r.tankY}}" width="56" height="{{r.tankH}}" fill="#2f86c4" fill-opacity="0.75"></rect><rect x="12" y="14" width="56" height="78" rx="8" fill="none" stroke="#8a8a8a" stroke-width="2"></rect><rect x="8" y="8" width="64" height="8" rx="3" fill="#5a5a5a"></rect></svg>
+<span><b style="font-weight: 600">Feed {{r.tankPct}}</b> <span style="color: #a4a4a4">· {{r.tankL}} · pH {{r.ph}} · EC {{r.feedEc}}</span></span>
+<sc-if value="{{r.stockLow}}" hint-placeholder-val="{{false}}"><span style="margin-left: auto; font-size: 12px; color: #ffca5b">{{r.stockNote}}</span></sc-if>
+</a>
+</section>
+</sc-for>
+</main>
+
+<nav aria-label="Sections" style="height: 64px; flex-shrink: 0; display: grid; grid-template-columns: repeat(5, 1fr); border-top: 1px solid #2e2e2e; background: #1c1c1c">
+<a href="P1-AllRooms.dc.html" aria-current="page" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; color: #4fc3f7; font-size: 11px; font-weight: 600; box-shadow: inset 0 2px 0 #03a9f4"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>Status</a>
+<a href="I1-Timeline.dc.html" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; color: #b8b8b8; font-size: 11px; font-weight: 500"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.7l5.7 5.7a8 8 0 1 1-11.3 0z"></path></svg>Irrigation</a>
+<a href="H1-Explorer.dc.html" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; color: #b8b8b8; font-size: 11px; font-weight: 500"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><polyline points="12 7 12 12 15 14"></polyline></svg>History</a>
+<a href="E1-Probes.dc.html" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; color: #b8b8b8; font-size: 11px; font-weight: 500"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"></path></svg>Equipment</a>
+<a href="T1-AlertRules.dc.html" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; color: #b8b8b8; font-size: 11px; font-weight: 500"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="4" y1="7" x2="20" y2="7"></line><line x1="4" y1="17" x2="20" y2="17"></line><circle cx="9" cy="7" r="2.5"></circle><circle cx="15" cy="17" r="2.5"></circle></svg>Settings</a>
+</nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+var PH = { P0: '#6b7580', P1: '#2f6fb5', P2: '#6450b0', P3: '#34405a' };
+function zone(name, ph, vwc, ec, o) {
+  o = o || {};
+  var y = 92 - vwc / 80 * 56, mode = o.mode || 'Automated';
+  return {
+    name: name, ph: ph, phColor: PH[ph], vwc: vwc + '%', ec: ec, waterY: y, waterH: 92 - y,
+    two: !!o.two, s1x: o.two ? 30 : 50, s2: o.backSilent ? 'transparent' : '#81c995', s2ring: o.backSilent ? '#ffca5b' : '#fff', s2dash: o.backSilent ? '3 2' : 'none',
+    ecInk: o.ecHigh ? '#ffca5b' : '#a4a4a4', ecW: o.ecHigh ? 700 : 400,
+    mode: mode, modeDot: mode === 'Watering' ? '#03a9f4' : mode === 'Paused' ? '#a4a4a4' : '#81c995',
+    edge: o.flag ? '#ffca5b' : mode === 'Watering' ? '#03a9f4' : '#2e2e2e',
+    bg: mode === 'Paused' ? 'repeating-linear-gradient(-45deg,#111111,#111111 8px,#181818 8px,#181818 16px)' : '#111111',
+    op: mode === 'Paused' ? 0.5 : 1, hasFlag: !!o.flag, flag: o.flag || ''
+  };
+}
+var ROOMS = [
+  { name: 'F2', dot: '#03a9f4', state: 'Watering · bulk', day: 38, runPct: '60%', perPlant: '0.21 L', roomL: '24.8 L room', tankPct: '68%', tankL: '310 L', ph: '5.84', feedEc: '2.4', tankY: 39, tankH: 53, stockLow: true, stockNote: 'Part B low',
+    zones: [zone('Zone 1', 'P2', 59.8, 5.2, { mode: 'Watering' }), zone('Zone 2', 'P2', 59.4, 6.6, { ecHigh: true, flag: 'EC over band' }), zone('Zone 3', 'P2', 60.2, 5.0)] },
+  { name: 'F1', dot: '#81c995', state: 'Holding · stretch', day: 12, runPct: '19%', perPlant: '0.16 L', roomL: '12.7 L room', tankPct: '47%', tankL: '188 L', ph: '6.02', feedEc: '1.9', tankY: 55, tankH: 37, stockLow: false, stockNote: '',
+    zones: [zone('Zone 1', 'P1', 63.8, 4.1, { two: true }), zone('Zone 2', 'P1', 62.9, 4.0, { two: true, backSilent: true, flag: 'Back sensor silent 3 h' }), zone('Zone 3', 'P1', 64.4, 4.2, { two: true, mode: 'Paused' })] }
+];
+class Component extends DCLogic {
+  renderVals() { return { rooms: ROOMS }; }
+}
+</script>
+</body>
+</html>

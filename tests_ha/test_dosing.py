@@ -283,3 +283,45 @@ async def test_a_recipe_in_parts_reaches_the_controller_in_whole_ml(
     await hass.async_block_till_done()
     batch = hass.states.get(SENSOR).attributes["batch"]
     assert (batch["part_ml"], batch["recipe"]) == (12.5, published)
+
+
+async def test_a_pump_needs_a_flow_entity_until_it_has_a_calibrated_flow(
+    hass, hass_admin_user
+):
+    entry = await _install(hass)
+    _devices(hass)
+    bare = {k: v for k, v in PUMP.items() if k != "flow_entity"}
+    refused = await _call(
+        hass,
+        hass_admin_user,
+        "dosing_save",
+        expected_revision=0,
+        pumps=[bare],
+        batch=BATCH,
+    )
+    assert "a flow entity or a calibrated flow is required" in refused["error"]
+    assert refused["config"]["revision"] == 0  # nothing stored
+    saved = await _call(
+        hass,
+        hass_admin_user,
+        "dosing_save",
+        expected_revision=0,
+        pumps=[PUMP],
+        batch=BATCH,
+    )
+    assert saved["error"] is None
+    # A calibration commit (the store's own field) gives the pump its flow; the flow entity may then go.
+    manager = hass.data[DOMAIN]["_dosing"][entry.entry_id]
+    manager.data["pumps"][0]["calibrated_ml_min"] = 663.6
+    again = await _call(
+        hass,
+        hass_admin_user,
+        "dosing_save",
+        expected_revision=1,
+        pumps=[bare],
+        batch=BATCH,
+    )
+    assert again["error"] is None
+    await hass.async_block_till_done()
+    (pump,) = hass.states.get(SENSOR).attributes["pumps"]
+    assert pump["flow_entity"] is None and pump["calibrated_ml_min"] == 663.6

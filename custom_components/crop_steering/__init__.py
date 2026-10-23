@@ -28,6 +28,7 @@ except ImportError:  # pragma: no cover - enables non-HA unit tests
         SELECT = "select"
         NUMBER = "number"
         BUTTON = "button"
+        BINARY_SENSOR = "binary_sensor"
 
 
 from .const import DEPRECATED, DOMAIN
@@ -56,6 +57,7 @@ PLATFORMS: list[Platform] = [
     Platform.SELECT,
     Platform.NUMBER,
     Platform.BUTTON,
+    Platform.BINARY_SENSOR,
 ]
 
 # Entities earlier versions created that nothing reads or sets any more, by platform and key. A key
@@ -145,6 +147,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     except Exception as err:  # pragma: no cover - never block setup on the notify store
         _LOGGER.warning("Notifications unavailable: %s", err)
 
+    # The event journal (spec section 4): one per site. A journal that cannot open only logs.
+    try:
+        from .journal_api import async_setup_journal
+
+        await async_setup_journal(hass, entry)
+    except Exception as err:  # pragma: no cover - never block setup on the journal
+        _LOGGER.warning("Event journal unavailable: %s", err)
+
     # Load this room's named-stage recipe (server-side Store) before the platforms
     # come up, so the recipe select + sensor can read it on setup.
     try:
@@ -190,6 +200,30 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         Exception
     ) as err:  # pragma: no cover - never block setup on the display options
         _LOGGER.warning("Display options unavailable: %s", err)
+
+    # The site store (pumps, exclusive groups, meters): one per site, set up with the first room.
+    try:
+        from .site_api import async_setup_site
+
+        await async_setup_site(hass, entry)
+    except Exception as err:  # pragma: no cover - never block setup on the site store
+        _LOGGER.warning("Site settings unavailable: %s", err)
+
+    # Wall, tablet and dosing dashboards from templates (G11): one store per site.
+    try:
+        from .dashboards import async_setup_dashboards
+
+        await async_setup_dashboards(hass, entry)
+    except Exception as err:  # pragma: no cover - never block setup on the dashboards
+        _LOGGER.warning("Dashboard templates unavailable: %s", err)
+
+    # Timer programs (G7): the room's watering timers, published for the controller app.
+    try:
+        from .timers_api import async_setup_timers
+
+        await async_setup_timers(hass, entry)
+    except Exception as err:  # pragma: no cover - never block setup on the timer store
+        _LOGGER.warning("Timer programs unavailable: %s", err)
 
     # Tests from the dashboard: a zone's test shot.
     from .selftest import async_setup_selftest
@@ -250,6 +284,26 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     from .overlays import async_setup_overlays
 
     await async_setup_overlays(hass, entry)
+    # The journal's history from the stores that now exist (once per room; in the background, setup never
+    # waits on it).
+    try:
+        from .journal_api import async_backfill_room
+        from .migration import note_history
+
+        async def _backfill():
+            added = await async_backfill_room(hass, entry)
+            # The Upgrade report says how much history came across.
+            if added and not fresh:
+                await note_history(hass, entry, added)
+
+        hass.async_create_task(_backfill())
+    except Exception as err:  # pragma: no cover - never block setup on the journal
+        _LOGGER.warning("Journal backfill unavailable: %s", err)
+    # The upgrade to 3.18 (migration.py): the room's settings carried into the new features, and its
+    # Upgrade report. Never stops the room loading.
+    from .migration import async_migrate_room
+
+    await async_migrate_room(hass, entry, fresh)
     await async_setup_panel(hass)
     # What's new: the release highlights the dashboard shows once after an update.
     try:
@@ -259,16 +313,26 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     except Exception as err:  # pragma: no cover - never block setup on the highlights
         _LOGGER.warning("What's new unavailable: %s", err)
 
+    # System status (G17): one system_health sensor for the site and system_status_get.
+    try:
+        from .system_status import async_setup_system_status
+
+        async_setup_system_status(hass, entry)
+    except Exception as err:  # pragma: no cover - never block setup on the status
+        _LOGGER.warning("System status unavailable: %s", err)
+
     # Setup health checks -> Home Assistant Repairs (read-only diagnostics)
     from datetime import timedelta
 
     from homeassistant.helpers.event import async_call_later, async_track_time_interval
 
     from .health import run_health_check
+    from .system_status import tick as system_status_tick
 
     @callback
     def _hc(_now=None):
         run_health_check(hass, entry)
+        system_status_tick(hass, entry)
 
     hass.data[DOMAIN].setdefault("_hc_unsubs", {})[entry.entry_id] = [
         async_call_later(hass, 60, _hc),  # first check once the add-on has booted
@@ -424,6 +488,21 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     from .display import async_unload_display
 
     await async_unload_display(hass, entry)
+    from .site_api import async_unload_site
+
+    await async_unload_site(hass, entry)
+    from .journal_api import async_leave_journal
+
+    async_leave_journal(hass, entry)
+    from .system_status import async_unload_system_status
+
+    async_unload_system_status(hass, entry)
+    from .dashboards import async_unload_dashboards
+
+    await async_unload_dashboards(hass, entry)
+    from .timers_api import async_unload_timers
+
+    await async_unload_timers(hass, entry)
     from .brain_api import async_unload_brain
 
     await async_unload_brain(hass, entry)
@@ -446,6 +525,11 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         if e.entry_id != entry.entry_id
     ]
     if not others_loaded:
+        from .journal_api import async_unload_journal
+        from .migration import async_unload_migration
+
+        await async_unload_journal(hass)
+        await async_unload_migration(hass)
         await async_unload_services(hass)
         from .selftest import async_unload_selftest
 

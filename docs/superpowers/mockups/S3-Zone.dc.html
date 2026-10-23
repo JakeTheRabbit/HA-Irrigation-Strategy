@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Status — F2 Zone 2</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#4fc3f7;text-decoration:none}a:hover{color:#b3e5fc}
+</style>
+</helmet>
+<!-- SHELL: 1440x1000 frame. Tokens: canvas #111111, surface #1c1c1c, raised #232323, border #2e2e2e, text #e1e1e1, muted #a4a4a4, faint #8a8a8a, primary #03a9f4, link #4fc3f7, success #81c995, warning #ffca5b, danger #f28b82. Phase P0 #6b7580, P1 #2f6fb5, P2 #6450b0, P3 #34405a. Font Roboto; sizes 12/14/15/17/20/24. Radius 12. -->
+<div style="width: 1440px; height: 1000px; box-sizing: border-box; background: #111111; color: #e1e1e1; font-family: Roboto, Arial, sans-serif; display: flex; overflow: hidden">
+
+<!-- SHELL: menu (sections + live room tree) -->
+<aside style="width: 248px; flex-shrink: 0; background: #1c1c1c; border-right: 1px solid #2e2e2e; padding: 22px 12px 16px; box-sizing: border-box; display: flex; flex-direction: column; gap: 4px">
+<div style="display: flex; align-items: center; gap: 10px; padding: 0 8px 18px">
+<span style="width: 36px; height: 36px; border-radius: 10px; background: #03a9f4; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0b1d27" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.7l5.7 5.7a8 8 0 1 1-11.3 0z"></path></svg></span>
+<span style="display: flex; flex-direction: column"><b style="font-size: 16px; font-weight: 600">Crop Steering</b><span style="font-size: 12px; color: #a4a4a4">Irrigation control</span></span>
+</div>
+<nav aria-label="Main navigation" style="display: flex; flex-direction: column; gap: 1px">
+<a href="S1-AllRooms.dc.html" style="display: flex; align-items: center; gap: 12px; min-height: 38px; padding: 0 12px; border-radius: 8px; color: #e1e1e1; font-weight: 600; font-size: 15px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>Status</a>
+<button type="button" aria-expanded="false" style="display: flex; align-items: center; gap: 12px; min-height: 38px; padding: 0 12px; border: 0; border-radius: 8px; background: transparent; color: #b8b8b8; font: inherit; font-size: 15px; font-weight: 500; text-align: left; cursor: pointer"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.7l5.7 5.7a8 8 0 1 1-11.3 0z"></path></svg>Irrigation<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="margin-left: auto"><polyline points="9 6 15 12 9 18"></polyline></svg></button>
+<button type="button" aria-expanded="false" style="display: flex; align-items: center; gap: 12px; min-height: 38px; padding: 0 12px; border: 0; border-radius: 8px; background: transparent; color: #b8b8b8; font: inherit; font-size: 15px; font-weight: 500; text-align: left; cursor: pointer"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><polyline points="12 7 12 12 15 14"></polyline></svg>History<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="margin-left: auto"><polyline points="9 6 15 12 9 18"></polyline></svg></button>
+<button type="button" aria-expanded="false" style="display: flex; align-items: center; gap: 12px; min-height: 38px; padding: 0 12px; border: 0; border-radius: 8px; background: transparent; color: #b8b8b8; font: inherit; font-size: 15px; font-weight: 500; text-align: left; cursor: pointer"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"></path></svg>Equipment<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="margin-left: auto"><polyline points="9 6 15 12 9 18"></polyline></svg></button>
+<button type="button" aria-expanded="false" style="display: flex; align-items: center; gap: 12px; min-height: 38px; padding: 0 12px; margin-top: 10px; border: 0; border-radius: 8px; background: transparent; color: #b8b8b8; font: inherit; font-size: 15px; font-weight: 500; text-align: left; cursor: pointer"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="4" y1="7" x2="20" y2="7"></line><line x1="4" y1="17" x2="20" y2="17"></line><circle cx="9" cy="7" r="2.5"></circle><circle cx="15" cy="17" r="2.5"></circle></svg>Settings<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="margin-left: auto"><polyline points="9 6 15 12 9 18"></polyline></svg></button>
+</nav>
+<nav aria-label="Rooms" style="display: flex; flex-direction: column; gap: 1px; margin-top: 16px">
+<span style="padding: 0 12px 6px; font-size: 12px; font-weight: 600; letter-spacing: .06em; color: #a4a4a4">ROOMS</span>
+<sc-for list="{{tree}}" as="r" hint-placeholder-count="3">
+<a href="S2-Room.dc.html" style="display: flex; align-items: center; gap: 8px; min-height: 36px; padding: 0 10px; margin-top: 6px; border-radius: 8px; color: #e1e1e1; font-size: 14px; font-weight: 500"><span style="width: 8px; height: 8px; border-radius: 4px; background: {{r.dot}}"></span>{{r.name}}<span style="margin-left: auto; font-size: 12px; color: #a4a4a4; font-weight: 400">{{r.state}}</span></a>
+<sc-for list="{{r.zones}}" as="z" hint-placeholder-count="3">
+<a href="S3-Zone.dc.html" aria-current="{{z.current}}" style="display: flex; align-items: center; gap: 8px; min-height: 30px; padding: 0 10px 0 24px; border-radius: 8px; background: {{z.bg}}; color: {{z.ink}}; font-size: 13px"><span style="min-width: 22px; padding: 0 4px; border-radius: 4px; background: {{z.phColor}}; color: #fff; font-size: 11px; font-weight: 700; text-align: center">{{z.ph}}</span>{{z.name}}<span style="margin-left: auto; font-size: 12px; color: #a4a4a4">{{z.vwc}}</span></a>
+</sc-for>
+</sc-for>
+</nav>
+<div style="margin-top: auto; padding: 0 8px; font-size: 12px; color: #8a8a8a">Integration 3.17.1 · Controller 3.17.1</div>
+</aside>
+
+<div style="flex: 1; min-width: 0; display: flex; flex-direction: column">
+<!-- SHELL: top bar (no room chips on desktop: the tree is the picker) -->
+<header style="height: 56px; flex-shrink: 0; border-bottom: 1px solid #2e2e2e; display: flex; align-items: center; justify-content: flex-end; gap: 12px; padding: 0 24px">
+<span style="font-size: 13px; color: #a4a4a4">Updated 12 s ago</span>
+<span style="display: flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border: 1px solid #2e2e2e; border-radius: 15px; font-size: 13px; font-weight: 600"><span style="width: 7px; height: 7px; border-radius: 4px; background: #81c995"></span>AI acting</span>
+<button type="button" aria-label="Search, Ctrl K" style="display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 12px; border: 1px solid #2e2e2e; border-radius: 8px; background: #1c1c1c; color: #a4a4a4; font: inherit; font-size: 13px">Jump to… <span style="border: 1px solid #3a3a3a; border-radius: 4px; padding: 0 5px; font-size: 11px">Ctrl K</span></button>
+<span style="font-size: 13px; color: #a4a4a4">F2</span>
+<button type="button" style="display: flex; align-items: center; gap: 7px; height: 34px; padding: 0 14px; border: 1px solid #2e2e2e; border-radius: 8px; background: #1c1c1c; color: #e1e1e1; font: inherit; font-size: 14px; font-weight: 600"><span style="width: 8px; height: 8px; border-radius: 4px; background: #81c995"></span>Watering on</button>
+<button type="button" style="height: 34px; padding: 0 14px; border: 1px solid #f28b82; border-radius: 8px; background: transparent; color: #f28b82; font: inherit; font-size: 14px; font-weight: 600">Stop all</button>
+</header>
+
+<main style="flex: 1; min-height: 0; overflow: hidden; padding: 20px 28px; display: grid; grid-template-columns: minmax(0, 1fr) 356px; grid-template-rows: auto 1fr; gap: 16px 20px">
+
+<!-- Title with phase + mode chips (once) -->
+<div style="grid-column: 1 / 3; display: flex; align-items: center; gap: 12px">
+<a href="S2-Room.dc.html" style="font-size: 15px; color: #a4a4a4">F2</a><span style="color: #8a8a8a">/</span>
+<h1 style="margin: 0; font-size: 24px; font-weight: 600">Zone 2</h1>
+<span style="padding: 2px 8px; border-radius: 4px; background: #6450b0; color: #fff; font-size: 13px; font-weight: 700">P2 Maintenance</span>
+<span style="display: flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px; border: 1px solid #3a3a3a; border-radius: 13px; font-size: 13px; font-weight: 600"><span style="width: 8px; height: 8px; border-radius: 4px; background: #81c995"></span>Automated</span>
+<span style="margin-left: auto; font-size: 14px; color: #a4a4a4">Day 38 of 63 · 40 plants · 1 sensor · <b style="color: #e1e1e1; font-weight: 600">7.9 L</b> today (198 mL per plant)</span>
+</div>
+
+<!-- Left: day charts -->
+<div style="display: flex; flex-direction: column; gap: 14px; min-width: 0">
+<section aria-label="VWC today" style="background: #1c1c1c; border: 1px solid #2e2e2e; border-radius: 12px; padding: 14px 16px 10px">
+<div style="display: flex; align-items: center; gap: 14px; margin-bottom: 6px">
+<b style="font-size: 17px; font-weight: 600">Today · VWC</b>
+<span style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: #a4a4a4"><svg width="12" height="12" aria-hidden="true"><circle cx="6" cy="6" r="4.5" fill="#03a9f4" stroke="#fff" stroke-width="1.5"></circle></svg>Shot</span>
+<span style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: #a4a4a4"><svg width="22" height="10" aria-hidden="true"><line x1="0" y1="5" x2="22" y2="5" stroke="#e1e1e1" stroke-width="2" stroke-dasharray="4 3"></line></svg>Expected</span>
+<span role="group" aria-label="Compare with" style="margin-left: auto; display: flex; align-items: center; gap: 0; font-size: 13px">
+<span style="color: #a4a4a4; margin-right: 8px">Compare with</span>
+<sc-for list="{{cmpOpts}}" as="o" hint-placeholder-count="3"><button type="button" aria-pressed="{{o.pressed}}" onClick="{{o.onClick}}" style="height: 30px; padding: 0 12px; border: 1px solid #3a3a3a; margin-left: -1px; background: {{o.bg}}; color: {{o.ink}}; font: inherit; font-size: 13px; font-weight: 600">{{o.label}}</button></sc-for>
+</span>
+</div>
+<svg width="724" height="300" viewBox="0 0 724 300" role="img" aria-label="VWC today with target band per phase, shots, now 59.4 percent">
+<rect x="{{nightA.x}}" y="14" width="{{nightA.w}}" height="236" fill="#0d0d0d"></rect>
+<rect x="{{nightB.x}}" y="14" width="{{nightB.w}}" height="236" fill="#0d0d0d"></rect>
+<sc-for list="{{bands}}" as="b" hint-placeholder-count="5">
+<rect x="{{b.x}}" y="{{b.y}}" width="{{b.w}}" height="{{b.h}}" fill="{{b.fill}}" fill-opacity="{{b.op}}"></rect>
+<line x1="{{b.x}}" x2="{{b.x}}" y1="14" y2="250" stroke="#2e2e2e" stroke-width="1"></line>
+<text x="{{b.cx}}" y="10" text-anchor="middle" font-size="11" font-weight="700" fill="#b8b8b8" font-family="Roboto, Arial">{{b.ph}}</text>
+</sc-for>
+<sc-for list="{{yTicks}}" as="t" hint-placeholder-count="4">
+<line x1="36" x2="716" y1="{{t.y}}" y2="{{t.y}}" stroke="#2a2a2a" stroke-width="1"></line>
+<text x="30" y="{{t.ty}}" text-anchor="end" font-size="11" fill="#8a8a8a" font-family="Roboto, Arial">{{t.label}}</text>
+</sc-for>
+<sc-if value="{{hasCmp}}" hint-placeholder-val="{{false}}"><polyline points="{{cmpPts}}" fill="none" stroke="#ffb74d" stroke-width="1.5" stroke-opacity="0.85"></polyline></sc-if>
+<polyline points="{{projPts}}" fill="none" stroke="#e1e1e1" stroke-width="2" stroke-dasharray="5 4" stroke-opacity="0.7"></polyline>
+<polyline points="{{vwcPts}}" fill="none" stroke="#e1e1e1" stroke-width="2.5" stroke-linejoin="round"></polyline>
+<line x1="36" x2="716" y1="{{thrY}}" y2="{{thrY}}" stroke="#4fc3f7" stroke-width="1" stroke-dasharray="2 3"></line>
+<text x="712" y="{{thrTy}}" text-anchor="end" font-size="11" fill="#4fc3f7" font-family="Roboto, Arial">shot below 58%</text>
+<sc-for list="{{shots}}" as="s" hint-placeholder-count="6"><circle cx="{{s.x}}" cy="{{s.y}}" r="5" fill="#03a9f4" stroke="#fff" stroke-width="1.5"></circle></sc-for>
+<line x1="{{nowX}}" x2="{{nowX}}" y1="14" y2="250" stroke="#e1e1e1" stroke-width="1.5"></line>
+<circle cx="{{nowX}}" cy="{{nowY}}" r="5" fill="#e1e1e1"></circle>
+<text x="{{nowTx}}" y="{{nowTy}}" font-size="13" font-weight="700" fill="#e1e1e1" font-family="Roboto, Arial">59.4%</text>
+<sc-for list="{{xTicks}}" as="t" hint-placeholder-count="5"><text x="{{t.x}}" y="268" text-anchor="middle" font-size="11" fill="#8a8a8a" font-family="Roboto, Arial">{{t.label}}</text></sc-for>
+<text x="{{nowX}}" y="268" text-anchor="middle" font-size="11" font-weight="700" fill="#e1e1e1" font-family="Roboto, Arial">now 14:10</text>
+<text x="36" y="290" font-size="11" fill="#8a8a8a" font-family="Roboto, Arial">Shaded: target band for each phase · dark: lights off (18:00 – 06:00)</text>
+<sc-if value="{{hasCmp}}" hint-placeholder-val="{{false}}"><line x1="560" x2="582" y1="286" y2="286" stroke="#ffb74d" stroke-width="2"></line><text x="716" y="290" text-anchor="end" font-size="11" fill="#ffb74d" font-family="Roboto, Arial">{{cmpLabel}}</text></sc-if>
+</svg>
+</section>
+
+<!-- Pore EC chart with its problem in place -->
+<section aria-label="Pore EC today" style="background: #1c1c1c; border: 1px solid #ffca5b; border-radius: 12px; padding: 14px 16px 14px; display: flex; flex-direction: column; gap: 8px">
+<div style="display: flex; align-items: center; gap: 12px">
+<b style="font-size: 17px; font-weight: 600">Today · Pore EC</b>
+<span style="font-size: 12px; color: #a4a4a4">target 4.5 – 6.0</span>
+<span style="margin-left: auto; font-size: 15px; color: #ffca5b; font-weight: 700">6.6 ▲</span>
+</div>
+<svg width="724" height="122" viewBox="0 0 724 122" role="img" aria-label="Pore EC today, over band since 12:24">
+<rect x="{{nightA.x}}" y="6" width="{{nightA.w}}" height="96" fill="#0d0d0d"></rect>
+<rect x="{{nightB.x}}" y="6" width="{{nightB.w}}" height="96" fill="#0d0d0d"></rect>
+<rect x="36" y="{{ecBand.y}}" width="680" height="{{ecBand.h}}" fill="rgba(129,201,149,.22)"></rect>
+<sc-for list="{{ecTicks}}" as="t" hint-placeholder-count="3"><text x="30" y="{{t.ty}}" text-anchor="end" font-size="11" fill="#8a8a8a" font-family="Roboto, Arial">{{t.label}}</text></sc-for>
+<polyline points="{{ecOkPts}}" fill="none" stroke="#e1e1e1" stroke-width="2.5" stroke-linejoin="round"></polyline>
+<polyline points="{{ecHiPts}}" fill="none" stroke="#ffca5b" stroke-width="2.5" stroke-linejoin="round"></polyline>
+<polyline points="{{ecProjPts}}" fill="none" stroke="{{ecProjInk}}" stroke-width="2" stroke-dasharray="5 4"></polyline>
+<line x1="{{nowX}}" x2="{{nowX}}" y1="6" y2="102" stroke="#e1e1e1" stroke-width="1.5"></line>
+<sc-for list="{{xTicks}}" as="t" hint-placeholder-count="5"><text x="{{t.x}}" y="118" text-anchor="middle" font-size="11" fill="#8a8a8a" font-family="Roboto, Arial">{{t.label}}</text></sc-for>
+</svg>
+<sc-if value="{{fixOpen}}" hint-placeholder-val="{{true}}">
+<div style="display: flex; align-items: center; gap: 16px; padding: 12px 14px; border-radius: 10px; background: rgba(255,202,91,.10)">
+<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#ffca5b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: none"><path d="M12 3 2 20h20z"></path><line x1="12" y1="10" x2="12" y2="14"></line><line x1="12" y1="17" x2="12" y2="17.01"></line></svg>
+<span style="display: flex; flex-direction: column; gap: 3px; font-size: 14px; line-height: 1.4; min-width: 0">
+<b style="font-weight: 600">Pore EC 6.6 is over the 4.5–6.0 band since 12:24 and rising about 0.3 per shot.</b>
+<span style="color: #b8b8b8">AI assistant suggests: <b style="color: #e1e1e1">Dilute next 2 shots (EC 1.6)</b> instead of the 2.4 feed. Dashed line shows the expected result: back to about 5.8 by lights-off.</span>
+</span>
+<button type="button" onClick="{{applyFix}}" style="flex: none; height: 40px; padding: 0 16px; border: 0; border-radius: 8px; background: #03a9f4; color: #0b1d27; font: inherit; font-size: 14px; font-weight: 700">Apply</button>
+<button type="button" onClick="{{dismissFix}}" style="flex: none; height: 40px; padding: 0 16px; border: 1px solid #3a3a3a; border-radius: 8px; background: transparent; color: #e1e1e1; font: inherit; font-size: 14px; font-weight: 600">Dismiss</button>
+</div>
+</sc-if>
+<sc-if value="{{fixDone}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-radius: 10px; background: #232323; font-size: 14px">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="{{fixIconInk}}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="4 12 10 18 20 6"></polyline></svg>
+<span>{{fixMsg}}</span>
+<button type="button" onClick="{{undoFix}}" style="margin-left: auto; height: 34px; padding: 0 14px; border: 1px solid #3a3a3a; border-radius: 8px; background: transparent; color: #4fc3f7; font: inherit; font-size: 14px; font-weight: 600">Undo</button>
+</div>
+</sc-if>
+</section>
+</div>
+
+<!-- Right column: slab, gauges, why/next, shot log -->
+<div style="display: flex; flex-direction: column; gap: 14px; min-width: 0">
+<section aria-label="Slab and gauges" style="background: #1c1c1c; border: 1px solid #2e2e2e; border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 12px">
+<div style="display: flex; gap: 14px; align-items: center">
+<svg width="120" height="100" viewBox="0 0 100 100" aria-hidden="true" style="flex: none"><path d="M50 30 V14" stroke="#4c8c3a" stroke-width="2.5" stroke-linecap="round" fill="none"></path><path d="M50 18 C40 10 36 12 34 6 C42 6 48 10 50 18 Z" fill="#64a548"></path><path d="M50 15 C58 7 63 8 66 3 C58 3 52 7 50 15 Z" fill="#64a548"></path><rect x="31" y="22" width="38" height="16" rx="2" fill="#e8dfc8" stroke="#b5a684" stroke-width="1.5"></rect><rect x="4" y="36" width="92" height="56" rx="5" fill="#efe7d2"></rect><rect x="4" y="50.4" width="92" height="41.6" fill="#2f86c4" fill-opacity="0.6"></rect><rect x="4" y="36" width="92" height="56" rx="5" fill="none" stroke="#b5a684" stroke-width="2"></rect><line x1="4" x2="96" y1="47.3" y2="47.3" stroke="#1b4f72" stroke-width="1.5" stroke-dasharray="4 3"></line><circle cx="50" cy="60" r="6" fill="#81c995" stroke="#fff" stroke-width="1.5"></circle></svg>
+<span style="display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: #a4a4a4; line-height: 1.4">
+<span>Water line: now. Dashed line: today's peak 63.8% at 08:47.</span>
+<span style="display: flex; align-items: center; gap: 6px"><span style="width: 8px; height: 8px; border-radius: 4px; background: #81c995"></span>Sensor Z2-A healthy, 9 s ago</span>
+</span>
+</div>
+<div style="display: grid; grid-template-columns: 96px minmax(0, 1fr) 50px; gap: 10px; align-items: center; font-size: 13px">
+<sc-for list="{{gauges}}" as="g" hint-placeholder-count="4">
+<span style="color: #a4a4a4">{{g.label}}<span style="display: block; font-size: 11px; color: #8a8a8a">{{g.band}}</span></span>
+<span style="position: relative; height: 8px; border-radius: 4px; background: #333333"><span style="position: absolute; left: {{g.bandL}}; width: {{g.bandW}}; top: 0; bottom: 0; background: rgba(129,201,149,.45); border-radius: 4px"></span><span style="position: absolute; left: {{g.pos}}; top: -5px; bottom: -5px; width: 3px; background: {{g.ink}}; border-radius: 2px"></span></span>
+<b style="text-align: right; font-size: 15px; font-weight: 600; color: {{g.ink}}">{{g.val}}</b>
+</sc-for>
+</div>
+</section>
+
+<section aria-label="Why and next action" style="background: #1c1c1c; border: 1px solid #2e2e2e; border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; font-size: 14px; line-height: 1.45">
+<span style="font-size: 12px; font-weight: 600; letter-spacing: .06em; color: #a4a4a4">WHY / NEXT ACTION</span>
+<span><b style="font-weight: 600">Now:</b> holding VWC in the 58–64% band until 16:00 (P2 maintenance).</span>
+<span style="padding: 8px 10px; border-left: 3px solid #03a9f4; background: #151515; border-radius: 0 6px 6px 0"><b style="font-weight: 600">Next:</b> maintenance shot when VWC falls under 58% (now 59.4%). Expected about 14:55, 33 mL per plant{{nextNote}}.</span>
+<span style="color: #b8b8b8"><b style="color: #e1e1e1; font-weight: 600">Then:</b> P3 dryback from 16:00, no shots after 15:30, aim 52–56% at lights-on.</span>
+</section>
+
+<section aria-label="Shot log" style="flex: 1; min-height: 0; background: #1c1c1c; border: 1px solid #2e2e2e; border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px">
+<div style="display: flex; align-items: baseline"><span style="font-size: 12px; font-weight: 600; letter-spacing: .06em; color: #a4a4a4">SHOT LOG · TODAY</span><a href="H1-Explorer.dc.html" style="margin-left: auto; font-size: 13px">History →</a></div>
+<sc-for list="{{log}}" as="l" hint-placeholder-count="6">
+<div style="display: grid; grid-template-columns: 44px 30px 1fr auto; gap: 8px; align-items: center; min-height: 30px; border-top: 1px solid #262626; font-size: 13px">
+<b style="font-weight: 600">{{l.t}}</b>
+<span style="padding: 0 4px; border-radius: 4px; background: {{l.phColor}}; color: #fff; font-size: 11px; font-weight: 700; text-align: center">{{l.ph}}</span>
+<span style="color: #a4a4a4">{{l.size}}</span>
+<span>{{l.delta}}</span>
+</div>
+</sc-for>
+</section>
+</div>
+</main>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1000}}'>
+var PH = { P0: '#6b7580', P1: '#2f6fb5', P2: '#6450b0', P3: '#34405a' };
+function tz(name, ph, vwc, cur) { return { name: name, ph: ph, phColor: PH[ph], vwc: vwc + '%', current: cur ? 'page' : 'false', bg: cur ? '#2a2a2a' : 'transparent', ink: cur ? '#4fc3f7' : '#b8b8b8' }; }
+var TREE = [
+  { name: 'F2', dot: '#03a9f4', state: 'Watering', zones: [tz('Zone 1', 'P2', 59.8), tz('Zone 2', 'P2', 59.4, true), tz('Zone 3', 'P2', 60.2)] },
+  { name: 'F1', dot: '#81c995', state: 'Holding', zones: [tz('Zone 1', 'P1', 63.8), tz('Zone 2', 'P1', 62.9), tz('Zone 3', 'P1', 64.4)] }
+];
+var X0 = 36, X1 = 716, NOW = 14 + 10 / 60;
+function xs(h) { return +(X0 + h / 24 * (X1 - X0)).toFixed(1); }
+function yv(v) { return +(250 - (v - 48) / 20 * 236).toFixed(1); }
+function ye(v) { return +(102 - (v - 3) / 5 * 96).toFixed(1); }
+function pts(arr, fy) { return arr.map(function (p) { return xs(p[0]) + ',' + fy(p[1]); }).join(' '); }
+var VWC = [[0, 61.0], [3, 57.6], [6, 54.6], [7.25, 53.4], [7.27, 56.6], [7.75, 55.9], [7.77, 59.0], [8.25, 58.4], [8.27, 61.4], [8.75, 60.9], [8.78, 63.8], [9.5, 62.7], [11.33, 58.0], [11.35, 60.9], [13.08, 58.0], [13.1, 60.8], [NOW, 59.4]];
+var PROJ = [[NOW, 59.4], [14.92, 58.0], [14.94, 60.8], [16, 59.4], [18, 57.4], [24, 53.6]];
+var SHOTS = [7.25, 7.75, 8.25, 8.75, 11.33, 13.08];
+var CMP = {
+  yday: { label: 'Yesterday (day 37)', pts: [[0, 60.2], [6, 53.9], [7.3, 52.8], [7.32, 56.0], [7.8, 55.3], [7.82, 58.4], [8.3, 57.8], [8.32, 60.9], [9.6, 61.8], [11.6, 57.9], [11.62, 60.6], [13.5, 57.9], [13.52, 60.5], [15.4, 58.0], [15.42, 60.4], [18, 58.1], [24, 54.0]] },
+  run: { label: 'Run 14, day 38', pts: [[0, 62.3], [6, 56.1], [7.0, 55.2], [7.02, 58.4], [7.6, 57.6], [7.62, 60.9], [8.2, 60.2], [8.22, 63.6], [10.4, 59.8], [12.3, 58.0], [12.32, 61.0], [14.6, 58.1], [14.62, 60.9], [18, 58.6], [24, 55.4]] }
+};
+var BANDS = [[0, 6, 'P3', 52, 60], [6, 7.25, 'P0', 52, 58], [7.25, 8.8, 'P1', 58, 66], [8.8, 16, 'P2', 58, 64], [16, 24, 'P3', 50, 60]];
+var EC = [[0, 5.6], [6, 5.8], [7.25, 5.9], [8.75, 5.4], [11.33, 5.8], [12.4, 6.0]];
+var ECHI = [[12.4, 6.0], [13.08, 6.3], [NOW, 6.6]];
+function pct(v, lo, hi) { return Math.max(1, Math.min(98, (v - lo) / (hi - lo) * 100)).toFixed(1) + '%'; }
+function gauge(label, band, v, lo, hi, bLo, bHi, unit, warn) {
+  return { label: label, band: band, val: v + unit, pos: pct(v, lo, hi), bandL: pct(bLo, lo, hi), bandW: ((bHi - bLo) / (hi - lo) * 100).toFixed(1) + '%', ink: warn ? '#ffca5b' : '#e1e1e1' };
+}
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { cmp: 'yday', fix: 'open' }; }
+  renderVals() {
+    var self = this, st = this.state;
+    var cmpOpts = [['off', 'Off'], ['yday', 'Yesterday'], ['run', 'Last run, day 38']].map(function (o) {
+      var on = st.cmp === o[0];
+      return { label: o[1], pressed: on ? 'true' : 'false', bg: on ? '#2a3a44' : '#151515', ink: on ? '#4fc3f7' : '#b8b8b8', onClick: function () { self.setState({ cmp: o[0] }); } };
+    });
+    var cmp = CMP[st.cmp];
+    var bands = BANDS.map(function (b) {
+      return { x: xs(b[0]), w: +(xs(b[1]) - xs(b[0])).toFixed(1), cx: +((xs(b[0]) + xs(b[1])) / 2).toFixed(1), ph: b[2], y: yv(b[4]), h: +(yv(b[3]) - yv(b[4])).toFixed(1), fill: PH[b[2]], op: b[0] >= NOW || b[1] > NOW && b[2] === 'P3' ? 0.28 : 0.45 };
+    });
+    var yTicks = [50, 55, 60, 65].map(function (v) { return { y: yv(v), ty: yv(v) + 4, label: v + '%' }; });
+    var xTicks = [0, 6, 12, 18, 24].map(function (h) { return { x: xs(h), label: (h < 10 ? '0' : '') + h + ':00' }; });
+    var shots = SHOTS.map(function (h) { var p = VWC.filter(function (q) { return q[0] >= h; })[0]; return { x: xs(h), y: yv(p[1]) }; });
+    var applied = st.fix === 'applied';
+    var ecProj = applied ? [[NOW, 6.6], [14.92, 6.2], [15.5, 5.9], [18, 5.8]] : [[NOW, 6.6], [14.92, 6.9], [15.5, 7.1], [18, 7.2]];
+    var gauges = [
+      gauge('VWC', 'P2 band 58–64%', 59.4, 45, 70, 58, 64, '%'),
+      gauge('Dryback', 'since peak, 3–6%', 4.4, 0, 10, 3, 6, '%'),
+      gauge('Pore EC', 'band 4.5–6.0', 6.6, 3, 8, 4.5, 6.0, '', true),
+      gauge('Root temp', 'band 20–23°', 21.8, 16, 28, 20, 23, '°')
+    ];
+    var log = [
+      ['13:05', 'P2', '33 mL · 52 s', '58.0 → 60.8%'], ['11:20', 'P2', '33 mL · 52 s', '58.0 → 60.9%'], ['08:47', 'P1', '33 mL · 52 s', '60.9 → 63.8%'],
+      ['08:15', 'P1', '33 mL · 52 s', '58.4 → 61.4%'], ['07:45', 'P1', '33 mL · 52 s', '55.9 → 59.0%'], ['07:15', 'P1', '33 mL · 52 s', '53.4 → 56.6%']
+    ].map(function (r) { return { t: r[0], ph: r[1], phColor: PH[r[1]], size: r[2], delta: r[3] }; });
+    var thr = yv(58);
+    return {
+      tree: TREE, cmpOpts: cmpOpts, hasCmp: !!cmp, cmpLabel: cmp ? cmp.label : '', cmpPts: cmp ? pts(cmp.pts, yv) : '',
+      nightA: { x: xs(0), w: xs(6) - xs(0) }, nightB: { x: xs(18), w: xs(24) - xs(18) },
+      bands: bands, yTicks: yTicks, xTicks: xTicks, shots: shots,
+      vwcPts: pts(VWC, yv), projPts: pts(PROJ, yv), thrY: thr, thrTy: thr - 4,
+      nowX: xs(NOW), nowY: yv(59.4), nowTx: xs(NOW) + 8, nowTy: yv(59.4) - 8,
+      ecBand: { y: ye(6.0), h: +(ye(4.5) - ye(6.0)).toFixed(1) },
+      ecTicks: [4, 6, 8].map(function (v) { return { ty: ye(v) + 4, label: v.toFixed(1) }; }),
+      ecOkPts: pts(EC, ye), ecHiPts: pts(ECHI, ye), ecProjPts: pts(ecProj, ye), ecProjInk: applied ? '#81c995' : '#ffca5b',
+      gauges: gauges, log: log,
+      fixOpen: st.fix === 'open', fixDone: st.fix !== 'open',
+      fixMsg: applied ? 'Dilution set: next 2 shots at EC 1.6. Written and read back 14:12.' : 'Suggestion dismissed. Pore EC stays flagged until it is back in band.',
+      fixIconInk: applied ? '#81c995' : '#a4a4a4',
+      nextNote: applied ? ', diluted to EC 1.6' : '',
+      applyFix: function () { self.setState({ fix: 'applied' }); },
+      dismissFix: function () { self.setState({ fix: 'dismissed' }); },
+      undoFix: function () { self.setState({ fix: 'open' }); }
+    };
+  }
+}
+</script>
+</body>
+</html>
