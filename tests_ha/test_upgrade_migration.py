@@ -129,6 +129,9 @@ async def test_a_3_17_0_room_gets_an_upgrade_report_with_what_came_across_and_wh
         assert row["page"].startswith("#/") and row["doc"].startswith("docs/UPGRADING.md#"), row
     supply = next(r for r in report["needs_you"] if r["id"] == "supply.pumps")
     assert "switch.irrigation_pump" in supply["detail"] and "switch.irrigation_main_line" in supply["detail"]
+    assert "Enter the supply's maximum flow" in supply["detail"]
+    feed = next(r for r in report["needs_you"] if r["id"] == "feed.ec_fallback")
+    assert feed["detail"].startswith("No feed EC probe in Setup")
     mode = next(r for r in report["carried"] if r["id"] == "irrigation.mode")
     assert mode["detail"] == "Every zone waters by Steering, as before (2 zones)."
     issue = ir.async_get(hass).async_get_issue(DOMAIN, "upgrade_report_3_18_flower_room")

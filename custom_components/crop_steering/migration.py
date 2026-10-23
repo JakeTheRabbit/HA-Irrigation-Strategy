@@ -253,8 +253,8 @@ async def step_supply(hass, entry, room) -> list[dict]:
             "supply.pumps",
             "Irrigation supply",
             "needs_you",
-            f"We found {found}. Enter its maximum flow, how many zones it may feed at once and any "
-            "flow meter, then Save. Until you save, watering works as before.",
+            f"We found {found}. Enter the supply's maximum flow, how many zones it may feed at once "
+            "and any flow meter, then Save. Until you save, watering works as before.",
             "#/equipment/setup",
             "supply",
         )
@@ -605,13 +605,22 @@ async def step_dosing_pumps(hass, entry, room) -> list[dict]:
     for pump in manager.data["pumps"]:
         if pump.get("ph_role") or pump.get("solution_type"):
             continue
+        name = pump.get("name") or pump.get("id")
+        # Its flow sensor wins over a calibrated mL/min: a calibration sizes nothing for such a pump.
+        detail = (
+            f"Pump {name}: pick its solution. It doses from its flow sensor "
+            f"{pump['flow_entity']}, as before (a pump calibration only sizes the doses of a "
+            "pump without one)."
+            if pump.get("flow_entity")
+            else f"Pump {name}: pick its solution and run a pump calibration so its doses are "
+            "sized from a measured mL/min. Until then it doses as before."
+        )
         out.append(
             row(
                 f"dosing.pump.{pump.get('id')}",
-                f"Dosing pump {pump.get('name') or pump.get('id')}",
+                f"Dosing pump {name}",
                 "needs_you",
-                f"Pump {pump.get('name') or pump.get('id')}: pick its solution and run a pump "
-                "calibration. It still doses from its flow sensor until then.",
+                detail,
                 "#/equipment/dosing",
                 "dosing-pumps",
             )
@@ -654,8 +663,9 @@ async def step_feed_ec_fallback(hass, entry, room) -> list[dict]:
             "feed.ec_fallback",
             "Feed EC",
             "needs_you",
-            "No feed EC probe: the old 3.0 mS/cm assumption is kept so flushing works as before. Map "
-            "a feed EC probe or set a recipe feed EC.",
+            "No feed EC probe in Setup: the old 3.0 mS/cm assumption is kept so flushing works as "
+            "before. Map a feed EC probe in Setup or set a recipe feed EC. A probe mapped only in "
+            "the controller app's options is used by the controller, which then ignores the 3.0.",
             "#/equipment/dosing",
             "feed-ec-fallback",
         )

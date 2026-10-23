@@ -97,8 +97,12 @@ assistant can explain it but cannot run it.
 
 *Report rows `dosing.ph_pumps`, `dosing.pump.<id>`.* The dosing setup was not changed. A pH up/down pump
 keeps its pH role. Each other pump is listed: pick its solution (nutrient or additive) in Crop Steering →
-Equipment → Feed & dosing, and run a pump calibration (Equipment → Pump calibration, `pump_calibrate`, then `pump_calibration_commit`) so doses are
-sized from a measured mL/min. Until then the pump doses from its flow sensor, as before.
+Equipment → Feed & dosing.
+
+- A pump with a flow sensor (`flow_entity`) doses from that sensor, as before. Its flow sensor always wins
+  over a calibrated mL/min, so a pump calibration changes nothing for it.
+- A pump without one: run a pump calibration (Equipment → Pump calibration, `pump_calibrate`, then
+  `pump_calibration_commit`) so its doses are sized from a measured mL/min. Until then it doses as before.
 
 ## Feed EC fallback
 
@@ -109,6 +113,17 @@ says so (CS-907). It stops by itself when either of these is done:
 
 - map a feed EC probe (Crop Steering → Equipment → Setup: pumps & valves, `hardware.feed_ec_sensor`), or
 - set the EC of the feed recipe in use (Crop Steering → Equipment → Feed & dosing).
+
+The report checks the probe mapped in Setup. A feed EC probe mapped only in the controller app's options is
+used by the controller, which then ignores the kept 3.0: map it in Setup too and this line goes away.
+
+The CS-907 notification is sent (not quiet) once each time the controller starts, for every room on the
+kept 3.0, until one of the above is done.
+
+**A change for rooms that do have a feed EC probe.** When the probe is offline for longer than the feed
+grace period, 3.17.0 assumed 3.0 mS/cm; 3.18 treats the feed EC as unknown (the recipe's EC if it declares
+one), so that room takes no EC flush and no hold for a high EC until the probe reads again. The kept 3.0
+is only for rooms with no probe at all.
 
 ## New panels
 

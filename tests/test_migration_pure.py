@@ -139,3 +139,25 @@ def test_a_store_that_is_not_loaded_fails_the_step_so_it_runs_again():
     hass = SimpleNamespace(data={migration.DOMAIN: {"_site": site}})
     with pytest.raises(RuntimeError):
         asyncio.run(migration.step_recipe_presets(hass, entry, {}))
+
+
+def test_a_dosing_pump_with_a_flow_sensor_is_not_sent_to_a_calibration_that_changes_nothing():
+    """A pump's flow sensor wins over its calibrated mL/min (dosing doses from the sensor), so only a
+    pump without one is told to calibrate."""
+    import asyncio
+    from types import SimpleNamespace
+
+    pumps = [
+        {"id": "a", "name": "Part A", "flow_entity": "sensor.part_a_flow"},
+        {"id": "b", "name": "Part B"},
+    ]
+    manager = SimpleNamespace(error=None, data={"pumps": pumps})
+    hass = SimpleNamespace(data={migration.DOMAIN: {"_dosing": {"e1": manager}}})
+    entry = SimpleNamespace(entry_id="e1")
+    rows = {
+        r["id"]: r["detail"]
+        for r in asyncio.run(migration.step_dosing_pumps(hass, entry, {}))
+    }
+    assert "calibration" not in rows["dosing.pump.a"].split("(")[0]
+    assert "sensor.part_a_flow" in rows["dosing.pump.a"]
+    assert "run a pump calibration" in rows["dosing.pump.b"]
