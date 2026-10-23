@@ -148,7 +148,7 @@ Every `crop_steering` service that answers (`SupportsResponse.ONLY` or `OPTIONAL
 
 With `api: 2`, a caller that asks for the answer (`return_response`) gets `{api: 2, ok: true, room_id, revision, readback: {status, at}, event_ids, data}`. `data` is the v1 answer. `readback.status` is `verified`, `refused` or `none`, and comes only from the service's own read-back. `event_ids` are the journal events the call recorded.
 
-A refusal is `{api: 2, ok: false, error: {code, message, current_revision?}}`, with `data` kept when the service answered rather than raised. The codes are:
+A refusal is `{api: 2, ok: false, error: {code, message, current_revision?}, event_ids}`, with `data` kept when the service answered rather than raised. `event_ids` are the events written before the refusal, raised or answered, so they can be undone. The codes are:
 
 - `stale_revision` (with the current revision)
 - `invalid`

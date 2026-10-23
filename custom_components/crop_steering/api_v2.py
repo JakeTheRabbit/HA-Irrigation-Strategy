@@ -287,7 +287,12 @@ def wrap(
             failed = _failure(error, events)
             if failed is None:
                 raise
-            return {"api": 2, "ok": False, "error": failed}
+            return {
+                "api": 2,
+                "ok": False,
+                "error": failed,
+                "event_ids": [event_id for event_id, _ in events],
+            }
         finally:
             EMITTED.reset(token)
         hook = refusals.get(call.service)

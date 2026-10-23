@@ -104,6 +104,7 @@ def test_stale_revision_maps_to_its_code_and_current_revision():
         "api": 2,
         "ok": False,
         "error": {"code": "stale_revision", "message": message, "current_revision": 4},
+        "event_ids": [],
     }
     # v1, and a v2 caller that does not read the answer, get the exception as before.
     for call in (_call({}), _call({"api": 2}, return_response=False)):
@@ -493,3 +494,19 @@ def test_a_source_with_no_timer_program_is_missing_not_a_refused_write():
     out = _run(wrapped(_call({"api": 2}, service="copy_config")))
     assert out["ok"] is False and out["error"]["code"] == "guard_refused"
     assert out["error"]["message"] == "Not applied: p1: out of range"
+
+
+def test_a_raised_refusal_answers_the_ids_of_the_events_written_before_it():
+    _, api_v2 = _stubs()
+    from homeassistant.exceptions import HomeAssistantError
+
+    from custom_components.crop_steering.journal_api import EMITTED
+
+    async def handler(call):
+        # One value written (and journaled) before the service raised: the UI can Undo it.
+        EMITTED.get().append(("01J0000000000000000000000B", "target.changed"))
+        raise HomeAssistantError("The second value could not be written")
+
+    out = _run(api_v2.wrap(handler)(_call({"api": 2})))
+    assert out["ok"] is False and out["error"]["code"] == "invalid"
+    assert out["event_ids"] == ["01J0000000000000000000000B"]
