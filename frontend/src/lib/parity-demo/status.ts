@@ -37,9 +37,10 @@ export function demoParityStatus(states: States, now: number): States {
           {
             event_id: demoId(now - 3 * 3_600_000, `${room_id}:alert:probe_silent`),
             ts: new Date(now - 3 * 3_600_000).toISOString(),
-            code: "CS-406",
+            code: "CS-102",
             title: "Back sensor silent 3 h, left out of the reading",
             zone: 2,
+            entity_id: "sensor.demo_room_b_z2_back_vwc",
             rule_id: null,
             acknowledged: false,
           },
@@ -58,7 +59,7 @@ export function demoParityStatus(states: States, now: number): States {
       });
   }
   // Room B's front and back sensors in each zone. Zone 2's back sensor stopped reporting 3 h ago
-  // (the open CS-406 alert): the zone reads its front sensor only.
+  // (the open CS-102 alert): the zone reads its front sensor only.
   for (const zone of [1, 2, 3]) {
     const silent = zone === 2;
     for (const kind of ["vwc", "ec"] as const) {

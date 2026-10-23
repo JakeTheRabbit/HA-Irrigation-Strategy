@@ -291,25 +291,35 @@ export interface StatusEntity {
   uptime_7d_pct: number | null;
 }
 export type ControllerState = "running" | "stale" | "absent";
+/** One heartbeat: a missed one is put in where the gap was over 2 x interval_s, with that gap. */
+export interface StatusBeat {
+  at: string;
+  missed: boolean;
+  readback_ms: number | null;
+  gap_s?: number;
+}
+export interface RoomHeartbeat {
+  last_beat: string | null;
+  age_s: number | null;
+  controller: ControllerState;
+  beats: StatusBeat[];
+  interval_s: number;
+}
 export interface SystemStatus {
   controller: ControllerState;
   addon_version: string | null;
-  ha_version: string;
-  ai: { model: string | null; calls_today: number; daily_budget: number; pct_used: number } | null;
+  /** Share of every mapped entity that is ok, unrounded; null with none mapped. */
+  pct_online: number | null;
+  ha_version: string | null;
+  ai: { model: string | null; calls_today: number | null; daily_budget: number | null; pct_used: number | null } | null;
   card_version: string | null;
   rooms: {
     room_id: string;
-    pct_online: number;
-    alerts_open: number;
-    entities: { entity_id: string; last_seen: string | null; ok: boolean }[];
+    pct_online: number | null;
+    alerts_open: number | null;
+    entities: StatusEntity[];
     groups: { kind: StatusEntity["kind"]; entities: StatusEntity[] }[];
-    heartbeat: {
-      last_beat: string | null;
-      age_s: number | null;
-      controller: ControllerState;
-      beats: { at: string; missed: boolean; readback_ms: number | null }[];
-      interval_s: number;
-    };
+    heartbeat: RoomHeartbeat;
   }[];
 }
 

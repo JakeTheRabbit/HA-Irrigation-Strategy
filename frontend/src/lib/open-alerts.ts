@@ -12,6 +12,8 @@ export interface OpenAlert {
   code: string | null;
   title: string;
   ruleId: string | null;
+  /** The entity it concerns, where the integration names one (3.18 inbox `entity_id`). */
+  entityId?: string | null;
   /** When it was raised (epoch ms); on 3.17, when the controller last reported. Null when
    * unknown: sort with `newestFirst`, which puts those last. */
   at: number | null;
@@ -33,6 +35,7 @@ interface InboxAlert {
   title?: string | null;
   zone?: number | null;
   rule_id?: string | null;
+  entity_id?: string | null;
   acknowledged?: boolean;
 }
 
@@ -54,6 +57,7 @@ export function openAlerts(controller: Controller): OpenAlert[] {
           code: alert.code ?? null,
           title: alert.title || alert.code || "Alert",
           ruleId: alert.rule_id ?? null,
+          entityId: alert.entity_id ?? null,
           at: instant(alert.ts),
         }));
     return buildRoom(states, room)
