@@ -5,8 +5,14 @@ import { demoHistoryWindow } from "./comparison-demo";
 import type { TimelineRequest } from "./day-timeline";
 import { allowedHistoryIds } from "./history-allow";
 import { setClockTimeZone } from "./clock";
+
 import type { OperatorAction } from "./operator-types";
 import { OperatorDemo } from "./operator-demo";
+import { demoJournalVwc } from "./parity-demo/journal";
+import { demoParityStatus, demoShotTable } from "./parity-demo/status";
+import { JournalMissing, mergeEvents, startEventFeed } from "./events";
+import { isParityAction, pagedQuery } from "./parity-api";
+import type { CsEvent } from "./parity-types";
 import { useEffect, useRef, useSyncExternalStore } from "react";
 import type { Change, Controller, EntityState, States, WriteResult } from "./types";
 import {
@@ -22,12 +28,14 @@ import {
   buildRoom,
   discoverRooms,
   emptyRoom,
+  numeric,
   resolveRequestedRoom,
   validateChange,
   waterLitres,
 } from "./model";
 import {
   createDemo,
+  demoBackend,
   demoBeat,
   demoClock,
   demoDay,
@@ -57,6 +65,46 @@ import {
 } from "./water-use";
 
 type Listener = () => void;
+/** v2 services that take one `room_id` (backend plan); the others are site-wide, all-rooms or
+ * keyed by a session or event id. */
+const PARITY_ROOM_DEFAULT = new Set<string>([
+  "journal_query",
+  "pump_precheck",
+  "pump_prime",
+  "pump_stop",
+  "pump_calibrate",
+  "pump_calibration_commit",
+  "calibration_start",
+  "calibration_revert",
+  "probe_offset_set",
+  "alert_ack",
+  "timer_program_set",
+  "timer_program_delete",
+  "timer_program_preview",
+  "timer_skip",
+]);
+/** v2 services whose `preview: true` dry run writes nothing (backend Tasks 11, 21, 22). No other
+ * service's `preview` key skips the write lock. */
+const PREVIEWABLE = new Set<string>(["preset_apply", "copy_config", "probe_offset_set", "supply_save"]);
+/** v2 services that change nothing: kept out of the one-write-at-a-time lock. `pump_stop` is
+ * here too: it ends a while-held prime and must never be refused behind another write. */
+const PARITY_READS = new Set<string>([
+  "journal_query",
+  "timeline_get",
+  "timeline_summary",
+  "history_changes",
+  "supply_get",
+  "timer_program_list",
+  "timer_program_preview",
+  "alert_rule_list",
+  "alert_rule_preview",
+  "pump_precheck",
+  "calibration_status",
+  "preset_list",
+  "dashboard_list",
+  "system_status_get",
+  "pump_stop",
+]);
 const SESSION_KEY = "crop-steering-connection-tab";
 /** Whether Home Assistant's signed-in user is an administrator; null when this page cannot tell
  * (a standalone tab with a token). */
@@ -92,15 +140,28 @@ export class ControllerStore {
   private operatorDemo?: OperatorDemo;
   private runDocuments = new Map<string, { generation: number; document: RunsDocument }>();
   private historyAborters = new Set<AbortController>();
-  constructor(demo = typeof window !== "undefined" && isDemoLocation(window.location)) {
+  /** The live event feed (Controller.recentEvents), over the rooms in `feedRooms`; `feedSince`
+   * keeps each room's last event time when the room set changes. */
+  private stopFeed?: () => void;
+  private feedRooms = "";
+  private feedSince = new Map<string, string>();
+  private recentEvents: readonly CsEvent[] = [];
+  constructor(
+    demo = typeof window !== "undefined" && isDemoLocation(window.location),
+    /** The page's query (tests pass their own). */
+    query: string | null = typeof window !== "undefined" ? window.location.search : null,
+  ) {
     this.demo = demo;
     this.admin = demo ? true : null;
     this.states = demo ? demoClock(createDemo()) : {};
     this.connection = demo ? "demo" : "connecting";
-    const search =
-      typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
+    const search = query === null ? null : new URLSearchParams(query);
     // ?display=show_climate,today_tank_readout (or all): those display options on in the demo.
     if (demo) this.states = demoDisplay(this.states, search?.get("display") ?? null);
+    // The 3.18 room entities (grow day, pump queue, open alerts...); an older integration has none.
+    if (demo && demoBackend(query ?? "") === "3.18") this.states = demoParityStatus(this.states, Date.now());
+    // An older integration has no Journal: its shot table instead.
+    else if (demo) this.states = demoShotTable(this.states, Date.now());
     if (demo)
       this.operatorDemo = new OperatorDemo(
         () => this.states,
@@ -118,6 +179,8 @@ export class ControllerStore {
         // ?notify-user=grower: Settings › Notifications as that phone's owner, who is not an
         // administrator.
         search?.get("notify-user") ?? null,
+        // ?backend=3.17: an integration without the parity (v2) services.
+        demoBackend(query ?? ""),
       );
     const requested = search?.get("room") ?? null;
     const rooms = discoverRooms(this.states);
@@ -162,6 +225,7 @@ export class ControllerStore {
       timeline: this.timeline,
       waterRecord: this.waterRecord,
       operator: this.operator,
+      recentEvents: this.recentEvents,
     };
     this.listeners.forEach((listener) => listener());
   }
@@ -191,6 +255,7 @@ export class ControllerStore {
       }
     }
     this.stopTimer ??= whileVisible(this.tick, 30_000);
+    this.startFeed();
     if (typeof window !== "undefined") window.addEventListener?.("pagehide", this.unsubscribe);
     return this.stop;
   };
@@ -199,6 +264,7 @@ export class ControllerStore {
     this.stopTimer = undefined;
     if (typeof window !== "undefined") window.removeEventListener?.("pagehide", this.unsubscribe);
     this.unsubscribe();
+    this.endFeed();
     clearTimeout(this.publishTimer);
     this.publishTimer = undefined;
     this.historyAborters.forEach((abort) => abort.abort());
@@ -226,6 +292,7 @@ export class ControllerStore {
       this.states = states;
       this.settle();
       if (this.live) this.subscribeLive(this.live);
+      this.startFeed();
       if (this.zoneOf !== client) void this.readTimeZone(client);
     } catch (error) {
       if (generation !== this.generation || request !== this.requestId) return;
@@ -327,6 +394,38 @@ export class ControllerStore {
         },
       );
   }
+  /** Every room's live Journal events into `recentEvents`: one feed per connection and set of
+   * rooms. A feed that stopped itself (an older integration) stays stopped until they change. */
+  private startFeed() {
+    const rooms = discoverRooms(this.states).map((room) => room.id).sort();
+    if (!rooms.length || (this.stopFeed && rooms.join() === this.feedRooms)) return;
+    this.endFeed();
+    this.feedRooms = rooms.join();
+    this.stopFeed = startEventFeed({
+      connection: this.demo ? null : this.live,
+      rooms,
+      poll: async (room_id, since) => {
+        const page = await pagedQuery(this, { room_id, since });
+        if (page.kind === "missing") throw new JournalMissing();
+        if (page.kind === "error") throw new Error(page.message);
+        return page.data.events;
+      },
+      onEvents: (events) => {
+        const ring = mergeEvents(this.recentEvents, events);
+        if (ring === this.recentEvents) return;
+        this.recentEvents = ring;
+        this.publish();
+      },
+      visible: () => typeof document === "undefined" || !document.hidden,
+      since: this.feedSince,
+      // The demo's Journal is generated up to now: show it from the start.
+      ...(this.demo ? { start: new Date(0).toISOString() } : {}),
+    });
+  }
+  private endFeed() {
+    this.stopFeed?.();
+    this.stopFeed = undefined;
+  }
   private unsubscribe = () => {
     this.liveToken++;
     this.dropLive?.();
@@ -382,6 +481,9 @@ export class ControllerStore {
     this.client?.dispose();
     this.client = client;
     this.unsubscribe();
+    this.endFeed();
+    this.recentEvents = [];
+    this.feedSince.clear();
     this.watched.clear();
     this.live = liveConnection(session);
     this.states = {};
@@ -408,6 +510,7 @@ export class ControllerStore {
     this.client?.dispose();
     this.client = null;
     this.unsubscribe();
+    this.endFeed();
     this.live = null;
     this.connection = "offline";
     this.error = "Disconnected. Displayed data is the last successful snapshot.";
@@ -437,15 +540,23 @@ export class ControllerStore {
           const reason = validateChange(this.snapshot.room, this.states, change);
           if (reason) result.failed.push({ entityId: change.entityId, reason });
           else {
+            const state =
+              typeof change.value === "boolean" ? (change.value ? "on" : "off") : String(change.value);
+            const stamp = new Date().toISOString();
+            if (typeof change.value === "number" && change.entityId.startsWith("number."))
+              this.operatorDemo?.journalTarget(
+                roomId,
+                this.snapshot.room.room.prefix,
+                change.entityId,
+                numeric(next[change.entityId]) ?? null,
+                change.value,
+              );
             next[change.entityId] = {
               ...next[change.entityId],
-              state:
-                typeof change.value === "boolean"
-                  ? change.value
-                    ? "on"
-                    : "off"
-                  : String(change.value),
-              last_updated: new Date().toISOString(),
+              state,
+              last_updated: stamp,
+              // As Home Assistant does: a new state is a change.
+              ...(next[change.entityId]?.state !== state ? { last_changed: stamp } : {}),
             };
             next = demoReact(next, change.entityId, change.value);
             result.applied.push(change.entityId);
@@ -497,9 +608,13 @@ export class ControllerStore {
   operator = async <T>(action: OperatorAction, data: Record<string, unknown> = {}): Promise<T> => {
     const generation = this.generation;
     const roomId = this.roomId;
-    // Notifications are the whole site's, never a room's.
+    const parity = isParityAction(action);
+    // Notifications are the whole site's, never a room's. A v2 service that names one room gets the
+    // selected room unless the caller names another (the live feed polls every room); site-wide and
+    // all-rooms reads (supply, presets, timeline_get's `rooms`, history_changes without a room) and
+    // session-keyed steps get none.
     const scoped =
-      action.startsWith("strategy_") ||
+      !parity && (action.startsWith("strategy_") ||
       action.startsWith("runs_") ||
       action.startsWith("setpoint_log_") ||
       action.startsWith("overlay_") ||
@@ -510,13 +625,21 @@ export class ControllerStore {
       action.startsWith("grow_days_") ||
       action.startsWith("harvests_") ||
       action.startsWith("display_") ||
-      action.startsWith("history_");
-    const payload = scoped ? { ...data, room_id: roomId } : data;
-    if (scoped && !roomId) throw new Error("Select an available room.");
+      action.startsWith("history_"));
+    const defaulted = parity && PARITY_ROOM_DEFAULT.has(action) && data.room_id === undefined;
+    const payload = scoped || defaulted ? { ...data, room_id: roomId } : data;
+    if ((scoped || defaulted) && !roomId) throw new Error("Select an available room.");
     // What's new's record and a test push change nothing a refresh would show, and must neither
-    // wait on nor hold up a change being applied.
+    // wait on nor hold up a change being applied. Nor do v2 reads and previews. Stopping a pump
+    // must never wait behind anything.
     const mutation =
       !action.startsWith("whats_new_") &&
+      !(
+        parity &&
+        (PARITY_READS.has(action) ||
+          (PREVIEWABLE.has(action) && data.preview === true) ||
+          (action === "alert_rule_test" && data.send !== true))
+      ) &&
       ![
         "strategy_get",
         "strategy_preview",
@@ -672,7 +795,8 @@ export class ControllerStore {
     const allowed = allowedHistoryIds(this.snapshot.room, this.states);
     if (entityIds.some((id) => !allowed.has(id)))
       throw new Error("History is limited to entities in the selected room.");
-    if (this.demo) return demoHistory(this.states, entityIds, hours);
+    // Zone VWC follows the demo Journal's shots, so each shot's "after" agrees with its "before".
+    if (this.demo) return demoJournalVwc(demoHistory(this.states, entityIds, hours), Date.now());
     if (!this.client || this.connection !== "live")
       throw new Error("Connect to Home Assistant to load recorded history.");
     const generation = this.generation;
@@ -696,6 +820,7 @@ export class ControllerStore {
    * over REST standalone. Live updates extend it from there (day-timeline.ts appendLive). */
   timeline = async (request: TimelineRequest) => {
     const allowed = allowedHistoryIds(this.snapshot.room, this.states);
+
     const ids = [...request.entityIds, ...request.attributeIds];
     if (!ids.length || ids.some((id) => !allowed.has(id)))
       throw new Error("History is limited to entities in the selected room.");

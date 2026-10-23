@@ -55,3 +55,10 @@ export function unreadableState(state: string | null | undefined): boolean {
 export function trimNumber(value: number, digits = 2): string {
   return String(Number(value.toFixed(digits)));
 }
+
+/** Whether an entity's state reads `want`: a finite number within half its step (the precision
+ * Home Assistant keeps), or within 1e-6 where the step is unknown. */
+export function sameValue(state: string | undefined, want: number, step?: number): boolean {
+  const value = state === undefined || state.trim() === "" ? NaN : Number(state);
+  return Number.isFinite(value) && Number.isFinite(want) && Math.abs(value - want) <= Math.max(1e-6, (step ?? 0) / 2);
+}

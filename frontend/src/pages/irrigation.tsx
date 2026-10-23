@@ -37,6 +37,7 @@ export function Irrigation({
     if (roomOnlyFeature(feature)) setView("current");
   }, [feature]);
   const [canvas, setCanvas] = useState<HTMLDivElement | null>(null);
+  const [reviewSlot, setReviewSlot] = useState<HTMLDivElement | null>(null);
   const [scheduleDirty, setScheduleDirty] = useState(false);
   const [canonicalDirty, setCanonicalDirty] = useState(false);
   useEffect(() => setView(initialView), [initialView]);
@@ -59,6 +60,11 @@ export function Irrigation({
   const currentCurve = useCallback(
     (curve: ReactNode) => (canvas && view === "current" ? createPortal(curve, canvas) : null),
     [canvas, view],
+  );
+  // Current day's Review & apply bar spans the canvas and the table.
+  const currentReview = useCallback(
+    (bar: ReactNode) => (reviewSlot && view === "current" ? createPortal(bar, reviewSlot) : null),
+    [reviewSlot, view],
   );
   const calendarCurve = useCallback(
     (curve: ReactNode) => (canvas && view === "calendar" ? createPortal(curve, canvas) : null),
@@ -141,6 +147,7 @@ export function Irrigation({
             embedded
             active={view === "current"}
             renderCurve={currentCurve}
+            renderReview={currentReview}
             onCanonicalDirtyChange={setCanonicalDirty}
           />
         </div>
@@ -156,6 +163,7 @@ export function Irrigation({
           />
         </div>
       </div>
+      <div className="irrigation-review" ref={setReviewSlot} />
     </div>
   );
 }

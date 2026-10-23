@@ -1,91 +1,64 @@
+import { NAV_TREE } from "@/lib/nav-tree";
 import { sectionOf, type Page, type Section } from "@/lib/routes";
 import "./page-tabs.css";
 
-/** The menu's five entries and the pages under each: one row of tabs above a page that has more
- * than one view. */
-export const SECTION_LABELS: Record<Section, string> = {
-  today: "Status",
-  plan: "Irrigation",
-  history: "History",
-  equipment: "Equipment",
-  settings: "Settings",
-};
-export const TABS: Partial<Record<Section, { page: Page; label: string }[]>> = {
-  today: [
-    { page: "all-zones", label: "All rooms" },
-    { page: "today", label: "Room" },
-  ],
-  plan: [
-    { page: "plan/targets", label: "Current day" },
-    { page: "plan/schedule", label: "Calendar" },
-  ],
-  history: [
-    { page: "history/timeline", label: "Timeline" },
-    { page: "history/water", label: "Water use" },
-    { page: "history/compare", label: "Compare runs" },
-    { page: "history/grows", label: "Grows" },
-    // Settings › Display › Dryback drivers: hidden while that is off.
-    { page: "history/drivers", label: "Dryback drivers" },
-  ],
-  equipment: [
-    { page: "equipment/probes", label: "Probes" },
-    { page: "equipment/stock", label: "Stock tanks" },
-    { page: "equipment/feed", label: "Tank and feed" },
-    { page: "equipment/dosing", label: "Dosing" },
-    { page: "equipment/setup", label: "Setup" },
-  ],
-  settings: [
-    { page: "settings", label: "Settings" },
-    { page: "settings/features", label: "Capabilities" },
-    { page: "settings/notifications", label: "Notifications" },
-    { page: "settings/ai", label: "AI assistant" },
-    { page: "help", label: "Help" },
-  ],
+/** The menu's five sections and the pages under each, as the tree menu lists them: on a phone, one
+ * row of tabs above a page whose section has more than one page. A wider window hides them; the
+ * tree menu shows the same pages. */
+export const SECTION_LABELS = Object.fromEntries(
+  NAV_TREE.map((group) => [group.section, group.label]),
+) as Record<Section, string>;
+export const TABS = Object.fromEntries(
+  NAV_TREE.map((group) => [group.section, group.items]),
+) as Record<Section, { page: Page; label: string }[]>;
+/** Pages reached from another page rather than the menu. */
+const OFF_MENU_LABELS: Partial<Record<Page, string>> = {
+  today: "Today",
+  zone: "Zone",
+  "today/ai": "AI assistant",
+  "history/grows": "Grows",
+  "history/drivers": "Dryback drivers",
+  "settings/features": "Capabilities",
 };
 /** A page's own name, for its tab and the window title. */
 export function pageLabel(page: Page): string {
-  if (page === "all-zones") return "All rooms";
-  if (page === "today") return "Today";
-  if (page === "zone") return "Zone";
-  if (page === "today/ai") return "AI assistant";
-  return TABS[sectionOf(page)]?.find((tab) => tab.page === page)?.label ?? SECTION_LABELS.today;
+  return (
+    OFF_MENU_LABELS[page] ??
+    TABS[sectionOf(page)].find((tab) => tab.page === page)?.label ??
+    SECTION_LABELS.today
+  );
 }
 
 export function PageTabs({
   page,
   navigate,
   badges = {},
-  hidden = [],
 }: {
   page: Page;
   navigate: (page: Page) => void;
-  /** Tabs of pages the room's display options leave out. */
-  hidden?: Page[];
   /** A count beside a tab: unsaved changes waiting on it. */
   badges?: Partial<Record<Page, number>>;
 }) {
   const section = sectionOf(page);
   const tabs = TABS[section];
-  if (!tabs) return null;
+  if (tabs.length < 2) return null;
   return (
     <nav
       className="page-tabs"
       data-section={section}
-      aria-label={`${SECTION_LABELS[section]} views`}
+      aria-label={`${SECTION_LABELS[section]} pages`}
     >
-      {tabs
-        .filter((tab) => !hidden.includes(tab.page))
-        .map((tab) => (
-          <button
-            type="button"
-            key={tab.page}
-            aria-current={tab.page === page ? "page" : undefined}
-            onClick={() => navigate(tab.page)}
-          >
-            {tab.label}
-            {!!badges[tab.page] && <i className="page-tab-count">{badges[tab.page]}</i>}
-          </button>
-        ))}
+      {tabs.map((tab) => (
+        <button
+          type="button"
+          key={tab.page}
+          aria-current={tab.page === page ? "page" : undefined}
+          onClick={() => navigate(tab.page)}
+        >
+          {tab.label}
+          {!!badges[tab.page] && <i className="page-tab-count">{badges[tab.page]}</i>}
+        </button>
+      ))}
     </nav>
   );
 }

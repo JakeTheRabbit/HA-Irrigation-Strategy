@@ -297,6 +297,23 @@ describe("room model", () => {
     const target = { entityId: "number.crop_steering_p1_target_vwc", value: 64.5 };
     expect(validateChange(planned, states, target)).toBeTruthy(); // targets stay the plan's
   });
+  it("lets a zone's irrigation mode be chosen, plan or not, and Steering only where it has a probe", () => {
+    const states = fixture();
+    const id = "select.crop_steering_zone_1_irrigation_mode";
+    states[id] = entity(id, "timer", { options: ["steering", "timer", "off"] });
+    const room = buildRoom(states, discoverRooms(states)[0]);
+    const planned = { ...room, strategy: { ...room.strategy, engaged: true } };
+    expect(validateChange(planned, states, { entityId: id, value: "off" })).toBeNull();
+    expect(validateChange(room, states, { entityId: id, value: "weekly" })).toBeTruthy();
+    expect(validateChange(room, states, { entityId: id, value: "steering" })).toBeNull();
+    const probeless = {
+      ...room,
+      zones: room.zones.map((z) => (z.id === 1 ? { ...z, vwc: { ...z.vwc, entityId: null } } : z)),
+    };
+    expect(validateChange(probeless, states, { entityId: id, value: "steering" })).toBe(
+      "Zone 1 has no probe, so it can't steer.",
+    );
+  });
   it("reads the room's Include Predictions in Notifications switch, which may be switched here", () => {
     const states = fixture();
     const id = "switch.crop_steering_notify_predictions";

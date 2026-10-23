@@ -16,6 +16,8 @@ export interface SettingWords {
   short: string;
   /** One line under the field. */
   help: string;
+  /** What a change to it does, in a few words: the note on a reviewed change. */
+  effect?: string;
   tag?: SettingTag;
   /** The "?" beside the field. */
   detail?: SettingDetail;
@@ -78,6 +80,7 @@ const WORDS: Record<string, SettingWords> = {
     label: "Peak VWC target",
     short: "Peak target",
     tag: "fills",
+    effect: "P1 stops ramping at this level",
     help: "The morning ramp waters up to this: the top of the day. It is capped at full saturation.",
   },
   p1_initial_shot_size: {
@@ -104,6 +107,7 @@ const WORDS: Record<string, SettingWords> = {
     label: "Maintenance shot when below",
     short: "Re-water point",
     tag: "waters",
+    effect: "P2 waters when VWC falls to this",
     help: "Through the day, a maintenance shot fires whenever moisture reads below this. The peak VWC target down to here is the daytime dryback.",
   },
   p2_shot_size: {
@@ -115,6 +119,7 @@ const WORDS: Record<string, SettingWords> = {
     label: "Rescue shot when below",
     short: "Rescue floor",
     tag: "rescues",
+    effect: "P3 fires a rescue shot below this",
     help: "In P3, a rescue shot fires whenever moisture reads below this. Keep it above the wilting point.",
   },
   p3_emergency_shot_size: {
@@ -237,6 +242,7 @@ const DRYBACK_WORDS: SettingWords = {
   label: "P3 dryback target",
   short: "P3 dryback target",
   tag: "dries",
+  effect: "How far P3 dries back from the day’s peak",
   help: "How far to dry back overnight, relative to the day’s peak: a 30% dryback from a 60% peak ends at 42%.",
 };
 

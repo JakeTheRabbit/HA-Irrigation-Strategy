@@ -123,7 +123,7 @@ try {
         curve,
         "Emergency floor must not pretend to reshape daytime moisture",
       );
-      await page.getByRole("button", { name: "Discard draft", exact: true }).waitFor();
+      await page.getByRole("button", { name: "Discard edits", exact: true }).waitFor();
       await noOverflow();
       await axe("manual preview");
       await page.evaluate(() => {
@@ -142,7 +142,7 @@ try {
       );
       await zoneTab(1).click();
       assert.equal(await floor.inputValue(), String(Number(original) + 5));
-      await page.getByRole("button", { name: "Discard draft", exact: true }).click();
+      await page.getByRole("button", { name: "Discard edits", exact: true }).click();
       assert.equal(await floor.inputValue(), original);
       assert.equal(await line("p3-floor").getAttribute("y1"), savedY);
     },
@@ -288,8 +288,8 @@ try {
       assert.notEqual(await rewater.inputValue(), before);
       assert.equal(await target.getAttribute("data-planning-draft"), "");
       assert.equal(await graph.locator(".hmi-check").count(), 0);
-      await shot.getByRole("button", { name: "Review changes", exact: true }).waitFor();
-      await shot.getByRole("button", { name: "Discard draft", exact: true }).click();
+      await shot.getByRole("button", { name: "Apply 1 change", exact: true }).waitFor();
+      await shot.getByRole("button", { name: "Discard edits", exact: true }).click();
       assert.equal(await rewater.inputValue(), before);
       for (const theme of ["light", "dark"]) {
         await shot.evaluate((value) => localStorage.setItem("irrigation-theme", value), theme);
@@ -367,11 +367,13 @@ try {
     assert.equal(await line("baseline-vwc").getAttribute("data-planning-values"), before);
     await target.fill("999");
     assert.equal(await target.getAttribute("aria-invalid"), "true");
+    await page.getByText("Fix the red check to apply", { exact: true }).waitFor();
     assert.equal(
-      await page.getByRole("button", { name: "Review changes", exact: true }).isDisabled(),
-      true,
+      await page.getByRole("button", { name: /^Apply \d+ changes?$/ }).count(),
+      0,
+      "an invalid draft has no Apply",
     );
-    await page.getByRole("button", { name: "Discard draft", exact: true }).click();
+    await page.getByRole("button", { name: "Discard edits", exact: true }).click();
   });
   await check(
     "Field capacity suggestion names its source, fills only the local draft and is never applied by itself",
@@ -468,9 +470,10 @@ try {
       }
       await records.getByRole("button", { name: "Add run", exact: true }).click();
       await page.getByLabel("Run name", { exact: true }).fill("Unsaved run draft");
+      // Status is a link in the tree menu.
       await page
         .locator(".desktop-sidebar")
-        .getByRole("button", { name: "Status", exact: true })
+        .getByRole("link", { name: "Status", exact: true })
         .click();
       await page.getByRole("heading", { name: "Discard unsaved workspace changes?" }).waitFor();
       await page.getByRole("button", { name: "Keep editing", exact: true }).click();
@@ -488,15 +491,16 @@ try {
       assert.equal(metadata.runs.length, 5); // Three sample records plus this workflow's two.
       assert.ok(metadata.runs.every((run) => run.zones.length === 3 && run.captured_at));
       // Compared on History, in the same visit.
+      // History › Compare runs, from the tree menu (its section opened first if it is closed).
+      const history = page.locator('.desktop-sidebar button[data-nav-section="history"]');
+      if ((await history.getAttribute("aria-expanded")) === "false") await history.click();
       await page
         .locator(".desktop-sidebar")
-        .getByRole("button", { name: "History", exact: true })
-        .click();
-      await page
-        .getByRole("navigation", { name: "History views" })
-        .getByRole("button", { name: "Compare runs", exact: true })
+        .getByRole("link", { name: "Compare runs", exact: true })
         .click();
       await page.getByRole("heading", { name: "Compare runs", exact: true }).waitFor();
+      // The zone-level view is one tap down, under the room-wide comparison.
+      await page.locator('details[data-section="zone-detail"] > summary').click();
       await page.getByRole("button", { name: "Overlay", exact: true }).click();
       await page.getByRole("img", { name: /VWC and EC by age/ }).waitFor();
       await page
@@ -570,6 +574,8 @@ try {
       );
       await open("history/compare");
       await page.getByRole("heading", { name: "Compare runs", exact: true }).waitFor();
+      // The zone-level view is one tap down, under the room-wide comparison.
+      await page.locator('details[data-section="zone-detail"] > summary').click();
       await page.setViewportSize({ width: 390, height: 844 });
       await noOverflow();
       await axe("mobile run comparison");

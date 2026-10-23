@@ -1,5 +1,7 @@
+import { formatEc, formatTemp, formatVolume, readDisplayUnits } from "./display-units";
 import type { SteCopy } from "./ste-copy";
-import type { EntityState, States } from "./types";
+import { clock } from "./time";
+import type { EntityState, RoomView, States } from "./types";
 
 /** What the dashboard shows in a room: the room's display options (Settings › Display), kept by
  * the integration in one store per room and published as sensor.crop_steering_<prefix>display
@@ -18,6 +20,12 @@ export interface DisplayOptions {
   show_dryback_drivers: boolean;
   planner_reference_rows: boolean;
   planner_day_curve: boolean;
+  /** Units and clock (integration 3.18): display only, storage stays mS/cm, °C and litres. */
+  ec_unit: "mS/cm" | "ppm500" | "ppm700";
+  temp_unit: "C" | "F";
+  /** "auto" follows Home Assistant's unit system. */
+  volume_unit: "auto" | "L" | "gal";
+  clock: 12 | 24;
 }
 export type DisplayKey = keyof DisplayOptions;
 
@@ -33,7 +41,29 @@ export const DISPLAY_DEFAULTS: DisplayOptions = {
   show_dryback_drivers: false,
   planner_reference_rows: false,
   planner_day_curve: false,
+  ec_unit: "mS/cm",
+  temp_unit: "C",
+  volume_unit: "auto",
+  clock: 24,
 };
+
+/** The options that take one of several values (display.py `choices`); the rest are on or off. */
+export const DISPLAY_CHOICES: Partial<Record<DisplayKey, readonly (string | number)[]>> = {
+  today_zone_layout: ["cards", "table"],
+  ec_unit: ["mS/cm", "ppm500", "ppm700"],
+  temp_unit: ["C", "F"],
+  volume_unit: ["auto", "L", "gal"],
+  clock: [12, 24],
+};
+/** The four unit options: an integration from before 3.18 publishes none of them. */
+export const UNIT_KEYS = ["ec_unit", "temp_unit", "volume_unit", "clock"] as const;
+export type UnitKey = (typeof UNIT_KEYS)[number];
+
+/** Whether `value` is one `key` takes. */
+export function validDisplayValue(key: DisplayKey, value: unknown): boolean {
+  const choices = DISPLAY_CHOICES[key];
+  return choices ? choices.includes(value as string | number) : typeof value === "boolean";
+}
 
 /** One row of Settings › Display: an on/off option, or a choice between two values. */
 export interface DisplayRow {
@@ -47,7 +77,9 @@ export interface DisplayRow {
   choice?: { value: string; label: string }[];
 }
 
-/** The rows Settings › Display offers, in page order. A row is listed once its panel exists. */
+/** The rows Settings › Display offers, in page order. A row is listed once its panel exists, and no
+ * longer once its panel is gone: `today_zone_layout` (Zones as) stays stored but is not offered, since
+ * the room page has no zone table. */
 export const DISPLAY_ROWS: DisplayRow[] = [
   {
     key: "today_tank_readout",
@@ -60,23 +92,6 @@ export const DISPLAY_ROWS: DisplayRow[] = [
         "Off: Today shows the tank only when a value is low or out of range. On: the room line always shows the tank values. A value that is low or out of range gives the same warning line as before.",
       guidance:
         "The room must have tank sensors in Equipment › Setup. Without them, Today shows no tank values. A phone does not show the tank values on Today. Use Equipment › Feed.",
-    },
-  },
-  {
-    key: "today_zone_layout",
-    group: "Today",
-    label: "Zones as",
-    choice: [
-      { value: "cards", label: "Cards" },
-      { value: "table", label: "Table" },
-    ],
-    copy: {
-      tooltip:
-        "Shows the zones on Today as cards, or as one table with a row for each zone: phase, VWC, EC, dryback, water, shots and the next action.",
-      impact:
-        "Cards: each zone has a card, as before. Table: a laptop shows one table. A phone always shows the cards.",
-      guidance:
-        "A table is easier to read in a room with many zones. Select a row to open its zone.",
     },
   },
   {
@@ -201,6 +216,8 @@ export const DISPLAY_ROWS: DisplayRow[] = [
 export interface RoomDisplay {
   /** The room has the store (an integration from before it does not, and nothing can be saved). */
   available: boolean;
+  /** The store keeps the units and clock (integration 3.18): the sensor carries all four. */
+  units: boolean;
   revision: number;
   options: DisplayOptions;
 }
@@ -212,13 +229,33 @@ export const displayEntityId = (prefix: string) => `sensor.crop_steering_${prefi
 export function readDisplay(entity: EntityState | undefined): RoomDisplay {
   const revision = Number(entity?.state);
   const available = !!entity && Number.isInteger(revision) && revision >= 0;
-  const options = { ...DISPLAY_DEFAULTS } as Record<DisplayKey, boolean | string>;
+  const options = { ...DISPLAY_DEFAULTS } as Record<DisplayKey, unknown>;
   for (const key of Object.keys(DISPLAY_DEFAULTS) as DisplayKey[]) {
     const value = available ? entity!.attributes[key] : undefined;
-    if (typeof DISPLAY_DEFAULTS[key] === "boolean" ? typeof value === "boolean" : value === "table")
-      options[key] = value as boolean | string;
+    if (validDisplayValue(key, value)) options[key] = value;
   }
-  return { available, revision: available ? revision : 0, options: options as DisplayOptions };
+  const units = available && UNIT_KEYS.every((key) => key in entity!.attributes);
+  return { available, units, revision: available ? revision : 0, options: options as DisplayOptions };
+}
+
+/** The unit `key` as stored, "auto" unresolved: the room's option on 3.18, else this browser's
+ * choice (`stored`, the JSON under crop-steering.units), else the default. */
+/** How Settings › Units saves: in the room's display store (3.18), in this browser (an integration
+ * without units), or not at all: offline or still connecting (the room's units are not known yet,
+ * and would later override this browser's), or the room's display sensor is unavailable. */
+export type UnitMode = "room" | "local" | "offline" | "unavailable";
+export function unitMode(entity: EntityState | undefined, connection: string): UnitMode {
+  if (connection !== "live" && connection !== "demo") return "offline";
+  const display = readDisplay(entity);
+  if (entity && !display.available) return "unavailable";
+  return display.units ? "room" : "local";
+}
+
+export function storedUnit(display: RoomDisplay, stored: string | null, key: UnitKey): string | number {
+  if (display.units) return display.options[key];
+  const local = readDisplayUnits(undefined, stored);
+  const value = { ec_unit: local.ec, temp_unit: local.temp, volume_unit: local.volume, clock: local.clock }[key];
+  return key === "clock" ? Number(value) : value;
 }
 
 export const roomDisplay = (states: States, prefix: string) =>
@@ -228,7 +265,9 @@ export const roomDisplay = (states: States, prefix: string) =>
  * each panel without a trip to Settings. */
 export function demoDisplay(states: States, param: string | null): States {
   if (!param) return states;
-  const wanted = param === "all" ? Object.keys(DISPLAY_DEFAULTS) : param.split(",");
+  // Panels only: a unit is a choice, not a panel to turn on.
+  const panels = Object.keys(DISPLAY_DEFAULTS).filter((key) => !(UNIT_KEYS as readonly string[]).includes(key));
+  const wanted = param === "all" ? panels : param.split(",").filter((key) => panels.includes(key));
   const next = { ...states };
   for (const [id, entity] of Object.entries(states)) {
     if (!/^sensor\.crop_steering_[a-z0-9_]*display$/.test(id)) continue;
@@ -243,4 +282,57 @@ export function demoDisplay(states: States, param: string | null): States {
       if (/^switch\.crop_steering_[a-z0-9_]*manual_hardware_enabled$/.test(id))
         next[id] = { ...states[id], state: "on" };
   return next;
+}
+
+/** Decimals the reading has (never formatted past them), at most 2. */
+const digitsOf = (value: number) =>
+  Math.min(2, (String(Number(value.toFixed(6))).split(".")[1] ?? "").length);
+const numberOf = (entity: EntityState | undefined) => {
+  const value = Number(entity?.state);
+  return entity && entity.state !== "" && Number.isFinite(value) ? value : null;
+};
+
+/** One live example per unit row of Settings, from the room's own readings through the display
+ * store: average EC, a °C or °F sensor of the room, water today, lights off. A row whose reading the
+ * room lacks says so and shows the unit on a plain example number. */
+export function unitExamples(
+  states: States,
+  room: RoomView,
+): { ec: string; temp: string; volume: string; clock: string } {
+  const metric = (key: "ec" | "water") => room.metrics.find((m) => m.key === key)?.value ?? null;
+  const ec = metric("ec");
+  const water = metric("water");
+  // The room's mapped thermometers (Equipment › Setup): zone 1's root zone, else the feed tank.
+  const config = states[`sensor.crop_steering_${room.room.prefix}engine_config`]?.attributes ?? {};
+  const roots = config.substrate_temperature_sensors as Record<string, unknown> | undefined;
+  const thermometer = (
+    [
+      ["Root zone", roots?.["1"]],
+      ["Feed tank", config.tank_temperature_sensor],
+    ] as const
+  )
+    .map(([label, id]) => ({ label, entity: typeof id === "string" ? states[id] : undefined }))
+    .find(({ entity }) => ["°C", "°F"].includes(String(entity?.attributes.unit_of_measurement)) && numberOf(entity) !== null);
+  const reading = numberOf(thermometer?.entity);
+  // A probe on US units reads in °F: stored and formatted as °C, kept to a tenth at least.
+  const fahrenheit = thermometer?.entity?.attributes.unit_of_measurement === "°F";
+  const temp = reading !== null && fahrenheit ? ((reading - 32) * 5) / 9 : reading;
+  const tempDigits = reading === null ? 0 : fahrenheit ? Math.max(1, digitsOf(reading)) : digitsOf(reading);
+  const off = numberOf(states[`number.crop_steering_${room.room.prefix}lights_off_hour`]);
+  return {
+    ec: ec !== null ? `Average EC ${formatEc(ec, digitsOf(ec))}` : `No EC reading yet, for example ${formatEc(2, 1)}`,
+    temp:
+      thermometer && temp !== null
+        ? `${thermometer.label} ${formatTemp(temp, tempDigits)}`
+        : `No temperature reading yet, for example ${formatTemp(21, 1)}`,
+    volume:
+      water !== null
+        ? `${room.room.name} water today ${formatVolume(water, digitsOf(water))}`
+        : `No water reading yet, for example ${formatVolume(10, 1)}`,
+    // A whole hour on the room's clock; UTC only carries the wall time to the formatter.
+    clock:
+      off !== null && Number.isInteger(off) && off >= 0 && off <= 23
+        ? `Lights off ${clock(Date.UTC(2000, 0, 1, off), "UTC")}`
+        : `No lights-off time yet, for example ${clock(Date.UTC(2000, 0, 1, 18), "UTC")}`,
+  };
 }

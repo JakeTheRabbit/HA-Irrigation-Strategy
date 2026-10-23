@@ -107,6 +107,7 @@ export function ControllerSettings({
         sensor={zone ? sensor : null}
         learnedPeak={zone?.auto?.learnedPeak}
         disabled={!connected}
+        controller={controller}
         onEdit={edit}
       />
     ));

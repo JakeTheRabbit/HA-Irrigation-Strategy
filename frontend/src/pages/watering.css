@@ -1,0 +1,332 @@
+/* Watering timeline page (pages/watering.tsx): mockups 05 (I1) and 25 (P2). */
+.watering {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+/* The day strip, Today and the span. */
+.wt-days {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.wt-week {
+  display: flex;
+  flex: 1 1 auto;
+  gap: 6px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.wt-week li {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.wt-week button,
+.wt-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 52px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--foreground);
+  font: inherit;
+  cursor: pointer;
+}
+.wt-step {
+  width: 44px;
+  flex: 0 0 auto;
+}
+.wt-week b {
+  font-size: var(--text-sm);
+}
+.wt-week small {
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+  white-space: nowrap;
+}
+.wt-week button[data-tone="problem"] small {
+  color: var(--destructive);
+}
+.wt-week button[aria-pressed="true"] {
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 12%, var(--surface));
+}
+.wt-span {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.wt-span button {
+  min-width: 52px;
+  min-height: 40px;
+  padding: 0 12px;
+  border: 0;
+  background: var(--surface);
+  color: var(--foreground);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.wt-span button + button {
+  border-left: 1px solid var(--border);
+}
+.wt-span button[aria-pressed="true"] {
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+
+/* Filters and the failed chip. */
+.wt-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.wt-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--foreground);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+.wt-chip[aria-pressed="true"] {
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 12%, var(--surface));
+}
+.wt-chip:disabled {
+  cursor: default;
+}
+.wt-failed {
+  border-color: color-mix(in srgb, var(--destructive) 60%, var(--border));
+  color: var(--destructive);
+}
+
+.wt-note {
+  margin: 0;
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+}
+.wt-error {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--destructive) 50%, var(--border));
+  border-radius: 10px;
+}
+.wt-error p {
+  margin: 0;
+}
+
+.wt-body {
+  min-width: 0;
+}
+.wt-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.wt-skeleton span {
+  height: 56px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--foreground) 7%, transparent);
+}
+.wt-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 24px 16px;
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+}
+.wt-empty p {
+  margin: 0;
+  font-weight: 600;
+}
+
+/* Phone: the day with its problems, between day steps. */
+.wt-dayline {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
+  align-items: center;
+}
+.wt-dayline > button {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  background: transparent;
+  color: var(--foreground);
+  cursor: pointer;
+}
+.wt-dayline p {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 0;
+  text-align: center;
+}
+.wt-dayline span {
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+}
+.wt-dayline span[data-tone="problem"] {
+  color: var(--destructive);
+}
+
+/* The block popover. */
+.wt-pop {
+  z-index: 60;
+  width: min(360px, calc(100vw - 24px));
+  max-height: var(--radix-popover-content-available-height);
+  overflow: auto;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--foreground);
+  box-shadow: 0 12px 32px rgb(0 0 0 / 0.28);
+}
+.wt-pop-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.wt-pop-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+.wt-pop-head small {
+  display: block;
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+}
+.wt-pop-head strong {
+  font-size: var(--text-lg);
+}
+.wt-pop-close {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--foreground);
+  cursor: pointer;
+}
+.wt-pop-status {
+  align-self: flex-start;
+  margin: 0;
+  padding: 3px 12px;
+  border: 1px solid var(--primary);
+  border-radius: 999px;
+  color: var(--primary);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+.wt-pop-status[data-glyph="failed"] {
+  border-color: var(--destructive);
+  color: var(--destructive);
+}
+.wt-pop-status[data-glyph="warning"],
+.wt-pop-status[data-glyph="queued"] {
+  border-color: var(--warning);
+  color: var(--foreground);
+}
+.wt-pop-status[data-glyph="done"]:not([data-running]) {
+  border-color: var(--border);
+  color: var(--muted-foreground);
+}
+.wt-pop-reason {
+  margin: 0;
+  padding: 10px 12px;
+  border-left: 3px solid var(--primary);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--foreground) 5%, transparent);
+  font-size: var(--text-sm);
+}
+.wt-pop-rows {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+.wt-pop-rows div {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  gap: 10px;
+}
+.wt-pop-rows dt {
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+}
+.wt-pop-rows dd {
+  margin: 0;
+  font-size: var(--text-sm);
+}
+.wt-source {
+  display: inline-block;
+  margin-right: 6px;
+  padding: 1px 8px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--primary) 18%, transparent);
+  font-weight: 600;
+}
+.wt-pop-note {
+  margin: 0;
+  color: var(--destructive);
+  font-size: var(--text-sm);
+}
+.wt-pop-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+.wt-pop-foot a {
+  color: var(--primary);
+  font-weight: 600;
+}
+
+@media (max-width: 720px) {
+  .watering {
+    gap: 10px;
+  }
+}
+.wt-dayfailed {
+  min-height: 24px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}

@@ -1,4 +1,10 @@
-import type { Tone } from "@/components/mini-visuals";
+import { dayKey } from "./time";
+import { formatVolume, getDisplayUnits } from "./display-units";
+import type { ParityState } from "./parity-api";
+import type { CsEvent } from "./parity-types";
+import type { Controller } from "./types";
+import { LITRES_PER_US_GALLON } from "./units";
+import { sameValue } from "./utils";
 
 /** A room's stock tanks, as the integration's stock services return them (stock_api.py). */
 export interface StockTank {
@@ -69,12 +75,6 @@ export function nextToRunOut(
   return next;
 }
 
-/** Red at or under the low mark, amber within half as much again, normal above. */
-export function stockTone(tank: Pick<StockTank, "level_l" | "low_l">): Tone {
-  if (tank.level_l <= tank.low_l) return "over";
-  return tank.level_l <= tank.low_l * 1.5 ? "high" : "normal";
-}
-
 /** The checks the integration makes (stock.py clean_tanks), so the editor can say so first. */
 export function draftErrors(drafts: StockTankDraft[], max = 12): string[] {
   const errors: string[] = [];
@@ -107,4 +107,221 @@ export function stockConfigurationPayload(tanks: StockTankDraft[]) {
     const { level_l: _measuredLevel, ...configuration } = tank;
     return configuration;
   });
+}
+
+/** What a tank still covers at today's use: whole batches, whole days at one batch every
+ * `batchEveryDays` (NaN when that is not known), and whether it is at or under its low mark (the
+ * integration's stock.low_tanks). */
+export function stockOutlook(
+  tank: Pick<StockTank, "level_l" | "low_l">,
+  usePerBatchL: number,
+  batchEveryDays: number,
+): { batches: number; daysLeft: number; belowLow: boolean } {
+  // Rounded first: 0.29 L is 289.99999999999997 mL in floating point, one batch short.
+  const exact =
+    Math.round(tank.level_l * 1000 * 1e6) / 1e6 / (Math.round(usePerBatchL * 1000 * 1e6) / 1e6);
+  return {
+    batches: Math.floor(exact),
+    daysLeft: Math.floor(Math.round(exact * batchEveryDays * 1e6) / 1e6),
+    belowLow: tank.level_l <= tank.low_l,
+  };
+}
+
+/** Sources that log a batch: a fill counted from the last-fill entity, one recorded by hand, and a
+ * batch the controller dosed (one row per pump, a minute apart). */
+const BATCH_SOURCES: readonly StockBatch["source"][] = ["fill", "manual", "batch"];
+/** Rows this close together are one batch. */
+const SAME_BATCH_MS = 30 * 60_000;
+
+/** One batch every so many days, from the batches the history logged: null below two. */
+export function batchEveryDays(history: readonly StockBatch[]): number | null {
+  const times = history
+    .filter((row) => BATCH_SOURCES.includes(row.source))
+    .map((row) => Date.parse(row.at))
+    .filter(Number.isFinite)
+    .sort((a, b) => a - b);
+  const batches: number[] = [];
+  for (const t of times)
+    if (!batches.length || t - batches[batches.length - 1] > SAME_BATCH_MS) batches.push(t);
+  if (batches.length < 2) return null;
+  return (batches[batches.length - 1] - batches[0]) / (batches.length - 1) / 86_400_000;
+}
+
+const calendarDay = (key: string) => Date.parse(`${key}T00:00:00Z`);
+const keyOf = (utcDay: number) => new Date(utcDay).toISOString().slice(0, 10);
+/** The Monday ("YYYY-MM-DD") of the week holding `ms` on the zone's calendar. */
+function mondayOf(ms: number, tz: string): string {
+  const day = calendarDay(dayKey(ms, tz));
+  return keyOf(day - ((new Date(day).getUTCDay() + 6) % 7) * 86_400_000);
+}
+
+/** Litres drawn from each tank per week (Monday to Sunday on the zone's calendar), from the oldest
+ * week the history holds to this one, which is `partial`. A week with nothing drawn has no tanks. */
+export function weeklyUse(
+  history: readonly Pick<StockBatch, "at" | "draw_ml">[],
+  tz: string,
+  now = Date.now(),
+): { week: string; byTank: Record<string, number>; partial: boolean }[] {
+  const ml = new Map<string, Record<string, number>>();
+  for (const row of history) {
+    const t = Date.parse(row.at);
+    if (!Number.isFinite(t) || t > now) continue;
+    const week = mondayOf(t, tz);
+    const sums = ml.get(week) ?? {};
+    for (const [tank, drawn] of Object.entries(row.draw_ml)) sums[tank] = (sums[tank] ?? 0) + drawn;
+    ml.set(week, sums);
+  }
+  if (!ml.size) return [];
+  const current = mondayOf(now, tz);
+  const weeks = [];
+  for (
+    let day = calendarDay([...ml.keys()].sort()[0]);
+    day <= calendarDay(current);
+    day += 7 * 86_400_000
+  ) {
+    const week = keyOf(day);
+    const sums = ml.get(week) ?? {};
+    weeks.push({
+      week,
+      byTank: Object.fromEntries(
+        Object.entries(sums).map(([tank, drawn]) => [tank, Math.round(drawn * 1e3) / 1e6]),
+      ),
+      partial: week === current,
+    });
+  }
+  return weeks;
+}
+
+/** Weeks for Used per week: the last `shown`. A full history (`kept` rows) may have lost the start of
+ * its oldest week, so that week is left out, unless it is this week. */
+export function weeksShown(
+  history: readonly Pick<StockBatch, "at" | "draw_ml">[],
+  tz: string,
+  kept: number,
+  shown: number,
+  now = Date.now(),
+) {
+  const weeks = weeklyUse(history, tz, now);
+  return (history.length >= kept && weeks.length > 1 ? weeks.slice(1) : weeks).slice(-shown);
+}
+
+/** One logged refill to capacity. */
+export interface RefillRow {
+  key: string;
+  tank: string;
+  /** The tank's place on the page, for its colour. */
+  hue: number;
+  at: number;
+  /** Litres added, when the level before is known. */
+  added: number | null;
+  to: number;
+}
+const near = (a: unknown, b: unknown) =>
+  typeof a === "number" && typeof b === "number" && Math.abs(a - b) <= 1e-6;
+/** Refills to capacity, newest first. From the Journal's `stock.refilled` events on 3.18: a set level
+ * (`full: false`) is not a refill, and a refill whose next event on that tank puts its level before
+ * back (an Undo) is left out. On an older integration (`events` null), each tank's last refill, the
+ * only one it keeps, unless `undone` holds it as `<tank id>@<refilled_at>`. */
+export function refillRows(
+  tanks: readonly StockTank[],
+  events: readonly CsEvent[] | null,
+  undone: ReadonlySet<string> = new Set(),
+): RefillRow[] {
+  const index = new Map(tanks.map((tank, i) => [tank.id, i]));
+  const sorted = [...(events ?? [])].sort(
+    (a, b) => Date.parse(a.ts) - Date.parse(b.ts) || (a.seq ?? 0) - (b.seq ?? 0),
+  );
+  const rows: RefillRow[] = events
+    ? sorted.flatMap((event, n) => {
+        const { tank, level_l, old_level_l, full } = event.data as Record<string, unknown>;
+        const i = index.get(String(tank));
+        if (i === undefined || full !== true || typeof level_l !== "number") return [];
+        const next = sorted.slice(n + 1).find((e) => e.data.tank === tank)?.data;
+        if (
+          next &&
+          next.full === false &&
+          near(next.old_level_l, level_l) &&
+          near(next.level_l, old_level_l)
+        )
+          return [];
+        return [
+          {
+            key: event.id,
+            tank: tanks[i].name,
+            hue: i,
+            at: Date.parse(event.ts),
+            added:
+              typeof old_level_l === "number"
+                ? Math.round((level_l - old_level_l) * 1e4) / 1e4
+                : null,
+            to: level_l,
+          },
+        ];
+      })
+    : tanks.flatMap((tank, i) =>
+        tank.refilled_at && !undone.has(`${tank.id}@${tank.refilled_at}`)
+          ? [
+              {
+                key: tank.id,
+                tank: tank.name,
+                hue: i,
+                at: Date.parse(tank.refilled_at),
+                added: null,
+                to: tank.capacity_l,
+              },
+            ]
+          : [],
+      );
+  return rows.filter((row) => Number.isFinite(row.at)).sort((a, b) => b.at - a.at);
+}
+
+/** What Refills lists: `older` when the integration has no Journal. While the Journal reloads (after
+ * every write) it keeps `last`, so the rows never flash empty; an older integration's rows need no
+ * answer, so they follow `undone` at once. Null: nothing to list yet, or the Journal failed. */
+export interface RefillsView {
+  rows: RefillRow[];
+  older: boolean;
+}
+export function refillsView(
+  state: ParityState,
+  events: readonly CsEvent[] | null,
+  tanks: readonly StockTank[],
+  undone: ReadonlySet<string>,
+  last: RefillsView | null,
+): RefillsView | null {
+  if (state === "ready") return { rows: refillRows(tanks, events ?? []), older: false };
+  if (state === "missing" || (state === "loading" && last?.older))
+    return { rows: refillRows(tanks, null, undone), older: true };
+  return state === "loading" ? last : null;
+}
+
+/** A Used per week tick: the chart's values are already in the display unit. */
+export const weeklyTick = (shown: number) =>
+  formatVolume(getDisplayUnits().volume === "gal" ? shown * LITRES_PER_US_GALLON : shown, 1);
+
+/** Undo a refill: the refilled tank back at `priorLevel` through stock_refill (so the Journal records
+ * the put-back), at `current`'s revision, so a change since refuses. Refuses itself when the tank no
+ * longer reads the refilled level, and when the answer does not read `priorLevel` back. */
+export async function undoRefill(
+  controller: Pick<Controller, "operator">,
+  current: StockDocument,
+  tankId: string,
+  refilledTo: number,
+  priorLevel: number,
+): Promise<StockDocument> {
+  const tank = current.tanks.find((t) => t.id === tankId);
+  const name = tank?.name ?? "The tank";
+  if (!tank || !sameValue(String(tank.level_l), refilledTo))
+    throw new Error(`${name} has changed since the refill. Nothing was put back.`);
+  const doc = await controller.operator<StockDocument>("stock_refill", {
+    expected_revision: current.revision,
+    id: tankId,
+    level_l: priorLevel,
+  });
+  const back = doc.tanks.find((t) => t.id === tankId);
+  if (!back || !sameValue(String(back.level_l), priorLevel))
+    throw new Error(
+      `The controller did not confirm ${name} at its previous level. Reload and check it.`,
+    );
+  return doc;
 }

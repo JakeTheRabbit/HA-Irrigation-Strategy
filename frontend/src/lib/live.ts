@@ -11,6 +11,8 @@ export interface LiveConnection {
   subscribeMessage<T>(
     callback: (message: T) => void,
     message: Record<string, unknown>,
+    /** `resubscribe: false`: not re-sent after a reconnect (the caller resubscribes on `ready`). */
+    options?: { resubscribe?: boolean },
   ): Promise<() => unknown>;
   sendMessagePromise?<T>(message: Record<string, unknown>): Promise<T>;
   addEventListener?(event: "ready", callback: () => void): void;
@@ -224,6 +226,9 @@ const ROOM_SENSORS = [
   "jev_log",
   // Batch-tank dosing: pumps, the batch and their history (docs/DOSING.md).
   "dosing",
+  // Feed calibration's corrected readings (calibration.py): the wizard's proof line.
+  "feed_ph_corrected",
+  "feed_ec_corrected",
 ];
 const ZONE_SENSORS = [
   "jev",
@@ -262,6 +267,8 @@ export function watchedEntities(states: States): string[] {
     }
     // Each dosing pump's entities and the batch's hardware: Equipment › Dosing shows them live.
     if (/^sensor\.crop_steering_.*dosing_config$/.test(id)) visit(entity.attributes);
+    // The supply's flow meters and pumps: History › Water & flow shows each meter's last change live.
+    if (id === "sensor.crop_steering_supply_config") visit(entity.attributes);
     if (!/^sensor\.crop_steering_.*engine_config$/.test(id)) continue;
     visit(entity.attributes);
     const { prefix, num_zones } = entity.attributes;

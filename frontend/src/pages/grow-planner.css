@@ -17,3 +17,204 @@
   margin: 4px 0;
   max-width: 60ch;
 }
+
+/* I4 (mockup 08): the plan's head, with its state and the draft bar. */
+.plan-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 20px;
+  margin: 8px 0 4px;
+}
+.plan-head-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 14px;
+  min-width: 0;
+}
+.plan-head-title h2 {
+  font-size: var(--text-xl);
+  font-weight: 600;
+}
+.plan-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+.plan-state::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--muted-foreground);
+}
+.plan-state[data-status="active"],
+.plan-state[data-status="armed"] {
+  border-color: color-mix(in srgb, var(--success) 60%, var(--border));
+  color: var(--success);
+}
+.plan-state[data-status="active"]::before,
+.plan-state[data-status="armed"]::before {
+  background: var(--success);
+}
+.plan-draft-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 6px 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.plan-draft-bar[data-dirty] {
+  border-color: var(--primary);
+}
+.plan-draft-bar > span {
+  font-weight: 500;
+}
+
+/* The plan beside its presets on a wide screen; presets below it otherwise. */
+.plan-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+.plan-main,
+.plan-side {
+  min-width: 0;
+}
+@media (min-width: 1280px) {
+  .plan-layout {
+    grid-template-columns: minmax(0, 1fr) minmax(320px, 400px);
+  }
+  .plan-side {
+    position: sticky;
+    top: 90px;
+  }
+}
+
+/* Presets (components/presets-panel.tsx). */
+.presets-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 18px;
+}
+.presets-panel h2 {
+  font-size: var(--text-lg);
+  font-weight: 600;
+}
+.presets-panel h3 {
+  font-size: var(--text-md);
+  font-weight: 600;
+}
+.preset-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.preset-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--foreground);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.preset-card[aria-pressed="true"] {
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 10%, var(--surface));
+}
+.preset-card b {
+  font-weight: 600;
+}
+.preset-card span {
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+}
+.preset-save {
+  border-style: dashed;
+}
+.preset-save-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.preset-save-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.preset-saved,
+.preset-same {
+  font-size: var(--text-sm);
+}
+.preset-skipped {
+  display: block;
+  color: var(--muted-foreground);
+}
+.preset-copy {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.preset-copy > .review-apply {
+  align-self: stretch;
+}
+.preset-not-copied {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+}
+.review-apply-not-copied {
+  color: var(--muted-foreground);
+}
+
+/* A day set apart from its block. */
+.plan-exception {
+  margin-top: 12px;
+  padding: 10px 14px;
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  max-width: 60ch;
+}
+.plan-exception[data-draft] {
+  border-color: var(--primary);
+}
+.plan-exception .eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+.plan-exception-add {
+  margin-top: 12px;
+}
+.plan-browser-heading {
+  margin: 4px 0 10px;
+}
+.plan-browser-heading h2 {
+  font-size: var(--text-lg);
+  font-weight: 600;
+}

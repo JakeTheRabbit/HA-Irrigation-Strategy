@@ -1,6 +1,17 @@
 import { stockConfigurationPayload } from "@/lib/stock";
-import { useEffect, useId, useState } from "react";
-import { FlaskConical, Pencil, Plus, Trash2 } from "lucide-react";
+import { useEffect, useId, useRef, useState } from "react";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
+import { toast } from "sonner";
+import { FlaskConical, Pencil, Plus, Trash2, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,40 +26,53 @@ import {
 import { Empty, Heading, number, type Page } from "@/components/dashboard";
 import { UiTip } from "@/components/info-tip";
 import {
+  MIN_BOTTLE,
+  StockBottle,
+  bottleSize,
+  bottleTop,
+  percentTop,
+} from "@/components/stock-bottle";
+import {
   dosingConfigId,
   dosingStatusId,
+  leftWords,
   pumpDraw,
   readConfig,
   readStatus,
   recipeRows,
   stockLeft,
+  stockState,
+  STOCK_STATES,
   type StockDraw,
 } from "@/lib/dosing";
+import { formatVolume, getDisplayUnits } from "@/lib/display-units";
+import { useParity } from "@/lib/parity-api";
+import type { CsEvent } from "@/lib/parity-types";
 import {
-  batchesLeft,
+  batchEveryDays,
   draftErrors,
   nextToRunOut,
+  refillsView,
+  stockOutlook,
   stockShare,
-  stockTone,
+  undoRefill,
+  weeklyUse,
+  weeksShown,
+  weeklyTick,
+  type RefillsView,
   type StockBatch,
   type StockDocument,
   type StockTank,
   type StockTankDraft,
 } from "@/lib/stock";
+import { clock, dayLabel, shortDate } from "@/lib/time";
 import type { Controller } from "@/lib/types";
-import { errorText } from "@/lib/utils";
-import { formatDateTime } from "@/lib/clock";
+import { LITRES_PER_US_GALLON } from "@/lib/units";
+import { offerUndo } from "@/lib/undo";
+import { errorText, sameValue } from "@/lib/utils";
 import "./stock.css";
 
-const when = (iso: string | null) =>
-  iso
-    ? formatDateTime(iso, {
-        month: "short",
-        day: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      })
-    : "Never";
+
 const SOURCES: Record<StockBatch["source"], string> = {
   fill: "Tank fill",
   manual: "By hand",
@@ -56,8 +80,11 @@ const SOURCES: Record<StockBatch["source"], string> = {
   dose: "Dose",
   batch: "Batch",
 };
-/** The draws a linked tank's card lists: what its pump ran, and the doses reported to it before. */
-const PUMPED: readonly StockBatch["source"][] = ["pump", "dose", "batch"];
+/** The integration keeps this many draws (stock.py HISTORY): a full history may start mid-week. */
+const HISTORY_KEPT = 30;
+const WEEKS_SHOWN = 8;
+/** Refills listed from the Journal (3.18) go back this far. */
+const REFILL_DAYS = 90;
 /** A tank's dosing pump, and what it draws each batch or dose. */
 interface Link {
   pump: string;
@@ -71,143 +98,130 @@ const blank = (): StockTankDraft => ({
   dose_entity: null,
   low_l: 4,
 });
+/** Litres in the display unit, never past the two places the page has always shown. */
+const volume = (litres: number) => {
+  const places = (String(litres).split(".")[1] ?? "").length;
+  return formatVolume(litres, Math.min(2, places));
+};
+/** A time on the zone's calendar and clock: "2 Oct 14:02". */
+const at = (iso: string | null, tz: string) => {
+  const ms = iso ? Date.parse(iso) : Number.NaN;
+  return Number.isFinite(ms) ? `${shortDate(ms, tz)} ${clock(ms, tz)}` : "Never";
+};
 
-/** A tank drawn as a vessel: the level filled in, the low mark dashed across it. */
-function Gauge({ tank }: { tank: StockTank }) {
-  const clip = useId();
-  const share = stockShare(tank);
-  const low = tank.capacity_l > 0 ? Math.min(100, (tank.low_l / tank.capacity_l) * 100) : 0;
-  // The inside runs from y=99 (empty) to y=1 (full): 0.98 units per percent.
-  const y = (percent: number) => 99 - percent * 0.98;
-  return (
-    <svg
-      className="stock-gauge"
-      viewBox="0 0 60 100"
-      role="img"
-      aria-label={`${tank.name}: ${number(share, 0)}% full, low mark at ${number(low, 0)}%`}
-      data-tone={stockTone(tank)}
-    >
-      <defs>
-        <clipPath id={clip}>
-          <rect x="1" y="1" width="58" height="98" rx="9" />
-        </clipPath>
-      </defs>
-      <rect x="1" y="1" width="58" height="98" rx="9" className="stock-shell" />
-      <g clipPath={`url(#${clip})`}>
-        <rect x="1" y={y(share)} width="58" height={99 - y(share)} className="stock-liquid" />
-      </g>
-      <path d={`M1 ${y(low)} H59`} className="stock-low-mark" />
-      <text x="30" y="55" textAnchor="middle" className="stock-percent">
-        {Math.round(share)}%
-      </text>
-    </svg>
-  );
+/** What a tank still covers: whole batches (and days, while the batch rhythm is known), or doses
+ * for a tank whose pump the recipe passes by. */
+function outlookWords(
+  tank: StockTank,
+  perBatchMl: number,
+  link: Link | null,
+  every: number | null,
+): string | null {
+  if (perBatchMl > 0) {
+    const { batches, daysLeft } = stockOutlook(tank, perBatchMl / 1000, every ?? Number.NaN);
+    const count = `${batches} ${batches === 1 ? "batch" : "batches"}`;
+    return Number.isFinite(daysLeft)
+      ? `${count} · ${daysLeft} ${daysLeft === 1 ? "day" : "days"} left`
+      : `${count} left`;
+  }
+  return link ? leftWords(stockLeft(tank.level_l, link.draw)) : null;
 }
 
 function TankCard({
   tank,
-  dose,
+  hue,
+  scale,
+  perBatchMl,
+  every,
   link,
-  draws,
+  next,
   busy,
   onRefill,
   onLevel,
 }: {
   tank: StockTank;
-  dose: number | undefined;
+  hue: number;
+  /** Its capacity over the room's largest. */
+  scale: number;
+  /** What one batch takes from it, in mL; 0 when a batch takes nothing. */
+  perBatchMl: number;
+  /** One batch every so many days, when known. */
+  every: number | null;
   /** The dosing pump that draws it, or null: then each batch takes its dose. */
   link: Link | null;
-  /** Its recent draws by what its pump dosed, newest first. */
-  draws: StockBatch[];
+  /** It runs out first. */
+  next: boolean;
   busy: boolean;
   onRefill: () => void;
   onLevel: (level: number) => Promise<boolean>;
 }) {
   const [setting, setSetting] = useState(false);
   const [level, setLevel] = useState(String(tank.level_l));
-  const tone = stockTone(tank);
-  // A linked tank lasts as many batches as its pump's recipe amount allows, or doses at its last.
-  const linked = link ? stockLeft(tank.level_l, link.draw) : null;
-  const left = link ? (linked?.count ?? null) : batchesLeft(tank, dose);
+  const state = stockState(tank);
+  const below = tank.level_l <= tank.low_l;
   const inputId = useId();
   const value = Number(level);
   const valid = level.trim() !== "" && value >= 0 && value <= tank.capacity_l;
+  const outlook = outlookWords(tank, perBatchMl, link, every);
+  const share = Math.round(stockShare(tank));
   return (
-    <section className="panel stock-card" data-stock-tank={tank.id}>
-      <div className="stock-card-head">
-        <h2>{tank.name}</h2>
+    <article
+      className="stock-card"
+      data-stock-tank={tank.id}
+      data-stock-hue={hue % 8}
+      data-state={state}
+      {...(next ? { "data-stock-next": "" } : {})}
+    >
+      <div className="stock-bottle-box">
+        <StockBottle
+          tank={tank}
+          state={state}
+          capacityScale={scale}
+          label={`${tank.name}: ${share}% full, ${volume(tank.level_l)} of ${volume(tank.capacity_l)}, low mark ${volume(tank.low_l)}${
+            STOCK_STATES[state] ? `, ${STOCK_STATES[state].toLowerCase()}` : ""
+          }`}
+        />
         <span
-          className="pill"
-          data-tone={tone === "over" ? "off" : tone === "high" ? "warn" : "on"}
-          data-stock-status={tank.id}
+          className="stock-bottle-percent"
+          aria-hidden="true"
+          style={{
+            // In the liquid; just above it while too little shows to hold the number.
+            top: `${percentTop(tank.level_l, tank.capacity_l, tank.low_l, scale)}%`,
+          }}
         >
-          <span className="pill-dot" />
-          {tone === "over" ? "Low" : tone === "high" ? "Getting low" : "OK"}
+          {share}%
+        </span>
+        <span
+          className="stock-bottle-low"
+          aria-hidden="true"
+          style={{
+            top: `${bottleTop(tank.low_l, tank.capacity_l, scale)}%`,
+            left: `calc(50% + ${35 * bottleSize(1, scale) + 4}%)`,
+          }}
+        >
+          low {volume(tank.low_l)}
         </span>
       </div>
-      <div className="stock-card-body">
-        <Gauge tank={tank} />
-        <dl className="stock-facts">
-          <div>
-            <dt>Left</dt>
-            <dd>
-              {number(tank.level_l, 2)}
-              <span className="unit"> of {number(tank.capacity_l, 2)} L</span>
-            </dd>
-          </div>
-          {link ? (
-            <div data-stock-drawn>
-              <dt>Drawn by</dt>
-              <dd>
-                {link.pump}
-                <span className="unit"> as it doses</span>
-              </dd>
-            </div>
-          ) : (
-            <div>
-              <dt>Per batch</dt>
-              <dd>
-                {number(dose ?? tank.dose_ml, 0)}
-                <span className="unit"> mL</span>
-              </dd>
-              {tank.dose_entity && (
-                <small title="Read at each batch">from {tank.dose_entity}</small>
-              )}
-            </div>
-          )}
-          <div>
-            <dt>{linked?.per === "dose" ? "Doses left" : "Batches left"}</dt>
-            <dd>{left === null ? "—" : `about ${left}`}</dd>
-          </div>
-          <div>
-            <dt>Low mark</dt>
-            <dd>
-              {number(tank.low_l, 2)}
-              <span className="unit"> L</span>
-            </dd>
-          </div>
-        </dl>
-      </div>
+      <h2>
+        {tank.name}
+        {next && <span className="sr-only"> (runs out first)</span>}
+      </h2>
+      <p className="stock-level" data-stock-level>
+        <strong>{volume(tank.level_l)}</strong> of {volume(tank.capacity_l)}
+      </p>
+      <p className="stock-outlook" data-stock-outlook>
+        {outlook ?? "No dose per batch set"}
+      </p>
       {link && (
-        <div className="stock-draws" data-stock-draws={tank.id}>
-          <h3>Recent draws</h3>
-          {draws.length ? (
-            <ul>
-              {draws.slice(0, 4).map((entry, index) => (
-                <li key={`${entry.at}-${index}`}>
-                  <span>{when(entry.at)}</span>
-                  <span>{SOURCES[entry.source]}</span>
-                  <span className="stock-draw-ml">
-                    {number(entry.draw_ml[tank.id], 1)}
-                    <span className="unit"> mL</span>
-                  </span>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="muted small">Nothing drawn yet.</p>
-          )}
-        </div>
+        <p className="stock-drawn" data-stock-drawn>
+          Drawn by {link.pump} as it doses
+        </p>
+      )}
+      {below && (
+        <p className="stock-warning" data-stock-low>
+          <TriangleAlert size={14} aria-hidden="true" />
+          <span>Below the low line. Order now.</span>
+        </p>
       )}
       {setting ? (
         <form
@@ -244,13 +258,12 @@ function TankCard({
         </form>
       ) : (
         <div className="stock-actions">
-          <Button size="sm" disabled={busy} onClick={onRefill}>
-            Refilled
+          <Button variant={next ? "default" : "outline"} disabled={busy} onClick={onRefill}>
+            Log refill to {volume(tank.capacity_l)}
           </Button>
-          <UiTip copyKey="refilled" />
           <Button
             size="sm"
-            variant="outline"
+            variant="link"
             disabled={busy}
             onClick={() => {
               setLevel(String(tank.level_l));
@@ -259,8 +272,165 @@ function TankCard({
           >
             Set level
           </Button>
-          <span className="muted small">Refilled {when(tank.refilled_at)}</span>
         </div>
+      )}
+    </article>
+  );
+}
+
+/** Litres drawn per week, a bar per tank; this week's so far faded. */
+function UsedPerWeek({ doc, tz }: { doc: StockDocument; tz: string }) {
+  const weeks = weeksShown(doc.history, tz, HISTORY_KEPT, WEEKS_SHOWN);
+  const gal = getDisplayUnits().volume === "gal";
+  const shown = (litres: number) => (gal ? litres / LITRES_PER_US_GALLON : litres);
+  const rows = weeks.map((week) => ({
+    label: week.partial ? "This week" : shortDate(Date.parse(`${week.week}T00:00:00Z`), "UTC"),
+    partial: week.partial,
+    ...Object.fromEntries(doc.tanks.map((tank) => [tank.id, shown(week.byTank[tank.id] ?? 0)])),
+  }));
+  const today = dayLabel(Date.now(), tz).split(" ")[0];
+  return (
+    <section className="panel stock-weekly" data-stock-weekly aria-labelledby="stock-weekly-title">
+      <div className="stock-panel-head">
+        <h2 id="stock-weekly-title">Used per week</h2>
+        <ul className="stock-legend" aria-label="Tanks">
+          {doc.tanks.map((tank, index) => (
+            <li key={tank.id} data-stock-hue={index % 8}>
+              <span className="stock-swatch" aria-hidden="true" />
+              {tank.name}
+            </li>
+          ))}
+        </ul>
+      </div>
+      {rows.length ? (
+        <>
+          <div className="stock-weekly-chart" role="img" aria-label={weeklyWords(weeks, doc.tanks)}>
+            <ResponsiveContainer width="100%" height={260}>
+              <BarChart data={rows} margin={{ top: 8, right: 4, bottom: 0, left: 0 }}>
+                <CartesianGrid vertical={false} stroke="var(--border)" />
+                <XAxis
+                  dataKey="label"
+                  tickLine={false}
+                  stroke="var(--muted-foreground)"
+                  fontSize={12}
+                />
+                <YAxis
+                  width={44}
+                  tickLine={false}
+                  axisLine={false}
+                  stroke="var(--muted-foreground)"
+                  fontSize={12}
+                  tickFormatter={weeklyTick}
+                />
+                <Tooltip
+                  cursor={{ fill: "color-mix(in srgb, var(--foreground) 6%, transparent)" }}
+                  contentStyle={{
+                    background: "var(--surface)",
+                    color: "var(--foreground)",
+                    border: "1px solid var(--border)",
+                    borderRadius: 8,
+                  }}
+                  formatter={(value) =>
+                    formatVolume(gal ? Number(value) * LITRES_PER_US_GALLON : Number(value), 2)
+                  }
+                />
+                {doc.tanks.map((tank, index) => (
+                  <Bar
+                    key={tank.id}
+                    dataKey={tank.id}
+                    name={tank.name}
+                    fill={`var(--stock-hue-${index % 8})`}
+                  >
+                    {rows.map((row) => (
+                      <Cell key={row.label} fillOpacity={row.partial ? 0.45 : 1} />
+                    ))}
+                  </Bar>
+                ))}
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+          {weeks.at(-1)?.partial && (
+            <p className="muted small">
+              Faded bars: this week so far (Mon{today === "Mon" ? "" : `–${today}`}).
+            </p>
+          )}
+        </>
+      ) : (
+        <p className="muted small">Nothing drawn yet.</p>
+      )}
+    </section>
+  );
+}
+const weeklyWords = (weeks: ReturnType<typeof weeklyUse>, tanks: StockTank[]) =>
+  `Used per week: ${weeks
+    .map(
+      (week) =>
+        `${week.partial ? "this week so far" : `week of ${shortDate(Date.parse(`${week.week}T00:00:00Z`), "UTC")}`} ${tanks
+          .map((tank) => `${tank.name} ${volume(week.byTank[tank.id] ?? 0)}`)
+          .join(", ")}`,
+    )
+    .join("; ")}`;
+
+/** Refills to capacity: from the Journal on 3.18; on an older integration, each tank's last one (the
+ * only one it keeps), less those Undo took back this visit (`undone`, see refillRows). */
+function Refills({
+  controller,
+  doc,
+  undone,
+}: {
+  controller: Controller;
+  doc: StockDocument;
+  undone: ReadonlySet<string>;
+}) {
+  const tz = controller.timeZone;
+  const journal = useParity<{ events: CsEvent[] }>(
+    controller,
+    "journal_query",
+    {
+      room_id: controller.roomId,
+      since: new Date(Date.now() - REFILL_DAYS * 86_400_000).toISOString(),
+      kinds: ["stock.refilled"],
+      limit: 500,
+    },
+    [controller.roomId, doc.revision],
+  );
+  // The list last shown, kept while the Journal reloads after a write.
+  const last = useRef<RefillsView | null>(null);
+  const view = refillsView(journal.state, journal.data?.events ?? null, doc.tanks, undone, last.current);
+  last.current = view;
+  return (
+    <section
+      className="panel stock-refills"
+      data-stock-refills
+      aria-labelledby="stock-refills-title"
+    >
+      <h2 id="stock-refills-title">Refills</h2>
+      {journal.state === "error" && <p className="workspace-message error">{journal.error}</p>}
+      {!view && journal.state !== "error" && <p className="muted small">Loading refills…</p>}
+      {view &&
+        (view.rows.length ? (
+          <ul className="stock-refill-list">
+            {view.rows.map((row) => (
+              <li key={row.key} data-stock-hue={row.hue % 8} data-stock-refill>
+                <span className="stock-refill-tank">
+                  <span className="stock-swatch" aria-hidden="true" />
+                  {row.tank}
+                </span>
+                <span className="stock-refill-date">{shortDate(row.at, tz)}</span>
+                <span className="stock-refill-amount">
+                  {row.added !== null && row.added >= 0 ? `+${volume(row.added)}, ` : ""}
+                  to {volume(row.to)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="muted small">No refills logged in the last {REFILL_DAYS} days.</p>
+        ))}
+      {view?.older && (
+        <p className="muted small" data-stock-refills-older>
+          This integration keeps only each tank's last refill to full.
+        </p>
       )}
     </section>
   );
@@ -424,6 +594,13 @@ export function StockTanks({
   const [busy, setBusy] = useState(false);
   const [editing, setEditing] = useState<StockTankDraft[] | null>(null);
   const [confirmBatch, setConfirmBatch] = useState(false);
+  // Refills Undo took back this visit, as "<tank id>@<refilled_at>": an older integration keeps the
+  // refill time through the put-back, so Refills leaves these out itself.
+  const [undone, setUndone] = useState<ReadonlySet<string>>(new Set());
+  // The newest document, for an Undo pressed after later changes.
+  const latest = useRef<StockDocument | null>(null);
+  latest.current = doc;
+  const tz = controller.timeZone;
   useEffect(() => {
     let current = true;
     setDoc(null);
@@ -436,24 +613,55 @@ export function StockTanks({
       current = false;
     };
   }, [controller.roomId, controller.connection]);
-  const act = async (action: "stock_save" | "stock_refill" | "stock_record_batch", data = {}) => {
-    if (!doc) return false;
+  const act = async (
+    action: "stock_save" | "stock_refill" | "stock_record_batch",
+    data = {},
+  ): Promise<StockDocument | null> => {
+    if (!doc) return null;
     setBusy(true);
     setError("");
     try {
-      setDoc(
-        await controller.operator<StockDocument>(action, {
-          ...data,
-          expected_revision: doc.revision,
-        }),
-      );
-      return true;
+      const next = await controller.operator<StockDocument>(action, {
+        ...data,
+        expected_revision: doc.revision,
+      });
+      setDoc(next);
+      return next;
     } catch (err) {
       setError(errorText(err));
-      return false;
+      return null;
     } finally {
       setBusy(false);
     }
+  };
+  /** Refilled to capacity at once, with Undo: back to the level it read before. */
+  const refill = async (tank: StockTank) => {
+    const before = tank.level_l;
+    const after = await act("stock_refill", { id: tank.id });
+    if (!after) return;
+    const read = after.tanks.find((t) => t.id === tank.id);
+    if (!read || !sameValue(String(read.level_l), tank.capacity_l)) {
+      toast.error(
+        `The controller did not confirm ${tank.name} at ${volume(tank.capacity_l)}. Reload and check it.`,
+      );
+      return;
+    }
+    offerUndo({
+      message: `${tank.name} refilled to ${volume(read.level_l)}. Written and read back ${clock(Date.now(), tz)}.`,
+      undo: async () => {
+        if (!latest.current) return;
+        setBusy(true);
+        try {
+          setDoc(await undoRefill(controller, latest.current, tank.id, read.level_l, before));
+          setUndone((done) => new Set(done).add(`${tank.id}@${read.refilled_at}`));
+          toast.success(
+            `${tank.name} put back to ${volume(before)}. Written and read back ${clock(Date.now(), tz)}.`,
+          );
+        } finally {
+          setBusy(false);
+        }
+      },
+    });
   };
   const edit = () =>
     setEditing(
@@ -477,17 +685,19 @@ export function StockTanks({
         draw: pumpDraw(pump.id, rows, status?.pumps[pump.id]?.last ?? null),
       });
   // A linked tank runs out by batches only while its pump is in the recipe.
-  const doses = {
+  const doses: Record<string, number> = {
     ...doc?.doses,
     ...Object.fromEntries(
       [...links].map(([id, link]) => [id, link.draw?.per === "batch" ? link.draw.ml : 0]),
     ),
   };
   const next = doc ? nextToRunOut(doc.tanks, doses) : null;
+  const every = doc ? batchEveryDays(doc.history) : null;
+  const largest = doc ? Math.max(...doc.tanks.map((tank) => tank.capacity_l)) : 0;
   return (
-    <>
+    <div className="stock-page">
       <Heading
-        title="Stock tanks"
+        title={`Stock tanks · ${controller.room.room.name}`}
         action={
           doc && (
             <div className="heading-actions">
@@ -512,38 +722,6 @@ export function StockTanks({
           {doc.error}
         </p>
       )}
-      {next && (
-        <p className="stock-next" data-stock-next>
-          Next to run out: <strong>{next.tank.name}</strong>, about {next.batches}{" "}
-          {next.batches === 1 ? "batch" : "batches"} left.
-        </p>
-      )}
-      {doc && (
-        <p className="stock-source" data-stock-source>
-          {doc.fill_entity ? (
-            <>
-              Batches are counted from <code>{doc.fill_entity}</code>: each newer fill time takes
-              one batch's dose from every tank
-              {links.size ? " not linked to a dosing pump" : ""}. Last batch {when(doc.last_batch)}.
-            </>
-          ) : (
-            <>
-              No tank last-fill entity is mapped, so record each batch by hand, or{" "}
-              <Button
-                variant="link"
-                className="inline-link"
-                onClick={() => navigate("equipment/setup")}
-              >
-                map one in Rooms and setup
-              </Button>
-              .
-            </>
-          )}
-          {links.size
-            ? " A tank linked to a dosing pump is drawn by what the pump runs, whoever starts the dose."
-            : ""}
-        </p>
-      )}
       {!doc && !error && <p className="muted">Loading stock tanks…</p>}
       {doc && !doc.tanks.length && !doc.error && (
         <Empty
@@ -557,22 +735,67 @@ export function StockTanks({
         />
       )}
       {doc && !!doc.tanks.length && (
-        <div className="stock-grid">
-          {doc.tanks.map((tank) => (
-            <TankCard
-              key={tank.id}
-              tank={tank}
-              dose={doc.doses[tank.id]}
-              link={links.get(tank.id) ?? null}
-              draws={doc.history.filter(
-                (entry) => PUMPED.includes(entry.source) && entry.draw_ml[tank.id] !== undefined,
-              )}
-              busy={busy}
-              onRefill={() => void act("stock_refill", { id: tank.id })}
-              onLevel={(level) => act("stock_refill", { id: tank.id, level_l: level })}
-            />
-          ))}
-        </div>
+        <>
+          <p className="stock-rhythm" data-stock-rhythm>
+            {doc.tanks.some((tank) => Math.cbrt(tank.capacity_l / largest) < MIN_BOTTLE)
+              ? "Drawn to scale, the smallest tanks a little larger"
+              : "Drawn to scale"}
+            {every
+              ? ` · one batch every ${number(every, 1)} ${number(every, 1) === "1" ? "day" : "days"} at current use`
+              : ""}
+          </p>
+          <section className="panel stock-shelf" aria-label="Stock tanks">
+            {doc.tanks.map((tank, index) => (
+              <TankCard
+                key={tank.id}
+                tank={tank}
+                hue={index}
+                scale={largest > 0 ? tank.capacity_l / largest : 1}
+                perBatchMl={doses[tank.id] ?? tank.dose_ml}
+                every={every}
+                link={links.get(tank.id) ?? null}
+                next={next?.tank.id === tank.id}
+                busy={busy}
+                onRefill={() => void refill(tank)}
+                onLevel={async (level) =>
+                  !!(await act("stock_refill", { id: tank.id, level_l: level }))
+                }
+              />
+            ))}
+          </section>
+          <div className="stock-lower">
+            <UsedPerWeek doc={doc} tz={tz} />
+            <div className="stock-side">
+              <Refills controller={controller} doc={doc} undone={undone} />
+              <p className="stock-source" data-stock-source>
+                {doc.fill_entity ? (
+                  <>
+                    Batches are counted from <code>{doc.fill_entity}</code>: each newer fill time
+                    takes one batch's dose from every tank
+                    {links.size ? " not linked to a dosing pump" : ""}. Last batch{" "}
+                    {at(doc.last_batch, tz)}.
+                  </>
+                ) : (
+                  <>
+                    No tank last-fill entity is mapped, so record each batch by hand, or{" "}
+                    <Button
+                      variant="link"
+                      className="inline-link"
+                      onClick={() => navigate("equipment/setup")}
+                    >
+                      map one in Rooms and setup
+                    </Button>
+                    .
+                  </>
+                )}
+                {links.size
+                  ? " A tank linked to a dosing pump is drawn by what the pump runs, whoever starts the dose."
+                  : ""}{" "}
+                Set a tank's level any time you weigh or dip it.
+              </p>
+            </div>
+          </div>
+        </>
       )}
       {doc && !!doc.history.length && (
         <details className="stock-history-more">
@@ -595,7 +818,7 @@ export function StockTanks({
                 <tbody>
                   {doc.history.slice(0, 10).map((batch, index) => (
                     <tr key={`${batch.at}-${index}`}>
-                      <td>{when(batch.at)}</td>
+                      <td>{at(batch.at, tz)}</td>
                       <td>
                         <span className="pill" data-tone="unknown">
                           {SOURCES[batch.source] ?? batch.source}
@@ -658,6 +881,6 @@ export function StockTanks({
           </DialogContent>
         </Dialog>
       )}
-    </>
+    </div>
   );
 }

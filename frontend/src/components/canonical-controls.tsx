@@ -12,11 +12,14 @@ export function CanonicalControls({
   controller,
   owner,
   zoneId,
+  hide = [],
   onDirtyChange,
 }: {
   controller: Controller;
   owner: ConfigOwner;
   zoneId?: number;
+  /** Features another editor on the same page writes. */
+  hide?: readonly string[];
   onDirtyChange?: (dirty: boolean) => void;
 }) {
   const [staged, setStaged] = useState<Record<string, Value>>({});
@@ -28,7 +31,7 @@ export function CanonicalControls({
     room.zones.map((z) => z.id),
     room.engine.entityId,
   )
-    .filter((f) => ownerKey(f.feature) === owner)
+    .filter((f) => ownerKey(f.feature) === owner && !hide.includes(f.feature.id))
     .map((f) => ({
       ...f,
       controls: [f.master, ...f.settings].flatMap((r) => {

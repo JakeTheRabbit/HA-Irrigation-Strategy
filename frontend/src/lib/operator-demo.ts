@@ -1,9 +1,12 @@
 import { GrowsDemo } from "./grows-demo";
 import { RunDemo } from "./comparison-demo";
 import { DosingDemo } from "./dosing-demo";
+import type { DosingDocument } from "./dosing";
+import { PumpDemo } from "./pump-demo";
 import { NotifyDemo } from "./notify-demo";
 import { StockDemo } from "./stock-demo";
 import { CalibrationDemo } from "./calibration";
+import { FeedCalibrationDemo } from "./parity-demo/feed-calibration";
 import type {
   OperatorAction,
   StrategyDocument,
@@ -24,9 +27,40 @@ import type { Overlay } from "./overlays";
 import { DEMO_WHATS_NEW } from "./whats-new-demo";
 import { compareVersions } from "./whats-new";
 import { InstructionsDemo } from "./brain-instructions";
-import { DISPLAY_DEFAULTS, displayEntityId, readDisplay, type DisplayOptions } from "./display";
+import { DISPLAY_DEFAULTS, displayEntityId, readDisplay, validDisplayValue, type DisplayOptions } from "./display";
+import type { DemoBackend } from "./demo";
+import { isParityAction } from "./parity-api";
+import { demoEnvelope, parityDemo } from "./parity-demo";
+import {
+  demoTargetWrite,
+  journalDemoTargetWrite,
+  resetDemoTargetWrites,
+  demoSetpointLog,
+  seedDemoChanges,
+  settleDemoTargetWrite,
+} from "./parity-demo/targets";
+import { resetDemoAlertRules } from "./parity-demo/settings";
+import { resetDemoTimers } from "./parity-demo/timers";
+import { answerPresets, resetDemoPresets } from "./parity-demo/presets";
+import { answerSupply, resetDemoSupply } from "./parity-demo/supply";
+import {
+  answerProbeOffset,
+  demoProbeOffsets,
+  isDemoOffsetWrite,
+  resetDemoProbeOffsets,
+  revertProbeOffset,
+} from "./parity-demo/equipment";
+import { sameValue } from "./utils";
 
 const clone = <T>(value: T): T => structuredClone(value);
+const FEED_CALIBRATION: readonly string[] = [
+  "calibration_start",
+  "calibration_capture",
+  "calibration_status",
+  "calibration_commit",
+  "calibration_revert",
+  "calibration_abandon",
+];
 export class OperatorDemo {
   private instructions = new InstructionsDemo();
   private runDemo?: RunDemo;
@@ -35,6 +69,8 @@ export class OperatorDemo {
   private stockDemo: StockDemo;
   private dosingDemo?: DosingDemo;
   private calibrationDemo?: CalibrationDemo;
+  private feedCalibrationDemo?: FeedCalibrationDemo;
+  private pumpDemo?: PumpDemo;
   private notifyDemo?: NotifyDemo;
   private plans = new Map<string, StrategyDocument>();
   private rooms: SetupRoom[] | null = null;
@@ -52,8 +88,17 @@ export class OperatorDemo {
     whatsNew: string | null = null,
     /** Whose phone the notifications demo answers as; null: the owner, an administrator. */
     private notifyUser: string | null = null,
+    /** `?backend=3.17`: no v2 services, and no v2 envelope on the existing ones. */
+    private backend: DemoBackend = "3.18",
   ) {
     this.stockDemo = new StockDemo(getStates, updateStates);
+    // The demo Journal's own setpoint writes and timer programs belong to this demo and its backend only.
+    resetDemoTargetWrites();
+    resetDemoTimers();
+    resetDemoAlertRules();
+    resetDemoPresets();
+    resetDemoSupply();
+    resetDemoProbeOffsets();
     this.whatsNewSeen =
       whatsNew === "unknown"
         ? null
@@ -364,26 +409,29 @@ export class OperatorDemo {
     const prefix = roomId.replace(/^room:/, "");
     const states = this.getStates();
     const entity = `number.crop_steering_${prefix}zone_3_p2_shot_size`;
+    // Zone 2's salt judge diluted its maintenance feed: the pore EC suggestion on its page.
+    const feed = `number.crop_steering_${prefix}zone_2_ec_target_veg_p2`;
     if (!this.overlays.has(roomId)) {
       const now = Date.now();
       const value = Number(states[entity]?.state);
-      this.overlays.set(
-        roomId,
-        states[`sensor.crop_steering_${prefix}zone_3_jev`] && Number.isFinite(value)
-          ? [
-              {
-                entity_id: entity,
-                zone: 3,
-                field: "p2_shot_size",
-                old: 4.5,
-                new: value,
-                by: "brain",
-                at: new Date(now - 3 * 3_600_000).toISOString(),
-                expires: new Date(now + 9 * 3_600_000).toISOString(),
-              },
-            ]
-          : [],
-      );
+      const diluted = Number(states[feed]?.state);
+      const rows: Overlay[] = [];
+      const open = (entity_id: string, zone: number, field: string, old: number, value: number) =>
+        rows.push({
+          entity_id,
+          zone,
+          field,
+          old,
+          new: value,
+          by: "brain",
+          at: new Date(now - 3 * 3_600_000).toISOString(),
+          expires: new Date(now + 9 * 3_600_000).toISOString(),
+        });
+      if (states[`sensor.crop_steering_${prefix}zone_3_jev`] && Number.isFinite(value))
+        open(entity, 3, "p2_shot_size", 4.5, value);
+      if (states[`sensor.crop_steering_${prefix}zone_2_jev`] && Number.isFinite(diluted))
+        open(feed, 2, "ec_target_veg_p2", 3.4, diluted);
+      this.overlays.set(roomId, rows);
     }
     const rows = this.overlays.get(roomId)!;
     if (action === "overlay_get")
@@ -418,20 +466,115 @@ export class OperatorDemo {
       throw new Error("Display options changed elsewhere. Reload before saving.");
     const changes = (data.options ?? {}) as Record<string, unknown>;
     for (const [key, value] of Object.entries(changes)) {
-      if (!(key in DISPLAY_DEFAULTS)) throw new Error(`Unknown display option: ${key}`);
-      const choice = key === "today_zone_layout";
-      if (choice ? value !== "cards" && value !== "table" : typeof value !== "boolean")
-        throw new Error(`${key}: invalid value`);
+      // An option the room's sensor does not carry is one this integration does not know (the
+      // units before 3.18).
+      if (!(key in DISPLAY_DEFAULTS) || !(key in states[id].attributes))
+        throw new Error(`Unknown display option: ${key}`);
+      if (!validDisplayValue(key as keyof DisplayOptions, value)) throw new Error(`${key}: invalid value`);
     }
     const options = { ...current.options, ...changes } as DisplayOptions;
     const revision = current.revision + 1;
     this.updateStates({
       ...states,
-      [id]: { ...states[id], state: String(revision), attributes: { ...options } },
+      [id]: { ...states[id], state: String(revision), attributes: { ...states[id].attributes, ...changes } },
     });
     return response(revision, options);
   }
+  /** One number entity set to `value` (a copy's write); the states after it. */
+  private writeNumber(entityId: string, value: number): States {
+    const states = this.getStates();
+    const next = { ...states, [entityId]: { ...states[entityId], state: String(value), last_changed: new Date().toISOString() } };
+    this.updateStates(next);
+    return next;
+  }
+  /** A 3.18 integration journals each base setpoint write as a manual `target.changed`. */
+  journalTarget(roomId: string, prefix: string, entityId: string, old: number | null, value: number) {
+    if (this.backend === "3.18") journalDemoTargetWrite(roomId, prefix, entityId, old, value, Date.now());
+  }
+  /** `history_revert` of one of the demo's own setpoint writes: the old value back, read back, and
+   * journalled as a manual "put back"; refused once the entity no longer holds the written value. */
+  private revertTarget(eventId: string, roomId: unknown) {
+    const write = demoTargetWrite(eventId)!;
+    const states = this.getStates();
+    const now = Date.now();
+    if (!write.revertible) return { api: 2, ok: false, error: { code: "invalid", message: "This change can't be put back" } };
+    if (typeof write.old !== "number" || !sameValue(states[write.entity_id]?.state, Number(write.new)))
+      return {
+        api: 2,
+        ok: false,
+        error: { code: "stale_revision", message: "This value has changed since. Reload and check it before trying again." },
+      };
+    this.updateStates({ ...states, [write.entity_id]: { ...states[write.entity_id], state: String(write.old), last_changed: new Date(now).toISOString() } });
+    settleDemoTargetWrite(eventId);
+    const prefix = String(write.room_id).replace(/^room:/, "");
+    const newId = journalDemoTargetWrite(write.room_id, prefix, write.entity_id, Number(write.new), write.old, now, "put back");
+    return demoEnvelope({ reverted_event_id: eventId, new_event_id: newId, readback: "verified" }, now, roomId);
+  }
+  private feedCalibration() {
+    return (this.feedCalibrationDemo ||= new FeedCalibrationDemo(
+      this.getStates,
+      this.updateStates,
+      () => (this.calibrationDemo ||= new CalibrationDemo(this.getStates)),
+    ));
+  }
   async call<T>(action: OperatorAction, data: Record<string, unknown>): Promise<T> {
+    if (action === "history_changes" && this.backend === "3.18") seedDemoChanges(this.getStates(), Date.now());
+    if (action === "history_revert" && this.backend === "3.18" && demoTargetWrite(String(data.event_id)))
+      return this.revertTarget(String(data.event_id), data.room_id) as T;
+    // Presets read and write the demo's own states; an older integration has none of them.
+    if (this.backend === "3.18" && ["preset_list", "preset_save", "preset_delete", "preset_apply", "copy_config"].includes(action))
+      return answerPresets(action, data, this.getStates(), (entityId, value) => this.writeNumber(entityId, value), Date.now()) as T;
+    // The supply reads the demo rooms' own zone sizing.
+    if (this.backend === "3.18" && (action === "supply_get" || action === "supply_save")) {
+      const rooms = this.setup()
+        .rooms.filter((r) => r.active)
+        .map((r) => ({
+          room_id: "room:" + r.prefix,
+          pump: String(r.hardware.pump_switch || ""),
+          zones: Object.fromEntries(
+            r.zones
+              .filter((z) => z.active)
+              .map((z) => [String(z.id), z.plant_count * (z.drippers_per_plant ?? 1) * (z.dripper_flow_rate ?? 0)]),
+          ),
+        }));
+      const now = Date.now();
+      const { answer, states } = answerSupply(action, data, rooms, this.getStates(), now);
+      if (states) this.updateStates(states);
+      const envelope = typeof answer === "object" && answer !== null && (answer as { api?: unknown }).api === 2;
+      return (envelope ? answer : demoEnvelope(answer, now)) as T;
+    }
+    // Probe offsets read and write the demo's own probes (parity-demo/equipment.ts).
+    if (this.backend === "3.18" && action === "probe_offset_set")
+      return answerProbeOffset(data, this.getStates(), this.updateStates, Date.now()) as T;
+    if (action === "history_revert" && this.backend === "3.18" && isDemoOffsetWrite(String(data.event_id)))
+      return revertProbeOffset(String(data.event_id), this.getStates(), this.updateStates, Date.now()) as T;
+    // The guided feed pH/EC calibration drives the demo's feed probes and its calibration store.
+    if (
+      this.backend === "3.18" &&
+      ((FEED_CALIBRATION.includes(action) && this.feedCalibration().handles(action, data)) ||
+        (action === "history_revert" && this.feedCalibration().owns(String(data.event_id))))
+    )
+      return this.feedCalibration().call(action, data) as T;
+    // Pump prime and calibration act on the demo's own dosing setup and flow numbers.
+    if (this.backend === "3.18" && action.startsWith("pump_")) {
+      const answer = (this.pumpDemo ||= new PumpDemo(this.getStates, this.updateStates)).call(action, data);
+      if (answer !== undefined) return answer as T;
+    }
+    if (isParityAction(action)) return (await parityDemo(action, data, Date.now(), this.backend)) as T;
+    // An existing service asked for v2: a 3.18 integration wraps its v1 answer in the envelope; a
+    // 3.17 one answers v1, which callV2 reads as missing.
+    if (data.api === 2) {
+      const { api: _api, ...v1 } = data;
+      if (this.backend === "3.17") return this.call<T>(action, v1);
+      try {
+        return demoEnvelope(await this.call<unknown>(action, v1), Date.now(), data.room_id) as T;
+      } catch (error) {
+        // The 3.18 integration answers a refusal inside the envelope; a moved revision keeps its code.
+        const message = error instanceof Error ? error.message : String(error);
+        const code = /revision|changed elsewhere|Reload/i.test(message) ? "stale_revision" : "invalid";
+        return { api: 2, ok: false, error: { code, message } } as T;
+      }
+    }
     if (action === "stop_all") {
       // The demo's room: its kill switch off, as the integration's Stop all does first.
       const prefix = String(data.room_id).replace(/^room:/, "");
@@ -487,7 +630,12 @@ export class OperatorDemo {
       return { seen: this.whatsNewSeen } as T;
     }
     if (action === "setpoint_log_get")
-      return { schema_version: 1, room_id: data.room_id, changes: [], error: null } as T;
+      return {
+        schema_version: 1,
+        room_id: data.room_id,
+        changes: data.room_id === "room:" ? demoSetpointLog(this.getStates(), Date.now()) : [],
+        error: null,
+      } as T;
     if (action.startsWith("brain_prompt_")) return this.instructions.call(action, data) as T;
     if (action.startsWith("overlay_")) return this.overlay(action, data) as T;
     if (action === "display_get" || action === "display_save")
@@ -514,7 +662,11 @@ export class OperatorDemo {
     if (action.startsWith("stock_")) return this.stockDemo.call(action, data) as T;
     if (action.startsWith("calibration_")) {
       this.calibrationDemo ||= new CalibrationDemo(this.getStates);
-      return this.calibrationDemo.call(action, data) as T;
+      const document = this.calibrationDemo.call(action, data);
+      // A 3.18 integration keeps each moisture probe's offset in the same store.
+      if (this.backend === "3.18" && action === "calibration_get")
+        return { ...document, probe_user_offsets: demoProbeOffsets(String(data.room_id)) } as T;
+      return document as T;
     }
     if (action.startsWith("dosing_")) {
       // The demo's controller draws each dose from its pump's stock tank with stock_draw.
@@ -522,12 +674,15 @@ export class OperatorDemo {
         this.stockDemo.call(name, args),
       );
       const result = this.dosingDemo.call(action, data);
+      // A 3.18 integration's dosing_get carries the pump catalogue, calibrations and open sessions.
+      if (action === "dosing_get" && this.backend === "3.18")
+        return (this.pumpDemo ||= new PumpDemo(this.getStates, this.updateStates)).decorate(result as DosingDocument) as T;
       // A saved setup can link a pump to another tank: the integration rewrites the stock sensor.
       if (action === "dosing_save" && !result.error) this.stockDemo.publish(String(data.room_id));
       return result as T;
     }
     if (action.startsWith("notify_")) {
-      this.notifyDemo ||= new NotifyDemo(this.getStates, this.updateStates, this.notifyUser);
+      this.notifyDemo ||= new NotifyDemo(this.getStates, this.updateStates, this.notifyUser, this.backend);
       return this.notifyDemo.call(action, data) as T;
     }
     let result: unknown;

@@ -187,9 +187,11 @@
 .facility-tank[data-held] {
   border-color: var(--destructive);
 }
+.facility-tank > span[aria-hidden="true"] {
+  flex: none;
+}
 .facility-tank .feed-tank {
   width: 52px;
-  flex: none;
 }
 .facility-tank-facts {
   display: grid;
@@ -209,10 +211,12 @@
   font-size: var(--text-lg);
   font-weight: 600;
 }
-.facility-tank-readings {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 2px var(--space-3);
+/* One line, "pH 5.84 · EC 2.4 · 19.8 °C", wrapping only between readings. */
+.facility-tank-readings > span {
+  white-space: nowrap;
+}
+.facility-tank-readings .facility-due {
+  margin-left: 0;
 }
 
 /* Zones: one card each, its slab, its state, what it drank, its readings and its sensors. */
@@ -235,8 +239,8 @@
 .facility-zone:hover {
   border-color: color-mix(in srgb, var(--foreground) 30%, var(--border));
 }
-/* The whole card opens the zone: its title button reaches over it. */
-.facility-zone h3 button::after {
+/* The whole card opens the zone: its title link reaches over it. */
+.facility-zone h3 a::after {
   content: "";
   position: absolute;
   inset: 0;
@@ -300,16 +304,46 @@
   font-size: var(--text-lg);
   font-weight: 600;
 }
-.facility-zone h3 button {
+.facility-zone h3 a {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 0;
-  border: 0;
-  background: none;
   color: var(--foreground);
-  font: inherit;
-  cursor: pointer;
+  text-decoration: none;
+}
+.facility-zone h3 a:hover {
+  color: var(--primary);
+}
+/* The last shot came up short: its drop is drawn hollow. */
+.facility-zone[data-last-shot="hollow"] .shot-dot:has(+ :not(.shot-dot)) {
+  background: none;
+  border: 1.5px solid var(--primary);
+}
+/* Waiting for the pump, or how much of the last shot arrived: facts, not alarms. */
+.facility-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--muted-foreground);
+}
+.facility-line svg {
+  flex: none;
+}
+.facility-zone[data-last-shot="hollow"] [data-facility-flow] {
+  color: var(--foreground);
+}
+/* A feed probe due for calibration, beside the reading it affects. */
+.facility-due {
+  margin-left: 6px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--warning) 18%, var(--surface));
+  color: var(--foreground);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  white-space: nowrap;
 }
 .facility-zone-chips {
   display: flex;
@@ -568,4 +602,147 @@
 .facility-gauges {
   display: grid;
   gap: 6px;
+}
+
+/* Phone (P1): the room's head, its zones as three tiles, and one feed line. */
+.facility-phone {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-3);
+}
+.facility-phone-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px var(--space-2);
+}
+.facility-phone .facility-room-day {
+  margin-left: auto;
+  font-size: var(--text-md);
+}
+.facility-phone-drink {
+  margin: 0;
+  color: var(--muted-foreground);
+  font-variant-numeric: tabular-nums;
+}
+.facility-phone-drink strong {
+  color: var(--foreground);
+  font-size: var(--text-lg);
+  font-weight: 600;
+}
+.facility-tiles {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+.facility-tile {
+  display: block;
+  min-width: 0;
+  color: var(--foreground);
+  text-decoration: none;
+}
+.facility-tile-body {
+  display: grid;
+  align-content: start;
+  gap: 4px;
+  height: 100%;
+  padding: var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--background);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+.facility-tile-body[data-level="warning"] {
+  border-color: var(--warning);
+}
+.facility-tile-body[data-mode="watering"] {
+  border-color: var(--primary);
+}
+.facility-tile-body[data-mode="room-off"],
+.facility-tile-body[data-mode="offline"],
+.facility-tile-body[data-mode="paused"],
+.facility-tile-body[data-mode="watering-off"] {
+  background: repeating-linear-gradient(
+    -45deg,
+    var(--background),
+    var(--background) 8px,
+    color-mix(in srgb, var(--muted-foreground) 8%, var(--background)) 8px,
+    color-mix(in srgb, var(--muted-foreground) 8%, var(--background)) 16px
+  );
+}
+.facility-tile-body[data-mode="paused"] .zone-slab,
+.facility-tile-body[data-mode="offline"] .zone-slab,
+.facility-tile-body[data-mode="room-off"] .zone-slab,
+.facility-tile-body[data-mode="watering-off"] .zone-slab {
+  filter: grayscale(1);
+  opacity: 0.6;
+}
+.facility-tile-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+}
+.facility-tile .zone-slab {
+  width: 100%;
+  max-width: 96px;
+  justify-self: center;
+}
+.facility-tile-reading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0 4px;
+}
+.facility-tile-reading strong {
+  font-size: var(--text-md);
+  font-weight: 600;
+}
+.facility-tile .facility-mode {
+  justify-self: start;
+  padding: 0;
+  border: 0;
+}
+.facility-tile-line {
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+}
+.facility-tile-problem {
+  color: color-mix(in srgb, var(--warning) 70%, var(--foreground));
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+.facility-phone-feed {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--background);
+  color: var(--foreground);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  text-align: left;
+  cursor: pointer;
+}
+.facility-phone-feed > span[aria-hidden="true"] {
+  flex: none;
+}
+.facility-phone-feed .feed-tank {
+  width: 28px;
+}
+.facility-nowrap {
+  white-space: nowrap;
+}
+.facility-phone-feed-text {
+  flex: 1 1 160px;
+}
+.facility-phone-low {
+  margin-left: auto;
+  color: color-mix(in srgb, var(--warning) 70%, var(--foreground));
+  font-weight: 600;
 }

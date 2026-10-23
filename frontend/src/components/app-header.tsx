@@ -5,29 +5,39 @@ import { ActivityPanel } from "@/components/activity-panel";
 import { UiTip } from "@/components/info-tip";
 import { BrainChip } from "@/components/brain";
 import { SafetySwitches } from "@/components/room-controls";
-import { ageText, ageTone, updatedText } from "@/lib/controller-health";
+import { CommandPalette } from "@/components/command-palette";
+import type { PaletteEntry } from "@/lib/command-palette";
+import { ageTone, updatedText } from "@/lib/controller-health";
 import { roomStatus, staleBanner } from "@/lib/model";
 import type { Controller } from "@/lib/types";
 import "./app-header.css";
 
-/** The frame's top bar on every page: each room as a status dot and a short state (the selected one
- * pressed; another one opens it), how old the selected room's controller data is, the AI assistant's
- * state, the recent records and refresh, and the room's two safety switches. */
+/** The frame's top bar on every page: how old the selected room's controller data is, the AI
+ * assistant's state, Jump to… (the palette), the recent records and refresh, then the selected
+ * room's name and its two safety switches. The room tree is the room picker, so no room chips.
+ * A phone leads with the page's title over the data's age and the AI's state. */
 export function AppHeader({
   controller,
+  title,
+  roomName,
   haMenu,
   openNavigation,
-  selectRoom,
+  jump,
   openLog,
   openBrain,
   refresh,
   refreshing,
 }: {
   controller: Controller;
+  /** The open page's title, the phone header's first line. */
+  title: string;
+  /** The selected room, named beside the switches that act on it. */
+  roomName: string;
   /** Opens Home Assistant's own menu, when the dashboard runs inside it. */
   haMenu: (() => void) | null;
   openNavigation: () => void;
-  selectRoom: (id: string) => void;
+  /** Opens what the palette picked. */
+  jump: (entry: PaletteEntry) => void;
   openLog: () => void;
   /** Opens the AI assistant page. */
   openBrain: () => void;
@@ -41,11 +51,8 @@ export function AppHeader({
     return () => window.clearInterval(timer);
   }, []);
   const now = Date.now();
-  const rooms = controller.rooms.map((room) => ({
-    room,
-    status: roomStatus(controller.states, room, now),
-  }));
-  const selected = rooms.find((item) => item.room.id === controller.roomId)?.status;
+  const room = controller.rooms.find((item) => item.id === controller.roomId);
+  const selected = room ? roomStatus(controller.states, room, now) : undefined;
   const age = selected?.reportedAt == null ? null : now - selected.reportedAt;
   const { connection } = controller;
   return (
@@ -70,57 +77,38 @@ export function AppHeader({
       >
         <Menu size={21} />
       </Button>
-      <div className="room-chips" role="group" aria-label="Rooms">
-        {rooms.map(({ room, status }) => {
-          const current = room.id === controller.roomId;
-          const roomAge = status.reportedAt === null ? null : now - status.reportedAt;
-          return (
-            <button
-              type="button"
-              key={room.id}
-              className="room-chip"
-              data-tone={status.tone}
-              data-room={room.id}
-              aria-pressed={current}
-              title={`${room.name}: ${status.text}. ${status.detail}${
-                roomAge === null ? "" : ` Data ${ageText(roomAge)} old.`
-              }${current ? "" : " Select to open this room."}`}
-              onClick={() => {
-                if (!current) selectRoom(room.id);
-              }}
+      <div className="topbar-status">
+        <span className="topbar-title">{title}</span>
+        <span className="topbar-facts">
+          {controller.demo && (
+            <span
+              className="demo-pill"
+              title="Sample readings. The dashboard shows sample readings. Your changes stay in this browser tab. The dashboard connects to no live equipment."
             >
-              <span className="room-chip-dot" aria-hidden="true" />
-              <span className="room-chip-words">
-                <span className="room-chip-name">{room.name}</span>
-                <span className="room-chip-state">{status.text}</span>
-              </span>
-            </button>
-          );
-        })}
+              Demo<span className="wide-only"> data</span>
+            </span>
+          )}
+          <span
+            className="data-age"
+            data-age={connection === "offline" ? "red" : ageTone(age)}
+            title="Age of the latest report. The time since the controller of the selected room sent its latest report."
+          >
+            {connection === "offline"
+              ? "Offline"
+              : connection === "connecting"
+                ? "Connecting…"
+                : age === null
+                  ? "No controller data"
+                  : updatedText(age)}
+          </span>
+          <span className="topbar-facts-dot" aria-hidden="true">
+            ·
+          </span>
+          <BrainChip controller={controller} open={openBrain} />
+        </span>
       </div>
       <div className="connection-info">
-        {controller.demo && (
-          <span
-            className="demo-pill"
-            title="Sample readings. The dashboard shows sample readings. Your changes stay in this browser tab. The dashboard connects to no live equipment."
-          >
-            Demo<span className="wide-only"> data</span>
-          </span>
-        )}
-        <span
-          className="data-age"
-          data-age={connection === "offline" ? "red" : ageTone(age)}
-          title="Age of the latest report. The time since the controller of the selected room sent its latest report."
-        >
-          {connection === "offline"
-            ? "Offline"
-            : connection === "connecting"
-              ? "Connecting…"
-              : age === null
-                ? "No controller data"
-                : updatedText(age)}
-        </span>
-        <BrainChip controller={controller} open={openBrain} />
+        <CommandPalette controller={controller} jump={jump} />
         <ActivityPanel controller={controller} openLog={openLog} />
         <Button
           variant="ghost"
@@ -135,7 +123,7 @@ export function AppHeader({
           className="header-safety-scope"
           title="Watering and stop controls apply only to this selected room"
         >
-          {controller.room.room.name}
+          {roomName}
         </span>
         <SafetySwitches controller={controller} />
       </div>

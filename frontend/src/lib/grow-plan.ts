@@ -339,3 +339,48 @@ export function parsePlanImport(text: string): GrowPlan {
       throw new Error("Invalid zone schedule.");
   return structuredClone(plan);
 }
+
+/** How many edits a draft holds against the saved plan: its name, each profile value (or a profile
+ * added or removed), each zone's start date (or a zone added or removed) and each run of days
+ * whose profile or balance changed. */
+export function planEdits(saved: GrowPlan, draft: GrowPlan): number {
+  let edits = (saved.name ?? "") === (draft.name ?? "") ? 0 : 1;
+  const ids = new Set([...saved.profiles, ...draft.profiles].map((p) => p.id));
+  for (const id of ids) {
+    const a = saved.profiles.find((p) => p.id === id),
+      b = draft.profiles.find((p) => p.id === id);
+    if (!a || !b) edits++;
+    else {
+      if (a.name !== b.name || JSON.stringify(a.reference) !== JSON.stringify(b.reference)) edits++;
+      for (const side of ["vegetative", "generative"] as const)
+        for (const key of new Set([...Object.keys(a[side]), ...Object.keys(b[side])]))
+          if (!Object.is(a[side][key], b[side][key])) edits++;
+    }
+  }
+  const zones = new Set([...saved.zones, ...draft.zones].map((z) => z.zone_id));
+  for (const id of zones) {
+    const a = saved.zones.find((z) => z.zone_id === id),
+      b = draft.zones.find((z) => z.zone_id === id);
+    if (!a || !b) edits++;
+    else {
+      if (a.start_date !== b.start_date) edits++;
+      // Each run of days whose profile or balance changed is one edit.
+      const last = Math.max(0, ...a.schedule.map((s) => s.end_day), ...b.schedule.map((s) => s.end_day));
+      let run = false;
+      for (let day = 1; day <= last; day++) {
+        const x = blockForDay(a, day),
+          y = blockForDay(b, day);
+        const changed = x?.profile_id !== y?.profile_id || x?.bias !== y?.bias;
+        if (changed && !run) edits++;
+        run = changed;
+      }
+    }
+  }
+  return edits;
+}
+
+/** A one-day block that sets a day apart from the rest of its zone's schedule, or null. */
+export function exceptionOn(zone: ZonePlan | undefined, day: number): ScheduleBlock | null {
+  const block = blockForDay(zone, day);
+  return block && zone && zone.schedule.length > 1 && block.start_day === day && block.end_day === day ? block : null;
+}

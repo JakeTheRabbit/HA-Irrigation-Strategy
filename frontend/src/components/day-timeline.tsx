@@ -170,6 +170,8 @@ interface Lane {
   steps: Steps;
   projection: Projection | null;
   yesterday: DayTrace | null;
+  /** The day today's VWC is drawn against: yesterday, or the last run's day of the same number. */
+  versus: { trace: DayTrace; name: string; series: "yesterday" | "last-run" } | null;
   past: DayTrace[];
   typical: TypicalPoint[];
   steering: Steering | null;
@@ -286,18 +288,43 @@ function useEarlierDays(
  * numbers, then what the zone did today (its phases, shots and pore EC), where it is now against
  * today's stage, and what comes next. Today is downloaded once when the page opens and live updates
  * extend it; the earlier days (yesterday, the typical day, last night's dryback) are downloaded once. */
-export function ZoneDay({ controller, zone }: { controller: Controller; zone: Zone }) {
+/** What the zone page compares today's VWC with. */
+export type ZoneCompare = "off" | "yesterday" | "last-run" | "typical";
+
+export function ZoneDay({
+  controller,
+  zone,
+  compare: compareWith,
+  onCompare,
+  lastRun = null,
+  beside,
+}: {
+  controller: Controller;
+  zone: Zone;
+  /** What today's VWC is compared with, chosen in the chart's heading (`onCompare`): Off,
+   * Yesterday, the last run's day of the same number, or the typical day (median of 7). */
+  compare: ZoneCompare;
+  onCompare: (next: ZoneCompare) => void;
+  /** The previous run's grow-day of the same number; "Last run" is offered only with one. */
+  lastRun?: { day: number; trace: DayTrace } | null;
+  /** A second chart beside today's VWC: under it on a wide screen, swiped to on a phone. */
+  beside?: { name: string; chart: ReactNode };
+}) {
   const [, tick] = useState(0);
   useEffect(() => {
     // The clock moves between live updates, and a quiet controller sends none.
     const timer = window.setInterval(() => tick((value) => value + 1), 30_000);
     return () => window.clearInterval(timer);
   }, []);
-  const [compare, setCompare] = useState(() => storedChart().compare);
-  const choose = (next: Compare) => {
-    setCompare(next);
-    rememberChart({ compare: next });
-  };
+  const versusRun = compareWith === "last-run" && lastRun ? lastRun : null;
+  const compare: Compare =
+    compareWith === "typical"
+      ? "typical"
+      : compareWith === "yesterday" || versusRun
+        ? "yesterday"
+        : "none";
+  const slides = useRef<HTMLDivElement>(null);
+  const [slide, setSlide] = useState(0);
   const { room, states } = controller;
   const now = Date.now();
   const prefix = room.room.prefix;
@@ -356,71 +383,125 @@ export function ZoneDay({ controller, zone }: { controller: Controller; zone: Zo
     : -Infinity;
   const age = Number.isFinite(newest) ? now - newest : null;
   const lane =
-    rows && day ? buildLane(controller, zone, entities, day, rows, now, earlier, compare) : null;
+    rows && day
+      ? buildLane(controller, zone, entities, day, rows, now, earlier, compare, versusRun)
+      : null;
+  const choices: [ZoneCompare, string][] = [
+    ["off", "Off"],
+    ["yesterday", "Yesterday"],
+    ...(lastRun ? [["last-run", `Last run, day ${lastRun.day}`] as [ZoneCompare, string]] : []),
+    ["typical", "Typical"],
+  ];
+  const chart = (
+    <section className="panel zone-day-chart" aria-labelledby={`zone-day-${zone.id}`}>
+      <div className="panel-heading">
+        <h2 id={`zone-day-${zone.id}`}>{beside ? "Today · VWC" : "Today"}</h2>
+        {beside && (
+          <span className="zone-day-swipe" aria-hidden="true">
+            Swipe: VWC · {beside.name}
+          </span>
+        )}
+        {rows && (
+          <div className="timeline-heading-side">
+            <div className="zone-day-compare" role="group" aria-label="Compare with">
+              <span className="timeline-compare" aria-hidden="true">
+                Compare with
+              </span>
+              {choices.map(([value, label]) => (
+                <button
+                  type="button"
+                  key={value}
+                  aria-pressed={compareWith === value}
+                  data-compare={value}
+                  title={value === "typical" ? "The median of the last 7 days, with its middle half" : undefined}
+                  onClick={() => onCompare(value)}
+                >
+                  {label}
+                </button>
+              ))}
+              <UiTip copyKey="compare with" />
+            </div>
+            <span className="timeline-age" data-age={ageTone(age)}>
+              {controller.demo ? "Demo data · " : ""}
+              {age === null ? "Nothing recorded yet" : `Newest reading ${ageText(age)} old`}
+            </span>
+          </div>
+        )}
+      </div>
+      {!ready && !rows ? (
+        <div className="chart-placeholder" role="status">
+          <LoaderCircle className="spin" />
+          Waiting for Home Assistant…
+        </div>
+      ) : !day ? (
+        <Empty
+          title="No lights schedule"
+          tip={<UiTip copyKey="no lights schedule" />}
+          detail="Set this room’s lights-on and lights-off hours to draw its grow day."
+        />
+      ) : error ? (
+        <Empty
+          title="Grow-day did not load"
+          tip={<UiTip copyKey="the grow day could not load" />}
+          detail={error}
+          action={
+            <Button variant="outline" onClick={() => setRetry((value) => value + 1)}>
+              Retry
+            </Button>
+          }
+        />
+      ) : !lane ? (
+        <div className="chart-placeholder" role="status">
+          <LoaderCircle className="spin" />
+          Loading today’s recorded history…
+        </div>
+      ) : (
+        <DayChart lane={lane} day={day} now={now} compare={compare} />
+      )}
+      {lane &&
+        day &&
+        compare !== "none" &&
+        !versusRun &&
+        room.display.options.zone_day_deltas && (
+          <DayDeltaChips controller={controller} zone={zone} lane={lane} day={day} now={now} compare={compare} />
+        )}
+    </section>
+  );
+  const names = beside ? ["VWC", beside.name] : [];
   return (
     <div className="day-timeline zone-day" data-day-timeline data-zone={zone.id}>
       <ZoneNumbers controller={controller} zone={zone} lane={lane} day={day} />
-      <section className="panel zone-day-chart" aria-labelledby={`zone-day-${zone.id}`}>
-        <div className="panel-heading">
-          <h2 id={`zone-day-${zone.id}`}>Today</h2>
-          {rows && (
-            <div className="timeline-heading-side">
-              <span className="label-with-tip">
-                <label htmlFor="day-timeline-compare" className="timeline-compare">
-                  Compare with
-                </label>
-                <UiTip copyKey="compare with" />
-              </span>
-              <select
-                id="day-timeline-compare"
-                value={compare}
-                onChange={(event) => choose(event.target.value as Compare)}
-              >
-                <option value="yesterday">Yesterday</option>
-                <option value="typical">Typical (median of 7 days)</option>
-                <option value="none">None</option>
-              </select>
-              <span className="timeline-age" data-age={ageTone(age)}>
-                {controller.demo ? "Demo data · " : ""}
-                {age === null ? "Nothing recorded yet" : `Newest reading ${ageText(age)} old`}
-              </span>
-            </div>
-          )}
+      {beside ? (
+        <div className="zone-day-charts">
+          <div
+            className="zone-day-slides"
+            ref={slides}
+            data-slide={slide}
+            onScroll={(event) => {
+              const box = event.currentTarget;
+              setSlide(Math.round(box.scrollLeft / Math.max(1, box.clientWidth)));
+            }}
+          >
+            {chart}
+            {beside.chart}
+          </div>
+          <div className="zone-day-dots" role="group" aria-label="Charts">
+            {names.map((name, index) => (
+              <button
+                type="button"
+                key={name}
+                aria-label={`Show the ${name} chart`}
+                aria-current={slide === index ? "true" : undefined}
+                onClick={() =>
+                  slides.current?.scrollTo({ left: index * slides.current.clientWidth, behavior: "smooth" })
+                }
+              />
+            ))}
+          </div>
         </div>
-        {!ready && !rows ? (
-          <div className="chart-placeholder" role="status">
-            <LoaderCircle className="spin" />
-            Waiting for Home Assistant…
-          </div>
-        ) : !day ? (
-          <Empty
-            title="No lights schedule"
-            tip={<UiTip copyKey="no lights schedule" />}
-            detail="Set this room’s lights-on and lights-off hours to draw its grow day."
-          />
-        ) : error ? (
-          <Empty
-            title="Grow-day did not load"
-            tip={<UiTip copyKey="the grow day could not load" />}
-            detail={error}
-            action={
-              <Button variant="outline" onClick={() => setRetry((value) => value + 1)}>
-                Retry
-              </Button>
-            }
-          />
-        ) : !lane ? (
-          <div className="chart-placeholder" role="status">
-            <LoaderCircle className="spin" />
-            Loading today’s recorded history…
-          </div>
-        ) : (
-          <DayChart lane={lane} day={day} now={now} compare={compare} />
-        )}
-        {lane && day && compare !== "none" && room.display.options.zone_day_deltas && (
-          <DayDeltaChips controller={controller} zone={zone} lane={lane} day={day} now={now} compare={compare} />
-        )}
-      </section>
+      ) : (
+        chart
+      )}
     </div>
   );
 }
@@ -491,6 +572,7 @@ function buildLane(
   now: number,
   earlier: Earlier | null,
   compare: Compare,
+  lastRun: { day: number; trace: DayTrace } | null = null,
 ): Lane {
   const { room, states } = controller;
   const root = `crop_steering_${room.room.prefix}`;
@@ -651,7 +733,7 @@ function buildLane(
       ? past.length >= 3
         ? past
         : []
-      : compare === "yesterday" && yesterday
+      : compare === "yesterday" && yesterday && !lastRun
         ? [yesterday]
         : [];
   const moved = earlier?.setup.filter(
@@ -686,6 +768,12 @@ function buildLane(
     steps,
     projection,
     yesterday,
+    versus:
+      compare !== "yesterday"
+        ? null
+        : lastRun
+          ? { trace: lastRun.trace, name: `Last run, day ${lastRun.day}`, series: "last-run" }
+          : yesterday && { trace: yesterday, name: "Yesterday", series: "yesterday" },
     past,
     typical:
       compare === "typical" && past.length >= 3
@@ -1026,7 +1114,7 @@ function DayChart({
           jev={lane.jevOn}
           compare={
             compare === "yesterday"
-              ? "Yesterday"
+              ? (lane.versus?.name ?? "Yesterday")
               : compare === "typical"
                 ? typicalDays >= 3
                   ? `Typical day (${typicalDays} days)`
@@ -1247,8 +1335,7 @@ function Chart({
   const timeAt = (px: number) => day.start + ((px - L) / plotW) * (day.end - day.start);
   const hourOf = (time: number) => (time - day.start) / 3_600_000;
   // Earlier days sit on today's axis by hours since their own lights-on.
-  const yesterday = compare === "yesterday" ? lane.yesterday : null;
-  const before = (yesterday?.points ?? [])
+  const before = ((compare === "yesterday" && lane.versus?.trace.points) || [])
     .filter((point) => point.hour <= hourOf(day.end))
     .map((point) => ({ time: day.start + point.hour * 3_600_000, value: point.value }));
   const typical = compare === "typical" ? lane.typical : [];
@@ -1569,7 +1656,12 @@ function Chart({
           <path data-layer="rescue" d={flat(rescue)} className="rescue-line" />
         )}
         {before.length > 0 && (
-          <path data-layer="yesterday" d={linePath(before, x, yOpen)} className="yesterday-line" />
+          <path
+            data-layer="yesterday"
+            data-series={lane.versus?.series}
+            d={linePath(before, x, yOpen)}
+            className="yesterday-line"
+          />
         )}
         {show("ec") && lane.ec.length > 1 && ecAxis && (
           <path
@@ -1823,9 +1915,9 @@ function readingText(
     ];
     if (readings.length) lines.push(readings.join(" · "));
   }
-  if (compare === "yesterday" && lane.yesterday) {
+  if (compare === "yesterday" && lane.versus) {
     const value = valueAtTime(before, at);
-    lines.push(`Yesterday ${value === null ? "not recorded" : `${number(value)}%`}`);
+    lines.push(`${lane.versus.name} ${value === null ? "not recorded" : `${number(value)}%`}`);
     if (lane.setupNote) lines.push(lane.setupNote);
   }
   if (compare === "typical") {

@@ -128,8 +128,10 @@ def _defined_twice(catalog: dict, *repairs: dict[str, str]) -> set[str]:
 
 
 def _bundled_codes(html: str) -> Counter:
-    """How often each code is an entry (`code:"CS-101"`) in a built dashboard."""
-    return Counter(re.findall(r"\bcode\"?:\s*[\"'`](CS-\d{3})[\"'`]", html))
+    """How often each code is an entry (`code:"CS-101",title:"…",source:"…"`) in a built dashboard.
+    An event or alert that only carries a code (the demo's Journal) is not an entry."""
+    entry = r"\bcode\"?:\s*[\"'`](CS-\d{3})[\"'`],\s*\"?title\"?:\s*([\"'`])(?:(?!\2).)*\2,\s*\"?source\"?:"
+    return Counter(match[1] for match in re.finditer(entry, html))
 
 
 def _unreserved(codes) -> set[str]:
@@ -286,7 +288,11 @@ def test_the_guard_catches_a_second_definition_and_an_unreserved_code():
     assert _defined_twice({"codes": []}, {"a": "CS-601"}, cards) == {"CS-601"}
     with pytest.raises(AssertionError, match=r"defined twice: \['a'\]"):
         _strict_json('{"issues": {"a": {}, "a": {}}}')
-    assert _bundled_codes('codes:[{code:`CS-101`},{"code":"CS-101"}]') == {"CS-101": 2}
+    assert _bundled_codes(
+        'codes:[{code:`CS-101`,title:`A`,source:`repairs`},{"code":"CS-101","title":"A","source":"x"}]'
+    ) == {"CS-101": 2}
+    # An event or alert that carries a code (the demo's Journal) is not a definition.
+    assert _bundled_codes("{zone:2,code:`CS-102`,outcome:`partial`},{code:`CS-102`,title:`Back sensor`,zone:2}") == {}
     assert _unreserved(["CS-105", "CS-320", "CS-609", "CS-901", "CS-207"]) == {
         "CS-105",
         "CS-320",

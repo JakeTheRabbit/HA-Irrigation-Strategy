@@ -1,0 +1,421 @@
+/* Timer programs page (pages/timers.tsx): mockup 07 (I3). */
+.timers {
+  display: grid;
+  grid-template-columns: minmax(280px, 380px) minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+  min-width: 0;
+}
+.tm-side {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.timers .panel {
+  margin-bottom: 20px;
+  padding: 16px 18px;
+  min-width: 0;
+}
+.tm-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.tm-head h2 {
+  font-size: var(--text-lg);
+  font-weight: 600;
+}
+.tm-head small,
+.tm-muted,
+.tm-help {
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+  font-weight: 400;
+}
+
+/* Program cards. */
+.tm-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.tm-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--foreground);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.tm-card[aria-pressed="true"] {
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 10%, var(--surface));
+}
+.tm-card b {
+  font-weight: 600;
+}
+.tm-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+}
+.tm-status::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--muted-foreground);
+}
+.tm-status[data-on]::before {
+  background: var(--success);
+}
+.tm-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+/* Segmented choices (type, window, irrigation mode). */
+.tm-seg {
+  display: inline-flex;
+  flex-wrap: wrap;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.tm-seg button {
+  min-height: 40px;
+  padding: 6px 16px;
+  border: 0;
+  border-left: 1px solid var(--border);
+  background: transparent;
+  color: var(--foreground);
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+}
+.tm-seg button:first-child {
+  border-left: 0;
+}
+.tm-seg button[aria-pressed="true"] {
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+.tm-seg button[data-mode="off"][aria-pressed="true"] {
+  background: color-mix(in srgb, var(--destructive) 22%, var(--surface));
+  color: var(--destructive);
+}
+.tm-seg button:disabled {
+  color: var(--muted-foreground);
+  text-decoration: line-through;
+  cursor: not-allowed;
+}
+.tm-seg button:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: -2px;
+}
+
+/* Irrigation mode rows. */
+.tm-mode-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.tm-mode-list li {
+  display: grid;
+  grid-template-columns: minmax(70px, 1fr) auto;
+  align-items: center;
+  gap: 4px 12px;
+}
+.tm-mode-list .tm-seg {
+  justify-self: end;
+}
+.tm-mode-list .tm-seg button {
+  min-width: 76px;
+  padding: 6px 10px;
+}
+.tm-mode-name {
+  font-weight: 600;
+}
+.tm-mode-note,
+.tm-mode-confirm,
+.tm-mode-list .tm-error {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+.tm-mode-note {
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+}
+.tm-mode-note[data-tone="pending"] {
+  color: var(--foreground);
+  font-weight: 500;
+}
+.tm-mode-note[data-tone="warn"] {
+  color: var(--warning);
+}
+.tm-mode-note[data-tone="bad"] {
+  color: var(--destructive);
+}
+.tm-mode-confirm {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* The editor. */
+.tm-kicker {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.tm-chip {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--warning) 18%, var(--surface));
+  color: var(--foreground);
+  letter-spacing: 0;
+  text-transform: none;
+}
+.tm-editor h2 {
+  margin: 4px 0 16px;
+  font-size: var(--text-xl, 1.35rem);
+  font-weight: 600;
+}
+.tm-fields {
+  display: grid;
+  grid-template-columns: 110px minmax(0, 1fr);
+  align-items: start;
+  gap: 16px 12px;
+}
+.tm-label {
+  padding-top: 9px;
+  color: var(--muted-foreground);
+}
+.tm-field {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  min-width: 0;
+}
+.tm-zones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+}
+.tm-zones label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+}
+.tm-zones input {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--primary);
+}
+.tm-error {
+  flex-basis: 100%;
+  margin: 0;
+  color: var(--destructive);
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+/* Next 24 hours. */
+.tm-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 20px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+.tm-preview-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 14px;
+}
+.tm-preview-head h3 {
+  font-size: var(--text-base);
+  font-weight: 600;
+}
+.tm-preview-head span {
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+}
+.tm-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+}
+.tm-legend [data-glyph="lights"]::before {
+  background: color-mix(in srgb, var(--warning) 16%, transparent);
+}
+
+/* Daily max, pump and safety cards. */
+.tm-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+.tm-cardbox {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  min-width: 0;
+}
+.tm-cardbox h3 {
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.tm-cardbox p {
+  margin: 0;
+}
+.tm-cardbox small {
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+}
+.tm-meter {
+  display: block;
+  height: 10px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--muted-foreground) 25%, transparent);
+  overflow: hidden;
+}
+.tm-meter span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--primary);
+}
+.tm-meter span[data-over] {
+  background: var(--destructive);
+}
+.tm-checks {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.tm-checks li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.tm-checks svg {
+  color: var(--success);
+}
+
+/* Delete, Discard and Save. */
+.tm-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 20px;
+}
+.tm-foot .tm-delete {
+  background: var(--surface);
+  color: var(--destructive);
+}
+.tm-save {
+  display: flex;
+  flex: 1 1 320px;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: flex-end;
+  gap: 10px;
+  min-width: 0;
+}
+.tm-save .review-apply {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.tm-foot > .tm-error {
+  flex-basis: 100%;
+}
+
+@media (max-width: 1100px) {
+  .timers {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 720px) {
+  .timers .panel {
+    padding: 14px;
+  }
+  .tm-fields {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 6px;
+  }
+  .tm-label {
+    padding-top: 10px;
+    font-weight: 600;
+    color: var(--foreground);
+  }
+  .tm-seg {
+    display: flex;
+    width: 100%;
+  }
+  .tm-seg button {
+    flex: 1 1 0;
+    padding: 6px 8px;
+  }
+  .tm-mode-list li {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .tm-mode-list .tm-seg {
+    justify-self: stretch;
+  }
+  .tm-mode-list .tm-seg button {
+    min-width: 0;
+  }
+  .tm-foot {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+  .tm-save {
+    flex-basis: auto;
+    justify-content: stretch;
+  }
+}

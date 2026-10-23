@@ -1,0 +1,236 @@
+/* Equipment › Pump calibration: pick a pump, prime it while held, a 30 s run, the mL, save. */
+.pump-cal {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+.pump-cal-title {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: baseline;
+}
+.pump-cal-title h1 {
+  margin: 0;
+}
+.pump-cal-crumb,
+.pump-cal-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--primary-strong);
+  font: inherit;
+  cursor: pointer;
+}
+.pump-cal-crumb {
+  font-size: var(--text-lg);
+}
+.pump-cal-link {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.pump-cal-sep {
+  color: var(--muted-foreground);
+}
+.pump-cal-rail {
+  padding: 14px 20px;
+}
+.pump-cal-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 34%);
+  gap: 24px;
+  padding: 20px;
+}
+.pump-cal-main {
+  display: grid;
+  gap: 14px;
+  align-content: start;
+  min-width: 0;
+}
+.pump-cal-main > p {
+  margin: 0;
+}
+.pump-cal-step-title {
+  margin: 0;
+  font-size: var(--text-lg);
+}
+.pump-cal-pumps {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr));
+  gap: 12px;
+}
+.pump-cal-card {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--foreground);
+  font: inherit;
+  font-size: var(--text-sm);
+  text-align: left;
+  cursor: pointer;
+}
+.pump-cal-card[aria-checked="true"] {
+  border: 2px solid var(--primary);
+  padding: 11px 13px;
+  background: color-mix(in srgb, var(--primary) 10%, var(--surface));
+}
+.pump-cal-card-name b {
+  font-size: var(--text-lg);
+}
+.pump-cal-card-name small,
+.pump-cal-due,
+.pump-cal-hint,
+.pump-cal-count {
+  color: var(--muted-foreground);
+}
+.pump-cal-card[data-due] .pump-cal-due {
+  color: var(--warning);
+}
+.pump-cal-facts {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+}
+.pump-cal-facts dt {
+  font-weight: 600;
+}
+.pump-cal-facts dd {
+  margin: 2px 0 0;
+}
+.pump-cal-hint {
+  margin: 0;
+  font-size: var(--text-sm);
+}
+.pump-cal-checks {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.pump-cal-checks li {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.pump-cal-checks svg {
+  flex: none;
+  width: 18px;
+  height: 18px;
+}
+.pump-cal-checks .is-ok svg {
+  color: var(--success);
+}
+.pump-cal-checks .is-bad svg,
+.pump-cal-status .is-bad,
+.pump-cal-measure .is-bad {
+  color: var(--destructive);
+}
+.pump-cal-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  min-height: 24px;
+}
+.pump-cal-measure {
+  display: grid;
+  gap: 6px;
+  max-width: 320px;
+}
+.pump-cal-measure label {
+  font-weight: 600;
+}
+.pump-cal-measure p {
+  margin: 0;
+}
+.pump-cal-ml {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.pump-cal-ml input {
+  max-width: 160px;
+  font-size: var(--text-lg);
+}
+.pump-cal-warn {
+  color: var(--warning);
+}
+.pump-cal-result {
+  display: grid;
+  gap: 10px;
+  justify-items: start;
+}
+.pump-cal-result p {
+  margin: 0;
+}
+.pump-cal-rate {
+  font-size: var(--text-lg);
+  font-weight: 600;
+}
+.pump-cal-wear {
+  color: var(--warning);
+}
+.pump-cal-spark {
+  width: 180px;
+  height: 52px;
+}
+.pump-cal-spark polyline {
+  fill: none;
+  stroke: var(--primary);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.pump-cal-visual {
+  display: grid;
+  gap: 12px;
+  align-content: center;
+  justify-items: center;
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  color: var(--muted-foreground);
+  text-align: center;
+}
+.pump-cal-visual p {
+  margin: 0;
+}
+.pump-cal-rig {
+  display: flex;
+  gap: 16px;
+  align-items: flex-end;
+}
+.pump-cal-rig .stock-bottle {
+  width: 72px;
+  height: auto;
+}
+.pump-cal-rig .peristaltic {
+  width: 132px;
+  height: auto;
+}
+.pump-cal-foot {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 14px 20px;
+}
+.pump-cal-foot > :last-child:not(:first-child):not(.pump-cal-count) {
+  margin-left: auto;
+}
+@media (max-width: 720px) {
+  .pump-cal-body {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 16px;
+  }
+  .pump-cal-rail,
+  .pump-cal-foot {
+    padding: 12px 16px;
+  }
+  .pump-cal-count {
+    display: none;
+  }
+}

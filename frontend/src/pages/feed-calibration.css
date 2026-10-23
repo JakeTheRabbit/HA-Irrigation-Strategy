@@ -1,0 +1,334 @@
+/* Equipment › Feed pH/EC calibration: choose a probe, two buffers, the result, apply (mockups 16, 28). */
+.feed-cal {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+.feed-cal-title {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: baseline;
+}
+.feed-cal-title h1,
+.feed-cal-phonebar h1 {
+  margin: 0;
+}
+.feed-cal-crumb {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--primary-strong);
+  font: inherit;
+  font-size: var(--text-lg);
+  cursor: pointer;
+}
+.feed-cal-sep,
+.feed-cal-hint,
+.feed-cal-count,
+.feed-cal-label,
+.feed-cal-caption {
+  color: var(--muted-foreground);
+}
+.feed-cal-phonebar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+}
+.feed-cal-phonebar h1 {
+  font-size: var(--text-lg);
+}
+.feed-cal-phonebar p {
+  margin: 2px 0 0;
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+}
+.feed-cal-rail {
+  padding: 14px 20px;
+}
+.feed-cal-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 34%);
+  gap: 24px;
+  padding: 20px;
+}
+.feed-cal-body:not(:has(.feed-cal-visual)) {
+  grid-template-columns: minmax(0, 1fr);
+}
+.feed-cal-main {
+  display: grid;
+  gap: 14px;
+  align-content: start;
+  min-width: 0;
+}
+.feed-cal-main > p {
+  margin: 0;
+}
+.feed-cal-step-title {
+  margin: 0;
+  font-size: var(--text-lg);
+}
+.feed-cal-hint {
+  font-size: var(--text-sm);
+}
+.feed-cal-bad {
+  margin: 0;
+  color: var(--destructive);
+}
+.feed-cal-ok {
+  color: var(--success);
+}
+.feed-cal-resume {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border: 1px solid var(--primary);
+  border-radius: 10px;
+}
+.feed-cal-probes {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr));
+  gap: 12px;
+}
+.feed-cal-card {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--foreground);
+  font: inherit;
+  font-size: var(--text-sm);
+  text-align: left;
+  cursor: pointer;
+}
+.feed-cal-card[aria-checked="true"] {
+  border: 2px solid var(--primary);
+  padding: 11px 13px;
+  background: color-mix(in srgb, var(--primary) 10%, var(--surface));
+}
+.feed-cal-card b {
+  font-size: var(--text-lg);
+}
+.feed-cal-due {
+  color: var(--muted-foreground);
+}
+.feed-cal-due[data-due] {
+  color: var(--warning);
+}
+.feed-cal-live {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+  align-items: flex-end;
+}
+.feed-cal-live > div {
+  display: grid;
+  gap: 2px;
+}
+.feed-cal-value {
+  font-size: 64px;
+  font-weight: 700;
+  line-height: 1.05;
+  font-variant-numeric: tabular-nums;
+}
+.feed-cal-trace {
+  flex: 1;
+  min-width: 180px;
+  max-width: 360px;
+  height: 120px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--foreground) 5%, transparent);
+}
+.feed-cal-trace polyline {
+  fill: none;
+  stroke: var(--primary);
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+.feed-cal-trace-now {
+  stroke: var(--muted-foreground);
+  stroke-dasharray: 4 4;
+}
+.feed-cal-stab {
+  display: grid;
+  gap: 10px;
+  padding: 14px 18px;
+  border: 1px solid var(--warning);
+  border-radius: 10px;
+  font-size: var(--text-sm);
+}
+.feed-cal-stab b {
+  color: var(--warning);
+  font-size: var(--text-md);
+}
+.feed-cal-stab[data-state="steady"] {
+  border-color: var(--success);
+}
+.feed-cal-stab[data-state="steady"] b {
+  color: var(--success);
+}
+.feed-cal-stab[data-state="offline"] {
+  border-color: var(--border);
+}
+.feed-cal-stab[data-state="offline"] b {
+  color: var(--muted-foreground);
+}
+.feed-cal-bar {
+  display: block;
+  height: 8px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--foreground) 12%, transparent);
+  overflow: hidden;
+}
+.feed-cal-bar > span {
+  display: block;
+  height: 100%;
+  background: currentColor;
+  color: var(--warning);
+}
+.feed-cal-stab[data-state="steady"] .feed-cal-bar > span {
+  color: var(--success);
+}
+.feed-cal-capture {
+  justify-self: start;
+}
+.feed-cal-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  min-height: 24px;
+}
+.feed-cal-more summary {
+  cursor: pointer;
+  color: var(--primary-strong);
+}
+.feed-cal-more[open] summary {
+  margin-bottom: 8px;
+}
+.feed-cal-ring {
+  display: grid;
+  gap: 12px;
+  justify-items: center;
+  text-align: center;
+}
+.feed-cal-ring p {
+  margin: 0;
+  color: var(--muted-foreground);
+}
+.feed-cal-headline {
+  font-size: var(--text-lg);
+  font-weight: 600;
+}
+.feed-cal-grades {
+  display: flex;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.feed-cal-grades li {
+  padding: 6px 14px;
+  border: 2px solid var(--border);
+  border-radius: 18px;
+  color: var(--muted-foreground);
+  font-weight: 700;
+}
+.feed-cal-grades li[aria-current][data-grade="pass"] {
+  border-color: var(--success);
+  color: var(--success);
+}
+.feed-cal-grades li[aria-current][data-grade="drifting"] {
+  border-color: var(--warning);
+  color: var(--warning);
+}
+.feed-cal-grades li[aria-current][data-grade="fail"] {
+  border-color: var(--destructive);
+  color: var(--destructive);
+}
+.feed-cal-proof {
+  margin: 0;
+  font-size: var(--text-lg);
+  font-weight: 600;
+}
+.feed-cal-actions,
+.feed-cal-expired {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+.feed-cal-expired p {
+  margin: 0;
+}
+.feed-cal-visual {
+  display: grid;
+  gap: 12px;
+  align-content: center;
+  justify-items: center;
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  color: var(--muted-foreground);
+  text-align: center;
+}
+.feed-cal-visual svg {
+  width: min(220px, 100%);
+  height: auto;
+}
+.feed-cal-visual p {
+  margin: 0;
+}
+.feed-cal-probe {
+  fill: color-mix(in srgb, var(--foreground) 35%, transparent);
+}
+.feed-cal-tip {
+  fill: color-mix(in srgb, var(--foreground) 55%, transparent);
+}
+.feed-cal-liquid {
+  fill: color-mix(in srgb, var(--success) 45%, transparent);
+}
+.feed-cal-glass {
+  fill: none;
+  stroke: var(--muted-foreground);
+  stroke-width: 3;
+}
+.feed-cal-visual text {
+  fill: var(--foreground);
+  font-size: 26px;
+  font-weight: 700;
+}
+.feed-cal-foot {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 14px 20px;
+}
+.feed-cal-next {
+  margin-left: auto;
+}
+@media (max-width: 720px) {
+  .feed-cal-body {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 16px;
+  }
+  .feed-cal-rail,
+  .feed-cal-foot {
+    padding: 12px 16px;
+  }
+  .feed-cal-next {
+    flex: 1;
+    height: 48px;
+    font-size: var(--text-lg);
+  }
+  .feed-cal-foot > button:first-child {
+    width: 48px;
+    height: 48px;
+  }
+}

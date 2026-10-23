@@ -17,6 +17,10 @@ describe("default landing view", () => {
     expect(landingView("plan/schedule")).toBe("plan/schedule");
     expect(initialRoute("", "", null).page).toBe("all-zones");
   });
+  it("moves a saved page that has a new home to that home", () => {
+    expect(readLandingView({ getItem: () => "history/timeline" })).toBe("history/explorer");
+    expect(initialRoute("", "", "history/timeline").page).toBe("history/explorer");
+  });
   it("uses a preference only on an unaddressed entry and preserves explicit links", () => {
     expect(initialRoute("", "", "history/water").page).toBe("history/water");
     expect(initialRoute("#/zone/2", "", "history/water")).toEqual({ page: "zone", zone: 2 });
