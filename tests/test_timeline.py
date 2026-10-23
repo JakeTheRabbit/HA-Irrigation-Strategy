@@ -192,6 +192,45 @@ def test_planned_blocks_come_from_projection_app_after_now_only():
     assert _blocks(out) == []
 
 
+def test_a_planned_block_carries_the_phase_its_intent_expects():
+    slot = {
+        "id": "t1",
+        "zone": 3,
+        "at": (NOW + timedelta(hours=2)).isoformat(),
+        "duration_s": 60,
+        "source": "timer",
+        "expected": False,
+        "room_id": F2,
+    }
+    phased = [
+        {**slot, "phase": "P2"},
+        {
+            **slot,
+            "id": "t2",
+            "at": (NOW + timedelta(hours=3)).isoformat(),
+            "phase": None,
+        },
+        {
+            **slot,
+            "id": "t3",
+            "at": (NOW + timedelta(hours=4)).isoformat(),
+            "phase": "x",
+        },
+        {
+            **slot,
+            "id": "t4",
+            "at": (NOW + timedelta(hours=5)).isoformat(),
+        },  # an older controller
+    ]
+    out = _build(planned=phased)
+    assert {b["id"]: b["phase"] for b in _blocks(out)} == {
+        "t1": "P2",
+        "t2": None,
+        "t3": None,
+        "t4": None,
+    }
+
+
 def test_a_planned_timer_block_is_drawn_once():
     slot = {
         "id": "t1",

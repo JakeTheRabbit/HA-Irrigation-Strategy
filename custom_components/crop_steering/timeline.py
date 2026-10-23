@@ -242,6 +242,9 @@ def _planned(intent, now, skips=()) -> dict | None:
     block["skipped"] = _skipped(intent, moment, skips)
     block["skippable"] = source in PLANNED_SOURCES and not block["skipped"]
     block["expected"] = intent.get("expected") is True
+    # The phase the engine expects then (a controller from before it sends none).
+    if intent.get("phase") in ("P0", "P1", "P2", "P3"):
+        block["phase"] = intent["phase"]
     return block
 
 

@@ -1203,6 +1203,37 @@ def _wall_clock(now):
     return now.astimezone(zone) if now.tzinfo is not None else now.replace(tzinfo=zone)
 
 
+def _phase_at(clock, minutes):
+    """The phase the engine expects a zone in `minutes` after its pass, by its clock rules only (decide()): lights
+    off is P3, the timed P2 end (P1 or P2 that long before lights-off) is P3, a lights-on starts P0 for its full wait,
+    and the phase it is in holds until one of those moves it. None where moisture decides (P0 ending, P1 -> P2): the
+    projection never guesses a phase. `clock` (_publish_waiting_for): {phase, lights_on, to_on_h, to_off_h, p2_end_h,
+    p0_left_min, p0_wait_min}, or None when the zone had no snapshot."""
+    if clock is None:
+        return None
+    t = minutes / 60.0
+
+    def last(first):  # the latest of first, first + 24 h, ... at or before t
+        return None if t < first else first + 24.0 * math.floor((t - first) / 24.0)
+
+    on, off = last(clock["to_on_h"]), last(clock["to_off_h"])
+    lit = clock["lights_on"] if on is None and off is None else (off is None or (on is not None and on > off))
+    if not lit:
+        return "P3"
+    next_off = clock["to_off_h"] + 24.0 * max(0, math.ceil((t - clock["to_off_h"]) / 24.0))
+    ending = clock["p2_end_h"] > 0 and next_off - t <= clock["p2_end_h"]
+    if on is None:  # the lights-on span the zone is in now
+        phase = clock["phase"]
+        if phase == "P0" and minutes < clock["p0_left_min"]:
+            return "P0"
+        if phase == "P3" or ending:  # P3 waits for the next lights-on; a P0 run out is P1 or P2 by now
+            return "P3"
+        return "P2" if phase == "P2" else ("P1" if phase == "P1" and minutes <= 0 else None)
+    if (t - on) * 60.0 < clock["p0_wait_min"]:
+        return "P0"
+    return "P3" if ending else None
+
+
 def _skipped_by(skip):
     """intent.refused's words for a skip (timer_skip): who asked for it, when the integration says."""
     by = skip.get("by")
@@ -3898,6 +3929,13 @@ class Controller:
         if getattr(room, "_waiting", None) is None:
             room._waiting = {}
         room._waiting[zone] = (conditions, now)
+        # And the clock the projection's expected phases follow (_phase_at).
+        clocks = room.__dict__.setdefault("_phase_clock", {})
+        clocks[zone] = None if snap is None or p is None else ({
+            "phase": snap.phase, "lights_on": snap.lights_on, "to_on_h": snap.hours_to_lights_on,
+            "to_off_h": snap.hours_to_lights_off, "p2_end_h": p.p2_end_h_before_off,
+            "p0_wait_min": max(p.p0_max_wait_min, p.p0_min_wait_min),
+            "p0_left_min": max(p.p0_max_wait_min, p.p0_min_wait_min) - snap.phase_minutes}, now)
         ha_set(
             f"sensor.crop_steering_{room.prefix}zone_{zone}_waiting_for_app",
             snap.phase if snap is not None else "none",
@@ -7820,13 +7858,20 @@ class Controller:
         it changes: the next PROJECTION_H hours of its timer zones' program slots, and each steering zone's next shot
         as the engine expects it (its waiting_for, `expected: true`), each with a stable id. Written only once the
         integration publishes timer programs (an older one has no timeline to read it). Each program is projected on
-        its own (_project); whatever else goes wrong is logged: it never stops watering (R5)."""
+        its own (_project); whatever else goes wrong is logged: it never stops watering (R5). Each intent carries
+        `phase`, the phase the engine expects the zone in then (_phase_at; None where moisture decides)."""
         timers = getattr(room, "_timers", None)
         if not timers or not timers["published"]:
             return
         try:
             # the slots on the zone-aware wall clock (a DST change inside the 24 h moves the later ones), each in UTC
             start, intents = _wall_clock(now), []
+            clocks = getattr(room, "_phase_clock", None) or {}
+
+            def phase(zone, at):
+                clock, then = clocks.get(zone) or (None, None)
+                return None if clock is None else _phase_at(
+                    clock, (at - then.astimezone(timezone.utc)).total_seconds() / 60.0)
             end = (start.astimezone(timezone.utc) + timedelta(hours=PROJECTION_H)).astimezone(start.tzinfo)
             for program in timers["programs"]:
                 for slot in self._project(room, program, start, end):
@@ -7836,7 +7881,7 @@ class Controller:
                             "id": derived_id(at, f"{room.prefix}:{slot.zone}:timer:{slot.program_id}"),
                             "zone": slot.zone,
                             "at": at.isoformat(), "duration_s": slot.duration_s, "source": "timer",
-                            "program_id": slot.program_id, "expected": False}))
+                            "program_id": slot.program_id, "expected": False, "phase": phase(slot.zone, at)}))
             for zone, (conditions, at) in (getattr(room, "_waiting", None) or {}).items():
                 waits = [c["in_min"] for c in conditions if c.get("shot") and c.get("in_min") is not None]
                 if timers["modes"].get(zone) != "steering" or not waits:
@@ -7845,7 +7890,12 @@ class Controller:
                         + timedelta(minutes=min(waits))).replace(second=0, microsecond=0)
                 intents.append((when, {
                     "id": derived_id(when, f"{room.prefix}:{zone}:engine:"), "zone": zone, "at": when.isoformat(),
-                    "duration_s": None, "source": "engine", "expected": True}))
+                    "duration_s": None, "source": "engine", "expected": True,
+                    # the shot is the rule of the phase the zone is in, unless a timed move comes first
+                    "phase": next((c["to"] for c in sorted(
+                        (c for c in conditions if c.get("to") and c.get("in_min") is not None),
+                        key=lambda c: c["in_min"]) if c["in_min"] <= min(waits)),
+                        (clocks.get(zone) or ({"phase": None}, None))[0]["phase"])}))
             intents = [i for _at, i in sorted(intents, key=lambda pair: pair[0])]
             self._show_line(PROJECTION_SENSOR.format(room.prefix), str(len(intents)), {
                 "room_id": "room:" + room.prefix, "intents": intents,
