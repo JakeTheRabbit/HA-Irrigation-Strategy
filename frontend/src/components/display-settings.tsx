@@ -5,13 +5,13 @@ import { InfoTip } from "@/components/info-tip";
 import {
   DISPLAY_ROWS,
   displayEntityId,
+  storedUnit,
   unitExamples,
   type DisplayOptions,
   type DisplayRow,
   type UnitKey,
 } from "@/lib/display";
 import {
-  getDisplayUnits,
   readDisplayUnits,
   setDisplayUnits,
   UNITS_STORAGE_KEY,
@@ -131,54 +131,49 @@ export function DisplaySettings({ controller }: { controller: Controller }) {
 }
 
 type UnitValue = string | number;
-/** The four unit rows: each option's value as display_save takes it, and as the display store
- * (lib/display-units) holds it. */
+/** The four unit rows: each option's value as display_save takes it. */
 const UNIT_ROWS: {
   key: UnitKey;
-  store: keyof DisplayUnits;
   label: string;
   example: "ec" | "temp" | "volume" | "clock";
-  options: { value: UnitValue; label: string; shown: string }[];
+  options: { value: UnitValue; label: string }[];
 }[] = [
   {
     key: "ec_unit",
-    store: "ec",
     label: "EC",
     example: "ec",
     options: [
-      { value: "mS/cm", label: "mS/cm", shown: "mS/cm" },
-      { value: "ppm500", label: "PPM 500", shown: "ppm500" },
-      { value: "ppm700", label: "PPM 700", shown: "ppm700" },
+      { value: "mS/cm", label: "mS/cm" },
+      { value: "ppm500", label: "PPM 500" },
+      { value: "ppm700", label: "PPM 700" },
     ],
   },
   {
     key: "temp_unit",
-    store: "temp",
     label: "Temperature",
     example: "temp",
     options: [
-      { value: "C", label: "°C", shown: "C" },
-      { value: "F", label: "°F", shown: "F" },
+      { value: "C", label: "°C" },
+      { value: "F", label: "°F" },
     ],
   },
   {
     key: "volume_unit",
-    store: "volume",
     label: "Volume",
     example: "volume",
     options: [
-      { value: "L", label: "Litres", shown: "L" },
-      { value: "gal", label: "US gallons", shown: "gal" },
+      { value: "auto", label: "Automatic (Home Assistant)" },
+      { value: "L", label: "Litres" },
+      { value: "gal", label: "US gallons" },
     ],
   },
   {
     key: "clock",
-    store: "clock",
     label: "Clock",
     example: "clock",
     options: [
-      { value: 24, label: "24 h", shown: "24" },
-      { value: 12, label: "12 h", shown: "12" },
+      { value: 24, label: "24 h" },
+      { value: 12, label: "12 h" },
     ],
   },
 ];
@@ -198,6 +193,14 @@ const LOCAL_FIELD: Record<UnitKey, keyof DisplayUnits> = {
   volume_unit: "volume",
   clock: "clock",
 };
+
+function readLocalRaw(): string | null {
+  try {
+    return localStorage.getItem(UNITS_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+}
 
 /** This browser's stored unit choice; null when storage is blocked. */
 function readLocal(): Record<string, unknown> | null {
@@ -222,7 +225,6 @@ export function UnitSettings({ controller }: { controller: Controller }) {
   const revision = useRef(0);
   const connected = ["live", "demo"].includes(controller.connection);
   const blocked = !local && (!connected || controller.admin === false);
-  const units = getDisplayUnits();
   const examples = unitExamples(controller.states, controller.room);
   const now = () => clock(Date.now(), controller.timeZone);
   const set = (key: UnitKey, result: RowResult) => setResults((r) => ({ ...r, [key]: result }));
@@ -309,8 +311,9 @@ export function UnitSettings({ controller }: { controller: Controller }) {
         </p>
       )}
       {UNIT_ROWS.map((row) => {
-        const shown = String(units[row.store]);
-        const current = row.options.find((o) => o.shown === shown) ?? row.options[0];
+        // The stored value, "auto" kept, so Undo puts back exactly what was there.
+        const stored = storedUnit(display, local ? readLocalRaw() : null, row.key);
+        const current = row.options.find((o) => o.value === stored) ?? row.options[0];
         const result = results[row.key];
         return (
           <div key={row.key} className="unit-row" data-unit={row.key}>

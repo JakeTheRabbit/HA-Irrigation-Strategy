@@ -410,7 +410,8 @@ function WallDashboards({ controller }: { controller: Controller }) {
         <div className="wall-cards">
           {list.data.templates.map((template) => (
             <DashboardCard
-              key={template.id}
+              // A room switch starts the card again on the room now selected.
+              key={`${template.id}:${controller.roomId}`}
               controller={controller}
               template={template}
               dashboards={list.data!.dashboards}
@@ -465,6 +466,8 @@ function DashboardCard({
   const [rooms, setRooms] = useState<string[]>([controller.roomId]);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState("");
+  /** The dashboard whose cards Home Assistant did not confirm: listed, but not shown as done. */
+  const [unconfirmed, setUnconfirmed] = useState("");
   const latest = dashboards
     .filter((d) => d.template === template.id && d.exists)
     .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))[0];
@@ -482,6 +485,7 @@ function DashboardCard({
   async function create() {
     setBusy(true);
     setProblem("");
+    setUnconfirmed("");
     const done = await callV2<{ url_path: string; title: string }>(controller, "dashboard_create", {
       template: template.id,
       rooms,
@@ -490,13 +494,16 @@ function DashboardCard({
     if (done.kind === "missing") return setProblem("Needs integration 3.18.");
     if (done.kind === "error") return setProblem(done.message);
     // A verified create read its cards back; the list then shows it as created.
-    if (done.readback.status !== "verified")
+    if (done.readback.status !== "verified") {
+      setUnconfirmed(done.data.url_path);
       setProblem(
         `Home Assistant did not confirm the cards of /${done.data.url_path}. Open it to check.`,
       );
+    }
     onCreated();
   }
   const created = latest ? Date.parse(latest.created_at) : NaN;
+  const confirmed = latest?.url_path !== unconfirmed;
   return (
     <article className="panel wall-card" data-template={template.id}>
       <TemplateSketch id={template.id} rooms={rooms.length} zones={controller.room.zones.length} />
@@ -522,9 +529,14 @@ function DashboardCard({
         </Button>
       </div>
       {latest && Number.isFinite(created) && (
-        <p className="success-text wall-created" data-created={latest.url_path}>
+        <p
+          className={`${confirmed ? "success-text" : "muted"} wall-created`}
+          data-created={latest.url_path}
+          data-confirmed={confirmed}
+        >
           Created {dayLabel(created, controller.timeZone)} {clock(created, controller.timeZone)} as /
           {latest.url_path}
+          {!confirmed && ", not confirmed"}
           <a href={`/${latest.url_path}`} target="_blank" rel="noreferrer">
             Open in Home Assistant
           </a>

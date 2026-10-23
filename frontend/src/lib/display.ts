@@ -1,4 +1,4 @@
-import { formatEc, formatTemp, formatVolume } from "./display-units";
+import { formatEc, formatTemp, formatVolume, readDisplayUnits } from "./display-units";
 import type { SteCopy } from "./ste-copy";
 import { clock } from "./time";
 import type { EntityState, RoomView, States } from "./types";
@@ -238,6 +238,15 @@ export function readDisplay(entity: EntityState | undefined): RoomDisplay {
   return { available, units, revision: available ? revision : 0, options: options as DisplayOptions };
 }
 
+/** The unit `key` as stored, "auto" unresolved: the room's option on 3.18, else this browser's
+ * choice (`stored`, the JSON under crop-steering.units), else the default. */
+export function storedUnit(display: RoomDisplay, stored: string | null, key: UnitKey): string | number {
+  if (display.units) return display.options[key];
+  const local = readDisplayUnits(undefined, stored);
+  const value = { ec_unit: local.ec, temp_unit: local.temp, volume_unit: local.volume, clock: local.clock }[key];
+  return key === "clock" ? Number(value) : value;
+}
+
 export const roomDisplay = (states: States, prefix: string) =>
   readDisplay(states[displayEntityId(prefix)]);
 
@@ -265,7 +274,8 @@ export function demoDisplay(states: States, param: string | null): States {
 }
 
 /** Decimals the reading has (never formatted past them), at most 2. */
-const digitsOf = (value: number) => Math.min(2, (String(value).split(".")[1] ?? "").length);
+const digitsOf = (value: number) =>
+  Math.min(2, (String(Number(value.toFixed(6))).split(".")[1] ?? "").length);
 const numberOf = (entity: EntityState | undefined) => {
   const value = Number(entity?.state);
   return entity && entity.state !== "" && Number.isFinite(value) ? value : null;

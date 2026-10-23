@@ -469,7 +469,7 @@ try {
     async () => {
       // Settings reads no history: anything asked for after this is Equipment's.
       await tree("settings", "Dashboards & display");
-      await visible(page.getByRole("heading", { name: "Settings", exact: true }));
+      await visible(page.getByRole("heading", { name: "Dashboards & display", exact: true }));
       await page.waitForTimeout(1000);
       history.length = 0;
       await tree("equipment", "Probes & offsets");

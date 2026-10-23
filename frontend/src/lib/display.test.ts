@@ -6,6 +6,7 @@ import {
   demoDisplay,
   displayEntityId,
   readDisplay,
+  storedUnit,
   unitExamples,
 } from "./display";
 import { formatEc, getDisplayUnits, parseEc, readDisplayUnits, setDisplayUnits } from "./display-units";
@@ -109,6 +110,26 @@ describe("display units in the room's display options", () => {
     expect(after.temp).toMatch(/°F/);
     expect(after.volume).toMatch(/\d gal$/);
     expect(after.clock).toMatch(/\d{1,2}:00 [ap]m/);
+  });
+  it("shows a reading with float noise at the source's precision", () => {
+    const states = createDemo(Date.UTC(2026, 9, 23, 3, 0));
+    const room = buildRoom(states, discoverRooms(states)[0]);
+    const config = states[`sensor.crop_steering_${room.room.prefix}engine_config`].attributes;
+    const root = (config.substrate_temperature_sensors as Record<string, string>)["1"];
+    states[root] = { ...states[root], state: String(21.8 + 0.1) };
+    setDisplayUnits({ temp: "C" });
+    expect(unitExamples(states, room).temp).toBe("Root zone 21.9 °C");
+  });
+  it('storedUnit keeps "auto" as the room or this browser stores it', () => {
+    const room = readDisplay(entity("4", { ec_unit: "mS/cm", temp_unit: "C", volume_unit: "auto", clock: 24 }));
+    expect(storedUnit(room, null, "volume_unit")).toBe("auto");
+    expect(storedUnit(readDisplay(entity("4", { ...room.options, volume_unit: "gal" })), null, "volume_unit")).toBe("gal");
+    // 3.17: this browser's choice, unresolved.
+    const old = readDisplay(entity("3", {}));
+    expect(storedUnit(old, null, "volume_unit")).toBe("auto");
+    expect(storedUnit(old, JSON.stringify({ volume: "gal", clock: "12" }), "volume_unit")).toBe("gal");
+    expect(storedUnit(old, JSON.stringify({ volume: "gal", clock: "12" }), "clock")).toBe(12);
+    expect(storedUnit(old, "{bad", "ec_unit")).toBe("mS/cm");
   });
   it("formatted ppm value parses back to the stored mS/cm", () => {
     for (const ec of ["ppm500", "ppm700"] as const) {

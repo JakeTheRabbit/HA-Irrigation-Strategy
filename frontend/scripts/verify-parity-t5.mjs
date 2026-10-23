@@ -10,10 +10,12 @@
  * - PPM 500 → "Saved and read back 14:10", the EC example turns to ppm; Undo puts mS/cm back ("Put
  *   back and read back 14:10"); PPM 500 again, and #/all-zones then shows ppm and no mS/cm (the
  *   Task 5 store, from the room's display store on 3.18, from this browser on 3.17);
+ * - Volume starts on "Automatic (Home Assistant)" (the stored "auto"); US gallons → saved; Undo →
+ *   "Put back and read back 14:10" with Automatic chosen again;
  * - Where the app opens: choosing a view says "Saved and read back 14:10";
  * - Wall and tablet dashboards (3.18): three template cards; Room tablet's "Create in Home
  *   Assistant" → "Created … 14:10 as /crop-steering-room_tablet-1", "Open in Home Assistant" and
- *   "Create again"; on 3.17 the "Needs integration 3.18" note sits in the dashboards region;
+ *   "Create again", the line marked confirmed; on 3.17 the "Needs integration 3.18" note sits in the dashboards region;
  * - "Keep this screen on while open" shows only where the browser has Wake Lock;
  * - "More display options" starts closed and opens to the connection, appearance and display
  *   options. */
@@ -59,6 +61,17 @@ await runParity({
     await ec.getByRole("button", { name: "PPM 500", exact: true }).click();
     await ec.getByText("Saved and read back 14:10").waitFor();
 
+    // Volume: the stored "auto" is a choice of its own, and Undo puts it back.
+    const volume = units.locator('[data-unit="volume_unit"]');
+    const auto = volume.getByRole("button", { name: "Automatic (Home Assistant)", exact: true });
+    assert.equal(await auto.getAttribute("aria-pressed"), "true", `${label}: volume starts automatic`);
+    await volume.getByRole("button", { name: "US gallons", exact: true }).click();
+    await volume.getByText("Saved and read back 14:10").waitFor();
+    assert.match(await volume.locator("[data-unit-example]").innerText(), /gal/, `${label}: volume example in gal`);
+    await volume.getByRole("button", { name: "Undo", exact: true }).click();
+    await volume.getByText("Put back and read back 14:10").waitFor();
+    assert.equal(await auto.getAttribute("aria-pressed"), "true", `${label}: undo puts automatic back`);
+
     // Where the app opens.
     const opens = page.locator(".where-opens");
     region("where the app opens");
@@ -78,6 +91,7 @@ await runParity({
       await created.waitFor();
       assert.match(await created.innerText(), /^Created .*14:10 as \/crop-steering-room_tablet-1\s*Open in Home Assistant$/, `${label}: created line`);
       assert.equal(await created.getByRole("link", { name: "Open in Home Assistant" }).getAttribute("href"), "/crop-steering-room_tablet-1");
+      assert.equal(await created.getAttribute("data-confirmed"), "true", `${label}: created and confirmed`);
       await tablet.getByRole("button", { name: "Create again", exact: true }).waitFor();
     } else {
       await walls.locator('[data-needs-integration="Wall and tablet dashboards"]').waitFor();

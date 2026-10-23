@@ -2537,6 +2537,8 @@ try {
       path: path.join(out, "dashboard-dark.png"),
       fullPage: true,
     });
+    // The reload closed More display options again.
+    await openMoreDisplay();
     await page.getByRole("button", { name: "Light", exact: true }).click();
   });
   await check("keyboard skip retains page and browser history works", async () => {
