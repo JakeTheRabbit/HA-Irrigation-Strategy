@@ -57,6 +57,7 @@ const FEED_CALIBRATION: readonly string[] = [
   "calibration_status",
   "calibration_commit",
   "calibration_revert",
+  "calibration_abandon",
 ];
 export class OperatorDemo {
   private instructions = new InstructionsDemo();

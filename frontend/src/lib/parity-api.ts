@@ -25,6 +25,7 @@ export const PARITY_ACTIONS = [
   "calibration_status",
   "calibration_commit",
   "calibration_revert",
+  "calibration_abandon",
   "probe_offset_set",
   "alert_rule_set",
   "alert_rule_delete",

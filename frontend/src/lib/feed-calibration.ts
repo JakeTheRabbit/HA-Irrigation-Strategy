@@ -1,5 +1,6 @@
 import { formatEc } from "./display-units";
 import type { V2Outcome } from "./parity-api";
+import { dayKey, daysBetween, shortDate } from "./time";
 import type { States } from "./types";
 
 /** Equipment › Feed pH/EC calibration: the wizard's arithmetic. The backend (calibration.py) decides
@@ -172,6 +173,28 @@ export function sessionStore(storage: Storage | null = browserStorage()) {
       return s && s.room_id === roomId && Date.parse(s.expires_at) > now ? s : null;
     },
   };
+}
+
+/** calibration.py `due()`: the probe's newest record that did not fail (applied or not: a failed
+ * check does not reset the clock), and when it goes due, `at` + `due_days` whole days at that exact
+ * time. A record without `due_days` never goes due (ruling R6): `dueAt` null. Records newest first. */
+export function dueState(
+  records: { probe?: string; verdict?: string; at: string; due_days?: number }[] | undefined,
+  probe: FeedProbe,
+): { at: number; dueAt: number | null } | null {
+  const latest = records?.find((r) => r.probe === probe && r.verdict !== "fail");
+  if (!latest) return null;
+  const at = Date.parse(latest.at);
+  if (!Number.isFinite(at)) return null;
+  const days = latest.due_days;
+  return { at, dueAt: typeof days === "number" && Number.isFinite(days) ? at + days * 86_400_000 : null };
+}
+/** The due line: "Overdue since 13 Oct" from the due time on (as binary_sensor …calibration_due
+ * turns on), else the zone's calendar days to go. */
+export function dueLine(dueAt: number, now: number, tz: string): { text: string; overdue: boolean } {
+  if (now >= dueAt) return { text: `Overdue since ${shortDate(dueAt, tz)}`, overdue: true };
+  const left = daysBetween(dayKey(now, tz), dayKey(dueAt, tz));
+  return { text: left <= 0 ? "Due today" : `Due in ${left} ${left === 1 ? "day" : "days"}`, overdue: false };
 }
 
 /** Whether calibration_get holds record `recordId` as the one applied. */

@@ -245,6 +245,7 @@ const DEFAULTS: Record<Exclude<ParityAction, StatefulAction>, (data: Record<stri
   calibration_status: (_d, now) => ({ reading: 7.02, raw: 7.08, stable: true, drift: 0.004, stable_s: 32, points_captured: 0, expires_at: iso(now + 30 * 60_000) }),
   calibration_commit: () => ({ slope_pct: 98.4, offset: 0.06, verdict: "pass", applied: true }),
   calibration_revert: () => ({ slope_pct: null, offset: null, verdict: null, applied: false }),
+  calibration_abandon: () => ({ abandoned: true }),
   probe_offset_set: (d) => ({ offset: 3, corrected_now: 52, fused_before: 49, fused_after: 52, ...(d.preview ? { diff: [{ path: "offset", old: 0, new: 3 }] } : {}) }),
   alert_rule_set: (d) => ({ ...rule(d), summary_sentence: preview(0).summary_sentence, revision: 2 }),
   alert_rule_delete: (d) => ({ id: d.id ?? null, revision: 2 }),

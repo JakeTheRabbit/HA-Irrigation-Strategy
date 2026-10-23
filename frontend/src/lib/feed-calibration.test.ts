@@ -1,11 +1,14 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createDemo } from "./demo";
 import { OperatorDemo } from "./operator-demo";
+import { demoParityStatus } from "./parity-demo/status";
 import { callV2 } from "./parity-api";
 import type { States } from "./types";
 import { revertEvents } from "./undo";
 import {
   captureState,
+  dueLine,
+  dueState,
   forcedLine,
   isApplied,
   looksSteady,
@@ -212,6 +215,33 @@ describe("proofLine and isApplied", () => {
   });
 });
 
+describe("dueState and dueLine (calibration.py due())", () => {
+  const now = Date.parse("2026-10-23T01:00:00Z");
+  const day = 86_400_000;
+  const rec = (over: Record<string, unknown>) => ({ probe: "feed_ph", verdict: "pass", at: new Date(now - 5 * day).toISOString(), due_days: 30, ...over });
+  it("counts the newest record that did not fail, applied or not, at its exact time", () => {
+    const records = [
+      rec({ verdict: "fail", at: new Date(now - day).toISOString() }),
+      rec({ applied: false, at: new Date(now - 40 * day).toISOString() }),
+      rec({ applied: true, at: new Date(now - 50 * day).toISOString() }),
+    ];
+    expect(dueState(records, "feed_ph")).toEqual({ at: now - 40 * day, dueAt: now - 10 * day });
+    expect(dueState(records, "feed_ec")).toBeNull();
+  });
+  it("a record without due_days never goes due (ruling R6)", () => {
+    expect(dueState([rec({ due_days: undefined })], "feed_ph")).toEqual({ at: now - 5 * day, dueAt: null });
+  });
+  it("10 days past due reads overdue since that date, not due today", () => {
+    expect(dueLine(now - 10 * day, now, "UTC")).toEqual({ text: "Overdue since 13 Oct", overdue: true });
+    expect(dueLine(now, now, "UTC")).toEqual({ text: "Overdue since 23 Oct", overdue: true });
+  });
+  it("before the due time counts calendar days on the zone's clock", () => {
+    expect(dueLine(now + 3 * day, now, "UTC")).toEqual({ text: "Due in 3 days", overdue: false });
+    expect(dueLine(now + day, now, "UTC")).toEqual({ text: "Due in 1 day", overdue: false });
+    expect(dueLine(now + 3_600_000, now, "UTC")).toEqual({ text: "Due today", overdue: false });
+  });
+});
+
 describe("the demo integration", () => {
   afterEach(() => vi.useRealTimers());
   it("settles the reading, captures both points, applies, reads back and undoes", async () => {
@@ -260,6 +290,33 @@ describe("the demo integration", () => {
     expect(isApplied((await read()).data, commit.data.record_id)).toBe(false);
     // Undoing twice is refused: the calibration in force is no longer this one.
     await expect(revertEvents(controller, commit.eventIds)).rejects.toThrow(/changed/);
+  });
+  it("abandon ends the session; a later step finds it expired", async () => {
+    let states = createDemo(Date.now());
+    const demo = new OperatorDemo(
+      () => states,
+      (next) => (states = next),
+    );
+    const controller = { operator: <T,>(action: string, data: Record<string, unknown> = {}) => demo.call<T>(action as never, data) };
+    const start = await callV2<{ session_id: string }>(controller, "calibration_start", { room_id: "room:", probe: "feed_ph" });
+    if (start.kind !== "ok") throw new Error("start");
+    expect(await callV2(controller, "calibration_abandon", { session_id: start.data.session_id })).toMatchObject({ kind: "ok", data: { abandoned: true } });
+    const after = await callV2(controller, "calibration_status", { session_id: start.data.session_id });
+    expect(refusalView(after as never).kind).toBe("expired");
+  });
+  it("Room A's seeded pH check is due when the demo's calibration_due sensor says so", async () => {
+    vi.useFakeTimers({ now: Date.parse("2026-10-23T01:00:00Z") });
+    let states = demoParityStatus(createDemo(Date.now()), Date.now());
+    const demo = new OperatorDemo(
+      () => states,
+      (next) => (states = next),
+    );
+    const controller = { operator: <T,>(action: string, data: Record<string, unknown> = {}) => demo.call<T>(action as never, data) };
+    const doc = await callV2<{ records: { probe: string; verdict: string; at: string; due_days?: number }[] }>(controller, "calibration_get", { room_id: "room:" });
+    if (doc.kind !== "ok") throw new Error("get");
+    const sensor = states["binary_sensor.crop_steering_calibration_due"];
+    expect(sensor.state).toBe("on");
+    expect(dueState(doc.data.records, "feed_ph")?.dueAt).toBe(Date.parse(String((sensor.attributes.due_at as Record<string, string>).feed_ph)));
   });
   it("refuses a room with no feed probe and an older integration has none of it", async () => {
     let states = createDemo(Date.now());

@@ -16,6 +16,8 @@ import {
   bufferName,
   captureState,
   digitsOf,
+  dueLine,
+  dueState,
   feedValue,
   forcedLine,
   isApplied,
@@ -31,9 +33,9 @@ import {
   type Reading,
   type StoredSession,
 } from "@/lib/feed-calibration";
-import { callV2 } from "@/lib/parity-api";
+import { callV2, type V2Outcome } from "@/lib/parity-api";
 import type { CalibrationCommitResult, CalibrationSession, CalibrationStatus, CaptureResult } from "@/lib/parity-types";
-import { clock, dayKey, daysBetween, shortDate } from "@/lib/time";
+import { clock, shortDate } from "@/lib/time";
 import { revertEvents } from "@/lib/undo";
 import { useNarrow } from "@/lib/use-narrow";
 import { useWakeLock } from "@/lib/wake-lock";
@@ -112,6 +114,32 @@ export function FeedCalibration({ controller, navigate }: PageProps) {
       }),
     [store],
   );
+  /** The session ended on the integration (EXPIRED): its hold on dosing went with it. The probe
+   * stays chosen for Start again. */
+  const sessionExpired = useCallback(
+    (which: FeedProbe) => {
+      setProbe(which);
+      setSession(null);
+      setExpired(true);
+    },
+    [setSession],
+  );
+  /** Asks the integration when the session ends now (a capture restarts its 30 min). */
+  const refreshExpiry = useCallback(
+    async (id: string) => {
+      const outcome = await callV2<CalibrationStatus>(latest.current, "calibration_status", { session_id: id });
+      if (outcome.kind === "ok") patchSession(id, (s) => ({ ...s, expires_at: outcome.data.expires_at }));
+    },
+    [patchSession],
+  );
+  /** Ends the session without a record, so it no longer holds dosing until it expires. */
+  const abandon = (open: StoredSession | null) => {
+    if (!open) return;
+    void callV2(latest.current, "calibration_abandon", { session_id: open.session_id }).then((outcome) => {
+      // Gone either way (ended now, or expired already): nothing left to resume.
+      if (outcome.kind === "ok" || (outcome.kind === "error" && refusalView(outcome).kind === "expired")) store.clear();
+    });
+  };
   const goto = (n: number) => {
     setStep(n);
     if (session) setSession({ ...session, step: n });
@@ -168,14 +196,14 @@ export function FeedCalibration({ controller, navigate }: PageProps) {
         setSilent(outcome.data.raw === null);
         const expires = outcome.data.expires_at;
         if (expires !== session.expires_at) patchSession(session.session_id, (s) => ({ ...s, expires_at: expires }));
-      } else if (outcome.kind === "error" && refusalView(outcome).kind === "expired") setExpired(true);
+      } else if (outcome.kind === "error" && refusalView(outcome).kind === "expired") sessionExpired(session.probe);
     };
     const timer = setInterval(() => void check(), STATUS_MS);
     return () => {
       live = false;
       clearInterval(timer);
     };
-  }, [session, done, expired, patchSession]);
+  }, [session, done, expired, patchSession, sessionExpired]);
 
   useWakeLock(step >= 2 && step <= 4 && !!session);
 
@@ -242,13 +270,16 @@ export function FeedCalibration({ controller, navigate }: PageProps) {
       }));
       const captured = `Captured ${feedValue(value, kind, digitsOf(raw?.state))}`;
       setNote({ point: index, kind: "captured", text: forced ? `${captured} while still moving` : captured });
+      void refreshExpiry(session.session_id);
       return;
     }
     if (outcome.kind === "ok") return setNote({ point: index, kind: "other", text: "The controller had no reading to capture." });
     const view = refusalView(outcome);
-    if (view.kind === "expired") return setExpired(true);
+    if (view.kind === "expired") return sessionExpired(session.probe);
     if (view.kind === "missing") return setLoad({ state: "missing" });
     setNote({ point: index, kind: view.kind === "moving" ? "moving" : "other", text: view.text });
+    // A capture refused only because the reading moves still restarted the session's 30 min.
+    if (view.kind === "moving") void refreshExpiry(session.session_id);
   };
 
   const points = shown?.points ?? [null, null];
@@ -266,9 +297,15 @@ export function FeedCalibration({ controller, navigate }: PageProps) {
     if (!session) return;
     setBusy(true);
     const outcome = await callV2<CalibrationCommitResult>(latest.current, "calibration_commit", { session_id: session.session_id });
+    if (outcome.kind === "ok") {
+      // The integration passed what the page read as a fail, and applied it: its receipt and Undo.
+      await committed(session, outcome);
+      setBusy(false);
+      return setStep(5);
+    }
     setBusy(false);
-    if (outcome.kind === "error" && refusalView(outcome).kind === "expired") return setExpired(true);
-    setFailed(outcome.kind === "error" ? outcome.message : "The controller applied the calibration.");
+    if (outcome.kind === "error" && refusalView(outcome).kind === "expired") return sessionExpired(session.probe);
+    setFailed(outcome.kind === "error" ? outcome.message : "This integration has no guided calibration.");
     setSession(null);
     void read();
   };
@@ -289,7 +326,7 @@ export function FeedCalibration({ controller, navigate }: PageProps) {
     const outcome = await callV2<CalibrationCommitResult>(latest.current, "calibration_commit", { session_id: s.session_id });
     if (outcome.kind !== "ok") {
       const view = outcome.kind === "missing" ? null : refusalView(outcome);
-      if (view?.kind === "expired") setExpired(true);
+      if (view?.kind === "expired") sessionExpired(s.probe);
       return {
         at: Date.now(),
         ok: false,
@@ -299,7 +336,13 @@ export function FeedCalibration({ controller, navigate }: PageProps) {
         message: view ? view.text : "This integration has no guided calibration.",
       };
     }
-    // The commit's own read-back is "none": the receipt claims only what calibration_get now holds.
+    return committed(s, outcome);
+  };
+  /** A commit the integration accepted. Its own read-back is "none": the receipt claims only what
+   * calibration_get now holds. */
+  const committed = async (s: StoredSession, outcome: Extract<V2Outcome<CalibrationCommitResult>, { kind: "ok" }>): Promise<ApplyReceipt> => {
+    const label = `${room} feed ${NAME_OF[s.kind]} correction`;
+    const before = inForce ? correction(inForce, s.kind) : "None, raw reading";
     const back = await read();
     const verified = back.kind === "ok" && isApplied(back.data, outcome.data.record_id);
     const receipt: ApplyReceipt = {
@@ -307,7 +350,7 @@ export function FeedCalibration({ controller, navigate }: PageProps) {
       ok: verified,
       ...(verified ? {} : { unconfirmed: true }),
       failed: [],
-      summary: verified ? `${rows[0].label} ${rows[0].before} → ${correction(outcome.data, kind)}` : "",
+      summary: verified ? `${label} ${before} → ${correction(outcome.data, s.kind)}` : "",
       eventIds: outcome.eventIds,
       ...(outcome.eventIds.length ? {} : { undoUnavailable: true }),
     };
@@ -325,14 +368,13 @@ export function FeedCalibration({ controller, navigate }: PageProps) {
 
   const startAgain = () => {
     setExpired(false);
-    setSession(null);
     if (chosen) void start(chosen);
   };
 
   // A session left open (Back from buffer 1, or ✕) keeps dosing paused until it expires.
   const resumable = !session && !done && step === 1 ? store.resumable(roomId, Date.now()) : null;
   // ---- header (desktop: crumb and title; phone: a full-screen bar with ✕)
-  const paused = !!(session ?? resumable)?.dosing_paused;
+  const paused = !expired && !!(session ?? resumable)?.dosing_paused;
   const shownStep = done ? 5 : step;
   const title = narrow ? `Calibrate ${room} feed ${name}` : `Calibrate feed ${name} probe`;
   const header = narrow ? (
@@ -341,13 +383,28 @@ export function FeedCalibration({ controller, navigate }: PageProps) {
         <h1>{title}</h1>
         <p>{`Equipment · step ${shownStep} of 5${paused ? " · dosing paused" : ""}`}</p>
       </div>
-      <Button variant="ghost" size="icon" aria-label="Close calibration, back to Feed & dosing" onClick={() => navigate("equipment/dosing")}>
+      <Button
+        variant="ghost"
+        size="icon"
+        aria-label="Close calibration, back to Feed & dosing"
+        onClick={() => {
+          abandon(session);
+          navigate("equipment/dosing");
+        }}
+      >
         <X aria-hidden />
       </Button>
     </div>
   ) : (
     <div className="feed-cal-title">
-      <button type="button" className="feed-cal-crumb" onClick={() => navigate("equipment/dosing")}>
+      <button
+        type="button"
+        className="feed-cal-crumb"
+        onClick={() => {
+          abandon(session);
+          navigate("equipment/dosing");
+        }}
+      >
         Feed &amp; dosing · {room}
       </button>
       <span className="feed-cal-sep" aria-hidden="true">
@@ -445,9 +502,11 @@ export function FeedCalibration({ controller, navigate }: PageProps) {
       : next;
   const backOff = step === 1 || busy || !!done || !!failed;
   const back = () => {
-    if (step === 2) {
-      // The session stays open: Resume picks it up until it expires.
-      setSessionState(null);
+    if (step === 2 || expired) {
+      // Back to choosing a probe ends the session, so it no longer holds dosing.
+      abandon(session);
+      setSession(null);
+      setExpired(false);
       setStep(1);
     } else goto(step - 1);
   };
@@ -495,9 +554,9 @@ export function FeedCalibration({ controller, navigate }: PageProps) {
                   const k = KIND_OF[p];
                   const entity = controller.states[doc!.sensors[p]!];
                   const value = entity && entity.state !== "" && Number.isFinite(Number(entity.state)) ? Number(entity.state) : null;
-                  const record = doc!.records.find((r) => r.probe === p && r.applied);
-                  const age = record ? daysBetween(dayKey(Date.parse(record.at), tz), dayKey(Date.now(), tz)) : null;
-                  const left = record?.due_days !== undefined && age !== null ? record.due_days - age : null;
+                  // As the integration's calibration_due sensor: the newest check that did not fail.
+                  const last = dueState(doc!.records, p);
+                  const due = last?.dueAt != null ? dueLine(last.dueAt, Date.now(), tz) : null;
                   const on = p === chosen;
                   return (
                     <button
@@ -513,11 +572,11 @@ export function FeedCalibration({ controller, navigate }: PageProps) {
                       <b>{`${room} feed ${NAME_OF[k]}`}</b>
                       <span>
                         {value === null ? "No reading" : `Reads ${feedValue(value, k, digitsOf(entity?.state))} raw`}
-                        {record ? ` · last calibrated ${shortDate(Date.parse(record.at), tz)}` : " · not calibrated yet"}
+                        {last ? ` · last calibrated ${shortDate(last.at, tz)}` : " · not calibrated yet"}
                       </span>
-                      {left !== null && (
-                        <span className="feed-cal-due" data-due={left <= 0 ? "" : undefined}>
-                          {left <= 0 ? `Due today, every ${record!.due_days} days` : `Due in ${left} ${left === 1 ? "day" : "days"}`}
+                      {due && (
+                        <span className="feed-cal-due" data-due={due.overdue ? "" : undefined}>
+                          {due.text}
                         </span>
                       )}
                     </button>
@@ -642,6 +701,7 @@ export function FeedCalibration({ controller, navigate }: PageProps) {
                 layout="panel"
                 rows={rows}
                 applyLabel="Apply calibration"
+                checks={admin && !done ? [{ ok: false, text: admin }] : undefined}
                 discardLabel="Back to the result"
                 onDiscard={() => goto(4)}
                 consequence={

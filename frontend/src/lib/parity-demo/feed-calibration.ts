@@ -10,7 +10,8 @@ import { demoId } from "./journal";
  * integration: a capture stores a point only when the last 30 s held still (or `force`), a session ends
  * 30 min after its last capture, a commit applies a pass or drifting result (a fail is kept, never
  * applied) and writes sensor.crop_steering_<prefix><probe>_corrected, and its Journal event puts the
- * calibration it replaced back (refused once the calibration in force is another). */
+ * calibration it replaced back (refused once the calibration in force is another). calibration_abandon
+ * ends a session without a record. */
 
 const PROBES: Record<FeedProbe, { kind: FeedKind; key: string }> = {
   feed_ph: { kind: "ph", key: "feed_ph_sensor" },
@@ -110,6 +111,12 @@ export class FeedCalibrationDemo {
         );
       if (action === "calibration_capture") return this.capture(session, data, now);
       if (action === "calibration_commit") return this.commit(session, now);
+      if (action === "calibration_abandon") {
+        // Ends the session without a record: the hold on the room's dosing goes with it.
+        this.sessions.delete(session.id);
+        this.expire(now);
+        return ok({ abandoned: true }, now, session.roomId);
+      }
     } catch (error) {
       return refuse("invalid", error instanceof Error ? error.message : String(error));
     }

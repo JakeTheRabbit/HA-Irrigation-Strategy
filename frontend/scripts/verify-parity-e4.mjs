@@ -10,13 +10,19 @@
  *   copy, "Step 2 of 5 · dosing for Room A paused" (phone: "Equipment · step 2 of 5 · dosing paused");
  *   the demo reading settles: Capture is disabled ("Capture 7.00 point · waiting for stable", phone
  *   "Waiting for a steady reading") while it moves, enabled once it held 30 s ("Steady"); Capture
- *   gives "Captured 7.04"; desktop Back keeps the session and step 1 offers "Resume calibration"
+ *   gives "Captured 7.04"; desktop, leaving through the menu keeps the session and step 1 offers "Resume calibration"
  *   with "Dosing for Room A stays paused until HH:MM" and the footer "Step 1 of 5 · dosing for Room A
  *   paused" (no "compensated" claim anywhere);
  *   buffer 2 the same ("Captured 4.09"); the result reads "Probe reads 0.04 pH high. Response 98.3% —
  *   healthy." with Pass marked; Apply calibration gives "Written and read back 14:1x" and the proof
  *   "Now reads 4.00 in pH 4.00 buffer ✓"; Undo writes the previous calibration back.
- * - Phone: ✕ goes back to Feed & dosing.
+ * - The Room A pH card reads "last calibrated <date>" and "Overdue since <date>", as the demo's
+ *   calibration_due sensor says (calibration.py due(): the newest record that did not fail).
+ * - Desktop, after Undo: "Calibrate the other probe", Start, then Back abandons the session (no Resume
+ *   card, footer "Step 1 of 5" with no pause); Start again, 31 min later the status poll finds it
+ *   expired: "Your last calibration session expired" and the footer no longer says dosing is paused.
+ * - Phone: ✕ goes back to Feed & dosing; ✕ mid-session abandons it (back on the page: step 1, no
+ *   Resume card, no "dosing paused").
  * - 3.17: the v1 two-point check form ("Feed probe calibration") under one Needs integration note.
  * - Both: Equipment › Probes & offsets shows the link "Feed pH and EC probes: Calibrate →".
  * Only requests to the page's own origin are made (the harness fails any other). */
@@ -66,7 +72,11 @@ await runParity({
       `${label}: probes`,
     );
     assert.equal(await cards.first().getAttribute("aria-checked"), "true");
+    const phCard = await cards.first().innerText();
+    assert.match(phCard, /last calibrated \d{1,2} \w{3}/, `${label}: pH card last calibrated`);
+    assert.match(phCard, /Overdue since \d{1,2} \w{3}/, `${label}: pH card overdue as calibration_due`);
     region("choose probe");
+    region("probe due as calibration_due");
 
     const foot = page.locator(".feed-cal-foot");
     await foot.getByRole("button", { name: "Start calibration" }).click();
@@ -101,8 +111,11 @@ await runParity({
     region("buffer 1 settles then captures");
 
     if (!phone) {
-      // Back keeps the session: step 1 offers to resume it.
-      await foot.getByRole("button", { name: "Back", exact: true }).click();
+      // Leaving through the menu keeps the session: step 1 offers to resume it.
+      await page.evaluate(() => (location.hash = "#/equipment/dosing"));
+      await page.waitForFunction(() => location.hash === "#/equipment/dosing");
+      await page.evaluate(() => (location.hash = "#/equipment/feed-calibration"));
+      await main.locator(".feed-cal-resume").waitFor();
       // The open session still pauses dosing: the Resume card and the footer say so.
       assert.match(
         await main.locator(".feed-cal-resume span").innerText(),
@@ -112,7 +125,7 @@ await runParity({
       assert.equal(await foot.locator(".feed-cal-count").innerText(), "Step 1 of 5 · dosing for Room A paused");
       assert.doesNotMatch(await page.locator(".feed-cal").innerText(), /compensated/, `${label}: no compensation claim`);
       await main.getByRole("button", { name: "Resume calibration" }).click();
-      await main.getByText("Captured 7.04", { exact: true }).waitFor();
+      await page.locator(".feed-cal-rail").getByText("read 7.04", { exact: true }).waitFor();
       region("resume");
     }
     await foot.getByRole("button", { name: "Next: rinse, into 4.00" }).click();
@@ -143,11 +156,40 @@ await runParity({
     region("undo");
 
     if (phone) {
-      await page.getByRole("button", { name: "Close calibration, back to Feed & dosing" }).click();
+      const close = page.getByRole("button", { name: "Close calibration, back to Feed & dosing" });
+      await close.click();
       await page.waitForFunction(() => location.hash === "#/equipment/dosing");
       region("phone close");
       await page.goBack();
       await main.getByRole("heading", { level: 1, name: title }).waitFor();
+      // ✕ mid-session abandons it: nothing left holding dosing.
+      await foot.getByRole("button", { name: "Start calibration" }).click();
+      await page.locator(".feed-cal-phonebar p").getByText("Equipment · step 2 of 5 · dosing paused", { exact: true }).waitFor();
+      await close.click();
+      await page.waitForFunction(() => location.hash === "#/equipment/dosing");
+      await page.goBack();
+      await main.getByRole("heading", { level: 1, name: title }).waitFor();
+      await main.locator("[data-feed-probe]").first().waitFor();
+      assert.equal(await page.locator(".feed-cal-phonebar p").innerText(), "Equipment · step 1 of 5", `${label}: no pause after close`);
+      assert.equal(await main.locator(".feed-cal-resume").count(), 0, `${label}: no resume after close`);
+      region("phone close abandons");
+    } else {
+      // Back from buffer 1 abandons the session.
+      await main.getByRole("button", { name: "Calibrate the other probe" }).click();
+      await foot.getByRole("button", { name: "Start calibration" }).click();
+      await foot.locator(".feed-cal-count").getByText("Step 2 of 5 · dosing for Room A paused", { exact: true }).waitFor();
+      await foot.getByRole("button", { name: "Back", exact: true }).click();
+      await foot.locator(".feed-cal-count").getByText("Step 1 of 5", { exact: true }).waitFor();
+      assert.equal(await main.locator(".feed-cal-resume").count(), 0, `${label}: no resume after Back`);
+      region("back abandons");
+      // A session that expires releases the hold: the page stops saying dosing is paused.
+      await foot.getByRole("button", { name: "Start calibration" }).click();
+      await foot.locator(".feed-cal-count").getByText("Step 2 of 5 · dosing for Room A paused", { exact: true }).waitFor();
+      await page.clock.fastForward(31 * 60_000);
+      await page.clock.runFor(6_000);
+      await main.getByText("Your last calibration session expired. Start again from buffer 1.", { exact: true }).waitFor();
+      assert.equal(await foot.locator(".feed-cal-count").innerText(), "Step 2 of 5", `${label}: no pause after expiry`);
+      region("expiry releases the pause");
     }
   },
 });
