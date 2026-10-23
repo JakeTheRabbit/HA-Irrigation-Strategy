@@ -354,7 +354,9 @@ async def step_recipe_presets(hass, entry, room) -> list[dict]:
     room_id = "room:" + room_prefix(entry)
     detail = f"{DETAIL}:recipe_presets"
     manager = hass.data.get(DOMAIN, {}).get("_recipe", {}).get(entry.entry_id)
-    recipe = getattr(manager, "recipe", None)
+    if manager is None:
+        raise RuntimeError("the recipe store is not loaded")
+    recipe = manager.recipe
     rows, unmapped = recipe_presets(recipe, _room_name(entry), room_id)
     out = []
     if unmapped:
@@ -581,7 +583,7 @@ async def step_dosing_pumps(hass, entry, room) -> list[dict]:
     listed for its solution and calibration."""
     manager = hass.data.get(DOMAIN, {}).get("_dosing", {}).get(entry.entry_id)
     if manager is None or manager.error:
-        return []
+        raise RuntimeError("the dosing setup is not loaded")
     out = []
     ph = [p for p in manager.data["pumps"] if p.get("ph_role")]
     if ph:

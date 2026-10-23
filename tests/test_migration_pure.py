@@ -117,3 +117,25 @@ def test_every_report_page_is_a_dashboard_page():
     if "RENDERED_PAGES" in routes:
         listed = routes.split("RENDERED_PAGES = [", 1)[1].split("]", 1)[0]
         assert used <= set(re.findall(r'"([^"]+)"', listed)), used
+
+
+def test_a_store_that_is_not_loaded_fails_the_step_so_it_runs_again():
+    """A missing or failed recipe or dosing store is an error (tried at the next start), never a step
+    recorded as skipped for good with its rows silently missing from the report."""
+    import asyncio
+    from types import SimpleNamespace
+
+    import pytest
+
+    entry = SimpleNamespace(entry_id="e1", data={}, options={}, title="F2")
+    site = SimpleNamespace(error=None, document={"presets": []})
+    for data in (
+        {"_site": site},
+        {"_site": site, "_dosing": {"e1": SimpleNamespace(error="disk error")}},
+    ):
+        hass = SimpleNamespace(data={migration.DOMAIN: data})
+        with pytest.raises(RuntimeError):
+            asyncio.run(migration.step_dosing_pumps(hass, entry, {}))
+    hass = SimpleNamespace(data={migration.DOMAIN: {"_site": site}})
+    with pytest.raises(RuntimeError):
+        asyncio.run(migration.step_recipe_presets(hass, entry, {}))
