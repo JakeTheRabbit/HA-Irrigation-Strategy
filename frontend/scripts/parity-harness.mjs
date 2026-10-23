@@ -36,6 +36,7 @@ export async function runParity({ id, route, mockup, phoneMockup, check }) {
     res.writeHead(200, { "Content-Type": "text/html" });
     res.end(html);
   });
+  // PORT: a fixed port when several checks run side by side; else any free one.
   await new Promise((resolve) => server.listen(Number(process.env.PORT) || 0, "127.0.0.1", resolve));
   const origin = `http://127.0.0.1:${server.address().port}`;
   const browser = await launch();

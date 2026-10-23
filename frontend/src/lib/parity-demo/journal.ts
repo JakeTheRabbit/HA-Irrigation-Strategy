@@ -8,6 +8,8 @@ import type { Series } from "../types";
  * paused by Ben 8 min before today's lights-on for a slab change, so it has none today). Only
  * events at or before `now` are answered. */
 export const DEMO_TIMER_PROGRAM_ID = "01JDEMQT1MERZ0NE3DAY000000";
+/** Room A's main-line flow meter, mapped to all three of its zones in the demo supply. */
+export const DEMO_MAIN_METER = "sensor.demo_main_line_meter";
 const ROOMS: Record<
   string,
   {
@@ -124,6 +126,13 @@ function roomDay(roomId: string, on: number, today: boolean): CsEvent[] {
       entity_id: `switch.crop_steering_${roomId.slice(5)}zone_${paused.zone}_enabled`,
       reason: paused.reason,
     }, { actor: "manual", zone: paused.zone });
+  // Room A yesterday at 02:14: water through the main-line meter with every valve shut (CS-319),
+  // gone 4 min later.
+  if (!today && roomId === "room:") {
+    const key = `flow_idle_${DEMO_MAIN_METER}`;
+    add(on - 466 * MIN, "alert.raised", { key, title: "Room A: water flows with no zone on (CS-319)", entity_id: DEMO_MAIN_METER }, { code: "CS-319", outcome: "partial" });
+    add(on - 462 * MIN, "alert.cleared", { key }, { code: "CS-319" });
+  }
   // Room A zone 1 today, between its fourth and fifth shots: the valve did not open (CS-304).
   if (today && roomId === "room:") {
     const at = on + 228 * MIN;
@@ -143,7 +152,9 @@ function roomDay(roomId: string, on: number, today: boolean): CsEvent[] {
       const start = requested + wait * 1000;
       const phase = start >= p2At && room.phase === "P2" ? "P2" : "P1";
       const commanded = 1.21;
-      const metered = zone === room.low && shot === 2 ? 0.85 : 1.18;
+      // Room A zone 2: one short shot, then from 14:14 today its line blocks (H2's "Blocked line?").
+      const blocked = today && zone === room.low && start >= on + 250 * MIN;
+      const metered = blocked ? 0.53 : zone === room.low && shot === 2 ? 0.85 : 1.18;
       const vwc = 56.4 + shot * 0.6 + index * 0.3;
       const intent = demoId(requested, `${roomId}:intent:${zone}:${shot}`);
       if (queued) add(requested, "intent.queued", { position: 1, priority: "steering", requested_at: iso(requested), guard: "pump_capacity" }, { zone, outcome: "queued", intent });

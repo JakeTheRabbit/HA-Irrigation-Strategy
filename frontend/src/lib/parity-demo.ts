@@ -1,6 +1,6 @@
 import { demoBackend, type DemoBackend } from "./demo";
 import { PARITY_ACTIONS, type ParityAction } from "./parity-api";
-import { DEMO_TIMER_PROGRAM_ID, demoId, demoJournal } from "./parity-demo/journal";
+import { DEMO_MAIN_METER, DEMO_TIMER_PROGRAM_ID, demoId, demoJournal } from "./parity-demo/journal";
 import { demoSystemStatus } from "./parity-demo/system";
 import { demoTargetChanges } from "./parity-demo/targets";
 import type {
@@ -180,7 +180,8 @@ const SUPPLY: SupplyDoc = {
   irrigation_pumps: [{ entity_id: "switch.demo_irrigation_pump", max_flow_lph: 1200, max_concurrent_zones: 1, flow_meter: null }],
   water_sources: [],
   zone_groups: {},
-  zone_meters: {},
+  // Room A's main-line meter counts each of its zones' shots (they run one at a time).
+  zone_meters: { "room:": { "1": DEMO_MAIN_METER, "2": DEMO_MAIN_METER, "3": DEMO_MAIN_METER } },
   capacity_check: {
     worst_case_lph: 480, max_flow_lph: 1200, ok: true, suggest_max_concurrent: 2,
     pairs: [{ zones: [1, 2], lph: 960, pct_of_pump: 80, verdict: "one_after_another" }],

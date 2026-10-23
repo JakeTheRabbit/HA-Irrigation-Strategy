@@ -262,6 +262,8 @@ export function watchedEntities(states: States): string[] {
     }
     // Each dosing pump's entities and the batch's hardware: Equipment › Dosing shows them live.
     if (/^sensor\.crop_steering_.*dosing_config$/.test(id)) visit(entity.attributes);
+    // The supply's flow meters and pumps: History › Water & flow shows each meter's last change live.
+    if (id === "sensor.crop_steering_supply_config") visit(entity.attributes);
     if (!/^sensor\.crop_steering_.*engine_config$/.test(id)) continue;
     visit(entity.attributes);
     const { prefix, num_zones } = entity.attributes;

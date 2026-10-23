@@ -211,6 +211,21 @@ describe("watched entities", () => {
       expect(ids).toContain(id);
     expect(ids).not.toContain("switch.not_in_ha");
   });
+  it("includes the flow meters the published supply names, so History › Water & flow's meter line stays live", () => {
+    const ids = watchedEntities({
+      ...home(),
+      ...states(
+        entity("sensor.crop_steering_supply_config", "1", {
+          zone_meters: { "room:room_b_": { "2": "sensor.z2_meter" } },
+          irrigation_pumps: [{ entity_id: "switch.main_pump", flow_meter: "sensor.main_meter" }],
+        }),
+        entity("sensor.z2_meter", "12.5"),
+        entity("sensor.main_meter", "1040.2"),
+      ),
+    });
+    expect(ids).toContain("sensor.z2_meter");
+    expect(ids).toContain("sensor.main_meter");
+  });
   it("is empty without crop-steering entities, so nothing subscribes to all of Home Assistant", () => {
     expect(watchedEntities(states(entity("light.kitchen", "on")))).toEqual([]);
   });
