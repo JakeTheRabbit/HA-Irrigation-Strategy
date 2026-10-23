@@ -1094,19 +1094,18 @@ try {
       // The switcher moves the header chip with the page, with no reload.
       await page.getByLabel("Sample AI state", { exact: true }).selectOption("budget");
       await visible(page.locator(".brain-chip").getByText("AI paused: budget"));
-      // The same permission now has one reviewed editor in Settings.
+      // The same permission has one editor in Settings: its judge's switch, written at once with Undo.
       await page
         .locator("[data-brain-powers]")
         .getByRole("link", { name: "Manage permissions" })
         .click();
-      const tune = page.getByRole("switch", { name: /Tune shot sizes/i });
-      assert.equal(await tune.isChecked(), false);
+      const tune = page.getByRole("switch", { name: "Shot sizes in Room A", exact: true });
+      assert.equal(await tune.getAttribute("aria-checked"), "false");
       await tune.click();
-      assert.equal(await tune.isChecked(), true, "Permission change is staged locally");
-      await page.getByRole("button", { name: "Review changes", exact: true }).click();
-      await page.getByRole("button", { name: /^Apply 1 change/ }).click();
-      await page.getByRole("dialog").waitFor({ state: "hidden" });
-      assert.equal(await tune.isChecked(), true, "Reviewed permission reads back enabled");
+      await visible(
+        page.locator("[data-sonner-toast]").filter({ hasText: /^Shot sizes on in Room A\. Written and read back/ }),
+      );
+      assert.equal(await tune.getAttribute("aria-checked"), "true", "Permission reads back enabled");
       await page.setViewportSize({ width: 1440, height: 1000 });
     },
   );

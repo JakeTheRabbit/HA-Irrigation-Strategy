@@ -1,30 +1,45 @@
 import { CanonicalControls } from "@/components/canonical-controls";
-import { useId, useState, useLayoutEffect, type ReactNode } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { ArrowRight } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Heading, time as clock, type Page } from "@/components/dashboard";
 import { UiTip } from "@/components/info-tip";
 import { Meter } from "@/components/mini-visuals";
 import {
+  AI_POWERS,
   BRAIN_DEMO_STATES,
   BRAIN_JUDGES,
+  JUDGES,
   confidenceWords,
+  judgeCount,
+  judgeMatrix,
   judgeTitle,
   keyWords,
   modeWords,
   money,
+  outcomes,
+  outcomesFromLog,
   parsePowers,
   providerWords,
   setDemoBrain,
   useBrain,
+  type AiOutcome,
   type BrainDemoState,
   type BrainPanel,
   type BrainView,
+  type JudgeRow,
 } from "@/lib/brain";
-import { jevAnswer, jevResult, readJev } from "@/lib/jev";
+import { jevAnswer, jevIds, jevResult, readJev } from "@/lib/jev";
+import { openAlerts } from "@/lib/open-alerts";
+import { pagedQuery, useParity } from "@/lib/parity-api";
+import type { CsEvent, SystemStatus } from "@/lib/parity-types";
 import { SETTING_COPY } from "@/lib/ste-copy";
-import type { Controller } from "@/lib/types";
+import { clock as wallClock, dayKey, dayLabel } from "@/lib/time";
+import type { Controller, Room } from "@/lib/types";
+import { offerUndo } from "@/lib/undo";
 import "./brain.css";
+import "./room-controls.css";
 import { BrainInstructions } from "./brain-instructions";
 
 type Navigate = (page: Page, zone?: number) => void;
@@ -415,7 +430,382 @@ function WhereTheKeyGoes() {
   );
 }
 
-/** Provider credentials stay in controller options; room context has a reviewed administrator editor. */
+const AI_KINDS = ["ai.judgement", "ai.outcome"];
+const POWER_FEATURES = AI_POWERS.map((power) => `ai_power_${power.key}`);
+const TAG = { act: "Can act", alerts: "Alerts", advice: "Advice" } as const;
+const LOCKED = "Only a Home Assistant administrator can change this.";
+
+/** Every judge with one switch per room. A switch writes at once and offers Undo; a judge without a
+ * switch shows whether the controller asks it, read only. */
+function JudgesCard({ controller }: { controller: Controller }) {
+  const { rooms, timeZone } = controller;
+  const rows = judgeMatrix(controller.states, rooms);
+  const count = judgeCount(rows);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [failed, setFailed] = useState<string | null>(null);
+  const latest = useRef(controller);
+  latest.current = controller;
+  const locked = controller.admin === false || !["live", "demo"].includes(controller.connection);
+  const write = async (entityId: string, on: boolean) => {
+    const result = await latest.current.write([{ entityId, value: on }]);
+    return result.applied.includes(entityId)
+      ? null
+      : (result.failed[0]?.reason ?? "The controller did not confirm the change.");
+  };
+  const flip = async (row: JudgeRow, room: Room, entityId: string, on: boolean) => {
+    const what = row.shares ? `${row.name} and ${row.shares}` : row.name;
+    const word = (value: boolean) => (value ? "on" : "off");
+    setBusy(entityId);
+    setFailed(null);
+    const refused = await write(entityId, on).finally(() => setBusy(null));
+    if (refused) {
+      setFailed(`${what} in ${room.name} was not turned ${word(on)}: ${refused}`);
+      return;
+    }
+    offerUndo({
+      message: `${what} ${word(on)} in ${room.name}. Written and read back ${wallClock(Date.now(), timeZone)}.`,
+      undo: async () => {
+        // Put back only what this change left: a newer change since then is someone else's.
+        if (latest.current.states[entityId]?.state !== word(on))
+          throw new Error(`${what} in ${room.name} changed since. Nothing was put back.`);
+        setBusy(entityId);
+        const back = await write(entityId, !on).finally(() => setBusy(null));
+        if (back) throw new Error(`${what} in ${room.name} was not put back: ${back}`);
+        toast(
+          `${what} ${word(!on)} again in ${room.name}. Written and read back ${wallClock(Date.now(), timeZone)}.`,
+        );
+      },
+    });
+  };
+  const roomNames = rooms.map((room) => room.name).join(" and ");
+  return (
+    <section className="panel ai-card ai-judges" aria-labelledby="ai-judges-title" data-ai-judges>
+      <div className="ai-card-head">
+        <h2 id="ai-judges-title">Judges</h2>
+        <span>
+          {count.on} of {count.of} on{roomNames ? ` · ${roomNames}` : ""}
+        </span>
+      </div>
+      <p className="brain-line">
+        Each judge is one question about one decision. The controller keeps the pump, valves and every
+        safety limit; a judge can only move inside them.
+      </p>
+      {failed && (
+        <p className="ai-failed" role="alert">
+          {failed}
+        </p>
+      )}
+      <div className="ai-judges-wrap">
+        <table className="ai-judges-table">
+          <thead>
+            <tr>
+              <th scope="col">Judge</th>
+              <th scope="col">Can it act?</th>
+              {rooms.map((room) => (
+                <th scope="col" key={room.id} className="ai-room-col">
+                  {room.name}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.id} data-judge={row.id}>
+                <th scope="row">
+                  <strong>
+                    {row.name}
+                    {row.shares && <small> · one switch with {row.shares}</small>}
+                  </strong>
+                  <span title={row.blurb}>{row.blurb}</span>
+                </th>
+                <td>
+                  <span className="ai-tag" data-power={row.power}>
+                    {TAG[row.power]}
+                  </span>
+                </td>
+                {rooms.map((room) => {
+                  const cell = row.perRoom[room.id];
+                  const label = `${row.name} in ${room.name}`;
+                  let body: ReactNode;
+                  if (cell.entityId && cell.note === undefined)
+                    body = (
+                      <button
+                        type="button"
+                        role="switch"
+                        className="switch"
+                        aria-checked={cell.on}
+                        aria-label={label}
+                        title={locked ? LOCKED : undefined}
+                        disabled={locked || busy === cell.entityId}
+                        onClick={() => void flip(row, room, cell.entityId!, !cell.on)}
+                      >
+                        <span className="switch-thumb" aria-hidden="true" />
+                      </button>
+                    );
+                  else if (cell.note === "Set in the controller app")
+                    body = (
+                      <span
+                        className="switch ai-fixed"
+                        data-on={cell.on}
+                        role="img"
+                        aria-label={`${label}: ${cell.on ? "asked" : "not asked"}. Set in the controller app.`}
+                        title="Set in the controller app's options (ai_judges)"
+                      >
+                        <span className="switch-thumb" aria-hidden="true" />
+                      </span>
+                    );
+                  else
+                    body = (
+                      <span
+                        className="ai-note"
+                        title={
+                          cell.note === "stacking off"
+                            ? `EC stacking is off in ${room.name}, so this judge never asks there`
+                            : cell.note === "No switch"
+                              ? `This integration has no switch for it in ${room.name}`
+                              : `${room.name} does not report the judges it asks`
+                        }
+                      >
+                        {cell.note}
+                      </span>
+                    );
+                  return (
+                    <td key={room.id} className="ai-room-col">
+                      {body}
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
+/** The day's calls and spend: system_status_get.ai on 3.18, else the room's brain sensor. */
+function useCalls(controller: Controller) {
+  const status = useParity<SystemStatus>(controller, "system_status_get", {}, []);
+  const ai = status.state === "ready" ? status.data?.ai : null;
+  const attrs = controller.states[jevIds(controller.room.room.prefix).room]?.attributes ?? {};
+  const num = (value: unknown) => (typeof value === "number" && Number.isFinite(value) ? value : null);
+  const calls = ai ? num(ai.calls_today) : num(attrs.calls_today);
+  const cap = ai ? num(ai.daily_budget) : num(attrs.daily_budget);
+  const pct = ai ? num(ai.pct_used) : calls !== null && cap ? (calls / cap) * 100 : null;
+  return { calls, cap, pct };
+}
+
+function BudgetCard({ controller, panel }: { controller: Controller; panel: BrainPanel | null }) {
+  const { timeZone } = controller;
+  const { calls, cap, pct } = useCalls(controller);
+  const warning = openAlerts(controller).find((alert) => alert.code === "CS-706");
+  const spent = panel?.spentUsd ?? null;
+  const budget = panel?.budgetUsd ?? null;
+  return (
+    <section className="panel ai-card" aria-labelledby="ai-budget-title" data-ai-budget>
+      <div className="ai-card-head">
+        <h2 id="ai-budget-title">Budget today</h2>
+        <strong className="ai-spent">{spent === null ? "—" : money(spent)}</strong>
+        <span>of {budget === null ? "—" : money(budget)}</span>
+      </div>
+      {pct !== null && (
+        <div
+          className="ai-bar"
+          role="meter"
+          aria-label="AI calls used today"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={Math.min(100, pct)}
+          aria-valuetext={`${pct.toFixed(1)} %`}
+          data-warn={pct >= 80}
+        >
+          <span style={{ width: `${Math.min(100, pct)}%` }} />
+          <i aria-hidden="true" />
+        </div>
+      )}
+      <div className="ai-bar-legend">
+        <span>
+          {calls === null ? "Calls not reported" : `${calls}${cap === null ? "" : ` of ${cap}`} calls`}
+          {pct === null ? "" : ` (${pct.toFixed(1)} %)`}
+          {panel?.resetsAt == null ? "" : ` · resets at lights-on ${wallClock(panel.resetsAt, timeZone)}`}
+        </span>
+        <span>CS-706 warns at 80 % by default · rules take over at 100 %</span>
+      </div>
+      {warning && (
+        <p className="ai-warning" data-code="CS-706">
+          <b>CS-706</b> raised{warning.at === null ? "" : ` ${wallClock(warning.at, timeZone)}`}:{" "}
+          {warning.title}. <a href="#/help?code=CS-706">What to do →</a>
+        </p>
+      )}
+      <p className="ai-budget-set">
+        <span>Daily budget US$</span>
+        <strong>{budget === null ? "—" : budget.toFixed(2)}</strong>
+        <span className="brain-line">
+          Set in the controller app's options (anthropic_daily_budget_usd). This page cannot change it.
+        </span>
+      </p>
+    </section>
+  );
+}
+
+const MODELS = [
+  ["haiku", "Haiku 5.5"],
+  ["sonnet", "Sonnet 5.5"],
+  ["opus", "Opus 5.5"],
+] as const;
+
+/** Dry run and the model, as the controller reports them, and what today cost. Both are controller
+ * options: shown, not switched here. */
+function ModelCard({ controller, panel }: { controller: Controller; panel: BrainPanel | null }) {
+  const { calls } = useCalls(controller);
+  const model = panel?.model ?? null;
+  const current = model ? MODELS.find(([key]) => model.includes(key))?.[0] : undefined;
+  const dry = panel?.mode === "dry_run";
+  const spent = panel?.spentUsd ?? null;
+  return (
+    <section className="panel ai-card" aria-labelledby="ai-model-title" data-ai-model>
+      <div className="ai-dry">
+        <span className="switch ai-fixed" data-on={dry} aria-hidden="true">
+          <span className="switch-thumb" />
+        </span>
+        <span>
+          <strong id="ai-model-title">{panel?.mode ? `Dry run ${dry ? "on" : "off"}` : "Not running"}</strong>
+          <span className="brain-line">
+            {!panel?.mode
+              ? "The rules decide every zone."
+              : dry
+                ? "The judges answer and the ledger shows what it would do. Nothing changes in the rooms."
+                : "The assistant acts inside its limits."}
+          </span>
+        </span>
+      </div>
+      <div className="ai-models" role="group" aria-label="Model">
+        {MODELS.map(([key, name]) => (
+          <span key={key} data-current={key === current} aria-current={key === current ? "true" : undefined}>
+            {name}
+          </span>
+        ))}
+      </div>
+      <p className="brain-line">
+        {model && !current ? `Model ${model}. ` : ""}
+        {calls !== null && spent !== null ? `Today's ${calls} calls cost ${money(spent)}. ` : ""}
+        Dry run and the model are set in the controller app's options.
+      </p>
+    </section>
+  );
+}
+
+const VERDICT = { worked: "Worked", measuring: "Measuring", "did not work": "Did not work" } as const;
+
+/** The AI assistant's decisions over the last week and what each check found: the Journal on 3.18, each
+ * room's decision log on 3.17. */
+function OutcomesCard({ controller }: { controller: Controller }) {
+  const { rooms, timeZone, states } = controller;
+  const [read, setRead] = useState<
+    { state: "loading" } | { state: "missing" } | { state: "error"; error: string } | { state: "ready"; events: CsEvent[] }
+  >({ state: "loading" });
+  const roomsKey = rooms.map((room) => room.id).join(",");
+  const latest = useRef(controller);
+  latest.current = controller;
+  useEffect(() => {
+    let live = true;
+    const since = new Date(Date.now() - 7 * 86_400_000).toISOString();
+    void Promise.all(
+      roomsKey
+        .split(",")
+        .filter(Boolean)
+        .map((room_id) => pagedQuery(latest.current, { room_id, since, kinds: AI_KINDS }, 500)),
+    ).then((pages) => {
+      if (!live) return;
+      const failed = pages.find((page) => page.kind !== "ok");
+      if (failed?.kind === "missing") setRead({ state: "missing" });
+      else if (failed?.kind === "error") setRead({ state: "error", error: failed.message });
+      else setRead({ state: "ready", events: pages.flatMap((page) => (page.kind === "ok" ? page.data.events : [])) });
+    });
+    return () => {
+      live = false;
+    };
+  }, [roomsKey]);
+  const liveEvents = controller.recentEvents.filter((event) => AI_KINDS.includes(event.kind));
+  const rows =
+    read.state === "ready"
+      ? outcomes([...new Map([...read.events, ...liveEvents].map((event) => [event.id, event])).values()])
+      : read.state === "missing"
+        ? rooms
+            .flatMap((room) => outcomesFromLog(readJev(states, room.prefix).log?.entries ?? [], room.id))
+            .sort((a, b) => b.at - a.at)
+        : [];
+  const today = dayKey(Date.now(), timeZone);
+  const where = (row: AiOutcome) => {
+    const room = rooms.find((r) => r.id === row.roomId);
+    const zone =
+      row.zone === null
+        ? ""
+        : row.roomId === controller.roomId
+          ? (controller.room.zones.find((z) => z.id === row.zone)?.name ?? `Zone ${row.zone}`)
+          : `Zone ${row.zone}`;
+    return [room?.name ?? row.roomId, zone].filter(Boolean).join(" ");
+  };
+  return (
+    <section className="panel ai-card ai-ledger" aria-labelledby="ai-ledger-title" data-ai-ledger>
+      <div className="ai-card-head">
+        <h2 id="ai-ledger-title">What it did, and what happened</h2>
+        <a href="#/history/changes?actor=ai">Full ledger in History →</a>
+      </div>
+      {read.state === "loading" ? (
+        <p className="brain-line">Reading the ledger…</p>
+      ) : read.state === "error" ? (
+        <p className="ai-failed">The ledger could not be read: {read.error}</p>
+      ) : !rows.length ? (
+        <p className="brain-line">Nothing in the last 7 days.</p>
+      ) : (
+        <ol className="ai-outcomes">
+          {rows.slice(0, 6).map((row) => (
+            <li key={row.id} data-verdict={row.verdict}>
+              <span className="ai-when">
+                <b>{wallClock(row.at, timeZone)}</b>
+                {dayKey(row.at, timeZone) === today ? "today" : dayLabel(row.at, timeZone)}
+              </span>
+              <span className="ai-what">
+                <span>
+                  <b>{where(row)}</b>
+                  <span className="brain-line"> · {JUDGES.find((j) => j.id === row.judge)?.name ?? judgeTitle(row.judge)}</span>
+                </span>
+                <span>{row.text}</span>
+                {row.result && <span className="brain-line">→ {row.result}</span>}
+              </span>
+              <span className="ai-verdict">
+                <span className="ai-pill" data-verdict={row.verdict}>
+                  {VERDICT[row.verdict]}
+                </span>
+                {row.band && row.value !== null && <BandTick band={row.band} value={row.value} />}
+              </span>
+            </li>
+          ))}
+        </ol>
+      )}
+    </section>
+  );
+}
+
+/** The check's target band and where the value landed, both as the controller sent them. */
+function BandTick({ band, value }: { band: [number, number]; value: number }) {
+  const span = band[1] - band[0] || 1;
+  const min = Math.min(band[0] - span, value);
+  const max = Math.max(band[1] + span, value);
+  const at = (v: number) => `${((v - min) / (max - min)) * 100}%`;
+  return (
+    <span className="ai-band" aria-hidden="true">
+      <span style={{ left: at(band[0]), width: `${(span / (max - min)) * 100}%` }} />
+      <i style={{ left: at(value) }} />
+    </span>
+  );
+}
+
+/** Settings › AI assistant: the judges with a switch per room, today's budget, dry run and model, what it
+ * did and what happened, and below them the room's instructions and permissions. Provider credentials stay
+ * in controller options. */
 export function AiSettings({
   controller,
   onDirtyChange,
@@ -442,40 +832,47 @@ export function AiSettings({
   return (
     <>
       <Heading title="AI assistant" />
-      <div className="settings-stack brain-settings">
-        <BrainInstructions controller={controller} onDirtyChange={setInstructionsDirty} />
-        <CanonicalControls controller={controller} owner="ai" onDirtyChange={setPermissionsDirty} />
-        {row("Provider", <p className="brain-line">{providerWords(panel)}</p>)}
-        {row(
-          "Anthropic key",
-          <>
-            <p className="brain-line" data-brain-key>
-              {keyWords(panel)}
-            </p>
-            <WhereTheKeyGoes />
-          </>,
-          "The key stays in the controller. This page only shows whether one is saved.",
-        )}
-        {row("Model", <p className="brain-line">{panel?.model ?? "None while rules run"}</p>)}
-        {row(
-          "Daily budget",
-          <p className="brain-line">
-            {panel?.budgetUsd === null || panel?.budgetUsd === undefined
-              ? "Not reported while rules run"
-              : `${money(panel.budgetUsd)} a day, resets at lights-on`}
-          </p>,
-        )}
-        {row("Mode", <p className="brain-line">{modeWords(panel)}</p>)}
-        {row("What it can do", <MayDo panel={panel} />)}
-        {row(
-          "Privacy",
-          <p className="brain-line">
-            What is sent: each zone's readings and settings, the day's stage, and the room and zone
-            names you typed, plus any saved room context and house notes. Automatically collected
-            evidence excludes entity ids and credentials. Keep credentials and personal information
-            out of notes; they are sent as entered to the AI provider.
-          </p>,
-        )}
+      <div className="ai-settings" data-ai-settings>
+        <div className="ai-grid">
+          <JudgesCard controller={controller} />
+          <div className="ai-side">
+            <BudgetCard controller={controller} panel={panel} />
+            <ModelCard controller={controller} panel={panel} />
+            <OutcomesCard controller={controller} />
+          </div>
+        </div>
+        <section className="ai-instructions" aria-labelledby="ai-instructions-title">
+          <h2 id="ai-instructions-title">Instructions and permissions</h2>
+          <div className="settings-stack brain-settings">
+            <BrainInstructions controller={controller} onDirtyChange={setInstructionsDirty} />
+            <CanonicalControls
+              controller={controller}
+              owner="ai"
+              hide={POWER_FEATURES}
+              onDirtyChange={setPermissionsDirty}
+            />
+            {row("Provider", <p className="brain-line">{providerWords(panel)}</p>)}
+            {row(
+              "Anthropic key",
+              <>
+                <p className="brain-line" data-brain-key>
+                  {keyWords(panel)}
+                </p>
+                <WhereTheKeyGoes />
+              </>,
+              "The key stays in the controller. This page only shows whether one is saved.",
+            )}
+            {row(
+              "Privacy",
+              <p className="brain-line">
+                What is sent: each zone's readings and settings, the day's stage, and the room and zone
+                names you typed, plus any saved room context and house notes. Automatically collected
+                evidence excludes entity ids and credentials. Keep credentials and personal information
+                out of notes; they are sent as entered to the AI provider.
+              </p>,
+            )}
+          </div>
+        </section>
       </div>
     </>
   );

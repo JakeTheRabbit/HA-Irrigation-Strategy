@@ -1,16 +1,25 @@
 import { describe, expect, it } from "vitest";
 import {
   AI_POWERS,
+  aiPowerId,
   BRAIN_DEMO_STATES,
   brainView,
   confidenceWords,
   demoBrainEntity,
+  judgeCount,
+  judgeMatrix,
   keyWords,
+  outcomes,
+  outcomesFromLog,
   parseBrainPanel,
   parsePowers,
   providerWords,
 } from "./brain";
+import { createDemo } from "./demo";
+import { buildRoom, discoverRooms, validateChange } from "./model";
+import type { CsEvent } from "./parity-types";
 import { SETTING_COPY, UI_COPY } from "./ste-copy";
+import type { JevEntry } from "./jev";
 import type { EntityState } from "./types";
 
 const sensor = (state: string, attributes: Record<string, unknown>): EntityState => ({
@@ -234,5 +243,194 @@ describe("what the AI assistant may do", () => {
     expect(UI_COPY["what the ai assistant may do"].tooltip).toBe(
       "When a power is off, the AI assistant only advises. It does not change that part.",
     );
+  });
+});
+
+describe("the judges matrix", () => {
+  const rooms = [
+    { id: "room:", name: "F2", prefix: "" },
+    { id: "room:f1_", name: "F1", prefix: "f1_" },
+  ];
+  const entity = (
+    entity_id: string,
+    state: string,
+    attributes: Record<string, unknown> = {},
+  ): EntityState => ({
+    entity_id,
+    state,
+    attributes,
+    last_updated: "2026-10-22T00:00:00Z",
+    last_changed: "2026-10-22T00:00:00Z",
+  });
+  const states = Object.fromEntries(
+    [
+      ...AI_POWERS.map((p) => entity(aiPowerId("", p.key), "on")),
+      entity(aiPowerId("f1_", "advance_phase"), "on"),
+      entity(aiPowerId("f1_", "ec_mode"), "on"),
+      entity(aiPowerId("f1_", "set_targets_from_achievable"), "off"),
+      entity("switch.crop_steering_f1_ec_stacking_enabled", "off"),
+      entity("sensor.crop_steering_jev", "on", { judges: ["dawn", "shot", "channel", "stage"] }),
+      entity("sensor.crop_steering_f1_jev", "on", { judges: ["dawn", "shot"] }),
+    ].map((e) => [e.entity_id, e]),
+  );
+
+  it("judgeMatrix maps per-room switches and notes", () => {
+    const matrix = judgeMatrix(states, rooms);
+    const row = (id: string) => matrix.find((r) => r.id === id)!;
+    // A judge that can act is its power's switch, in each room.
+    expect(row("dawn")).toMatchObject({ name: "Morning start", power: "act" });
+    expect(row("dawn").perRoom["room:"]).toEqual({
+      on: true,
+      entityId: aiPowerId("", "advance_phase"),
+    });
+    expect(row("targets").perRoom["room:f1_"]).toEqual({
+      on: false,
+      entityId: aiPowerId("f1_", "set_targets_from_achievable"),
+    });
+    // Two judges share one power: each row says so.
+    expect(row("dawn").shares).toBe("Day end");
+    expect(row("dusk").shares).toBe("Morning start");
+    // Pore EC never asks where EC stacking is off.
+    expect(row("salt").perRoom["room:f1_"]).toEqual({
+      on: false,
+      entityId: aiPowerId("f1_", "ec_mode"),
+      note: "stacking off",
+    });
+    // No switch in a room: said, never shown as on or off.
+    expect(row("probe").perRoom["room:f1_"]).toEqual({ on: false, entityId: null, note: "No switch" });
+    // Alert and advice judges have no switch: asked or not, as the controller publishes it.
+    expect(row("channel")).toMatchObject({ name: "Water channel", power: "alerts" });
+    expect(row("channel").perRoom["room:"]).toEqual({
+      on: true,
+      entityId: null,
+      note: "Set in the controller app",
+    });
+    expect(row("channel").perRoom["room:f1_"]).toEqual({
+      on: false,
+      entityId: null,
+      note: "Set in the controller app",
+    });
+    expect(row("stage").power).toBe("advice");
+    // A room that publishes no judge list.
+    expect(
+      judgeMatrix({}, rooms.slice(0, 1)).find((r) => r.id === "shot")!.perRoom["room:"],
+    ).toEqual({ on: false, entityId: null, note: "Not reported" });
+  });
+
+  it("counts k of n over the cells with a known state", () => {
+    expect(judgeCount(judgeMatrix(states, rooms))).toEqual({ on: 15, of: 24 });
+  });
+});
+
+describe("what it did, and what happened", () => {
+  const event = (
+    id: string,
+    ts: string,
+    kind: string,
+    data: Record<string, unknown>,
+    extra: Partial<CsEvent> = {},
+  ): CsEvent => ({
+    v: 1,
+    id,
+    ts,
+    room_id: "room:",
+    zone: 2,
+    kind,
+    outcome: "ok",
+    code: null,
+    source: { actor: "ai", detail: String(data.judge ?? "") },
+    data,
+    ...extra,
+  });
+  const ledger = (id: string) => ({ correlation: { ledger_id: id } });
+
+  it("outcomes verdict from ai.outcome", () => {
+    const rows = outcomes([
+      event("01A", "2026-10-21T02:14:00Z", "ai.judgement", { judge: "setpoints", label: "Raised the P2 re-water point", action: "setpoint" }, ledger("7")),
+      event("01B", "2026-10-22T02:14:00Z", "ai.outcome", { what: "Dryback back in band", good: true }, ledger("7")),
+      event("01C", "2026-10-21T22:41:00Z", "ai.judgement", { judge: "shotsize", label: "Cut the maintenance shot", action: "shot_size" }, { zone: 1, ...ledger("8") }),
+      event("01D", "2026-10-20T02:30:00Z", "ai.judgement", { judge: "setpoints", label: "Lowered the maintenance shot", action: "setpoint" }, ledger("5")),
+      event("01E", "2026-10-21T02:30:00Z", "ai.outcome", { what: "Dryback overshot", good: false, band: [18, 22], value: 24.1 }, ledger("5")),
+      event("01F", "2026-10-21T03:00:00Z", "ai.judgement", { judge: "dawn", label: "Start early", action: "refused" }, { outcome: "refused", ...ledger("9") }),
+    ]);
+    expect(rows.map((r) => [r.judge, r.verdict, r.result])).toEqual([
+      ["shotsize", "measuring", ""],
+      ["setpoints", "worked", "Dryback back in band"],
+      ["setpoints", "did not work", "Dryback overshot"],
+    ]);
+    expect(rows[1]).toMatchObject({
+      roomId: "room:",
+      zone: 2,
+      text: "Raised the P2 re-water point",
+      band: null,
+      value: null,
+      at: Date.parse("2026-10-21T02:14:00Z"),
+    });
+    // A band is drawn only from numbers the controller sent.
+    expect(rows[2]).toMatchObject({ band: [18, 22], value: 24.1 });
+  });
+
+  it("pairs an outcome without a ledger id with the next one in the same room and zone", () => {
+    const rows = outcomes([
+      event("01A", "2026-10-22T07:30:00Z", "ai.judgement", { judge: "dryback", label: "Dryback on target", action: "advice" }, { zone: 1 }),
+      event("01C", "2026-10-22T08:00:00Z", "ai.outcome", { what: "Another zone", good: false }, { zone: 3 }),
+      event("01B", "2026-10-22T10:00:00Z", "ai.outcome", { what: "Dryback came back to target.", good: true }, { zone: 1 }),
+    ]);
+    expect(rows.map((r) => [r.verdict, r.result])).toEqual([["worked", "Dryback came back to target."]]);
+  });
+
+  it("reads the 3.17 ledger: decisions and the outcome that names them", () => {
+    const entry = (over: Partial<JevEntry>): JevEntry => ({
+      key: "k",
+      time: 0,
+      stamp: "",
+      of: "",
+      zone: 1,
+      judge: "dawn",
+      title: "Morning start",
+      kind: "decision",
+      verdict: "",
+      p: null,
+      agreed: null,
+      action: "",
+      result: "acted",
+      resultText: "acted",
+      reason: "",
+      ...over,
+    });
+    const rows = outcomesFromLog(
+      [
+        entry({ key: "a", time: 2000, stamp: "t2", of: "t1", kind: "outcome", verdict: "Peak reached in band", result: "worked" }),
+        entry({ key: "b", time: 1000, stamp: "t1", action: "Started the ramp sooner" }),
+        entry({ key: "c", time: 900, stamp: "t0", zone: 2, judge: "salt", result: "refused" }),
+      ],
+      "room:",
+    );
+    expect(rows).toEqual([
+      expect.objectContaining({
+        judge: "dawn",
+        text: "Started the ramp sooner",
+        result: "Peak reached in band",
+        verdict: "worked",
+        at: 1000,
+      }),
+    ]);
+  });
+});
+
+describe("judge switches of any room pass the write check", () => {
+  it("accepts another room's AI power switch, nothing else of that room", () => {
+    const states = createDemo(Date.parse("2026-10-22T01:00:00Z"));
+    const other = aiPowerId("room_b_", "ec_mode");
+    states[other] = { ...states[aiPowerId("", "ec_mode")], entity_id: other };
+    const roomA = discoverRooms(states).find((r) => r.prefix === "")!;
+    const view = buildRoom(states, roomA);
+    expect(validateChange(view, states, { entityId: other, value: false })).toBeNull();
+    expect(
+      validateChange(view, states, {
+        entityId: "switch.crop_steering_room_b_auto_setpoints",
+        value: false,
+      }),
+    ).not.toBeNull();
   });
 });

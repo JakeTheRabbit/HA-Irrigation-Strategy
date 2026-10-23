@@ -1,8 +1,9 @@
 import { useSyncExternalStore } from "react";
 import { HEARTBEAT_STALE_MS, parseControllerTime } from "./controller-health";
-import { jevIds } from "./jev";
+import { jevIds, type JevEntry } from "./jev";
 import { roomStatus } from "./model";
-import type { Controller, EntityState, States } from "./types";
+import type { CsEvent } from "./parity-types";
+import type { Controller, EntityState, Room, States } from "./types";
 
 /** The AI assistant's panel, read from the room's brain sensor `sensor.crop_steering_<prefix>jev` (its id is
  * kept for upgraded installs). The controller publishes it on every provider, under rules too
@@ -255,6 +256,184 @@ export function parsePowers(states: States, prefix: string): AiPower[] {
     };
   });
 }
+/** The judges Settings › AI assistant lists, in the controller's order (brain_bridge.ALL, less the ones
+ * that only write reports or answers). `act`: the judge can change something, through its power's switch
+ * (brain_bridge.JUDGE_POWER); with the power off it only advises. `alerts` and `advice` judges have no
+ * switch: the controller's ai_judges option decides whether they are asked. */
+export const JUDGES: {
+  id: string;
+  name: string;
+  blurb: string;
+  power: "act" | "alerts" | "advice";
+  powerKey?: AiPowerKey;
+}[] = [
+  { id: "dawn", name: "Morning start", blurb: "Starts the morning ramp sooner when the night dryback is big enough.", power: "act", powerKey: "advance_phase" },
+  { id: "ramp", name: "Ramp hand-over", blurb: "Ends the ramp once the slab is full, not when new feed passes the probe.", power: "act", powerKey: "ramp_control" },
+  { id: "salt", name: "Pore EC", blurb: "Lets EC stacking move the re-water point, hold it or move it back.", power: "act", powerKey: "ec_mode" },
+  { id: "dusk", name: "Day end", blurb: "Stops the day's shots early on generative zones.", power: "act", powerKey: "advance_phase" },
+  { id: "probe", name: "Probe trust", blurb: "Sets a stuck, drifting or misplaced probe aside.", power: "act", powerKey: "set_probe_aside" },
+  { id: "shot", name: "Shot landing", blurb: "Checks 20 min after each shot that the water reached the slab.", power: "alerts" },
+  { id: "night", name: "Night low", blurb: "Tells a dry slab from a bad probe near the rescue floor.", power: "alerts" },
+  { id: "zones", name: "Zone comparison", blurb: "Explains a zone drinking far more or less than the others.", power: "alerts" },
+  { id: "channel", name: "Water channel", blurb: "Spots water running past the slab or the probe.", power: "alerts" },
+  { id: "stage", name: "Stage arc", blurb: "Checks today's dryback and pore EC suit the stage.", power: "advice" },
+  { id: "setpoints", name: "Setpoints", blurb: "Moves one setting one step each night, inside your range.", power: "act", powerKey: "nudge_setpoints" },
+  { id: "balance", name: "Balance", blurb: "Suggests moving tomorrow's water toward the room's.", power: "advice" },
+  { id: "targets", name: "Targets", blurb: "Writes tomorrow's field capacity, peak, re-water and dryback targets.", power: "act", powerKey: "set_targets_from_achievable" },
+  { id: "shotsize", name: "Shot sizes", blurb: "Writes ramp and maintenance shot sizes after lights-off.", power: "act", powerKey: "tune_shot_sizes" },
+  { id: "plan", name: "Grow plan", blurb: "Applies today's plan day while a stale probe holds the plan.", power: "act", powerKey: "plan_catch_up" },
+];
+
+export interface JudgeCell {
+  on: boolean;
+  /** The power switch this cell writes; null where the judge has no switch in the room. */
+  entityId: string | null;
+  /** Shown in place of a working switch: why there is none, or why it never asks here. */
+  note?: string;
+}
+export interface JudgeRow {
+  id: string;
+  name: string;
+  blurb: string;
+  power: "act" | "alerts" | "advice";
+  /** The other judge on the same power switch: one switch turns both. */
+  shares?: string;
+  perRoom: Record<string, JudgeCell>;
+}
+
+/** Every judge, with one cell per room: a judge that can act is its power's switch (missing: "No switch";
+ * Pore EC where EC stacking is off: "stacking off"); an alert or advice judge is on when the room's brain
+ * sensor lists it among the judges it asks, read only. */
+export function judgeMatrix(states: States, rooms: Room[]): JudgeRow[] {
+  return JUDGES.map((judge) => {
+    const partner = judge.powerKey
+      ? JUDGES.find((other) => other !== judge && other.powerKey === judge.powerKey)
+      : undefined;
+    const perRoom = Object.fromEntries(
+      rooms.map((room): [string, JudgeCell] => {
+        if (judge.powerKey) {
+          const entityId = aiPowerId(room.prefix, judge.powerKey);
+          const state = states[entityId]?.state;
+          if (state !== "on" && state !== "off") return [room.id, { on: false, entityId: null, note: "No switch" }];
+          const stacking = states[`switch.crop_steering_${room.prefix}ec_stacking_enabled`]?.state;
+          if (judge.id === "salt" && stacking === "off")
+            return [room.id, { on: false, entityId, note: "stacking off" }];
+          return [room.id, { on: state === "on", entityId }];
+        }
+        const asked = states[jevIds(room.prefix).room]?.attributes.judges;
+        return [
+          room.id,
+          Array.isArray(asked)
+            ? { on: asked.includes(judge.id), entityId: null, note: "Set in the controller app" }
+            : { on: false, entityId: null, note: "Not reported" },
+        ];
+      }),
+    );
+    const { powerKey: _power, ...row } = judge;
+    return { ...row, ...(partner ? { shares: partner.name } : {}), perRoom };
+  });
+}
+
+/** A cell whose state is known: a switch, or a judge the controller lists. */
+export const judgeKnown = (cell: JudgeCell) =>
+  cell.note === undefined || cell.note === "Set in the controller app";
+/** "k of n on": over the cells with a known state. */
+export function judgeCount(rows: JudgeRow[]): { on: number; of: number } {
+  const cells = rows.flatMap((row) => Object.values(row.perRoom)).filter(judgeKnown);
+  return { on: cells.filter((cell) => cell.on).length, of: cells.length };
+}
+
+/** One thing the AI assistant did, and what its check found. */
+export interface AiOutcome {
+  id: string;
+  /** When it decided (epoch ms). */
+  at: number;
+  roomId: string;
+  zone: number | null;
+  judge: string;
+  /** What it did, as the controller wrote it. */
+  text: string;
+  /** What the check found; "" while it is still measuring. */
+  result: string;
+  verdict: "worked" | "measuring" | "did not work";
+  /** The target band and the value the check read, only when the controller sent both. */
+  band: [number, number] | null;
+  value: number | null;
+}
+
+const ledgerOf = (event: CsEvent) => {
+  const id = event.correlation?.ledger_id;
+  return id === null || id === undefined || id === "" ? null : `${event.room_id}|${id}`;
+};
+
+/** The AI assistant's decisions from the Journal (`ai.judgement`), each with the `ai.outcome` that judges
+ * it, newest first. An outcome names its decision's ledger row (correlation.ledger_id); one without a
+ * ledger id goes to the next decision without one in the same room and zone. Refused decisions changed
+ * nothing and are left out. */
+export function outcomes(events: readonly CsEvent[]): AiOutcome[] {
+  const sorted = [...events]
+    .filter((e) => e.kind === "ai.judgement" || e.kind === "ai.outcome")
+    .sort((a, b) => Date.parse(a.ts) - Date.parse(b.ts));
+  const used = new Set<string>();
+  const rows: AiOutcome[] = [];
+  sorted.forEach((event, index) => {
+    if (event.kind !== "ai.judgement") return;
+    const data = event.data;
+    if (event.outcome === "refused" || data.action === "refused") return;
+    const ledger = ledgerOf(event);
+    const found = sorted.slice(index + 1).find(
+      (other) =>
+        other.kind === "ai.outcome" &&
+        !used.has(other.id) &&
+        (ledger
+          ? ledgerOf(other) === ledger
+          : !ledgerOf(other) && other.room_id === event.room_id && other.zone === event.zone),
+    );
+    if (found) used.add(found.id);
+    const good = found?.data.good;
+    const band = found?.data.band;
+    const value = finite(found?.data.value);
+    const bandOk =
+      Array.isArray(band) && band.length === 2 && band.every((n) => finite(n) !== null) && value !== null;
+    rows.push({
+      id: event.id,
+      at: Date.parse(event.ts),
+      roomId: event.room_id,
+      zone: event.zone,
+      judge: text(data.judge) || text(event.source.detail),
+      text: text(data.label) || text(data.action).replaceAll("_", " "),
+      result: found ? text(found.data.what) : "",
+      verdict: good === true ? "worked" : good === false ? "did not work" : "measuring",
+      band: bandOk ? [Number(band[0]), Number(band[1])] : null,
+      value: bandOk ? value : null,
+    });
+  });
+  return rows.reverse();
+}
+
+/** The same rows from a 3.17 room's decision log (sensor.crop_steering_<prefix>jev_log): each decision
+ * that acted, with the outcome entry that names it (`of`). Advice is left out: nothing checks it. */
+export function outcomesFromLog(entries: readonly JevEntry[], roomId: string): AiOutcome[] {
+  return entries
+    .filter((e) => e.kind === "decision" && e.time !== null && e.result === "acted")
+    .map((e) => {
+      const found = entries.find((o) => o.kind === "outcome" && o.of !== "" && o.of === e.stamp);
+      return {
+        id: `${roomId}|${e.key}`,
+        at: e.time!,
+        roomId,
+        zone: e.zone,
+        judge: e.judge,
+        text: e.action || e.verdict,
+        result: found ? found.verdict || found.reason : "",
+        verdict:
+          found?.result === "worked" ? "worked" : found?.result === "did not work" ? "did not work" : "measuring",
+        band: null,
+        value: null,
+      };
+    });
+}
+
 export const judgeTitle = (judge: string) =>
   BRAIN_JUDGES[judge]?.title ??
   (judge ? judge.charAt(0).toUpperCase() + judge.slice(1).replaceAll("_", " ") : "Judge");
