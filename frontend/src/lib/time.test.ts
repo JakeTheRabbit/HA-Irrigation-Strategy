@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "vitest";
-import { clock, dayKey, dayLabel, hourTicks, lightsWindow, startOfDay } from "./time";
+import { clock, dayKey, dayLabel, daysBefore, hourTicks, lightsWindow, startOfDay } from "./time";
 import { setDisplayUnits } from "./display-units";
 
 const NZ = "Pacific/Auckland";
@@ -57,6 +57,12 @@ describe("zoned time", () => {
     const c = startOfDay(Date.parse("2026-10-22T12:00:00+13:45"), CH);
     expect(hourTicks(c, c + 12 * HOUR, 1, CH).map((t) => clock(t, CH))[1]).toBe("01:00");
     expect(c).toBe(Date.parse("2026-10-22T00:00:00+13:45"));
+  });
+  test("daysBefore keeps the zone's wall time across a daylight-saving change", () => {
+    // NZ springs forward on 27 Sep 2026: seven days back from 3 Oct 14:00 is 26 Sep 14:00, 167 h.
+    const now = Date.parse("2026-10-03T14:00:00+13:00");
+    expect(daysBefore(now, 7, NZ)).toBe(Date.parse("2026-09-26T14:00:00+12:00"));
+    expect(now - daysBefore(now, 7, NZ)).toBe(167 * HOUR);
   });
   test("dayLabel names the zone's date", () => {
     // 20:00 UTC on the 21st is already Thursday the 22nd in Auckland.

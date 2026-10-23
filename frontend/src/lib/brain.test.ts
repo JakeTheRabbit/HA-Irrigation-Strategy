@@ -1,4 +1,7 @@
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import { JudgesCard, ModelCard } from "@/components/brain";
 import {
   AI_POWERS,
   aiPowerId,
@@ -17,6 +20,7 @@ import {
   parseBrainPanel,
   parsePowers,
   providerWords,
+  undoStale,
 } from "./brain";
 import { parseControllerTime } from "./controller-health";
 import { createDemo } from "./demo";
@@ -24,7 +28,7 @@ import { buildRoom, discoverRooms, validateChange } from "./model";
 import type { CsEvent } from "./parity-types";
 import { SETTING_COPY, UI_COPY } from "./ste-copy";
 import type { JevEntry } from "./jev";
-import type { EntityState } from "./types";
+import type { Controller, EntityState, Room } from "./types";
 
 const sensor = (state: string, attributes: Record<string, unknown>): EntityState => ({
   entity_id: "sensor.crop_steering_jev",
@@ -345,6 +349,43 @@ describe("the judges matrix", () => {
     // Not asked, no switch and stacking off are left out of n.
     expect(judgeCount(judgeMatrix(states, rooms))).toEqual({ on: 13, of: 22 });
   });
+
+  const card = (over: Partial<Controller> = {}) =>
+    renderToStaticMarkup(
+      createElement(JudgesCard, {
+        controller: {
+          states,
+          rooms: rooms as Room[],
+          timeZone: "UTC",
+          admin: true,
+          connection: "live",
+          ...over,
+        } as unknown as Controller,
+      }),
+    );
+  const describedBy = (html: string, label: string) => {
+    const tag = html.match(new RegExp(`<[^>]*aria-label="${label}"[^>]*>`))![0];
+    const ids = tag.match(/aria-describedby="([^"]+)"/)?.[1].split(" ") ?? [];
+    return ids.map((id) => html.match(new RegExp(`id="${id}"[^>]*>([^<]*)<`))?.[1]);
+  };
+
+  it("gives the admin lock and the grow plan's catch as text a switch is described by, not only a title", () => {
+    const locked = card({ admin: false });
+    expect(describedBy(locked, "Morning start in F2")).toContain(
+      "Only a Home Assistant administrator can change these switches.",
+    );
+    const open = card();
+    expect(open).not.toContain("Only a Home Assistant administrator");
+    expect(describedBy(open, "Grow plan in F2").join(" ")).toMatch(/ai_judges/);
+    expect(describedBy(open, "Morning start in F2")).toEqual([]);
+  });
+
+  it("names why a cell has no switch in text, not only a title", () => {
+    const html = card();
+    expect(html).toMatch(/EC stacking is off in F1, so this judge never asks there/);
+    expect(html).toMatch(/This integration has no switch for it in F1/);
+    expect(html).not.toMatch(/<span class="ai-note"[^>]*title=/);
+  });
 });
 
 describe("what it did, and what happened", () => {
@@ -424,6 +465,14 @@ describe("what it did, and what happened", () => {
     });
   });
 
+  it("words the grow plan's catch-up for a grower, never the ledger label", () => {
+    const rows = outcomes([
+      event("04A", "2026-10-22T07:30:00Z", "ai.judgement", { judge: "plan", label: "catch_up", action: "catch_up" }, { zone: null, ...ledger("p1") }),
+      event("04B", "2026-10-22T08:30:00Z", "ai.judgement", { judge: "dawn", label: "advance_phase", action: "advance_phase" }, ledger("p2")),
+    ]);
+    expect(rows.map((r) => r.text)).toEqual(["advance phase", "Applied today's plan day"]);
+  });
+
   it("pairs an outcome without a ledger id with the next one in the same room, zone and judge", () => {
     const rows = outcomes([
       event("01A", "2026-10-22T07:30:00Z", "ai.judgement", { judge: "ramp", label: "Ended the ramp", action: "setpoint" }, { zone: 1 }),
@@ -474,6 +523,14 @@ describe("what it did, and what happened", () => {
         "room:",
       )[0],
     ).toMatchObject({ result: "Ramp ended in band", verdict: "worked" });
+    // Only the window the card names: decisions before `since` are left out.
+    expect(
+      outcomesFromLog(
+        [entry({ key: "n", time: 5000, action: "New" }), entry({ key: "o", time: 4000, action: "Old" })],
+        "room:",
+        4500,
+      ).map((r) => r.text),
+    ).toEqual(["New"]);
     expect(rows).toEqual([
       expect.objectContaining({
         judge: "dawn",
@@ -518,5 +575,43 @@ describe("judge switches of any room pass the write check", () => {
         value: false,
       }),
     ).not.toBeNull();
+  });
+});
+
+describe("undo of a judge switch", () => {
+  const sw = (state: string, last_updated: string): EntityState => ({
+    entity_id: "switch.x",
+    state,
+    attributes: {},
+    last_updated,
+    last_changed: last_updated,
+  });
+  const before = "2026-10-22T01:00:00Z";
+  it("trusts the read-back while Home Assistant has not sent the new state yet", () => {
+    expect(undoStale(sw("off", before), true, before)).toBe(false);
+  });
+  it("puts back when the state shows what was written", () => {
+    expect(undoStale(sw("on", "2026-10-22T01:00:05Z"), true, before)).toBe(false);
+  });
+  it("refuses when a newer change moved it since", () => {
+    expect(undoStale(sw("off", "2026-10-22T01:00:09Z"), true, before)).toBe(true);
+    expect(undoStale(undefined, true, before)).toBe(true);
+  });
+});
+
+describe("dry run and model", () => {
+  it("names the first AI route, never 'Dry run off' and acting inside limits", () => {
+    const panel = parseBrainPanel({
+      entity_id: "sensor.crop_steering_jev",
+      state: "on",
+      attributes: {},
+      last_updated: "",
+      last_changed: "",
+    });
+    expect(panel?.state).toBe("legacy");
+    const html = renderToStaticMarkup(createElement(ModelCard, { panel }));
+    expect(html).not.toContain("Dry run off");
+    expect(html).not.toContain("The assistant acts inside its limits.");
+    expect(html).toContain("First AI route");
   });
 });

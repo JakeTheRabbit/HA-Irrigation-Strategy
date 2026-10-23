@@ -30,13 +30,14 @@ import {
   type BrainPanel,
   type BrainView,
   type JudgeRow,
+  undoStale,
 } from "@/lib/brain";
 import { jevAnswer, jevIds, jevResult, readJev } from "@/lib/jev";
 import { openAlerts } from "@/lib/open-alerts";
 import { pagedQuery, useParity } from "@/lib/parity-api";
 import type { CsEvent, SystemStatus } from "@/lib/parity-types";
 import { SETTING_COPY } from "@/lib/ste-copy";
-import { clock as wallClock, dayKey, dayLabel } from "@/lib/time";
+import { clock as wallClock, dayKey, dayLabel, daysBefore } from "@/lib/time";
 import type { Controller, Room } from "@/lib/types";
 import { offerUndo } from "@/lib/undo";
 import "./brain.css";
@@ -434,11 +435,10 @@ function WhereTheKeyGoes() {
 const AI_KINDS = ["ai.judgement", "ai.outcome"];
 const POWER_FEATURES = AI_POWERS.map((power) => `ai_power_${power.key}`);
 const TAG = { act: "Can act", alerts: "Alerts", advice: "Advice" } as const;
-const LOCKED = "Only a Home Assistant administrator can change this.";
 
 /** Every judge with one switch per room. A switch writes at once and offers Undo; a judge without a
  * switch shows whether the controller asks it, read only. */
-function JudgesCard({ controller }: { controller: Controller }) {
+export function JudgesCard({ controller }: { controller: Controller }) {
   const { rooms, timeZone } = controller;
   const rows = judgeMatrix(controller.states, rooms);
   const count = judgeCount(rows);
@@ -446,7 +446,26 @@ function JudgesCard({ controller }: { controller: Controller }) {
   const [failed, setFailed] = useState<string | null>(null);
   const latest = useRef(controller);
   latest.current = controller;
-  const locked = controller.admin === false || !["live", "demo"].includes(controller.connection);
+  const locked =
+    controller.admin === false
+      ? "Only a Home Assistant administrator can change these switches."
+      : !["live", "demo"].includes(controller.connection)
+        ? "Connect to Home Assistant to change these switches."
+        : null;
+  const id = useId();
+  // Why a room's cell has no switch, said once below the table; "Not asked" has its own line.
+  const why = (note: string | undefined, room: Room) =>
+    note === "stacking off"
+      ? `EC stacking is off in ${room.name}, so this judge never asks there.`
+      : note === "No switch"
+        ? `This integration has no switch for it in ${room.name}.`
+        : note === "Not reported"
+          ? `${room.name} does not report the judges it asks.`
+          : null;
+  const reasons = [
+    ...new Set(rows.flatMap((row) => rooms.map((room) => why(row.perRoom[room.id].note, room)))),
+  ].filter((reason): reason is string => reason !== null);
+  const reasonId = (reason: string) => `${id}-why-${reasons.indexOf(reason)}`;
   const write = async (entityId: string, on: boolean) => {
     const result = await latest.current.write([{ entityId, value: on }]);
     return result.applied.includes(entityId)
@@ -458,6 +477,7 @@ function JudgesCard({ controller }: { controller: Controller }) {
     const partner = rows.find((other) => other.name === row.shares)?.perRoom[room.id];
     const what = row.shares && partner?.note !== "Not asked" ? `${row.name} and ${row.shares}` : row.name;
     const word = (value: boolean) => (value ? "on" : "off");
+    const before = latest.current.states[entityId]?.last_updated;
     setBusy(entityId);
     setFailed(null);
     const refused = await write(entityId, on).finally(() => setBusy(null));
@@ -469,7 +489,7 @@ function JudgesCard({ controller }: { controller: Controller }) {
       message: `${what} ${word(on)} in ${room.name}. Written and read back ${wallClock(Date.now(), timeZone)}.`,
       undo: async () => {
         // Put back only what this change left: a newer change since then is someone else's.
-        if (latest.current.states[entityId]?.state !== word(on))
+        if (undoStale(latest.current.states[entityId], on, before))
           throw new Error(`${what} in ${room.name} changed since. Nothing was put back.`);
         setBusy(entityId);
         const back = await write(entityId, !on).finally(() => setBusy(null));
@@ -494,6 +514,11 @@ function JudgesCard({ controller }: { controller: Controller }) {
         Each judge is one question about one decision. The controller keeps the pump, valves and every
         safety limit; a judge can only move inside them.
       </p>
+      {locked && (
+        <p className="brain-line" id={`${id}-locked`}>
+          {locked}
+        </p>
+      )}
       {failed && (
         <p className="ai-failed" role="alert">
           {failed}
@@ -522,6 +547,11 @@ function JudgesCard({ controller }: { controller: Controller }) {
                       {row.shares && <small> · one switch with {row.shares}</small>}
                     </strong>
                     <span title={row.blurb}>{row.blurb}</span>
+                    {row.hint && (
+                      <span className="brain-line" id={`${id}-hint-${row.id}`}>
+                        {row.hint}
+                      </span>
+                    )}
                   </div>
                 </th>
                 <td>
@@ -541,8 +571,12 @@ function JudgesCard({ controller }: { controller: Controller }) {
                         className="switch"
                         aria-checked={cell.on}
                         aria-label={label}
-                        title={locked ? LOCKED : row.hint}
-                        disabled={locked || busy === cell.entityId}
+                        aria-describedby={
+                          [locked && `${id}-locked`, row.hint && `${id}-hint-${row.id}`]
+                            .filter(Boolean)
+                            .join(" ") || undefined
+                        }
+                        disabled={locked !== null || busy === cell.entityId}
                         onClick={() => void flip(row, room, cell.entityId!, !cell.on)}
                       >
                         <span className="switch-thumb" aria-hidden="true" />
@@ -560,23 +594,17 @@ function JudgesCard({ controller }: { controller: Controller }) {
                         <span className="switch-thumb" aria-hidden="true" />
                       </span>
                     );
-                  else
+                  else {
+                    const reason = why(cell.note, room);
                     body = (
                       <span
                         className="ai-note"
-                        title={
-                          cell.note === "stacking off"
-                            ? `EC stacking is off in ${room.name}, so this judge never asks there`
-                            : cell.note === "No switch"
-                              ? `This integration has no switch for it in ${room.name}`
-                              : cell.note === "Not asked"
-                                ? `${room.name} does not ask this judge: set in the controller app's options (ai_judges)`
-                                : `${room.name} does not report the judges it asks`
-                        }
+                        aria-describedby={reason ? reasonId(reason) : `${id}-not-asked`}
                       >
                         {cell.note}
                       </span>
                     );
+                  }
                   return (
                     <td key={room.id} className="ai-room-col">
                       {body}
@@ -588,8 +616,13 @@ function JudgesCard({ controller }: { controller: Controller }) {
           </tbody>
         </table>
       </div>
+      {reasons.map((reason) => (
+        <p className="brain-line" key={reason} id={reasonId(reason)}>
+          {reason}
+        </p>
+      ))}
       {notAsked && (
-        <p className="brain-line" data-ai-not-asked>
+        <p className="brain-line" id={`${id}-not-asked`} data-ai-not-asked>
           Not asked: the controller app's judge list (ai_judges) leaves it out, so its switch does nothing
           there. Change the list in the controller app's options.
         </p>
@@ -672,24 +705,29 @@ const MODELS = [
 
 /** Dry run and the model, as the controller reports them (calls and spend: Budget today). Both are
  * controller options: shown, not switched here. */
-function ModelCard({ panel }: { panel: BrainPanel | null }) {
+export function ModelCard({ panel }: { panel: BrainPanel | null }) {
   const model = panel?.model ?? null;
   const current = model ? modelKey(model) : null;
   const dry = panel?.mode === "dry_run";
+  const legacy = panel?.state === "legacy";
   return (
     <section className="panel ai-card" aria-labelledby="ai-model-title" data-ai-model>
       <div className="ai-dry">
-        <span className="switch ai-fixed" data-on={dry} aria-hidden="true">
+        <span className="switch ai-fixed" data-on={dry} hidden={legacy} aria-hidden="true">
           <span className="switch-thumb" />
         </span>
         <span>
-          <strong id="ai-model-title">{panel?.mode ? `Dry run ${dry ? "on" : "off"}` : "Not running"}</strong>
+          <strong id="ai-model-title">
+            {legacy ? "First AI route" : panel?.mode ? `Dry run ${dry ? "on" : "off"}` : "Not running"}
+          </strong>
           <span className="brain-line">
-            {!panel?.mode
-              ? "The rules decide every zone."
-              : dry
-                ? "The judges answer and the ledger shows what it would do. Nothing changes in the rooms."
-                : "The assistant acts inside its limits."}
+            {legacy
+              ? "An older controller app runs it and does not report dry run or the model. Update the controller app."
+              : !panel?.mode
+                ? "The rules decide every zone."
+                : dry
+                  ? "The judges answer and the ledger shows what it would do. Nothing changes in the rooms."
+                  : "The assistant acts inside its limits."}
           </span>
         </span>
       </div>
@@ -727,7 +765,7 @@ function OutcomesCard({ controller }: { controller: Controller }) {
   latest.current = controller;
   useEffect(() => {
     let live = true;
-    const since = new Date(Date.now() - 7 * 86_400_000).toISOString();
+    const since = new Date(daysBefore(Date.now(), 7, latest.current.timeZone)).toISOString();
     void Promise.all(
       roomsKey
         .split(",")
@@ -744,15 +782,20 @@ function OutcomesCard({ controller }: { controller: Controller }) {
       live = false;
     };
   }, [roomsKey]);
+  const since = daysBefore(Date.now(), 7, timeZone);
+  const notCheckedId = useId();
   const liveEvents = controller.recentEvents.filter((event) => AI_KINDS.includes(event.kind));
   const rows =
     read.state === "ready"
-      ? outcomes([...new Map([...read.events, ...liveEvents].map((event) => [event.id, event])).values()])
+      ? outcomes([...new Map([...read.events, ...liveEvents].map((event) => [event.id, event])).values()]).filter(
+          (row) => row.at >= since,
+        )
       : read.state === "missing"
         ? rooms
-            .flatMap((room) => outcomesFromLog(readJev(states, room.prefix).log?.entries ?? [], room.id))
+            .flatMap((room) => outcomesFromLog(readJev(states, room.prefix).log?.entries ?? [], room.id, since))
             .sort((a, b) => b.at - a.at)
         : [];
+  const shown = rows.slice(0, 6);
   const today = dayKey(Date.now(), timeZone);
   const where = (row: AiOutcome) => {
     const room = rooms.find((r) => r.id === row.roomId);
@@ -778,7 +821,7 @@ function OutcomesCard({ controller }: { controller: Controller }) {
         <p className="brain-line">Nothing in the last 7 days.</p>
       ) : (
         <ol className="ai-outcomes">
-          {rows.slice(0, 6).map((row) => (
+          {shown.map((row) => (
             <li key={row.id} data-verdict={row.verdict}>
               <span className="ai-when">
                 <b>{wallClock(row.at, timeZone)}</b>
@@ -794,7 +837,7 @@ function OutcomesCard({ controller }: { controller: Controller }) {
               </span>
               <span className="ai-verdict">
                 {row.verdict === "not checked" ? (
-                  <span className="brain-line" title="The controller does not check this kind of decision later">
+                  <span className="brain-line" aria-describedby={notCheckedId}>
                     {VERDICT[row.verdict]}
                   </span>
                 ) : (
@@ -807,6 +850,11 @@ function OutcomesCard({ controller }: { controller: Controller }) {
             </li>
           ))}
         </ol>
+      )}
+      {shown.some((row) => row.verdict === "not checked") && (
+        <p className="brain-line" id={notCheckedId}>
+          Not checked: the controller does not check this kind of decision later.
+        </p>
       )}
     </section>
   );

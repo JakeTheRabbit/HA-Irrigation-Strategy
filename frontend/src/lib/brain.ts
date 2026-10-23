@@ -351,6 +351,15 @@ export function judgeCount(rows: JudgeRow[]): { on: number; of: number } {
   return { on: cells.filter((cell) => cell.on).length, of: cells.length };
 }
 
+/** Whether a judge switch moved since this page wrote `written` to it, so Undo must not put it back. The
+ * write's read-back proved the value; until Home Assistant sends that state, the entity is still the one
+ * from before the write (`before`, its last_updated then), which is no newer change. */
+export function undoStale(entity: EntityState | undefined, written: boolean, before: string | undefined) {
+  if (!entity) return true;
+  if (entity.state === (written ? "on" : "off")) return false;
+  return entity.last_updated !== before;
+}
+
 /** One thing the AI assistant did, and what its check found. */
 export interface AiOutcome {
   id: string;
@@ -374,6 +383,9 @@ export interface AiOutcome {
  * setpoints and targets 1440 min) and the grow plan's 6 h check. Any other decision never gets an outcome. */
 const CHECKED = ["ramp", "salt", "dusk", "setpoints", "targets", "plan"];
 const pending = (judge: string): AiOutcome["verdict"] => (CHECKED.includes(judge) ? "measuring" : "not checked");
+
+/** Ledger labels the controller records as engine words (brain_bridge: the grow plan's "catch_up"). */
+const ACTION_WORDS: Record<string, string> = { catch_up: "Applied today's plan day" };
 
 const ledgerOf = (event: CsEvent) => {
   const id = event.correlation?.ledger_id;
@@ -419,7 +431,7 @@ export function outcomes(events: readonly CsEvent[]): AiOutcome[] {
       roomId: event.room_id,
       zone: event.zone,
       judge,
-      text: text(data.label) || text(data.action).replaceAll("_", " "),
+      text: ACTION_WORDS[text(data.label)] ?? (text(data.label) || text(data.action)).replaceAll("_", " "),
       result: found ? text(found.data.what) : "",
       verdict: good === true ? "worked" : good === false ? "did not work" : pending(judge),
       band: bandOk ? [Number(band[0]), Number(band[1])] : null,
@@ -431,11 +443,11 @@ export function outcomes(events: readonly CsEvent[]): AiOutcome[] {
 
 /** The same rows from a 3.17 room's decision log (sensor.crop_steering_<prefix>jev_log): each decision
  * that acted, with the outcome entry that names it (`of`: its stamp, or its time before 3.4). Advice is
- * left out: nothing checks it. */
-export function outcomesFromLog(entries: readonly JevEntry[], roomId: string): AiOutcome[] {
+ * left out: nothing checks it, and so is any decision before `since`. */
+export function outcomesFromLog(entries: readonly JevEntry[], roomId: string, since = -Infinity): AiOutcome[] {
   const attached = attachOutcomes(entries).outcomes;
   return entries
-    .filter((e) => e.kind === "decision" && e.time !== null && e.result === "acted")
+    .filter((e) => e.kind === "decision" && e.time !== null && e.time >= since && e.result === "acted")
     .map((e) => {
       const found = attached.get(e.key)?.[0];
       return {
