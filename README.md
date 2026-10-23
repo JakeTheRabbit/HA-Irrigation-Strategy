@@ -16,7 +16,7 @@
 
 ![All rooms across both demo rooms, grouped by room with current VWC, pore EC, water delivery and feed supply](img/all-zones.png)
 
-[The whole system, part by part](https://cropsteering.growlabs.nz/features) · [Try the released demo](https://jaketherabbit.github.io/HA-Irrigation-Strategy/dashboard.html?demo=1) · [Take the free beginner course](https://jaketherabbit.github.io/HA-Irrigation-Strategy/learn/) · [Safety first](#safety-first) · [New to crop steering?](#new-to-crop-steering) · [Install](#install) · [First-run setup](#first-run-setup) · [Daily use](#daily-use) · [The AI assistant](#the-ai-assistant) · [Upgrade](#upgrade) · [Troubleshooting](#troubleshooting) · [Documents](#documents)
+[The whole system, part by part](https://cropsteering.growlabs.nz/features) · [How it connects](docs/SYSTEM_MAP.md) · [Try the released demo](https://jaketherabbit.github.io/HA-Irrigation-Strategy/dashboard.html?demo=1) · [Take the free beginner course](https://jaketherabbit.github.io/HA-Irrigation-Strategy/learn/) · [Safety first](#safety-first) · [New to crop steering?](#new-to-crop-steering) · [Install](#install) · [First-run setup](#first-run-setup) · [Daily use](#daily-use) · [The AI assistant](#the-ai-assistant) · [Upgrade](#upgrade) · [Troubleshooting](#troubleshooting) · [Documents](#documents)
 
 ## What it does
 
@@ -539,6 +539,7 @@ Some facts to know:
 
 ## Documents
 
+- [How it all connects: the system map](docs/SYSTEM_MAP.md) · [Roadmap](ROADMAP.md)
 - [All documents, by task](docs/README.md) · [Upgrading to 3.18](docs/UPGRADING-TO-PARITY.md) · [one section per Upgrade report row](docs/UPGRADING.md)
 - [Set up an install with an AI assistant](docs/AI-SETUP.md) and the [MCP connector](docs/MCP.md)
 - Features new in 3.18: [water supply](docs/features/water-supply.md) · [timers and modes](docs/features/timers-and-modes.md) · [presets and copy](docs/features/presets-and-copy.md) · [history and changes](docs/features/history-and-changes.md) · [alerts](docs/features/alerts.md) · [calibration](docs/features/calibration.md) · [system status](docs/features/system-status.md) · [dashboards and display](docs/features/dashboards-and-display.md)
