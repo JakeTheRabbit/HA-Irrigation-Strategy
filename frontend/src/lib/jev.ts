@@ -8,7 +8,8 @@ import { growerWords } from "./words";
  * last said about the zone). Read tolerantly: a controller older than the log, or one entry missing a
  * field, must never break the page. */
 
-/** Each judge's plain title, for an entry that carries none (brain/journal.py TITLES). */
+/** Each judge's plain title (brain/journal.py TITLES, plus the grow plan and alert triage, which it does
+ * not title): the one source of judge names on every page. */
 export const JEV_TITLES: Record<string, string> = {
   dawn: "Morning start",
   ramp: "Ramp hand-over",
@@ -20,6 +21,11 @@ export const JEV_TITLES: Record<string, string> = {
   zones: "Zone comparison",
   stage: "Stage arc",
   setpoints: "Setpoints",
+  channel: "Water path",
+  balance: "Room balance",
+  targets: "Targets",
+  shotsize: "Shot sizes",
+  plan: "Grow plan",
   alerts: "Alert triage",
 };
 

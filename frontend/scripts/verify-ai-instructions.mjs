@@ -33,6 +33,13 @@ try {
   await page.goto(`${origin}/?demo=1#/settings/ai`);
   const instructions = page.locator("[data-brain-instructions]");
   await instructions.getByText("Saved revision 0", { exact: true }).waitFor();
+  // The editor sits under "Instructions and permissions", below the judges, budget and ledger.
+  const section = page.locator(".ai-instructions");
+  assert.equal(
+    await section.getByRole("heading", { name: "Instructions and permissions", exact: true }).count(),
+    1,
+  );
+  assert.equal(await section.locator("[data-brain-instructions]").count(), 1);
   await page.locator("#prompt-profile-environment").fill("Sealed room with CO₂ enrichment.");
   await page.locator("#prompt-notes").fill("Inspect emitters every morning.");
   await instructions.getByRole("button", { name: "Review instructions", exact: true }).click();

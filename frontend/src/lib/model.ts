@@ -1092,10 +1092,11 @@ export function validateChange(room: RoomView, states: States, change: Change): 
       ? null
       : "Select one of the available options.";
   }
-  // What the AI assistant may do in the room (brain.ts AI_POWERS): one switch per power. Any other
-  // switch registered in features.json is a configuration control too.
+  // What the AI assistant may do in a room (brain.ts AI_POWERS): one switch per power, in any room,
+  // since Settings › AI assistant shows every room's judges side by side. Any other switch
+  // registered in features.json is a configuration control too.
   const registeredSwitch =
-    change.entityId.startsWith(`switch.${ROOT}${room.room.prefix}ai_power_`) ||
+    discoverRooms(states).some((r) => change.entityId.startsWith(`switch.${ROOT}${r.prefix}ai_power_`)) ||
     registered?.control.domain === "switch";
   if (
     (safeSwitches.has(change.entityId) || registeredSwitch) &&

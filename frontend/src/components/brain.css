@@ -203,3 +203,309 @@
   font-size: var(--text-sm);
   overflow-wrap: anywhere;
 }
+
+/* Settings › AI assistant (mockup 22): the judges beside budget, model and the ledger; instructions and
+   permissions below. */
+.ai-settings {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+.ai-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 560px) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+.ai-side {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+.ai-card {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 14px 18px;
+  min-width: 0;
+}
+.ai-card-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+}
+.ai-card-head h2 {
+  margin: 0;
+  font-size: var(--text-lg);
+  font-weight: 600;
+}
+.ai-card-head > span {
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+}
+.ai-card-head > a {
+  margin-left: auto;
+  font-size: var(--text-sm);
+}
+.ai-spent {
+  margin-left: auto;
+  font-size: var(--text-xl);
+  font-weight: 600;
+}
+.ai-failed {
+  margin: 0;
+  color: var(--destructive);
+  font-size: var(--text-sm);
+}
+.ai-judges-wrap {
+  overflow-x: auto;
+}
+.ai-judges-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+.ai-judges-table th,
+.ai-judges-table td {
+  padding: 5px 4px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: middle;
+}
+.ai-judges-table thead th {
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+.ai-judges-table tbody th {
+  max-width: 340px;
+  font-weight: 400;
+}
+.ai-judge-name {
+  display: grid;
+}
+.ai-judges-table tbody th strong {
+  font-weight: 600;
+}
+.ai-judges-table tbody th small {
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+  font-weight: 400;
+}
+.ai-judges-table tbody th span {
+  overflow: hidden;
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ai-judges-table .ai-room-col {
+  width: 56px;
+  text-align: center;
+}
+.ai-judges-table .ai-room-col > .switch {
+  display: inline-block;
+  vertical-align: middle;
+}
+.ai-tag {
+  display: inline-block;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: var(--text-xs);
+  white-space: nowrap;
+}
+.ai-tag[data-power="act"] {
+  border-color: var(--primary);
+}
+.ai-fixed {
+  cursor: default;
+  opacity: 0.6;
+}
+.ai-fixed[data-on="true"] {
+  border-color: var(--primary);
+  background: var(--primary);
+}
+.ai-fixed[data-on="true"] .switch-thumb {
+  transform: translateX(20px);
+}
+.ai-note {
+  display: inline-block;
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+  line-height: 1.2;
+}
+.ai-bar {
+  position: relative;
+  height: 14px;
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--foreground) 18%, var(--surface));
+}
+.ai-bar > span {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 7px;
+  background: var(--success);
+}
+.ai-bar[data-warn="true"] > span {
+  background: var(--warning);
+}
+.ai-bar-legend {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 2px 12px;
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+}
+.ai-warning {
+  margin: 0;
+  padding: 5px 10px;
+  border-left: 3px solid var(--warning);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--warning) 10%, var(--surface));
+  font-size: var(--text-sm);
+}
+.ai-budget-set {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  margin: 0;
+  font-size: var(--text-sm);
+}
+.ai-budget-set strong {
+  font-size: var(--text-base);
+}
+.ai-dry {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.ai-dry > span:last-child {
+  display: grid;
+}
+.ai-models {
+  display: flex;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.ai-models > span {
+  flex: 1;
+  padding: 8px 4px;
+  border-radius: 8px;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  text-align: center;
+}
+.ai-models > span[data-current="true"] {
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+.ai-outcomes {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ai-outcomes > li {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr) auto;
+  gap: 10px;
+  padding: 7px 0;
+  border-top: 1px solid var(--border);
+  font-size: var(--text-sm);
+}
+.ai-when,
+.ai-what {
+  display: grid;
+  align-content: start;
+  gap: 2px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.ai-when {
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+}
+.ai-when b {
+  color: var(--foreground);
+  font-size: var(--text-sm);
+}
+.ai-verdict {
+  display: grid;
+  justify-items: end;
+  align-content: start;
+  gap: 6px;
+}
+.ai-pill {
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.ai-pill[data-verdict="worked"] {
+  border-color: var(--success);
+}
+.ai-pill[data-verdict="measuring"] {
+  border-color: var(--primary);
+}
+.ai-pill[data-verdict="did not work"] {
+  border-color: var(--destructive);
+}
+.ai-band {
+  position: relative;
+  width: 90px;
+  height: 7px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--foreground) 18%, var(--surface));
+}
+.ai-band > span {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--success) 45%, transparent);
+}
+.ai-band > i {
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--foreground);
+}
+.ai-instructions {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+.ai-instructions > h2 {
+  margin: 8px 0 0;
+  font-size: var(--text-lg);
+  font-weight: 600;
+}
+@media (max-width: 1100px) {
+  .ai-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 720px) {
+  .ai-judges-table tbody th {
+    max-width: 160px;
+  }
+  .ai-judges-table tbody th span {
+    white-space: normal;
+  }
+  .ai-outcomes > li {
+    grid-template-columns: 48px minmax(0, 1fr);
+  }
+  .ai-verdict {
+    grid-column: 2;
+    justify-items: start;
+  }
+}

@@ -77,6 +77,11 @@ export function lightsWindow(dayStartMs: number, onHHMM: string, offHHMM: string
   const nextDay = off.h * 60 + off.m <= on.h * 60 + on.m ? 1 : 0;
   return { on: zoned(y, m, d, on.h, on.m, tz), off: zoned(y, m, d + nextDay, off.h, off.m, tz) };
 }
+/** The zone's same wall time `days` calendar days before `ms` (a "last 7 days" window's start). */
+export function daysBefore(ms: number, days: number, tz: string): number {
+  const { y, m, d, h, min, s } = wall(ms, tz);
+  return zoned(y, m, d - days, h, min, tz) + s * 1000;
+}
 /** The zone's wall time at `ms` as a 24-hour "HH:MM" (a time field's value). */
 export function wallHhmm(ms: number, tz: string): string {
   const { h, min } = wall(ms, tz);

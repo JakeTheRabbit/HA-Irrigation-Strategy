@@ -687,84 +687,72 @@ try {
     },
   );
   await check(
-    "AI permissions: reviewed owner, read-only Today summary, refusal preserves draft, 1440 and 390",
+    "AI judges: a switch per room writes at once with Undo, a refusal says so, read-only Today summary, 1440 and 390",
     async () => {
-      const labels = [
-        "Start the next phase early",
-        "End the morning ramp",
-        "Set a probe aside",
-        "Change the EC steer",
-        "Adjust maintenance watering",
-        "Apply today's plan day",
-        "Set targets from what a zone reaches",
-        "Tune shot sizes",
-      ];
       const id = (key) => `switch.crop_steering_room_b_ai_power_${key}`;
-      const box = (key) => page.locator(`#config-ai_power_${key}`).getByRole("switch");
-      async function applyReview() {
-        await page.getByRole("button", { name: "Review changes", exact: true }).click();
-        await page
-          .getByRole("dialog")
-          .getByRole("button", { name: "Apply 1 change", exact: true })
-          .click();
-      }
+      const judges = page.locator("[data-ai-judges]");
+      const sw = (name) => judges.getByRole("switch", { name: `${name} in Room B`, exact: true });
+      const toast = page.locator("[data-sonner-toast]");
       for (const width of [1440, 390]) {
         await page.setViewportSize({ width, height: width === 390 ? 844 : 1000 });
         await page.goto(`${base}/dashboard.html?room=room_b#/settings/ai`, {
           waitUntil: "networkidle",
         });
         await connected();
-        const powers = page.locator('[id^="config-ai_power_"]');
-        await visible(powers.first());
-        assert.equal(await powers.getByRole("switch").count(), 8);
-        for (const label of labels)
-          await visible(powers.getByRole("heading", { name: new RegExp(label, "i") }));
-        for (const toggle of await powers.getByRole("switch").all())
-          assert.ok(
-            (await toggle.getAttribute("aria-label"))?.endsWith("Room default"),
-            "permission has an accessible room-scoped label",
-          );
+        await visible(judges);
+        assert.equal(await judges.locator("tbody tr").count(), 15);
+        // Room B has a switch per power (9 judges that can act); Room A's integration has none.
+        assert.equal(await judges.getByRole("switch", { name: / in Room B$/ }).count(), 9);
+        assert.equal(await judges.getByRole("switch", { name: / in Room A$/ }).count(), 0);
+        // Every other room here models an integration from before the power switches.
+        const others = (await judges.locator("thead th.ai-room-col").count()) - 1;
+        assert.equal(await judges.locator("td", { hasText: "No switch" }).count(), 9 * others);
+        assert.equal(
+          await page.locator('[id^="config-ai_power_"]').count(),
+          0,
+          "the powers have one editor on the page",
+        );
         assert.equal(
           await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
           true,
           `no horizontal scroll at ${width}`,
         );
         await page.screenshot({
-          path: path.join(out, `live-ai-powers-${width}.png`),
+          path: path.join(out, `live-ai-judges-${width}.png`),
           fullPage: true,
         });
       }
+      // One switch turns both judges on it, at once, and Undo puts it back.
       let before = calls.length;
-      await box("advance_phase").click();
-      assert.equal(calls.length, before, "permission changes stay draft until reviewed");
-      await applyReview();
-      await page.getByRole("dialog").waitFor({ state: "hidden" });
-      assert.equal(await box("advance_phase").isChecked(), false);
+      await sw("Morning start").click();
+      await visible(toast.filter({ hasText: /^Morning start and Day end off in Room B\. Written and read back/ }));
       assert.deepEqual(calls.slice(before), [
         { path: "/api/services/switch/turn_off", entity_id: id("advance_phase") },
       ]);
+      assert.equal(await sw("Day end").getAttribute("aria-checked"), "false");
+      await toast.getByRole("button", { name: "Undo" }).first().click();
+      await visible(toast.filter({ hasText: /^Morning start and Day end on again in Room B\./ }));
+      assert.deepEqual(calls.slice(before + 1), [
+        { path: "/api/services/switch/turn_on", entity_id: id("advance_phase") },
+      ]);
+      assert.equal(await sw("Morning start").getAttribute("aria-checked"), "true");
+      // A refused write says so in place and the switch keeps the controller's state.
+      failWrite = id("ec_mode");
+      await sw("Pore EC").click();
+      await visible(judges.getByRole("alert").filter({ hasText: /^Pore EC in Room B was not turned off/ }));
+      assert.equal(states[id("ec_mode")].state, "on");
+      assert.equal(await sw("Pore EC").getAttribute("aria-checked"), "true");
+      failWrite = "";
+      // From the other room's page too: the judges of every room sit side by side.
+      await page.setViewportSize({ width: 1440, height: 1000 });
+      await roomChip("room:").click();
+      await visible(judges);
       before = calls.length;
-      await box("tune_shot_sizes").click();
-      await applyReview();
-      await page.getByRole("dialog").waitFor({ state: "hidden" });
-      assert.equal(await box("tune_shot_sizes").isChecked(), true);
+      await sw("Shot sizes").click();
+      await visible(toast.filter({ hasText: /^Shot sizes on in Room B\. Written and read back/ }));
       assert.deepEqual(calls.slice(before), [
         { path: "/api/services/switch/turn_on", entity_id: id("tune_shot_sizes") },
       ]);
-      failWrite = id("ec_mode");
-      await box("ec_mode").click();
-      await applyReview();
-      await visible(page.getByRole("dialog").getByText(/Fixture refused write/));
-      assert.equal(states[id("ec_mode")].state, "on");
-      await page.getByRole("button", { name: "Back to editing" }).click();
-      assert.equal(
-        await box("ec_mode").isChecked(),
-        false,
-        "failed permission draft remains available",
-      );
-      await page.getByRole("button", { name: "Discard draft", exact: true }).click();
-      assert.equal(await box("ec_mode").isChecked(), true);
-      failWrite = "";
       before = calls.length;
       await page.goto(`${base}/dashboard.html?room=room_b#/today/ai`, { waitUntil: "networkidle" });
       assert.equal(
@@ -780,8 +768,9 @@ try {
       assert.equal(await old.locator("input").count(), 0);
       assert.match(await old.innerText(), /Unavailable/);
       await page.getByRole("link", { name: "Manage permissions" }).click();
+      await visible(judges);
       assert.equal(
-        await page.locator('[id^="config-ai_power_"] input').count(),
+        await judges.getByRole("switch", { name: / in Room A$/ }).count(),
         0,
         "missing entities have no pretend editor",
       );
