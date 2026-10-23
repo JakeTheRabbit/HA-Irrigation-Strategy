@@ -1,12 +1,21 @@
 import { useEffect, useRef, useState } from "react";
-import { paletteEntries, paletteKey, searchPalette, type PaletteEntry } from "@/lib/command-palette";
+import {
+  focusAfterClose,
+  paletteEntries,
+  paletteKey,
+  searchPalette,
+  shortcutHint,
+  type PaletteEntry,
+} from "@/lib/command-palette";
 import type { Controller } from "@/lib/types";
 
 const SHOWN = 12;
+const SHORTCUT = shortcutHint(typeof navigator === "undefined" ? "" : navigator.platform);
 
 /** The header's "Jump to…" button and the palette it opens (also Ctrl/⌘ K, or "/" outside a
  * field): type a few letters of a page, room, zone or action, Enter opens the first. A native
- * modal dialog; closing it puts focus back where it was. */
+ * modal dialog; closing it puts focus back where it was, or on the button when a jump took that
+ * away. Never opens over another open modal. */
 export function CommandPalette({
   controller,
   jump,
@@ -64,7 +73,7 @@ export function CommandPalette({
         aria-keyshortcuts="Control+K Meta+K /"
         onClick={show}
       >
-        Jump to…<kbd aria-hidden="true">Ctrl K</kbd>
+        Jump to…<kbd aria-hidden="true">{SHORTCUT}</kbd>
       </button>
       <dialog
         ref={dialog}
@@ -72,7 +81,7 @@ export function CommandPalette({
         aria-label="Jump to"
         onClose={() => {
           setOpen(false);
-          opener.current?.focus();
+          focusAfterClose(opener.current, button.current)?.focus();
         }}
         onClick={(event) => {
           // A click on the backdrop (the dialog box itself, outside its content) closes it.

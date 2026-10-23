@@ -1729,13 +1729,10 @@ nav button.active > svg {
   }
 }
 
-/* Where the menu shows the room tree (wider than a phone), the room chips in the header, the
-   Status tabs (All rooms / Room) and a zone page's zone switcher repeat it: the tree is the one
-   place to choose a room or zone. A phone, with the tree in its drawer, keeps them. */
+/* Where the menu shows the room tree (wider than a phone), the Status tabs (All rooms / Room) and
+   a zone page's zone switcher repeat it: the tree is the one place to choose a room or zone. A
+   phone, with the tree in its drawer, keeps them. */
 @media (min-width: 721px) {
-  .topbar .room-chips {
-    visibility: hidden;
-  }
   .page-tabs[data-section="today"],
   .zone-page-bar {
     display: none;

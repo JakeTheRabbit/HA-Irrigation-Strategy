@@ -3,7 +3,7 @@ import { buildRoom } from "./model";
 import { NAV_TREE } from "./nav-tree";
 import { routeHash } from "./routes";
 import { demoController } from "./test-helpers";
-import { paletteEntries, paletteKey, searchPalette } from "./command-palette";
+import { focusAfterClose, paletteEntries, paletteKey, searchPalette, shortcutHint } from "./command-palette";
 
 /** The demo, with its two rooms named as the mockups name them: F2 (selected) and F1. */
 function controller() {
@@ -74,5 +74,64 @@ describe("the jump-to palette", () => {
     expect(paletteKey(key("/", outside), panel)).toBeNull();
     // Ctrl K from a field still opens it: the shortcut is no character a field takes.
     expect(paletteKey(key("k", input, { ctrlKey: true }), panel)).toBe("open");
+  });
+
+  test("paletteKey opens from the document body, outside the panel's own element", () => {
+    const body = { tagName: "BODY" };
+    const panel = { contains: () => false, ownerDocument: { body, querySelector: () => null } } as unknown as Element;
+    expect(paletteKey(key("k", body, { ctrlKey: true }), panel)).toBe("open");
+    expect(paletteKey(key("/", body), panel)).toBe("open");
+    expect(paletteKey(key("/", { tagName: "DIV" }), panel)).toBeNull();
+  });
+
+  test("paletteKey does nothing while another modal (Stop all, a review) is open", () => {
+    const inside = { tagName: "BUTTON" };
+    const selectors: string[] = [];
+    const panel = {
+      contains: () => true,
+      ownerDocument: {
+        querySelector: (selector: string) => {
+          selectors.push(selector);
+          return {};
+        },
+      },
+    } as unknown as Element;
+    expect(paletteKey(key("k", inside, { ctrlKey: true }), panel)).toBeNull();
+    expect(paletteKey(key("/", inside), panel)).toBeNull();
+    expect(selectors[0]).toContain("dialog[open]");
+  });
+
+  test("Calibrate <room> feed pH/EC is listed only for a room mapping that feed probe", () => {
+    const c = controller();
+    const labels = paletteEntries(c).map((e) => e.label);
+    // F2 (Room A) maps both feed probes; F1 (Room B) maps none.
+    expect(labels).toContain("Calibrate F2 feed pH");
+    expect(labels).toContain("Calibrate F2 feed EC");
+    expect(labels.filter((l) => l.startsWith("Calibrate F1"))).toEqual([]);
+    const config = `sensor.crop_steering_${c.rooms[0].prefix}engine_config`;
+    const state = c.states[config];
+    const onlyEc = {
+      ...c,
+      states: { ...c.states, [config]: { ...state, attributes: { ...state.attributes, feed_ph_sensor: "" } } },
+    };
+    const calibrate = paletteEntries(onlyEc).filter((e) => e.label.startsWith("Calibrate"));
+    expect(calibrate.map((e) => e.label)).toEqual(["Calibrate F2 feed EC"]);
+  });
+
+  test("shortcutHint names Cmd on a Mac and Ctrl elsewhere", () => {
+    expect(shortcutHint("MacIntel")).toBe("⌘ K");
+    expect(shortcutHint("iPad")).toBe("⌘ K");
+    expect(shortcutHint("Win32")).toBe("Ctrl K");
+    expect(shortcutHint("Linux x86_64")).toBe("Ctrl K");
+    expect(shortcutHint("")).toBe("Ctrl K");
+  });
+
+  test("focusAfterClose returns to the opener while it is still on the page, else the Jump to… button", () => {
+    const button = { isConnected: true } as HTMLElement;
+    const kept = { isConnected: true } as HTMLElement;
+    const gone = { isConnected: false } as HTMLElement;
+    expect(focusAfterClose(kept, button)).toBe(kept);
+    expect(focusAfterClose(gone, button)).toBe(button);
+    expect(focusAfterClose(null, button)).toBe(button);
   });
 });

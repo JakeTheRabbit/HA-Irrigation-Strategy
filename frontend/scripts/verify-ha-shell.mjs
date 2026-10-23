@@ -61,6 +61,13 @@ try {
   await palette.waitFor();
   await palette.getByRole("combobox").press("Escape");
   await palette.waitFor({ state: "hidden" });
+  // Opened with focus on the menu button just clicked, so focus goes back there.
+  assert.ok(
+    await frame
+      .getByRole("button", { name: "Open Home Assistant menu", exact: true })
+      .evaluate((el) => el === el.ownerDocument.activeElement),
+    "focus back on the menu button after Escape",
+  );
   await page.setViewportSize({ width: 390, height: 844 });
   await frame.getByRole("button", { name: "Open Home Assistant menu", exact: true }).click();
   assert.ok(await frame.locator("html").evaluate((el) => el.scrollWidth <= innerWidth + 1));

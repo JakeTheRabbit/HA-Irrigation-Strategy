@@ -40,15 +40,21 @@ export function paletteEntries(controller: Controller): PaletteEntry[] {
       room: room.id,
     })),
   ]);
-  const calibrate = rooms.flatMap((room) =>
-    (["pH", "EC"] as const).map((reading) => ({
+  // Only the feed probes a room maps (engine_config `feed_ph_sensor` / `feed_ec_sensor`).
+  const calibrate = rooms.flatMap((room) => {
+    const config = controller.states[`sensor.crop_steering_${room.prefix}engine_config`]?.attributes ?? {};
+    const mapped = (reading: "pH" | "EC") => {
+      const entity = config[`feed_${reading.toLowerCase()}_sensor`];
+      return typeof entity === "string" && entity !== "";
+    };
+    return (["pH", "EC"] as const).filter(mapped).map((reading) => ({
       label: `Calibrate ${room.name} feed ${reading}`,
       hint: "Equipment › Feed pH/EC calibration",
       hash: routeHash({ page: "equipment/feed-calibration" }),
       keywords: ["probe", "sensor", "buffer"],
       room: room.id,
-    })),
-  );
+    }));
+  });
   const actions: PaletteEntry[] = [
     ...calibrate,
     {
@@ -95,8 +101,13 @@ export function searchPalette(entries: PaletteEntry[], q: string): PaletteEntry[
     .map((hit) => hit.entry);
 }
 
+/** A modal already open (the palette itself, Stop all, a review sheet, the phone's room drawer):
+ * the shortcut leaves it alone rather than stacking another on top. */
+const OPEN_MODAL = 'dialog[open], [role="dialog"][data-state="open"], [role="alertdialog"][data-state="open"]';
+
 /** Whether a key press opens the palette: Ctrl/⌘ K with focus in the dashboard (or on nothing),
- * or "/" there when focus is not in a field, where it is a character. */
+ * or "/" there when focus is not in a field, where it is a character; never while another modal
+ * is open. */
 export function paletteKey(
   e: { key: string; ctrlKey: boolean; metaKey: boolean; target: EventTarget | null },
   panel: Element,
@@ -105,10 +116,22 @@ export function paletteKey(
   if (!target) return null;
   const inside = panel.contains(target) || target === panel.ownerDocument?.body;
   if (!inside) return null;
+  if (panel.ownerDocument?.querySelector(OPEN_MODAL)) return null;
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") return "open";
   if (e.key !== "/" || e.ctrlKey || e.metaKey) return null;
   const field =
     target.isContentEditable === true ||
     ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName ?? "");
   return field ? null : "open";
+}
+
+/** The shortcut as the keyboard prints it: ⌘ K on a Mac, iPhone or iPad, Ctrl K elsewhere. */
+export function shortcutHint(platform: string): string {
+  return /Mac|iPhone|iPad|iPod/.test(platform) ? "⌘ K" : "Ctrl K";
+}
+
+/** Where focus goes when the palette closes: back where it was, unless a jump took that element
+ * off the page with its old page; then the Jump to… button. */
+export function focusAfterClose(opener: HTMLElement | null, button: HTMLElement | null): HTMLElement | null {
+  return opener?.isConnected ? opener : button;
 }
