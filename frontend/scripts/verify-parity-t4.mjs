@@ -110,7 +110,11 @@ await runParity({
 
     // The ledger link opens Changes filtered to the AI (last: it leaves the page).
     await ledger.getByRole("link", { name: "Full ledger in History →" }).click();
-    await page.waitForFunction(() => location.hash === "#/history/changes?actor=ai");
+    // Changes may add `since=` once it reads an older week (the phone list is short enough to do so).
+    await page.waitForFunction(() => {
+      const [route, query = ""] = location.hash.split("?");
+      return route === "#/history/changes" && new URLSearchParams(query).get("actor") === "ai";
+    });
     await page.goBack();
     await page.getByRole("heading", { level: 1, name: "AI assistant", exact: true }).waitFor();
     region("ledger link");
