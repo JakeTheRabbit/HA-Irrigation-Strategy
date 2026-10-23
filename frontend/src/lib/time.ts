@@ -64,6 +64,10 @@ export function wallText(hhmmText: string): string {
   const { h, m } = hhmm(hhmmText);
   return `${h % 12 || 12}:${pad(m)} ${h < 12 ? "am" : "pm"}`;
 }
+/** The end of a day strip: "24:00", or the 12-hour clock's midnight "12:00 am". */
+export function dayEndText(): string {
+  return getDisplayUnits().clock === "24" ? "24:00" : wallText("00:00");
+}
 /** An hour of the day as a number (6.5 is 06:30) as "HH:MM", to the nearest minute. */
 export function hourClock(hour: number): string {
   const minutes = Math.round(hour * 60);

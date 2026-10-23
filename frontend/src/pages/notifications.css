@@ -408,7 +408,7 @@
   color: var(--muted-foreground);
   font-size: var(--text-sm);
 }
-.notify-quiet-phones button[aria-pressed="true"] {
+.notify-quiet-phones button[aria-checked="true"] {
   border-color: var(--quiet);
   background: color-mix(in srgb, var(--quiet) 22%, var(--surface));
   color: var(--foreground);

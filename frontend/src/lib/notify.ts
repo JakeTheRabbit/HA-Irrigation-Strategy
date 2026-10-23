@@ -1,6 +1,7 @@
 import { asCode, errorCodes } from "./error-codes";
 import { clock, dayKey, dayLabel, startOfDay, wallText } from "./time";
 import type { Room, States } from "./types";
+import { errorText } from "./utils";
 
 /** Who gets a phone push for which alerts (docs/NOTIFICATIONS.md): the site's notification setup as
  * `notify_get` returns it, and what Settings & help › Notifications works out from it. Nothing here
@@ -425,6 +426,46 @@ export function draftErrors(draft: NotifyDraft): string[] {
         : []),
   ];
 }
+/** Each field's own problem, shown under it. */
+export function fieldErrors(draft: NotifyDraft): { idle: string | null; quiet: string | null } {
+  const errors = draftErrors(draft);
+  return {
+    idle: errors.find((error) => error.startsWith("Shots stopped")) ?? null,
+    quiet: errors.find((error) => error.startsWith("Quiet hours")) ?? null,
+  };
+}
+export const NO_PHONES_WARNING =
+  "With no phones listed, every push goes back to the controller app's notify_service option.";
+/** The bar's checks: each problem blocks Apply; a draft with no phones applies, with a warning. */
+export const applyChecks = (draft: NotifyDraft): { ok: boolean | "warn"; text: string }[] => [
+  ...draftErrors(draft).map((text) => ({ ok: false, text })),
+  ...(draft.recipients.length ? [] : [{ ok: "warn" as const, text: NO_PHONES_WARNING }]),
+];
+/** What quiet hours hold back, as notify_api.py routes a push. */
+export const QUIET_NOTE =
+  "During quiet hours emergencies still come through, and so do the AI's setpoint changes with Keep and Undo (unless that phone takes a digest) and alerts this integration does not know yet. Other alerts wait and arrive as one summary when that phone's quiet hours end. A Home Assistant restart drops what is waiting.";
+export const IDLE_NOTE =
+  "Sent as CS-209 to the phones that tick Shots stopped, again each time that many hours pass while it lasts, and over at the next shot. A room counts only while a zone is in P1 or P2: the morning dryback (P0) and the night (P3) do not start the clock.";
+
+/** `notify_save` answered with an error: the setup was not changed. */
+export class NotifyRefusal extends Error {}
+/** A save that threw, as Review & apply shows it: the integration's own refusal, or Home Assistant's
+ * refusal of the call. Anything else (a closed socket, a timeout) may have landed: null. */
+export function saveRefusal(
+  error: unknown,
+): { kind: "error"; code: "stale_revision" | "forbidden" | "guard_refused"; message: string } | null {
+  const code = error && typeof error === "object" ? (error as { code?: unknown }).code : undefined;
+  const message = errorText(error);
+  if (!(error instanceof NotifyRefusal) && !["invalid_format", "service_validation_error", "unauthorized"].includes(code as string))
+    return null;
+  if (message === "revision") return { kind: "error", code: "stale_revision", message: notifyError(message) };
+  if (code === "unauthorized" || /^not allowed\b/i.test(message))
+    return { kind: "error", code: "forbidden", message: notifyError(message) };
+  return { kind: "error", code: "guard_refused", message };
+}
+/** What Undo of a mute writes back: the earlier end, or no mute once that end has passed (the
+ * integration drops a mute already over). */
+export const muteUndoTarget = (was: number | null, now: number) => (was !== null && was > now ? was : null);
 
 /** What `notify_save` is sent. The threshold is the site's, an administrator's to change: anyone
  * else sends the rows alone. Each row's kinds in the order the page shows them. */

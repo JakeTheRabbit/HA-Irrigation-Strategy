@@ -1,10 +1,21 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { QuietPhones } from "../pages/notifications";
 import { HaClient } from "./client";
 import { createDemo } from "./demo";
 import { setDisplayUnits } from "./display-units";
 import { errorCodes } from "./error-codes";
 import {
+  IDLE_NOTE,
+  NO_PHONES_WARNING,
   NOTIFY_CONFIG_ID,
+  NotifyRefusal,
+  QUIET_NOTE,
+  applyChecks,
+  fieldErrors,
+  muteUndoTarget,
+  saveRefusal,
   canEditRow,
   draftChanges,
   draftErrors,
@@ -948,5 +959,76 @@ describe("Task 26 review round 1", () => {
       "notify.a": ok,
       "notify.b": { sent: false, error: "No answer for this phone." },
     });
+  });
+});
+
+describe("notifications review round 2 (Task 26)", () => {
+  it("the quiet-hours note says what the integration lets through and what a restart drops", () => {
+    expect(QUIET_NOTE).toMatch(/emergencies/i);
+    expect(QUIET_NOTE).toMatch(/Keep and Undo/);
+    expect(QUIET_NOTE).toMatch(/one summary when that phone's quiet hours end/);
+    expect(QUIET_NOTE).toMatch(/restart.*drops what is waiting/i);
+    expect(QUIET_NOTE).not.toMatch(/only emergencies/i);
+  });
+  it("field errors sit on their own fields", () => {
+    const base = toDraft(DEMO_NOTIFY);
+    expect(fieldErrors(base)).toEqual({ idle: null, quiet: null });
+    expect(fieldErrors({ ...base, idle_hours: 0 }).idle).toBe("Shots stopped needs 1 to 12 whole hours.");
+    const same = updateRow(base, OWNER, { quiet_hours: { from: "06:00", to: "06:00" } });
+    expect(fieldErrors(same)).toEqual({ idle: null, quiet: "Quiet hours need a start and an end that differ." });
+  });
+  it("bar checks warn when no phone is listed, and block on errors", () => {
+    const base = toDraft(DEMO_NOTIFY);
+    expect(applyChecks(base)).toEqual([]);
+    expect(applyChecks({ ...base, recipients: [] })).toEqual([{ ok: "warn", text: NO_PHONES_WARNING }]);
+    expect(NO_PHONES_WARNING).toMatch(/notify_service option/);
+    expect(applyChecks({ ...base, idle_hours: 0 })).toEqual([
+      { ok: false, text: "Shots stopped needs 1 to 12 whole hours." },
+    ]);
+  });
+  it("the idle note keeps CS-209 and that only P1 and P2 count", () => {
+    expect(IDLE_NOTE).toMatch(/CS-209/);
+    expect(IDLE_NOTE).toMatch(/P1 or P2/);
+  });
+  it("only the integration's own refusals are refusals; anything else may have landed", () => {
+    expect(saveRefusal(new NotifyRefusal("revision"))).toMatchObject({ code: "stale_revision" });
+    expect(saveRefusal(new NotifyRefusal("not allowed: only an administrator can mute a room"))).toMatchObject({
+      code: "forbidden",
+    });
+    expect(saveRefusal(new NotifyRefusal("Quiet hours need a start and an end that differ"))).toEqual({
+      kind: "error",
+      code: "guard_refused",
+      message: "Quiet hours need a start and an end that differ",
+    });
+    expect(saveRefusal({ code: "invalid_format", message: "extra keys not allowed" })).toMatchObject({
+      code: "guard_refused",
+    });
+    expect(saveRefusal({ code: "unauthorized", message: "Unauthorized" })).toMatchObject({ code: "forbidden" });
+    expect(saveRefusal(new Error("Connection lost"))).toBeNull();
+    expect(saveRefusal({ code: 3, message: "Home Assistant request timed out." })).toBeNull();
+  });
+  it("Undo of a mute whose earlier end has passed unmutes", () => {
+    const now = Date.parse("2026-10-23T00:00:00Z");
+    expect(muteUndoTarget(null, now)).toBeNull();
+    expect(muteUndoTarget(now - 1000, now)).toBeNull();
+    expect(muteUndoTarget(now + 60_000, now)).toBe(now + 60_000);
+  });
+  it("the quiet-hours phones are one radio group", () => {
+    const html = renderToStaticMarkup(
+      createElement(QuietPhones, {
+        phones: [
+          { service: "notify.a", title: "Owner", window: "23:00–05:00" },
+          { service: "notify.b", title: "Grower", window: null },
+        ],
+        value: "notify.b",
+        onChange: () => undefined,
+      }),
+    );
+    expect(html).toContain('role="radiogroup"');
+    expect(html).toContain('aria-label="Quiet hours for"');
+    expect(html).not.toContain("aria-pressed");
+    expect(html).toMatch(/role="radio" aria-checked="false" tabindex="-1"[^>]*data-quiet-phone="notify.a"/);
+    expect(html).toMatch(/role="radio" aria-checked="true" tabindex="0"[^>]*data-quiet-phone="notify.b"/);
+    expect(html).toContain("no quiet hours");
   });
 });

@@ -22,16 +22,21 @@ import { ReviewApply, type ApplyReceipt } from "@/components/review-apply";
 import { useDraft } from "@/lib/drafts";
 import {
   IDLE_HOURS,
+  IDLE_NOTE,
+  NotifyRefusal,
+  QUIET_NOTE,
+  applyChecks,
   canEditRow,
   draftChanges,
-  draftErrors,
   draftSummary,
+  fieldErrors,
   hasNotifyConfig,
   isClock,
   kindCoverage,
   lightSpans,
   liveRevision,
   muteEndWords,
+  muteUndoTarget,
   mutePayload,
   newRecipient,
   notifyError,
@@ -50,6 +55,7 @@ import {
   sameMuteEnd,
   savePayload,
   saveReceipt,
+  saveRefusal,
   serviceFromText,
   spanMinutes,
   testLine,
@@ -68,7 +74,7 @@ import {
   type QuietHours,
   type Span,
 } from "@/lib/notify";
-import { clock, hourClock, wallText } from "@/lib/time";
+import { clock, dayEndText, hourClock, wallText } from "@/lib/time";
 import type { Controller, Room } from "@/lib/types";
 import { UndoError, offerUndo } from "@/lib/undo";
 import { errorText } from "@/lib/utils";
@@ -106,7 +112,7 @@ async function readNotify(controller: Controller): Promise<NotifyDocument> {
 async function saveNotify(controller: Controller, payload: Record<string, unknown>) {
   const raw = await controller.operator<unknown>("notify_save", payload);
   const result = parseNotifyDocument(raw);
-  if (result.error) throw new Error(result.error);
+  if (result.error) throw new NotifyRefusal(result.error);
   return hasNotifyConfig(raw) ? result : readNotify(controller);
 }
 
@@ -339,7 +345,7 @@ function DayStrip({ quiet, lights }: { quiet: Span[]; lights: Span[] }) {
       </div>
       <div className="notify-strip-ticks">
         {["00:00", "06:00", "12:00", "18:00", "24:00"].map((tick) => (
-          <span key={tick}>{tick === "24:00" ? "24:00" : wallText(tick)}</span>
+          <span key={tick}>{tick === "24:00" ? dayEndText() : wallText(tick)}</span>
         ))}
       </div>
     </div>
@@ -467,7 +473,8 @@ export function Notifications({
   const editable = views.filter((view) => view.editable);
   const uncovered = shown.recipients.length ? roomsWithoutEmergencies(shown, rooms) : [];
   const readOnly = views.some((view) => !view.editable);
-  const errors = draftErrors(shown);
+  const checks = applyChecks(shown);
+  const fieldError = fieldErrors(shown);
   const changes = draftChanges(doc.config, shown, context);
   const rows = dirty ? reviewRows(changes) : [];
   const summary = dirty ? draftSummary(shown, doc.config, context) : "";
@@ -553,14 +560,11 @@ export function Notifications({
     try {
       fresh = await saveNotify(controller, savePayload(doc!, sent));
     } catch (err) {
-      const message = errorText(err);
-      if (message === "revision") {
-        loaded(await readNotify(controller));
-        return { kind: "error" as const, code: "stale_revision" as const, message: notifyError("revision") };
-      }
-      if (/^not allowed\b/i.test(message))
-        return { kind: "error" as const, code: "forbidden" as const, message: notifyError(message) };
-      return { kind: "error" as const, code: "guard_refused" as const, message };
+      const refusal = saveRefusal(err);
+      // Not a refusal (a closed socket, a timeout): it may have landed, so it is not confirmed.
+      if (!refusal) throw err;
+      if (refusal.code === "stale_revision") loaded(await readNotify(controller));
+      return refusal;
     }
     const receipt: ApplyReceipt = saveReceipt(rows, sent, fresh.config, Date.now());
     lastSave.current = { before, revision: fresh.config.revision };
@@ -615,14 +619,15 @@ export function Notifications({
           const current = await readNotify(controller);
           if (!sameMuteEnd(current.config.mutes[prefix], until))
             throw new UndoError(`${room.name}'s mute changed since. Nothing was undone.`, 0, 1);
-          if (!(await write(current, was)))
+          const back = muteUndoTarget(was, Date.now());
+          if (!(await write(current, back)))
             throw new UndoError(
               "The integration did not confirm the previous mute. Reload and check before trying again.",
               0,
               1,
             );
           toast(
-            `${was === null ? `${room.name} sends every alert again` : `${room.name} muted until ${muteEndWords(was, Date.now(), tz)} again`}. Written and read back ${clock(Date.now(), tz)}.`,
+            `${back === null ? `${room.name} sends every alert again${was === null ? "" : ": its earlier mute had already ended"}` : `${room.name} muted until ${muteEndWords(back, Date.now(), tz)} again`}. Written and read back ${clock(Date.now(), tz)}.`,
           );
         },
       });
@@ -940,25 +945,15 @@ export function Notifications({
             <NeedsIntegration feature="Quiet hours" />
           ) : (
             <>
-              <div className="notify-quiet-phones" role="group" aria-label="Quiet hours for">
-                <span aria-hidden="true">for</span>
-                {views.map((view) => (
-                  <button
-                    type="button"
-                    key={view.recipient.service}
-                    aria-pressed={view === quietView}
-                    data-quiet-phone={view.recipient.service}
-                    onClick={() => setQuietFor(view.recipient.service)}
-                  >
-                    {view.label.title}{" "}
-                    <small>
-                      {view.recipient.quiet_hours
-                        ? quietWords(view.recipient.quiet_hours)
-                        : "no quiet hours"}
-                    </small>
-                  </button>
-                ))}
-              </div>
+              <QuietPhones
+                phones={views.map((view) => ({
+                  service: view.recipient.service,
+                  title: view.label.title,
+                  window: view.recipient.quiet_hours ? quietWords(view.recipient.quiet_hours) : null,
+                }))}
+                value={quietView?.recipient.service ?? null}
+                onChange={setQuietFor}
+              />
               {quietView && (
                 <div className="notify-quiet-window">
                   <label>
@@ -993,6 +988,11 @@ export function Notifications({
                   </label>
                 </div>
               )}
+              {fieldError.quiet && (
+                <p className="field-error" role="alert">
+                  {fieldError.quiet}
+                </p>
+              )}
               <DayStrip quiet={quiet} lights={lights} />
               <p className="notify-strip-legend" data-quiet-legend>
                 <span className="notify-key-quiet" aria-hidden="true" />
@@ -1003,10 +1003,7 @@ export function Notifications({
                   </span>
                 )}
               </p>
-              <p className="muted small">
-                During quiet hours only emergencies come through. Everything else waits and arrives
-                as one summary when that phone's quiet hours end.
-              </p>
+              <p className="muted small">{QUIET_NOTE}</p>
             </>
           )}
         </section>
@@ -1026,7 +1023,7 @@ export function Notifications({
               step={1}
               value={Number.isFinite(hours) ? String(hours) : ""}
               disabled={!admin || !connected}
-              aria-invalid={errors.some((error) => error.startsWith("Shots stopped"))}
+              aria-invalid={!!fieldError.idle}
               onChange={(event) => {
                 const value = event.target.value.trim();
                 edit((current) => ({
@@ -1037,6 +1034,12 @@ export function Notifications({
             />{" "}
             h with no shot, lights on
           </label>
+          {fieldError.idle && (
+            <p className="field-error" role="alert">
+              {fieldError.idle}
+            </p>
+          )}
+          <p className="muted small">{IDLE_NOTE}</p>
           {admin ? null : (
             <p className="muted small">Only an administrator can change it or mute a room.</p>
           )}
@@ -1078,7 +1081,7 @@ export function Notifications({
           summary={summary ? <SummaryText text={summary} /> : undefined}
           discardLabel="Discard"
           applyLabel={`Apply ${count} ${count === 1 ? "change" : "changes"}`}
-          checks={errors.map((text) => ({ ok: false, text }))}
+          checks={dirty ? checks : []}
           apply={apply}
           onDiscard={stored.discard}
           onReload={() => setReads((n) => n + 1)}
@@ -1130,6 +1133,47 @@ export function Notifications({
     </div>
   );
 
+}
+
+/** The quiet-hours editor's phone picker: one phone shown at a time, so a radio group. */
+export function QuietPhones({
+  phones,
+  value,
+  onChange,
+}: {
+  phones: { service: string; title: string; window: string | null }[];
+  value: string | null;
+  onChange: (service: string) => void;
+}) {
+  const move = (from: number, step: number) => {
+    const next = phones[(from + step + phones.length) % phones.length];
+    onChange(next.service);
+    document.querySelector<HTMLElement>(`[data-quiet-phone="${next.service}"]`)?.focus();
+  };
+  return (
+    <div className="notify-quiet-phones" role="radiogroup" aria-label="Quiet hours for">
+      <span aria-hidden="true">for</span>
+      {phones.map((phone, index) => (
+        <button
+          type="button"
+          key={phone.service}
+          role="radio"
+          aria-checked={phone.service === value}
+          tabIndex={phone.service === value ? 0 : -1}
+          data-quiet-phone={phone.service}
+          onClick={() => onChange(phone.service)}
+          onKeyDown={(event) => {
+            const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[event.key];
+            if (!step) return;
+            event.preventDefault();
+            move(index, step);
+          }}
+        >
+          {phone.title} <small>{phone.window ?? "no quiet hours"}</small>
+        </button>
+      ))}
+    </div>
+  );
 }
 
 /** "2 changes not applied yet: Sam's phone gets Dosing", its count part in bold. */

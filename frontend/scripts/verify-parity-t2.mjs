@@ -136,12 +136,16 @@ await runParity({
     const legend = quiet.locator("[data-quiet-legend]");
     assert.match(await legend.innerText(), /quiet 6 h/, `${label}: owner's quiet hours`);
     assert.match(await legend.innerText(), /lights on: Room A 10:00–22:00, Room B 08:00–20:00/, `${label}: lights`);
-    const chips = quiet.getByRole("group", { name: "Quiet hours for" });
-    const chip = (name) => chips.getByRole("button", { name: new RegExp(`^${name} `) });
+    const chips = quiet.getByRole("radiogroup", { name: "Quiet hours for" });
+    const chip = (name) => chips.getByRole("radio", { name: new RegExp(`^${name} `) });
     assert.equal((await chip("Owner").innerText()).replace(/\s+/g, " ").trim(), "Owner 23:00–05:00", `${label}: Owner's window`);
     assert.equal((await chip("Grower").innerText()).replace(/\s+/g, " ").trim(), "Grower no quiet hours", `${label}: Grower has none`);
     await chip("Grower").click();
-    assert.equal(await chip("Grower").getAttribute("aria-pressed"), "true", `${label}: Grower shown`);
+    assert.equal(await chip("Grower").getAttribute("aria-checked"), "true", `${label}: Grower shown`);
+    assert.equal(await chip("Owner").getAttribute("aria-checked"), "false", `${label}: Owner not shown`);
+    assert.match(await quiet.innerText(), /emergencies still come through, and so do the AI's setpoint changes with Keep and Undo/, `${label}: quiet note`);
+    assert.match(await quiet.innerText(), /A Home Assistant restart drops what is waiting\./, `${label}: restart note`);
+    assert.equal((await quiet.locator(".notify-strip-ticks span").last().innerText()).trim(), "24:00", `${label}: day end tick`);
     assert.equal(await quiet.getByRole("switch", { name: /^Quiet hours on Grower/ }).isChecked(), false, `${label}: Grower off`);
     await quiet.getByRole("switch", { name: /^Quiet hours on Grower/ }).check();
     await quiet.getByLabel("From").fill("22:00");
@@ -155,6 +159,11 @@ await runParity({
     );
     assert.equal((await chip("Owner").innerText()).replace(/\s+/g, " ").trim(), "Owner 23:00–05:00", `${label}: Owner unchanged`);
     assert.equal((await chip("Grower").innerText()).replace(/\s+/g, " ").trim(), "Grower 22:00–06:00", `${label}: Grower's window`);
+    // A problem sits on its field: the same start and end shows under the quiet-hours editor.
+    await quiet.getByLabel("to", { exact: true }).fill("22:00");
+    await quiet.locator(".field-error", { hasText: "Quiet hours need a start and an end that differ." }).waitFor();
+    await quiet.getByLabel("to", { exact: true }).fill("06:00");
+    await quiet.locator(".field-error").waitFor({ state: "detached" });
     let quietBar = page.locator(".notify-bar");
     if (phone) {
       await quietBar.getByRole("button", { name: "Review 1 change", exact: true }).click();
