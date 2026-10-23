@@ -58,6 +58,12 @@ export function clock(ms: number, tz: string): string {
   if (getDisplayUnits().clock === "24") return `${pad(h)}:${pad(min)}`;
   return `${h % 12 || 12}:${pad(min)} ${h < 12 ? "am" : "pm"}`;
 }
+/** A wall time "HH:MM" as the display units' clock writes it: "22:00", or "10:00 pm". */
+export function wallText(hhmmText: string): string {
+  if (getDisplayUnits().clock === "24") return hhmmText;
+  const { h, m } = hhmm(hhmmText);
+  return `${h % 12 || 12}:${pad(m)} ${h < 12 ? "am" : "pm"}`;
+}
 /** The zone's calendar date: "2026-10-22". */
 export function dayKey(ms: number, tz: string): string {
   const { y, m, d } = wall(ms, tz);
