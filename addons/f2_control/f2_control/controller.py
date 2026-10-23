@@ -3235,7 +3235,7 @@ class Controller:
         # change log (the integration's setpoint_log.py). The brain's put-back is the safety writer.
         who = ("safety" if by.endswith("(put back)") else "brain" if by.startswith(("Jev", "AI "))
                else "learner")
-        claim = {"entity_id": entity, "value": value, "who": who}
+        claim = {"entity_id": entity, "value": value, "who": who, "claim_id": uuid.uuid4().hex}
         if reason:
             claim["reason"] = str(reason)[:200]
         if expected:
@@ -3249,6 +3249,8 @@ class Controller:
             claim["expires"] = on.astimezone().isoformat(timespec="seconds")
         ha_fire("crop_steering_setpoint_write", claim)
         if not ha_call("number", "set_value", entity_id=entity, value=value):
+            # Not written: take the claim back, or the operator writing this value next is taken for us.
+            ha_fire("crop_steering_setpoint_claim_cancel", {k: claim[k] for k in ("entity_id", "value", "who", "claim_id")})
             return False
         written[(zone, suffix)] = (value, now)
         self.__dict__.setdefault("_settings_noted", {})[entity] = (value, now)  # said here, not again
