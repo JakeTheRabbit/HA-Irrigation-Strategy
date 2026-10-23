@@ -7,9 +7,12 @@ import { resetDemoAlertRules } from "./parity-demo/settings";
 import {
   RULE_SOURCES,
   deliveryLine,
+  formatRuleValue,
   notReporting,
+  ruleContext,
   ruleStatus,
   ruleTokens,
+  saveReceipt,
   sensorsPhones,
   type RuleContext,
 } from "./alert-rules";
@@ -170,6 +173,45 @@ describe("deliveryLine", () => {
     );
     expect(deliveryLine([{ service: "notify.zz", ok: true, error: null }], names)).toBe("Delivered to notify.zz ✓.");
     expect(deliveryLine([], names)).toBe("No phone got it: none is ticked for Sensors alerts.");
+  });
+});
+
+describe("review round 1", () => {
+  test("saveReceipt words the read-back rule: watching only when it is on", () => {
+    expect(saveReceipt({ active: true }, NOW, TZ)).toBe("Saved and watching. Written and read back 14:10.");
+    expect(saveReceipt({ active: false }, NOW, TZ)).toBe("Saved (off). Written and read back 14:10.");
+  });
+
+  test("Tell token says phones not known when the phone list could not be read", () => {
+    expect((token(ruleTokens(base, () => {}, { ...ctx, phones: null }), "tell") as { text: string; href: string })).toMatchObject({
+      text: "phones not known",
+      href: "#/settings/notifications",
+    });
+  });
+
+  test("ruleContext: another room's probe by its friendly name and its stock tanks by name", () => {
+    const here = { roomId: "room:f2_", zones: [1, 2], probes: [{ id: "sensor.a", name: "A" }] };
+    const names = (id: string) => (id === "sensor.b_back_ec" ? "Room B zone 1 back EC" : id);
+    const probe = { ...base, room_id: "room:b_", source: "probe.silence_s" as const, zones: [], entity_id: "sensor.b_back_ec" };
+    const other = ruleContext(probe, here, { room: "Room B", phones: ["Phone 1"], stocks: [{ id: "part_b", name: "Part B" }], nameOf: names });
+    expect(other).toEqual({ room: "Room B", zones: [], phones: ["Phone 1"], stocks: [{ id: "part_b", name: "Part B" }], probes: [{ id: "sensor.b_back_ec", name: "Room B zone 1 back EC" }] });
+    const silent = notReporting({ ...item({}), ...probe, current_value: null }, other);
+    expect(silent).toBe("Room B Room B zone 1 back EC silence isn't reporting. This rule can't fire until it does.");
+    const stock = { ...base, room_id: "room:b_", source: "stock.litres" as const, zones: [], tank_id: "part_b" };
+    expect(notReporting({ ...item({}), ...stock, current_value: null }, ruleContext(stock, here, { room: "Room B", phones: [], stocks: [{ id: "part_b", name: "Part B" }], nameOf: names })))
+      .toBe("Room B Part B stock isn't reporting. This rule can't fire until it does.");
+    const own = ruleContext({ ...base, room_id: "room:f2_" }, here, { room: "F2", phones: null, stocks: [], nameOf: names });
+    expect([own.zones, own.probes, own.phones]).toEqual([[1, 2], [{ id: "sensor.a", name: "A" }], null]);
+  });
+
+  test("formatRuleValue goes through the display units at a given precision", () => {
+    setDisplayUnits({ ec: "ppm500", temp: "F", volume: "gal", clock: "24" });
+    expect(formatRuleValue("zone.ec", 4.5, 1)).toBe("2250 ppm");
+    expect(formatRuleValue("zone.temperature", 25, 1)).toBe("77.0 °F");
+    expect(formatRuleValue("stock.litres", 3.785411784, 1)).toBe("1.0 gal");
+    setDisplayUnits({ ec: "mS/cm", temp: "C", volume: "L", clock: "24" });
+    expect(formatRuleValue("zone.ec", 4.5, 1)).toBe("4.5 mS/cm");
+    expect(formatRuleValue("zone.vwc", 40.1, 1)).toBe("40.1 %");
   });
 });
 

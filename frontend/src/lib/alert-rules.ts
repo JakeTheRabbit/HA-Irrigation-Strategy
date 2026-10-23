@@ -12,8 +12,9 @@ export interface RuleContext {
   /** The rule's room, as the room tree names it. */
   room: string;
   zones: number[];
-  /** Names of the phones that get the Sensors kind in this room: rule pushes go out as it. */
-  phones: string[];
+  /** Names of the phones that get the Sensors kind in this room: rule pushes go out as it. Null
+   * when the phone list could not be read. */
+  phones: string[] | null;
   stocks: { id: string; name: string }[];
   probes: { id: string; name: string }[];
 }
@@ -92,9 +93,10 @@ export function displayScale(source: AlertSource): {
   }
 }
 
-/** A reading of the rule's source in the display units: "5.4 L", "4.4 mS/cm", "30 %", "3 h". */
-export function formatRuleValue(source: AlertSource, value: number): string {
-  const digits = (v: number) => Math.min(2, (String(v).split(".")[1] ?? "").length);
+/** A reading of the rule's source in the display units: "5.4 L", "4.4 mS/cm", "30 %", "3 h". `places`
+ * fixes the decimals (the replay's axis and line); else the value's own, at most two. */
+export function formatRuleValue(source: AlertSource, value: number, places?: number): string {
+  const digits = (v: number) => places ?? Math.min(2, (String(v).split(".")[1] ?? "").length);
   switch (sourceOf(source).unit) {
     case "mS/cm":
       return formatEc(value, digits(value));
@@ -111,7 +113,7 @@ export function formatRuleValue(source: AlertSource, value: number): string {
       return `${clean(Number((s / 3600).toFixed(1)))} h`;
     }
     default:
-      return `${clean(Number(value.toFixed(2)))} %`;
+      return places === undefined ? `${clean(Number(value.toFixed(2)))} %` : `${value.toFixed(places)} %`;
   }
 }
 
@@ -154,6 +156,28 @@ export function sourceLabel(rule: Pick<AlertRule, "source" | "zones" | "tank_id"
   if (def.needs === "tank_id") return def.label(ctx.room, undefined, ctx.stocks.find((s) => s.id === rule.tank_id)?.name ?? rule.tank_id);
   if (def.needs === "entity_id") return def.label(ctx.room, undefined, ctx.probes.find((p) => p.id === rule.entity_id)?.name ?? rule.entity_id);
   return def.label(ctx.room);
+}
+
+/** The builder's context for a rule: zones, probes and stocks of the room the tree picked (`here`);
+ * in another room, its probe by Home Assistant's name and the stock tanks read for that room. */
+export function ruleContext(
+  rule: Pick<AlertRule, "room_id" | "entity_id">,
+  here: { roomId: string; zones: number[]; probes: { id: string; name: string }[] },
+  room: { room: string; phones: string[] | null; stocks: { id: string; name: string }[]; nameOf(entity: string): string },
+): RuleContext {
+  const own = rule.room_id === here.roomId;
+  return {
+    room: room.room,
+    zones: own ? here.zones : [],
+    phones: room.phones,
+    stocks: room.stocks,
+    probes: own ? here.probes : rule.entity_id ? [{ id: rule.entity_id, name: room.nameOf(rule.entity_id) }] : [],
+  };
+}
+
+/** The note after a save, worded from the rule the list read back. */
+export function saveReceipt(rule: Pick<AlertRule, "active">, at: number, tz: string): string {
+  return `${rule.active ? "Saved and watching." : "Saved (off)."} Written and read back ${clock(at, tz)}.`;
 }
 
 /** In place on a rule whose source reads nothing: it can't fire until it does. */
@@ -203,7 +227,7 @@ export function ruleTokens(draft: AlertRule, set: (next: AlertRule) => void, ctx
     : WINDOWS;
   return [
     "Tell",
-    { id: "tell", kind: "static", label: "Tell", text: ctx.phones.length ? and(ctx.phones) : "no phone yet", href: "#/settings/notifications" },
+    { id: "tell", kind: "static", label: "Tell", text: ctx.phones === null ? "phones not known" : ctx.phones.length ? and(ctx.phones) : "no phone yet", href: "#/settings/notifications" },
     "when",
     {
       id: "source",

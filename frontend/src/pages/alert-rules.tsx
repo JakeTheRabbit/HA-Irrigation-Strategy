@@ -7,12 +7,15 @@ import { Button } from "@/components/ui/button";
 import {
   deliveryLine,
   displayScale,
+  formatRuleValue,
   newRule,
   notReporting,
   ruleBody,
   ruleStatus,
+  ruleContext,
   ruleTokens,
   sameRule,
+  saveReceipt,
   sensorsPhones,
   sourceLabel,
   type RuleContext,
@@ -72,25 +75,37 @@ export function AlertRules({ controller, onDirtyChange }: PageProps) {
     void load();
   }, [load]);
 
-  // Who rule pushes reach (the Sensors kind), and the room's stock tanks and probes.
+  // Who rule pushes reach (the Sensors kind): unknown (null) until notify_get answers, and when it fails.
   const [notify, setNotify] = useState<NotifyDocument | null>(null);
+  const [notifyFailed, setNotifyFailed] = useState(false);
   useEffect(() => {
     controller
       .operator<unknown>("notify_get")
-      .then((raw) => setNotify(parseNotifyDocument(raw)))
-      .catch(() => setNotify(null));
+      .then((raw) => {
+        setNotify(parseNotifyDocument(raw));
+        setNotifyFailed(false);
+      })
+      .catch(() => {
+        setNotify(null);
+        setNotifyFailed(true);
+      });
   }, [controller.operator]);
-  const [stocks, setStocks] = useState<{ id: string; name: string }[]>([]);
+  // The stock tanks of the room the tree picked and of every room a stock rule watches, by room.
+  const [stocksByRoom, setStocksByRoom] = useState<Record<string, { id: string; name: string }[]>>({});
+  const stockRooms = [...new Set([roomId, ...list.rules.filter((r) => r.source.startsWith("stock.")).map((r) => r.room_id)])].sort().join("|");
   useEffect(() => {
     let current = true;
-    controller
-      .operator<StockDocument>("stock_get", { room_id: roomId })
-      .then((doc) => current && setStocks((doc.tanks ?? []).map((t) => ({ id: t.id, name: t.name }))))
-      .catch(() => current && setStocks([]));
+    for (const id of stockRooms.split("|")) {
+      if (id in stocksByRoom) continue;
+      controller
+        .operator<StockDocument>("stock_get", { room_id: id })
+        .then((doc) => current && setStocksByRoom((p) => ({ ...p, [id]: (doc.tanks ?? []).map((t) => ({ id: t.id, name: t.name })) })))
+        .catch(() => current && setStocksByRoom((p) => ({ ...p, [id]: [] })));
+    }
     return () => {
       current = false;
     };
-  }, [controller.operator, roomId]);
+  }, [controller.operator, stockRooms]);
   const nameOf = (entity: string) => {
     const name = states[entity]?.attributes.friendly_name;
     return typeof name === "string" && name ? name : entity;
@@ -101,14 +116,13 @@ export function AlertRules({ controller, onDirtyChange }: PageProps) {
   );
   const roomName = (id: string) => rooms.find((r) => r.id === id)?.name ?? (id === roomId ? room.room.name : id.replace(/^room:/, "") || "Room");
   const prefixOf = (id: string) => id.replace(/^room:/, "");
-  const phonesFor = (id: string) => sensorsPhones(notify?.config.recipients ?? [], prefixOf(id));
-  const ctxFor = (rule: Pick<AlertRule, "room_id">): RuleContext => ({
-    room: roomName(rule.room_id),
-    zones: rule.room_id === roomId ? room.zones.map((z) => z.id) : [],
-    phones: phonesFor(rule.room_id).map((p) => p.name),
-    stocks: rule.room_id === roomId ? stocks : [],
-    probes: rule.room_id === roomId ? probes : [],
-  });
+  const phonesFor = (id: string) => (notify ? sensorsPhones(notify.config.recipients, prefixOf(id)) : null);
+  const ctxFor = (rule: Pick<AlertRule, "room_id" | "entity_id">): RuleContext =>
+    ruleContext(
+      rule,
+      { roomId, zones: room.zones.map((z) => z.id), probes },
+      { room: roomName(rule.room_id), phones: phonesFor(rule.room_id)?.map((p) => p.name) ?? null, stocks: stocksByRoom[rule.room_id] ?? [], nameOf },
+    );
 
   // The rule the builder holds: `?rule=<id>`, else a new one for the room the tree picked.
   const [param, setParam] = useState<string | null>(() => ruleParam());
@@ -126,13 +140,20 @@ export function AlertRules({ controller, onDirtyChange }: PageProps) {
   const original: AlertRule = editing ?? fresh;
   const [draft, setDraft] = useState<AlertRule>(original);
   const originalKey = JSON.stringify(ruleBody(original));
+  // The listed rule changed (a switch, a save, another rule picked): take it, but an unsaved edit of
+  // the same rule keeps its values and only follows the On switch.
+  const previous = useRef(original);
   useEffect(() => {
-    setDraft(original);
+    const prev = previous.current;
+    previous.current = original;
+    setDraft((d) => (original.id && prev.id === original.id && !sameRule(d, prev) ? { ...d, active: original.active } : original));
     setDelivery(null);
   }, [originalKey, editing?.id]);
   const dirty = !sameRule(draft, original);
   useEffect(() => onDirtyChange(dirty), [dirty]);
-  const [note, setNote] = useState<{ text: string; tone: "ok" | "bad" } | null>(null);
+  // A save's receipt names the values written: it shows only while the draft still holds them.
+  const [note, setNote] = useState<{ text: string; tone: "ok" | "bad"; rule?: AlertRule } | null>(null);
+  const shownNote = note && (!note.rule || sameRule(note.rule, draft)) ? note : null;
   const [busy, setBusy] = useState<string | null>(null);
 
   // Yesterday as the draft would have seen it, 250 ms after the last edit.
@@ -207,7 +228,7 @@ export function AlertRules({ controller, onDirtyChange }: PageProps) {
     const back = await readBack(out.data.rule.id);
     setBusy(null);
     if (back.ok && back.rule && sameRule(back.rule, draft)) {
-      setNote({ text: `Saved and watching. Written and read back ${clock(Date.now(), tz)}.`, tone: "ok" });
+      setNote({ text: saveReceipt(back.rule, Date.now(), tz), tone: "ok", rule: back.rule });
       setRuleParam(out.data.rule.id);
     } else
       setNote({
@@ -309,7 +330,7 @@ export function AlertRules({ controller, onDirtyChange }: PageProps) {
             <RuleReplay
               draft={draft}
               preview={preview?.data ?? null}
-              error={preview?.error ?? null}
+              error={list.state === "error" ? `The rules could not be read, so yesterday can't be replayed: ${list.error}` : (preview?.error ?? null)}
               label={sourceLabel(draft, ctx)}
               lights={lights(draft.room_id)}
               tz={tz}
@@ -318,8 +339,8 @@ export function AlertRules({ controller, onDirtyChange }: PageProps) {
               onThreshold={(threshold) => setDraft((d) => ({ ...d, threshold }))}
             />
             <div className="ar-actions">
-              <Button variant="outline" onClick={sendTest} disabled={busy !== null || !phones.length || controller.admin === false}>
-                {phone ? "Send test" : `Send a test push to ${phones.length ? phones.map((p) => p.name).join(" and ") : "your phone"}`}
+              <Button variant="outline" onClick={sendTest} disabled={busy !== null || !phones?.length || controller.admin === false}>
+                {phone ? "Send test" : `Send a test push to ${phones?.length ? phones.map((p) => p.name).join(" and ") : "your phone"}`}
               </Button>
               {!isNew && (
                 <Button variant="ghost" onClick={() => editing && void remove(editing)} disabled={busy !== null || controller.admin === false}>
@@ -330,9 +351,15 @@ export function AlertRules({ controller, onDirtyChange }: PageProps) {
                 {busy === "save" ? "Saving…" : !dirty && !isNew ? "Saved" : phone ? "Save rule" : isNew ? "Save rule and start watching" : "Save changes"}
               </Button>
             </div>
-            {!phones.length && notify && (
+            {phones && !phones.length && (
               <p className="ar-muted">
                 No phone gets Sensors alerts in this room yet: tick it on <a href="#/settings/notifications">Notifications</a>.
+              </p>
+            )}
+            {notifyFailed && (
+              <p className="ar-muted" data-test-reason>
+                The phone list could not be read, so no test push can be sent. Reload, or check{" "}
+                <a href="#/settings/notifications">Notifications</a>.
               </p>
             )}
             {controller.admin === false && <p className="ar-muted">Only a Home Assistant administrator can save rules or send a test push.</p>}
@@ -341,9 +368,9 @@ export function AlertRules({ controller, onDirtyChange }: PageProps) {
                 {delivery}
               </p>
             )}
-            {note && (
-              <p className={`ar-note is-${note.tone}`} role="status" data-save-note>
-                {note.text}
+            {shownNote && (
+              <p className={`ar-note is-${shownNote.tone}`} role="status" data-save-note>
+                {shownNote.text}
               </p>
             )}
           </section>
@@ -512,7 +539,8 @@ function RuleReplay({
     e.preventDefault();
     move(threshold + delta);
   };
-  const shown = (v: number) => `${Number(v.toFixed(2))} ${scale.unit}`;
+  const places = (String(scale.step).split(".")[1] ?? "").length;
+  const shown = (v: number) => formatRuleValue(draft.source, scale.fromDisplay(v), places);
   const lightsText = lights ? ` · lights ${hh(lights.on)}–${hh(lights.off)}` : "";
 
   return (

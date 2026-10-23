@@ -14,6 +14,8 @@
  *   moves it by 0.1 and the sentence's number follows;
  * - 3.18: Send a test push → "Delivered to Phone 1 ✓.";
  * - 3.18: Save → "Written and read back HH:MM" and a sixth row;
+ * - 3.18: Edit the Off Part B rule, save → "Saved (off). Written and read back HH:MM."; editing
+ *   again hides that receipt, putting the written value back shows it;
  * - 3.18: the On switch applies at once with Undo; Undo puts it back, read back;
  * - 3.17: the builder shows "Needs integration 3.18" (Your own alert rules) and the list says Home
  *   Assistant has no rule sensors yet.
@@ -133,6 +135,24 @@ await runParity({
     await page.waitForFunction(() => document.querySelectorAll(".ar-row").length === 6);
     assert.match(await rows.nth(5).locator(".ar-sentence").innerText(), /^Tell when Room A zone 1 VWC stays below 40\.1% for 10 min\.$/);
     region("save new row");
+
+    // Edit the Off rule (Part B stock): its receipt says it is off, not watching; a further edit
+    // hides the receipt until the draft holds the written values again.
+    await rows.nth(4).getByRole("button", { name: /^Edit: / }).click();
+    if (phone) await main.getByRole("heading", { level: 1, name: "Edit alert rule" }).waitFor();
+    const threshold = rule.locator('input[aria-label="Threshold"]');
+    // The builder holds Part B (6 L) before it is edited.
+    await page.waitForFunction(() => document.querySelector('input[aria-label="Threshold"]')?.value === "6");
+    await threshold.fill("7");
+    await main.getByRole("button", { name: phone ? "Save rule" : "Save changes" }).click();
+    await saved.waitFor();
+    assert.match(await saved.innerText(), /^Saved \(off\)\. Written and read back \d{2}:\d{2}\.$/, `${label}: off receipt`);
+    await threshold.fill("8");
+    await saved.waitFor({ state: "detached" });
+    await threshold.fill("7");
+    await saved.waitFor();
+    if (phone) await main.getByRole("button", { name: "All rules" }).click();
+    region("off rule receipt");
 
     // The On switch, then Undo.
     const toggle = rows.nth(1).getByRole("switch");
