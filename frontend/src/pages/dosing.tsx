@@ -69,7 +69,8 @@ import {
 } from "@/lib/dosing";
 import { tankTelemetry, type TankReading } from "@/lib/tank-telemetry";
 import type { Controller } from "@/lib/types";
-import { dayWord, errorText } from "@/lib/utils";
+import { dayWord, errorText, unreadableState } from "@/lib/utils";
+import { formatClock } from "@/lib/clock";
 import "./dosing.css";
 
 const mL = (value: number) =>
@@ -84,7 +85,7 @@ const seconds = (value: number) =>
 const when = (iso: string | null, now: number) => {
   const at = Date.parse(iso ?? "");
   if (!Number.isFinite(at)) return "time not reported";
-  const time = new Date(at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  const time = formatClock(at);
   const day = dayWord(at, now);
   return day ? `${day} ${time}` : time;
 };
@@ -665,7 +666,7 @@ export function Dosing({
   const tank = tankTelemetry(states, room.room);
   const fullId = config?.batch.full_entity ?? null;
   const full = fullId
-    ? !states[fullId] || ["unknown", "unavailable"].includes(states[fullId].state)
+    ? unreadableState(states[fullId]?.state)
       ? "Unavailable"
       : states[fullId].state === config!.batch.full_state
         ? "Full"

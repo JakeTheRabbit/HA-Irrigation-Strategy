@@ -1,6 +1,7 @@
 import { parseControllerTime } from "./controller-health";
 import type { EntityState, States } from "./types";
 import { growerWords } from "./words";
+import { unreadableState } from "./utils";
 
 /** What the controller's AI assistant bridge publishes for a room (addons/f2_control/f2_control/brain_bridge.py):
  * `sensor.crop_steering_<prefix>jev_log` (every decision, newest first), `sensor.crop_steering_<prefix>jev`
@@ -156,7 +157,7 @@ export function parseJevLog(
   );
   const state = text(entity.state);
   return {
-    headline: ["unknown", "unavailable"].includes(state) ? "" : state,
+    headline: unreadableState(state) ? "" : state,
     entries,
   };
 }
@@ -262,7 +263,8 @@ export function parseJevRoom(entity: EntityState | undefined): JevRoom | null {
     deprecatedRoute: a.deprecated_route === true,
     costUsd: count(a.cost_usd_today),
     on:
-      !["rules", "error", "unknown", "unavailable"].includes(text(entity.state)) &&
+      !unreadableState(entity.state) &&
+      !["rules", "error"].includes(text(entity.state)) &&
       (!text(a.state) || BRAIN_ON.includes(text(a.state))),
   };
 }
@@ -307,7 +309,7 @@ export function parseJevZone(
   const state = text(entity.state);
   if (state === "rules" || text(entity.attributes?.provider) === "rules") return null;
   const acting =
-    !state || ["watching", "unknown", "unavailable"].includes(state)
+    unreadableState(state) || state === "watching"
       ? []
       : state
           .split(",")

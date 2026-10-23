@@ -138,7 +138,11 @@ describe("controller heartbeat", () => {
   });
   describe("while a quiet controller has a zone valve open", () => {
     const VALVE = "switch.zone_1_valve";
-    const quiet = (opened: number, extra: EntityState[] = []) =>
+    const quiet = (
+      opened: number,
+      extra: EntityState[] = [],
+      published: Record<string, unknown> = { max_shot_s: 900 },
+    ) =>
       fixture([
         entity("sensor.crop_steering_engine_config", "ready", {
           prefix: "",
@@ -150,7 +154,7 @@ describe("controller heartbeat", () => {
         entity(
           HEARTBEAT,
           "healthy",
-          { enable_flag: "input_boolean.f2_control_enabled" },
+          { enable_flag: "input_boolean.f2_control_enabled", ...published },
           ago(12 * 60_000),
         ),
         { ...entity(VALVE, "on", {}, ago(opened)), last_changed: ago(opened) },
@@ -166,16 +170,18 @@ describe("controller heartbeat", () => {
       expect(status(states)).toMatchObject({ tone: "watering", text: "Watering" });
     });
     it("calls a valve open longer than the room's maximum shot what it is: not a shot", () => {
-      // The controller's fallback cap is 900 s: a controller that stopped mid-shot left it open.
+      // The controller sized its last shot with 900 s: one that stopped mid-shot left it open.
       const states = quiet(16 * 60_000);
       expect(view(states).alerts[0]).toMatchObject({
         severity: "critical",
         title: "Controller not running",
       });
       expect(status(states)).toMatchObject({ tone: "stale", text: "Data 12 min old" });
-      // The room's own cap decides, when it has one.
-      const longer = quiet(16 * 60_000, [entity("number.crop_steering_max_shot_duration", "1800")]);
-      expect(view(longer).alerts[0].title).toBe("Watering");
+      // The room's own cap decides when the controller publishes none (one from before it did).
+      const cap = [entity("number.crop_steering_max_shot_duration", "1800")];
+      expect(view(quiet(16 * 60_000, cap, {})).alerts[0].title).toBe("Watering");
+      // With neither, the dashboard keeps no copy of the controller's 900 s: not a shot.
+      expect(view(quiet(3 * 60_000, [], {})).alerts[0].title).toBe("Controller not running");
     });
     it("reads a valve that is closed, or a controller that is fresh, as nothing special", () => {
       const closed = quiet(3 * 60_000, [entity(VALVE, "off")]);

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { formatClock } from "./clock";
 import {
   AI_POWERS,
   BRAIN_DEMO_STATES,
@@ -57,11 +58,15 @@ describe("each brain state in grower words", () => {
       fallback_since: "2026-10-15T14:12:00",
       resets_at: "2026-10-16T06:00",
     });
-    expect(words.body).toBe("$1.00 spent at 14:12. Rules only until lights-on at 06:00.");
+    // The dashboard's one clock (lib/clock.ts), on Home Assistant's time.
+    const at = (iso: string) => formatClock(Date.parse(iso));
+    expect(words.body).toBe(
+      `$1.00 spent at ${at("2026-10-15T14:12:00")}. Rules only until lights-on at ${at("2026-10-16T06:00")}.`,
+    );
   });
   it("says when it stopped answering", () => {
     expect(view("unavailable", { fallback_since: "2026-10-15T10:42:00" }).headline).toBe(
-      "AI not answering since 10:42",
+      `AI not answering since ${formatClock(Date.parse("2026-10-15T10:42:00"))}`,
     );
   });
   it("adds a line for the judges it would not answer", () => {

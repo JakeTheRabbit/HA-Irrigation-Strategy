@@ -11,6 +11,7 @@ import { ComparisonChart, ComparisonSummary, format, type Loaded } from "./compa
 import { RunWeeks } from "./comparison-weeks";
 import { buildSetpointPreview } from "@/lib/setpoint-preview";
 import { buildComparisonTarget } from "@/lib/comparison-target";
+import { DATE_TIME, formatClock, formatDateTime } from "@/lib/clock";
 import "./comparison.css";
 const errorText = (error: unknown) =>
   error instanceof Error ? error.message : "Comparison request failed.";
@@ -531,7 +532,7 @@ export function Comparison({
                   <p className="small">
                     {reference === "saved" && currentRun
                       ? `${savedZone?.reference_source || currentRun.reference_source}. Captured ${new Date(currentRun.captured_at).toLocaleString(undefined, { timeZone: currentRun.time_zone })} (${currentRun.time_zone}). Saved lights on/off: ${format(currentRun.lights.on)} / ${format(currentRun.lights.off)} h.`
-                      : `Current configuration observed ${controller.lastUpdated ? new Date(controller.lastUpdated).toLocaleString() : "at this page snapshot"}; source: ${preview?.source || "selected live zone unavailable"}.`}
+                      : `Current configuration observed ${controller.lastUpdated ? formatDateTime(controller.lastUpdated, DATE_TIME) : "at this page snapshot"}; source: ${preview?.source || "selected live zone unavailable"}.`}
                   </p>
                   <p className="small">
                     This is a reference illustration, not the historical targets used during these
@@ -549,7 +550,7 @@ export function Comparison({
               <p className="small">
                 History requested through{" "}
                 {new Date(loaded.end).toLocaleString(undefined, { timeZone: loaded.timeZone })} (
-                {loaded.timeZone}); loaded {new Date(loaded.loadedAt).toLocaleTimeString()}. Use
+                {loaded.timeZone}); loaded {formatClock(loaded.loadedAt)}. Use
                 Refresh history to advance this window. Raw retained state changes are summarized
                 before chart downsampling.
               </p>

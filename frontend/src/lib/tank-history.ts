@@ -2,6 +2,8 @@ import type { HistoryPoint } from "./comparison-types";
 import { descriptor, numeric } from "./model";
 import { mergeSeries, plotPoints, type SensorReading } from "./sensor-context";
 import type { EntityState, Room, Series, States } from "./types";
+import { formatClock, formatDateTime } from "./clock";
+import { trimNumber as trim } from "./utils";
 
 /** Tank EC and pH over time, and the controller's source-water gate beside them.
  * Everything here is pure: the components only draw what these functions return. */
@@ -192,7 +194,6 @@ export function sourceGate(states: States, room: Room, key: TankKey): SourceGate
     option: !room.prefix && !(Number(attributes?.setup_revision) >= 1),
   };
 }
-const trim = (value: number) => String(Number(value.toFixed(2)));
 /** What the chart says about one half of the gate. Its lines are drawn only while it holds
  * irrigation on some probe (`active`); the text names which one. */
 export function gateText(
@@ -261,10 +262,10 @@ export function rangeTicks(start: number, end: number, hours: number): number[] 
 export function tickLabel(time: number, hours: number): string {
   const date = new Date(time);
   return hours <= 24
-    ? date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+    ? formatClock(date)
     : hours <= 168
-      ? date.toLocaleDateString([], { weekday: "short", day: "numeric" })
-      : date.toLocaleDateString([], { day: "numeric", month: "short" });
+      ? formatDateTime(date, { weekday: "short", day: "numeric" })
+      : formatDateTime(date, { day: "numeric", month: "short" });
 }
 
 /** A sparkline in a width × height box: the window across, the readings (at least `minSpan` of

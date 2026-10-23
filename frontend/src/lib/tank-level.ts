@@ -11,7 +11,7 @@ import {
 } from "./day-timeline";
 import { dosingConfigId } from "./dosing";
 import { descriptor } from "./model";
-import { MINIMUM_PCT, RELEASE_PCT, tankLevelId } from "./reservoir";
+import { tankLevelId, tankMarks } from "./reservoir";
 import { fillTime } from "./tank-telemetry";
 import type { RoomView, States } from "./types";
 
@@ -240,14 +240,14 @@ export interface LevelLine {
 export function levelLines(states: States, prefix: string, levelId: string | null): LevelLine[] {
   const lines: LevelLine[] = [];
   const tank = states[tankLevelId(prefix)];
-  if (tank) {
-    const set = Number(tank.attributes.minimum_pct);
-    const value = Number.isFinite(set) && set > 0 ? set : MINIMUM_PCT;
+  const marks = tank ? tankMarks(tank.attributes) : null;
+  if (marks?.minimum != null) {
+    const value = marks.minimum;
     lines.push({
       key: "minimum",
       value,
       label: `Minimum ${value} %`,
-      title: `Watering is held at ${value} % on the controller's tank level, until it reads ${RELEASE_PCT} %`,
+      title: `Watering is held at ${value} % on the controller's tank level, until it reads ${marks.release === null ? "above it" : `${marks.release} %`}`,
     });
   }
   const batch = states[dosingConfigId(prefix)]?.attributes.batch;

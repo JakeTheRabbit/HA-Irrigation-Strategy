@@ -1,4 +1,5 @@
 import type { EntityState } from "./types";
+import { unreadableState } from "./utils";
 
 /** A controller that has not reported for this long is not running: the integration's own limit
  * (the engine-offline repair and a zone's "Controller not reporting"). A shot holds the
@@ -48,7 +49,7 @@ export function readHeartbeat(entity: EntityState | undefined, now: number): Hea
       attributes,
     };
   const at = Number.isFinite(updated) ? updated : parseControllerTime(attributes.last_beat);
-  if (at === null || ["unknown", "unavailable"].includes(entity.state))
+  if (at === null || unreadableState(entity.state))
     return { health: "unreadable", at: null, attributes };
   const health = now - at > HEARTBEAT_STALE_MS ? "stale" : "fresh";
   if (entity.state === "error")

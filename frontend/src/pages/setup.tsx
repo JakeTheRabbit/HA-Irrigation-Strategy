@@ -1,4 +1,4 @@
-import { sizingChangedSince } from "@/lib/setup-sizing";
+import { newZone, sizingChangedSince } from "@/lib/setup-sizing";
 import { CanonicalControls } from "@/components/canonical-controls";
 import { AllZonesSwitch, RoomPower } from "@/components/room-controls";
 import { useLayoutEffect, useEffect, useState } from "react";
@@ -50,7 +50,7 @@ import {
   plumbingUses,
   type PlumbingLayout,
 } from "@/lib/plumbing";
-import { errorText } from "@/lib/utils";
+import { errorText, unreadableState } from "@/lib/utils";
 import { needsWizard } from "@/lib/commissioning";
 import type {
   Commissioning,
@@ -88,11 +88,10 @@ export function MappingPicker({
   );
   const selected = values.filter(Boolean);
   // A mapped entity Home Assistant reports no state for is mapped, but not usable.
-  const silent = selected.filter((id) =>
-    ["unavailable", "unknown"].includes(
-      candidates.find((c) => c.entity_id === id)?.state.toLowerCase() ?? "",
-    ),
-  ).length;
+  const silent = selected.filter((id) => {
+    const candidate = candidates.find((c) => c.entity_id === id);
+    return !!candidate && unreadableState(candidate.state);
+  }).length;
   return (
     <div className="mapping-picker">
       <div className="mapping-head">
@@ -196,23 +195,6 @@ export function MappingPicker({
       </Dialog>
     </div>
   );
-}
-/** A new zone, its sizing from the integration's one defaults table (`defaults`; these values
- * where an older integration does not send it). */
-function newZone(id: number, defaults: SetupDocument["sizing_defaults"] = {}): SetupZone {
-  return {
-    id,
-    name: "Zone " + id,
-    active: true,
-    valve: "",
-    vwc_sensors: [],
-    ec_sensors: [],
-    plant_count: 1,
-    substrate_volume: 5,
-    drippers_per_plant: 1,
-    dripper_flow_rate: 2,
-    ...defaults,
-  };
 }
 const hardwareFields = [
   ["pump_switch", "Room pump", "switch"],

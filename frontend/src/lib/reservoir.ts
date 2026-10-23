@@ -1,24 +1,40 @@
 import type { PillTone } from "@/components/mini-visuals";
 import { BATCH_STEPS, STEP_LABELS, resultTone, resultWords, type DosingStatus } from "./dosing";
 import type { States } from "./types";
+import { formatDateTime } from "./clock";
 
 /** The tank level the controller reads from the level mapped in Rooms and setup, with its minimum and
  * overfill marks (docs/USER_GUIDE.md, "Reservoir minimum"). Published only for a room with a tank
  * level mapped. */
 export const tankLevelId = (prefix: string) => `sensor.crop_steering_${prefix}tank_level`;
 
-/** The marks the controller holds by (tank_level.py): watering held at or below the minimum until
- * the level reads RELEASE_PCT; a fill stopped at or over OVER_PCT until it reads OVER_RELEASE_PCT. */
-export const MINIMUM_PCT = 8;
-export const RELEASE_PCT = 12;
-export const OVER_PCT = 102;
-export const OVER_RELEASE_PCT = 98;
+/** The marks the controller holds by (tank_level.py), as it publishes them on its tank level:
+ * watering held at or below `minimum` until the level reads `release`; a fill stopped at or over
+ * `over` until it reads `overRelease`. Null where the controller does not say (one from before it
+ * published the release and full marks): the dashboard keeps no copy of its numbers. */
+export interface TankMarks {
+  minimum: number | null;
+  release: number | null;
+  over: number | null;
+  overRelease: number | null;
+}
+const mark = (value: unknown) =>
+  typeof value === "number" && Number.isFinite(value) && value > 0 ? value : null;
+export function tankMarks(attrs: Record<string, unknown>): TankMarks {
+  return {
+    minimum: mark(attrs.minimum_pct),
+    release: mark(attrs.release_pct),
+    over: mark(attrs.over_pct),
+    overRelease: mark(attrs.over_release_pct),
+  };
+}
 
 export type ReservoirState = "unmapped" | "ok" | "held" | "unknown" | "over";
 export interface ReservoirView {
   state: ReservoirState;
   level: number | null;
-  minimum: number;
+  minimum: number | null;
+  marks: TankMarks;
   /** Litres drawn per 1 % of level, learned from the shots; null until learned. */
   litresPerPct: number | null;
   /** About how many litres are left above the minimum; null until the litres per 1 % are learned. */
@@ -36,12 +52,16 @@ const finite = (value: unknown) =>
 export function reservoirView(states: States, prefix: string): ReservoirView {
   const entity = states[tankLevelId(prefix)];
   const attrs = entity?.attributes ?? {};
-  const minimum = finite(attrs.minimum_pct) ?? MINIMUM_PCT;
+  const marks = tankMarks(attrs);
+  const { minimum } = marks;
+  const heldAt = minimum === null ? "at its minimum" : `at ${minimum} %`;
+  const startsAgain =
+    marks.release === null ? "once it reads above it" : `at ${marks.release} %`;
   const raw = entity && entity.state.trim() ? Number(entity.state) : NaN;
   const level = Number.isFinite(raw) ? raw : null;
   const litresPerPct = finite(attrs.litres_per_pct);
   const aboveMinimumL =
-    level !== null && litresPerPct !== null && litresPerPct > 0
+    level !== null && minimum !== null && litresPerPct !== null && litresPerPct > 0
       ? Math.max(0, (level - minimum) * litresPerPct)
       : null;
   const view = (
@@ -54,6 +74,7 @@ export function reservoirView(states: States, prefix: string): ReservoirView {
     state,
     level,
     minimum,
+    marks,
     litresPerPct,
     aboveMinimumL,
     label,
@@ -84,7 +105,7 @@ export function reservoirView(states: States, prefix: string): ReservoirView {
       "Watering held: tank at its minimum",
       "warn",
       attrs.below_minimum === true
-        ? `The tank is at or below its ${minimum} % minimum. Watering starts again by itself at ${RELEASE_PCT} %. Refill the tank.`
+        ? `The tank is at or below its ${minimum === null ? "" : `${minimum} % `}minimum. Watering starts again by itself ${startsAgain}. Refill the tank.`
         : "The tank's low float reads low. Watering starts again by itself once it no longer does. Refill the tank.",
       "CS-901",
     );
@@ -93,7 +114,7 @@ export function reservoirView(states: States, prefix: string): ReservoirView {
       "over",
       "Filling stopped: over the full mark",
       "warn",
-      `The tank reads at or over ${OVER_PCT} % of its full mark, so no fill valve opens until it reads ${OVER_RELEASE_PCT} % or less. The shots continue.`,
+      `The tank reads at or over ${marks.over === null ? "its full mark" : `${marks.over} % of its full mark`}, so no fill valve opens until it reads ${marks.overRelease === null ? "less again" : `${marks.overRelease} % or less`}. The shots continue.`,
       "CS-904",
     );
   return view(
@@ -101,8 +122,8 @@ export function reservoirView(states: States, prefix: string): ReservoirView {
     "Watering allowed",
     "on",
     aboveMinimumL === null
-      ? `Watering is held at ${minimum} % and starts again at ${RELEASE_PCT} %. The litres each 1 % holds are learned from the shots; until then no shot waits ahead of the minimum.`
-      : `Watering is held at ${minimum} % and starts again at ${RELEASE_PCT} %. A shot that would take the tank to its minimum waits, and a refill is asked for one round of shots ahead.`,
+      ? `Watering is held ${heldAt} and starts again ${startsAgain}. The litres each 1 % holds are learned from the shots; until then no shot waits ahead of the minimum.`
+      : `Watering is held ${heldAt} and starts again ${startsAgain}. A shot that would take the tank to its minimum waits, and a refill is asked for one round of shots ahead.`,
   );
 }
 
@@ -122,7 +143,7 @@ export function batchLine(status: DosingStatus | null): { label: string; tone: P
   const ended = batch.ended_at ? new Date(batch.ended_at) : null;
   const when =
     ended && Number.isFinite(ended.getTime())
-      ? ` · ${ended.toLocaleString([], { dateStyle: "short", timeStyle: "short" })}`
+      ? ` · ${formatDateTime(ended, { dateStyle: "short", timeStyle: "short" })}`
       : "";
   return {
     label: `Last batch: ${resultWords(batch.result)}${when}`,

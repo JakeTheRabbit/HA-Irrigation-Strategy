@@ -27,7 +27,7 @@ describe("the reservoir minimum in words", () => {
     expect(reservoirView(level("45"), "").aboveMinimumL).toBeNull();
   });
   it("holds at the minimum until 12 %, and on a low float, naming the code", () => {
-    const held = reservoirView(level("10", { below_minimum: true }), "");
+    const held = reservoirView(level("10", { below_minimum: true, release_pct: 12 }), "");
     expect(held).toMatchObject({ state: "held", code: "CS-901", tone: "warn" });
     expect(held.detail).toContain("12 %");
     expect(reservoirView(level("40", { low: true }), "")).toMatchObject({
@@ -44,6 +44,19 @@ describe("the reservoir minimum in words", () => {
     const view = reservoirView(level("103", { over_full: true }), "");
     expect(view).toMatchObject({ state: "over", code: "CS-904" });
     expect(view.detail).toContain("The shots continue");
+  });
+  it("says the marks the controller publishes, never its own copy of them", () => {
+    const marks = { release_pct: 15, over_pct: 105, over_release_pct: 95 };
+    expect(reservoirView(level("10", { below_minimum: true, ...marks }), "").detail).toContain(
+      "starts again by itself at 15 %",
+    );
+    const over = reservoirView(level("106", { over_full: true, ...marks }), "").detail;
+    expect(over).toContain("at or over 105 %");
+    expect(over).toContain("reads 95 % or less");
+    // A controller from before it published them: no number the dashboard made up.
+    const older = reservoirView(level("10", { below_minimum: true }), "");
+    expect(older.detail).not.toMatch(/12 %/);
+    expect(older.marks).toEqual({ minimum: 8, release: null, over: null, overRelease: null });
   });
   it("reads the room's own sensor by its prefix", () => {
     const states = createDemo(Date.parse("2026-09-28T04:00:00Z"));

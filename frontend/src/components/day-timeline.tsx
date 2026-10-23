@@ -96,6 +96,8 @@ import type { Controller, Setting, Zone } from "@/lib/types";
 import { errorText } from "@/lib/utils";
 import { dailyWater, estimateRuntime, flowInputs, waterParameters } from "@/lib/water-delivery";
 import { plantAmount, useWaterView, zonePlants } from "@/lib/water-view";
+import { ecTargetBand, poreEcNeutral } from "@/lib/ec-band";
+import { formatDateTime } from "@/lib/clock";
 import "./day-timeline.css";
 
 /** Each phase as the zone views name it, and as its chart column says it where there is room. */
@@ -663,6 +665,7 @@ function buildLane(
   const choice = states[`select.${root}zone_${zone.id}_steering_mode`]?.state;
   const steering = steeringOf(choice, stage?.steering);
   const ecTarget = zone.ecTarget.value;
+  const targetBand = ecTargetBand(poreEcNeutral(states, room.room.prefix), ecTarget);
   // Tonight's dryback is the controller's live one; last night's, what it held at lights-on.
   const tonight = now >= day.lightsOff;
   return {
@@ -691,10 +694,10 @@ function buildLane(
     steering,
     ecBand: stage?.poreEc
       ? { band: stage.poreEc, source: `the pore EC band for ${stage.name}` }
-      : ecTarget !== null && ecTarget > 0
+      : targetBand
         ? {
-            band: [ecTarget * 0.9, ecTarget * 1.1],
-            source: `the zone’s EC target ${number(ecTarget, 2)} ±10 %`,
+            band: targetBand,
+            source: `the zone’s EC target ${number(ecTarget, 2)}, where the controller leaves a shot’s size alone`,
           }
         : null,
     dryback: tonight
@@ -1730,9 +1733,7 @@ function columnText(column: Column, lane: Lane, day: GrowDay, now: number): stri
 
 /** A clock hour short enough for an axis: "4 PM", "16". */
 const hourLabel = (time: number) =>
-  new Date(time)
-    .toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
-    .replace(/:00(?=\D|$)/, "");
+  formatDateTime(time, { hour: "numeric", minute: "2-digit" }).replace(/:00(?=\D|$)/, "");
 const diamond = (cx: number, cy: number) =>
   `M${cx} ${cy - 5}L${cx + 5} ${cy}L${cx} ${cy + 5}L${cx - 5} ${cy}Z`;
 /** The recorded VWC as one path, broken where readings stop for more than 20 minutes. */

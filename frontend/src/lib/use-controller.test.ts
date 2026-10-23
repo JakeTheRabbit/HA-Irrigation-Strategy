@@ -199,6 +199,28 @@ describe("controller lifecycle", () => {
       (await store.history(["sensor.demo_room_b_tank_ph"], 24))[0].points.length,
     ).toBeGreaterThan(0);
   });
+  it("lets every history entry point read the same sensors of the room, and none of another's", async () => {
+    browser();
+    const store = new ControllerStore(true);
+    const end = Date.now(),
+      start = end - 3_600_000;
+    const span = { start: new Date(start).toISOString(), end: new Date(end).toISOString() };
+    const reads = (id: string) => [
+      () => store.history([id], 1),
+      () => store.timeline({ entityIds: [id], attributeIds: [], start, end }),
+      () => store.historyWindow({ entityIds: [id], ...span, timeZone: "UTC" }),
+      () => store.dailyRanges({ entityIds: [id], ...span, timeZone: "UTC" }),
+      () => store.sensorStatistics({ entityIds: [id], ...span, timeZone: "UTC" }),
+      () => store.waterRecord({ entityIds: [id], start, end }),
+    ];
+    // The room's tank probe and a room sensor: allowed by all six (the run comparisons read sensors
+    // only, whatever the room maps).
+    for (const id of ["sensor.demo_tank_ec", "sensor.crop_steering_vwc_zone_1"])
+      for (const [index, read] of reads(id).entries())
+        await expect(read(), `${id} #${index}`).resolves.toBeDefined();
+    for (const [index, read] of reads("sensor.demo_room_b_tank_ec").entries())
+      await expect(read(), `#${index}`).rejects.toThrow();
+  });
   it("reads a long history one day per request and joins the days in order", async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(Date.parse("2026-09-24T12:00:00Z"));

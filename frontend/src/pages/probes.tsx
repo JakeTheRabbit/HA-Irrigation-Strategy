@@ -24,7 +24,8 @@ import {
 } from "@/lib/probes";
 import type { Controller, EntityState } from "@/lib/types";
 import { useRecentHistory } from "@/lib/use-recent-moisture";
-import { errorText } from "@/lib/utils";
+import { errorText, unreadableState } from "@/lib/utils";
+import { DATE_TIME, formatDateTime } from "@/lib/clock";
 import "./probes.css";
 
 /** Hours of readings each sparkline draws. */
@@ -263,7 +264,7 @@ function ProbeRow({
         ) : (
           <time
             dateTime={new Date(probe.reported).toISOString()}
-            title={new Date(probe.reported).toLocaleString()}
+            title={formatDateTime(probe.reported, DATE_TIME)}
           >
             {ageText(now - probe.reported)} ago
           </time>
@@ -559,8 +560,7 @@ function ControllerInternals({ controller }: { controller: Controller }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("all");
-  const rawAvailable = (state: string) =>
-    !["unavailable", "unknown", "none", ""].includes(state.toLowerCase());
+  const rawAvailable = (state: string) => !unreadableState(state);
   const unverifiedProbeIds = new Set(
     controller.room.zones
       .flatMap((zone) => [zone.vwc, zone.ec])

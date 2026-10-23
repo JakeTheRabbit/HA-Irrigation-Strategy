@@ -4,7 +4,7 @@ import { Pill } from "@/components/mini-visuals";
 import { TankLevel } from "@/components/tank-level";
 import { TankStatus } from "@/components/tank-status";
 import { dosingStatusId, readStatus } from "@/lib/dosing";
-import { batchLine, reservoirView, RELEASE_PCT } from "@/lib/reservoir";
+import { batchLine, reservoirView } from "@/lib/reservoir";
 import type { Page } from "@/lib/routes";
 import type { Controller } from "@/lib/types";
 import "./reservoir.css";
@@ -57,7 +57,8 @@ export function Reservoir({
               <div>
                 <dt>Minimum</dt>
                 <dd>
-                  {guard.minimum} % · starts again at {RELEASE_PCT} %
+                  {guard.minimum === null ? "Not reported" : `${guard.minimum} %`}
+                  {guard.marks.release !== null && ` · starts again at ${guard.marks.release} %`}
                 </dd>
               </div>
               <div>
