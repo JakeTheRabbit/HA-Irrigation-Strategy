@@ -39,6 +39,8 @@ def _two_shots(c, fake, monkeypatch):
     room = c.rooms[0]
     for switch in ARMED[1:]:
         fake.set_state(switch, "on")
+    # the room's own kill switch on (an upgraded room has no slug): it is read while the shot opens
+    fake.set_state(controller.room_gate(room), "on")
     fake.calls.clear()
     c._execute_shot(room, 1, 10, 5, flow_lps=0.05)
     sent = {"shot": _hardware_calls(fake, OLD_HARDWARE)}
