@@ -14,6 +14,8 @@
  * - 3.18: the CS-102 card sits under the Room B Zone 2 back VWC row (F1 Zone 2 back), the silent row
  *   leads its group; each room's heartbeat strip draws its beats, Room B's with one missed;
  *   "What to do →" opens Help at CS-102; Acknowledge removes the card and says so;
+ * - 3.18: Room A's Upgrade report lists Needs you and Carried across, each line linking its page and
+ *   its section of docs/UPGRADING.md; Room B (new) has none;
  * - 3.17: the page is built from the entities; uptime reads "—" and the heartbeat "—", each with a
  *   compact "Needs integration 3.18".
  * Also writes a full-page screenshot of each run, before Acknowledge, beside the harness's own. */
@@ -48,6 +50,27 @@ await runParity({
     assert.match(await health.locator(".system-checked").innerText(), new RegExp(`^Checked ${HHMM}$`), `${label}: checked`);
     assert.equal(await health.locator(".health-ring").count(), 1, `${label}: ring`);
     region("health");
+
+    // Upgrade report (CS-616): Room A came from 3.17, its two lists with links; Room B is new, so
+    // none. An integration without migration_report shows none.
+    const report = page.locator('[data-upgrade-report="room:"]');
+    if (v318) {
+      await report.waitFor();
+      assert.equal(await page.locator("[data-upgrade-report]").count(), 1, `${label}: only Room A has a report`);
+      const needs = report.getByRole("region", { name: "Needs you" });
+      assert.ok((await needs.locator("li").count()) > 0, `${label}: needs you rows`);
+      assert.equal(
+        await needs.locator('[data-upgrade-row="supply"] a', { hasText: "Open the page" }).getAttribute("href"),
+        "#/equipment/setup",
+        `${label}: supply opens Setup`,
+      );
+      assert.match(
+        await needs.locator('[data-upgrade-row="supply"] a', { hasText: "How to set it up" }).getAttribute("href"),
+        /\/blob\/main\/docs\/UPGRADING\.md#supply$/,
+        `${label}: supply links its guide section`,
+      );
+      assert.ok((await report.getByRole("region", { name: "Carried across" }).locator("li").count()) > 0, `${label}: carried rows`);
+    } else assert.equal(await page.locator("[data-upgrade-report]").count(), 0, `${label}: no report on 3.17`);
 
     // Software and Heartbeat.
     const software = page.getByRole("region", { name: "Software" });

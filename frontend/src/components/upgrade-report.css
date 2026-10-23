@@ -1,0 +1,71 @@
+/* Settings › System status › Upgrade report: two lists per room, Needs you first. */
+.upgrade-report {
+  padding: 16px 20px;
+}
+.upgrade-report-head h2 {
+  margin: 0;
+  font-size: var(--text-md);
+  font-weight: 600;
+}
+.upgrade-report-head p {
+  margin: 4px 0 0;
+  font-size: var(--text-sm);
+  color: var(--muted-foreground);
+}
+.upgrade-report-lists {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+  gap: 16px;
+  margin-top: 12px;
+}
+.upgrade-report-list h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 6px;
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+.upgrade-report-count {
+  min-width: 22px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--muted);
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+  text-align: center;
+}
+.upgrade-report-list[data-upgrade-list="needs_you"] .upgrade-report-count {
+  background: var(--warning-bg);
+  color: var(--foreground);
+}
+.upgrade-report-list ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.upgrade-report-list li {
+  display: grid;
+  gap: 2px;
+  padding: 8px 0;
+  border-top: 1px solid var(--border);
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+.upgrade-report-detail {
+  color: var(--muted-foreground);
+}
+.upgrade-report-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+}
+.upgrade-report-links a {
+  color: var(--primary-strong);
+  font-weight: 500;
+}
+.upgrade-report-none {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--muted-foreground);
+}

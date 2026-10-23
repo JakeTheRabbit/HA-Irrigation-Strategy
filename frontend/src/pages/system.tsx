@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Heading } from "@/components/dashboard";
 import { NeedsIntegration } from "@/components/needs-integration";
+import { UpgradeReports } from "@/components/upgrade-report";
 import { HealthRing } from "@/components/primitives/ring";
 import { Button } from "@/components/ui/button";
 import { duration } from "@/lib/day-timeline";
@@ -39,8 +40,9 @@ const instant = (text: string | null | undefined) => {
 type Row = StatusEntity & { roomId: string; label: string };
 type Ack = { busy: boolean; error: string | null };
 
-/** Settings › System status (mockup 21): the health ring and its sentence, Software, Heartbeat and
- * every mapped device, each open alert on the device it is about. */
+/** Settings › System status (mockup 21): the health ring and its sentence, each room's Upgrade
+ * report after an update (CS-616), Software, Heartbeat and every mapped device, each open alert on
+ * the device it is about. */
 export function SystemStatus({ controller }: PageProps) {
   const v2 = useParity<Status>(controller, "system_status_get", {}, []);
   const { reload } = v2;
@@ -187,6 +189,7 @@ export function SystemStatus({ controller }: PageProps) {
           {said}
         </p>
       </section>
+      <UpgradeReports controller={controller} />
 
       <div className="system-grid">
         <div className="system-side">

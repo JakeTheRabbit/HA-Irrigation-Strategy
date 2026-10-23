@@ -222,6 +222,40 @@ const DASHBOARDS: DashboardList = {
  * (parity-demo/presets.ts). */
 type StatefulAction = "preset_list" | "preset_save" | "preset_apply" | "preset_delete" | "copy_config";
 const STATEFUL: readonly string[] = ["preset_list", "preset_save", "preset_apply", "preset_delete", "copy_config"];
+/** migration_report for the demo: Room A came from 3.17 (a report with both lists), Room B is new
+ * (two empty lists, so its report is hidden), as migration.py answers them. */
+function demoUpgradeReport(roomId: string) {
+  const row = (id: string, title: string, status: "carried" | "needs_you", detail: string, page: string, anchor: string) => ({
+    id,
+    title,
+    status,
+    detail,
+    page,
+    doc: `docs/UPGRADING.md#${anchor}`,
+  });
+  const upgraded = roomId === "room:";
+  return {
+    schema_version: 1,
+    release: "3.18.0",
+    room_id: roomId,
+    acknowledged: null,
+    carried: upgraded
+      ? [
+          row("irrigation.mode", "Irrigation mode", "carried", "Every zone waters by Steering, as before (2 zones).", "#/all-zones", "irrigation-mode"),
+          row("presets.snapshot", "Settings before the update", "carried", "A preset of this room's settings before 3.18 was saved. Nothing was applied.", "#/plan/schedule", "presets"),
+          row("notify.recipients", "Notification phones", "carried", "Every phone that had alerts still gets them.", "#/settings/notifications", "quiet-hours"),
+        ]
+      : [],
+    needs_you: upgraded
+      ? [
+          row("supply", "Irrigation supply", "needs_you", "Each pump's real flow, how many zones it feeds at once and its flow meter. Nothing is saved until you save it.", "#/equipment/setup", "supply"),
+          row("feed.calibration", "Feed pH and EC probes", "needs_you", "Calibrate the feed pH and EC probes in two buffer solutions.", "#/equipment/feed-calibration", "feed-calibration"),
+          row("browser.recipes", "Recipes on this browser", "needs_you", "Grow-plan recipes saved only in a browser can be imported as presets on Grow plan & presets.", "#/plan/schedule", "browser-recipes"),
+        ]
+      : [],
+  };
+}
+
 /** Task 3's answer for every other parity action: plausible, deterministic for `now`. */
 const DEFAULTS: Record<Exclude<ParityAction, StatefulAction>, (data: Record<string, unknown>, now: number) => unknown> = {
   // Never reached: parity-demo/journal.ts always answers journal_query (the record needs a key).
@@ -280,6 +314,7 @@ const DEFAULTS: Record<Exclude<ParityAction, StatefulAction>, (data: Record<stri
   },
   dashboard_list: () => structuredClone(DASHBOARDS),
   system_status_get: (_d, now) => demoSystemStatus(now),
+  migration_report: (d) => demoUpgradeReport(typeof d.room_id === "string" ? d.room_id : "room:"),
 };
 
 /** The demo's v2 integration: a lane handler whose `match` accepts the call, else Task 3's default.

@@ -46,6 +46,7 @@ export const PARITY_ACTIONS = [
   "dashboard_create",
   "dashboard_list",
   "system_status_get",
+  "migration_report",
 ] as const;
 export type ParityAction = (typeof PARITY_ACTIONS)[number];
 export const isParityAction = (action: string): action is ParityAction =>

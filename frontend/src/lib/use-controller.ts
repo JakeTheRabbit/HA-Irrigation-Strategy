@@ -103,6 +103,7 @@ const PARITY_READS = new Set<string>([
   "preset_list",
   "dashboard_list",
   "system_status_get",
+  "migration_report",
   "pump_stop",
 ]);
 const SESSION_KEY = "crop-steering-connection-tab";
