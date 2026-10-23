@@ -230,16 +230,16 @@ try {
       ["strategy", "plan/targets", "Irrigation"],
       ["grow-plan", "plan/schedule", "Irrigation"],
       ["compare", "history/compare", "Compare runs"],
-      ["insights", "equipment/probes", "Probes"],
+      ["insights", "equipment/probes", "Probes & offsets"],
       ["activity", "history/explorer", "Explorer"],
-      ["sensors", "equipment/probes", "Probes"],
+      ["sensors", "equipment/probes", "Probes & offsets"],
       ["stock", "equipment/stock", "Stock tanks"],
       ["setup", "equipment/setup", "Rooms and setup"],
       ["plan", "plan/watering", "Timeline"],
       ["history", "history/explorer", "Explorer"],
       ["history/timeline", "history/explorer", "Explorer"],
       ["equipment/feed", "equipment/dosing", "Dosing"],
-      ["equipment", "equipment/probes", "Probes"],
+      ["equipment", "equipment/probes", "Probes & offsets"],
     ];
     for (const [old, now, heading] of moved) {
       await go(old);
@@ -255,7 +255,7 @@ try {
     await go("today");
     const before = await page.evaluate(() => history.length);
     await page.evaluate(() => (location.hash = "#/sensors"));
-    await expectVisible(page.getByRole("heading", { name: "Probes", exact: true }));
+    await expectVisible(page.getByRole("heading", { name: "Probes & offsets", exact: true }));
     assert.equal(new URL(page.url()).hash, "#/equipment/probes");
     assert.equal(await page.evaluate(() => history.length), before + 1);
     await page.goBack();
@@ -274,7 +274,7 @@ try {
     ["history/water", "Water use"],
     ["history/compare", "Compare runs"],
     ["history/changes", "Changes"],
-    ["equipment/probes", "Probes"],
+    ["equipment/probes", "Probes & offsets"],
     ["equipment/stock", "Stock tanks"],
     ["equipment/dosing", "Dosing"],
     ["equipment/pump-calibration", "Pump calibration"],
@@ -1328,29 +1328,36 @@ try {
     },
   );
   await check(
-    "probes: every probe's health, the controller and Jev, the internals one tap down",
+    "probes: the room's moisture probes and their health, the controller and Jev, the internals one tap down",
     async () => {
       await go("equipment/probes");
+      // The room's moisture probes under its name, pore EC beside each.
       const rows = page.locator(".probes-table tr[data-probe]");
       await expectVisible(rows.first());
-      assert.equal(await rows.count(), 12, "two moisture and two EC probes in each of three zones");
-      // Name first, entity id under it.
-      const first = await rows.first().locator("td").first().innerText();
-      assert.match(first, /^Zone 1 front VWC\nsensor\.demo_z1_front_vwc$/);
-      const health = await pillTones(".probes-table [data-probe-health]");
-      assert.equal(health.filter(([text]) => text === "OK").length, 11);
-      assert.deepEqual(
-        health.find(([text]) => text !== "OK"),
-        ["Silent 3 h, left out of the zone's reading", "warn"],
+      assert.equal(await rows.count(), 6, "front and back moisture probes in each of three zones");
+      assert.equal(await page.locator('tbody[data-probes-room="room:"]').count(), 1);
+      assert.equal(
+        (await page.locator(".page-heading p").innerText()).trim(),
+        "6 probes · 6 in zone values · raw readings always kept",
       );
-      // Each probe's last six hours.
+      // The probe's side, its entity id on hover.
+      const first = rows.first().locator('td[data-label="Probe"] strong');
+      assert.equal((await first.innerText()).trim(), "Front");
+      assert.equal(await first.getAttribute("title"), "sensor.demo_z1_front_vwc");
+      const health = await pillTones(".probes-table .pill[data-probe-health]");
+      assert.deepEqual(health, Array(6).fill(["OK", "on"]));
+      // Room A zone 3's back pore EC probe is silent: said beside its reading.
+      assert.match(
+        await page.locator('[data-probe-ec="sensor.demo_z3_back_ec"]').innerText(),
+        /Silent 3 h/,
+      );
+      // Each probe's last 24 hours.
       await page.locator(".probes-table [data-sensor-trend] .sparkline").first().waitFor();
-      assert.equal(await page.locator(".probes-table [data-sensor-trend] .sparkline").count(), 12);
-      // Each zone's valve; the controller and the AI assistant at the top.
-      assert.equal(await page.locator(".probes-zone [data-zone-valve]").count(), 3);
+      assert.equal(await page.locator(".probes-table [data-sensor-trend] .sparkline").count(), 6);
+      // The controller and the AI assistant at the top.
       assert.match(
         await page.locator(".probes-status").innerText(),
-        /Probes\s+11 of 12 OK[\s\S]*Controller\s+Reporting[\s\S]*AI assistant\s+On/,
+        /Controller\s+Reporting[\s\S]*AI assistant\s+On/,
       );
       // The controller's own sensors: collapsed, then as the Sensors page had them.
       const internals = page.locator("details.probes-more", {
@@ -2543,11 +2550,11 @@ try {
       "equipment",
       "Probes & offsets",
     );
-    await expectVisible(page.getByRole("heading", { name: "Probes", exact: true }));
+    await expectVisible(page.getByRole("heading", { name: "Probes & offsets", exact: true }));
     await page.goBack();
     await expectVisible(page.getByRole("heading", { name: "Room A", exact: true, level: 1 }));
     await page.goForward();
-    await expectVisible(page.getByRole("heading", { name: "Probes", exact: true }));
+    await expectVisible(page.getByRole("heading", { name: "Probes & offsets", exact: true }));
   });
   await check("history explorer: range, any sensor, previous run, 390px", async () => {
     await go("history/explorer?zone=1");

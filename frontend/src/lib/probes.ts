@@ -254,3 +254,49 @@ export function probeChoicePayload(room: SetupRoom, choices: Record<string, Prob
     })),
   };
 }
+
+/** The probe's health in a word or two, for its pill: "Silent 3 h", "Stuck 4 h", "Out of range". */
+export function healthChip(probe: Probe, now: number): string {
+  switch (probe.health) {
+    case "stale":
+      return probe.reported === null ? "Not reporting" : `Silent ${duration(now - probe.reported)}`;
+    case "stuck":
+      return probe.changed === null ? "Stuck" : `Stuck ${duration(now - probe.changed)}`;
+    case "out-of-range":
+      return "Out of range";
+    case "no-reading":
+      return "No reading";
+    case "left-out":
+      return "Left out";
+    case "not-counted":
+      return "Does not count";
+    default:
+      return "OK";
+  }
+}
+
+/** A moisture probe whose reading points at where it sits (out of range, or far from the zone's other
+ * probes): moving it is the fix, not an offset. */
+export const placementProblem = (probe: Probe) =>
+  probe.kind === "vwc" && (probe.health === "out-of-range" || probe.reason === "excluded_outlier");
+
+/** One row of Probes & offsets: a moisture probe, and the pore EC probe on its side of the slab (by
+ * "front"/"back" in their names, else by order). */
+export interface ProbeRow {
+  side: string;
+  vwc: Probe;
+  ec: Probe | null;
+}
+const sideOf = (probe: Probe) => /\b(front|back)\b/i.exec(probe.name)?.[1].toLowerCase() ?? null;
+export function probeRows(probes: readonly Probe[]): ProbeRow[] {
+  const moisture = probes.filter((probe) => probe.kind === "vwc");
+  const ec = probes.filter((probe) => probe.kind === "ec");
+  return moisture.map((vwc, index) => {
+    const side = sideOf(vwc);
+    return {
+      side: side ? side[0].toUpperCase() + side.slice(1) : moisture.length > 1 ? vwc.name : "Probe",
+      vwc,
+      ec: (side ? ec.find((probe) => sideOf(probe) === side) : undefined) ?? ec[index] ?? null,
+    };
+  });
+}

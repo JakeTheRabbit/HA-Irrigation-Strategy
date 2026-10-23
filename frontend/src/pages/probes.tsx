@@ -1,40 +1,111 @@
 import { CanonicalControls } from "@/components/canonical-controls";
-import { useEffect, useState } from "react";
-import { ArrowRight, Search } from "lucide-react";
+import { Fragment, useEffect, useRef, useState } from "react";
+import { ArrowRight, Search, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Empty, Heading, Status, time, type Page } from "@/components/dashboard";
 import { UiTip } from "@/components/info-tip";
 import { JevTrouble, jevUsage } from "@/components/jev-status";
 import { Pill, Sparkline } from "@/components/mini-visuals";
+import { NeedsIntegration } from "@/components/needs-integration";
 import { ProbeCalibration } from "@/components/probe-calibration";
+import { ReviewApply, type ReviewRow } from "@/components/review-apply";
 import { ageText, readHeartbeat } from "@/lib/controller-health";
+import { formatEc, formatTemp } from "@/lib/display-units";
 import { recentReadings } from "@/lib/dryback";
 import { brainWords, readJev } from "@/lib/jev";
 import { descriptor, numeric } from "@/lib/model";
 import type { SetupDocument, SetupRoom } from "@/lib/operator-types";
+import { callV2, type V2Outcome } from "@/lib/parity-api";
+import {
+  applyOffset,
+  curveDisabledReason,
+  handheldOffset,
+  moisturePct,
+  previewOffset,
+  readOffsets,
+  signedPoints,
+  type OffsetAnswer,
+  type ProbeOffset,
+} from "@/lib/probe-offset";
 import {
   PROBE_TONE,
   READING_REASON,
+  healthChip,
+  placementProblem,
   probeChoicePayload,
   probeChoices,
+  probeRows,
   zoneProbes,
   type Probe,
   type ProbeChoice,
+  type ProbeRow,
 } from "@/lib/probes";
-import type { Controller, EntityState } from "@/lib/types";
+import type { Controller, EntityState, RoomView, Zone } from "@/lib/types";
+import { revertEvents } from "@/lib/undo";
 import { useRecentHistory } from "@/lib/use-recent-moisture";
 import { errorText } from "@/lib/utils";
+import { rootZoneSensor } from "@/lib/zone-extras";
 import "./probes.css";
 
-/** Hours of readings each sparkline draws. */
+/** Hours of readings each controller-sensor sparkline draws; each probe's line draws a day. */
 const RECENT_H = 6;
+const PROBE_H = 24;
 const asId = (value: unknown) =>
   typeof value === "string" && /^[a-z_]+\.[a-z0-9_]+$/.test(value) ? value : "";
+const pct = (value: number | null) => (value === null ? "—" : `${value.toFixed(1)}%`);
+const digits = (state: string | undefined) => (state?.split(".")[1] ?? "").length;
 
-/** Equipment › Probes: is every probe reporting, and believable; which one is off, and since when.
- * Then the valves and pump, the controller's heartbeat and the AI assistant, and, one tap down, the room map and
- * the controller's own sensors. */
+/** The rooms' stored probe offsets (calibration_get): `missing` on an integration older than 3.18,
+ * which keeps none; a room whose store cannot be read has none to show. */
+function useOffsets(controller: Controller, roomIds: string[]) {
+  const [read, setRead] = useState<{
+    key: string;
+    missing: boolean;
+    rooms: Record<string, Record<string, ProbeOffset> | null>;
+  } | null>(null);
+  const [tick, setTick] = useState(0);
+  const key = roomIds.join("|");
+  useEffect(() => {
+    let current = true;
+    if (!["live", "demo"].includes(controller.connection) || !key) return;
+    void Promise.all(
+      key.split("|").map((id) => callV2<unknown>(controller, "calibration_get", { room_id: id })),
+    ).then((outcomes) => {
+      if (!current) return;
+      setRead({
+        key,
+        missing: outcomes.some((outcome) => outcome.kind === "missing"),
+        rooms: Object.fromEntries(
+          key.split("|").map((id, index) => {
+            const outcome = outcomes[index];
+            return [id, outcome.kind === "ok" ? readOffsets(outcome.data) : null];
+          }),
+        ),
+      });
+    });
+    return () => {
+      current = false;
+    };
+  }, [key, controller.connection, tick]);
+  const fallback: { missing: boolean; rooms: Record<string, Record<string, ProbeOffset> | null> } = { missing: false, rooms: {} };
+  return { ...(read && read.key === key ? read : fallback), reload: () => setTick((n) => n + 1) };
+}
+
+/** The rooms' zones as Probes & offsets draws them: each moisture probe on a row, pore EC beside it. */
+interface ZoneGroup {
+  zone: Zone;
+  rows: ProbeRow[];
+}
+interface RoomGroup {
+  view: RoomView;
+  zones: ZoneGroup[];
+}
+
+/** Equipment › Probes & offsets: the selected room's probes, under the room's name, whether to believe each one,
+ * and each moisture probe's offset, matched to a handheld meter in place. Then the substrate curve, where
+ * to put a probe, the probes that count, the feed-water probes' calibration, and one tap down the room
+ * map and the controller's own sensors. */
 export function Probes({
   controller,
   navigate,
@@ -46,12 +117,27 @@ export function Probes({
 }) {
   const { room, states } = controller;
   const now = Date.now();
+  // The room the tree picks: each room's readings, history and calibration store are its own.
+  const groups: RoomGroup[] = room.zones.length
+    ? [{ view: room, zones: room.zones.map((zone) => ({ zone, rows: probeRows(zoneProbes(zone, states, now)) })) }]
+    : [];
+  const rows = groups.flatMap((group) => group.zones.flatMap((zone) => zone.rows));
   const probes = room.zones.flatMap((zone) => zoneProbes(zone, states, now));
   const history = useRecentHistory(
     controller,
-    probes.map((probe) => probe.id),
-    RECENT_H,
+    rows.flatMap((row) => [row.vwc.id, ...(row.ec ? [row.ec.id] : [])]),
+    PROBE_H,
   );
+  const offsets = useOffsets(
+    controller,
+    groups.map((group) => group.view.room.id),
+  );
+  const [open, setOpen] = useState<string | null>(null);
+  const placement = useRef<HTMLElement>(null);
+  const checkPlacement = () => {
+    placement.current?.scrollIntoView({ block: "nearest" });
+    placement.current?.focus();
+  };
   const config = descriptor(states, room.room)?.attributes ?? {};
   const heartbeat = readHeartbeat(
     states[`sensor.crop_steering_${room.room.prefix}ai_heartbeat`],
@@ -59,29 +145,37 @@ export function Probes({
   );
   const status = states[`sensor.crop_steering_${room.room.prefix}app_status`]?.state;
   const jev = readJev(states, room.room.prefix).room;
-  const trouble = probes.filter(
-    (probe) => probe.health !== "ok" && probe.health !== "not-counted",
-  ).length;
+  const used = rows.filter((row) => row.vwc.used !== false && row.vwc.health !== "not-counted").length;
   const hardware = [
     ["Pump", asId(config.pump)],
     ["Main-line valve", asId(config.mainline)],
     ["Feed-water EC", asId(config.feed_ec_sensor)],
     ["Feed-water pH", asId(config.feed_ph_sensor)],
   ].filter(([, id]) => id) as [string, string][];
+  const misplaced = groups.flatMap((group) =>
+    group.zones.flatMap(({ zone, rows }) =>
+      rows
+        .filter((row) => placementProblem(row.vwc))
+        .map((row) => ({ room: group.view.room.name, zone: zone.name, row })),
+    ),
+  );
+  const tempIds = new Set(
+    groups.flatMap((group) => group.view.zones.map((zone) => rootZoneSensor(states, group.view.room, zone.id))),
+  );
+  const showTemp = [...tempIds].some(Boolean);
+  const reload = () => {
+    offsets.reload();
+    void controller.refresh();
+  };
   return (
     <>
-      <Heading title="Probes" action={<UiTip copyKey="probes" />} />
+      <Heading
+        title="Probes & offsets"
+        description={`${rows.length} ${rows.length === 1 ? "probe" : "probes"} · ${used} in zone values · raw readings always kept`}
+        action={<UiTip copyKey="probes" />}
+      />
       <CanonicalControls controller={controller} owner="probes" onDirtyChange={onDirtyChange} />
       <section className="panel probes-status" aria-label="Controller and AI assistant">
-        <div>
-          <span className="eyebrow">Probes</span>
-          <strong>
-            {probes.length - trouble} of {probes.length} OK
-          </strong>
-          <span className="muted small">
-            {trouble ? `${trouble} to look at, below` : "Every probe reports and reads true"}
-          </span>
-        </div>
         <div>
           <span className="eyebrow">Controller</span>
           <strong>
@@ -123,74 +217,87 @@ export function Probes({
           ))}
         </div>
       )}
-      <section className="panel" aria-labelledby="probes-title">
-        <div className="panel-heading">
-          <div>
-            <h2 id="probes-title">Probes of each zone</h2>
-            <p>
-              What each probe reads, when it last reported, and whether the zone’s reading uses it
-            </p>
-          </div>
-          <Button variant="ghost" size="sm" onClick={() => navigate("equipment/setup")}>
-            Map probes <ArrowRight size={15} aria-hidden="true" />
-          </Button>
-        </div>
-        {!room.zones.length ? (
-          <Empty
-            title="No zones found"
-            detail="Probes appear once the room’s zones are mapped in Setup."
-          />
-        ) : (
-          <div className="table-scroll" tabIndex={0} role="region" aria-label="Probes by zone">
-            <table className="data-table probes-table">
-              <thead>
-                <tr>
-                  <th scope="col">Probe</th>
-                  <th scope="col">Reading</th>
-                  <th scope="col">Last report</th>
-                  <th scope="col">Last {RECENT_H} h</th>
-                  <th scope="col">Health</th>
-                </tr>
-              </thead>
-              {room.zones.map((zone) => (
-                <tbody key={zone.id}>
-                  <tr className="probes-zone">
-                    <th scope="colgroup" colSpan={5}>
-                      {zone.name}
-                      <Pill
-                        dot
-                        tone={
-                          zone.valveOn === true ? "on" : zone.valveOn === false ? "off" : "unknown"
-                        }
-                        title={zone.valveEntity ?? "No valve mapped"}
-                        data-zone-valve={zone.id}
-                      >
-                        Valve{" "}
-                        {zone.valveOn === true
-                          ? "open"
-                          : zone.valveOn === false
-                            ? "shut"
-                            : "unknown"}
-                      </Pill>
-                      {zone.enabled === false && <Status enabled={false} label="Zone paused" />}
+      <div className="probes-layout">
+        <section className="panel probes-board" aria-label="Probes by room">
+          {offsets.missing && (
+            <div className="probes-missing" data-match-handheld-missing>
+              <span>Match handheld</span>
+              <NeedsIntegration feature="Matching a probe to a handheld meter" compact />
+            </div>
+          )}
+          {!rows.length ? (
+            <Empty
+              title="No probes found"
+              detail="Probes appear once the room’s zones are mapped in Setup."
+            />
+          ) : (
+            <div className="table-scroll" tabIndex={0} role="region" aria-label="Probes, by room and zone">
+              <table className="data-table probes-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Zone value</th>
+                    <th scope="col">Health</th>
+                    <th scope="col">Probe</th>
+                    <th scope="col">Last 24 h</th>
+                    <th scope="col" className="numeric">VWC</th>
+                    <th scope="col" className="numeric">{showTemp ? "EC · Temp" : "EC"}</th>
+                    <th scope="col" className="numeric">Offset</th>
+                    <th scope="col">
+                      <span className="sr-only">Action</span>
                     </th>
                   </tr>
-                  {probes
-                    .filter((probe) => probe.zone === zone.id)
-                    .map((probe) => (
-                      <ProbeRow
-                        key={probe.id}
-                        probe={probe}
-                        points={history?.find((series) => series.entityId === probe.id)?.points}
-                        now={now}
-                      />
-                    ))}
-                </tbody>
-              ))}
-            </table>
-          </div>
-        )}
-      </section>
+                </thead>
+                {groups.map((group) => (
+                  <RoomRows
+                    key={group.view.room.id}
+                    controller={controller}
+                    group={group}
+                    offsets={offsets.missing ? null : (offsets.rooms[group.view.room.id] ?? null)}
+                    v2={!offsets.missing}
+                    history={history}
+                    now={now}
+                    open={open}
+                    onOpen={setOpen}
+                    onCheckPlacement={checkPlacement}
+                    onChanged={reload}
+                  />
+                ))}
+              </table>
+            </div>
+          )}
+        </section>
+        <aside className="probes-aside">
+          <SubstrateCurve room={room} probes={probes} missing={offsets.missing} offsets={offsets.rooms[room.room.id] ?? null} />
+          <section
+            className="panel probe-placement"
+            aria-labelledby="probe-placement-title"
+            tabIndex={-1}
+            ref={placement}
+            data-placement-card
+            data-warning={misplaced.length ? "" : undefined}
+          >
+            <h2 id="probe-placement-title">Where to put a probe</h2>
+            {misplaced.map(({ room, zone, row }) => (
+              <p className="probe-placement-warning" key={row.vwc.id} data-placement-warning={row.vwc.id}>
+                <TriangleAlert size={17} aria-hidden="true" />
+                <span>
+                  {`${room} ${zone} ${row.side} reads ${pct(row.vwc.value)}`}
+                  {row.vwc.health === "out-of-range"
+                    ? ", which no probe can read: it is likely not seated, or sits in the drip. Move it, and it rejoins the zone value once it reads in range."
+                    : ", far from the zone’s other probes: probably right under a dripper. Move it, and it rejoins the zone value once it reads like the others."}
+                </span>
+              </p>
+            ))}
+            <PlacementPicture />
+            <ul>
+              <li>Push straight down, prongs fully in, not touching the slab bottom.</li>
+              <li>5–8 cm from the dripper, towards the middle of the slab.</li>
+              <li>Not at a slab end, a drain slit or a cube edge.</li>
+              <li>Front and back probes: same distance from their drippers.</li>
+            </ul>
+          </section>
+        </aside>
+      </div>
       <ProbePicker controller={controller} probes={probes} />
       {hardware.length > 0 && (
         <section className="panel" aria-labelledby="probes-room-title">
@@ -234,62 +341,400 @@ export function Probes({
   );
 }
 
-function ProbeRow({
-  probe,
-  points,
+/** One room's zones: its name, how its probes are laid out and how many are healthy, then each moisture
+ * probe's row, and the handheld match under the probe it is open on. */
+function RoomRows({
+  controller,
+  group,
+  offsets,
+  v2,
+  history,
   now,
+  open,
+  onOpen,
+  onCheckPlacement,
+  onChanged,
 }: {
-  probe: Probe;
-  points: { time: string; value: number }[] | undefined;
+  controller: Controller;
+  group: RoomGroup;
+  /** The room's stored offsets; null where they are not known. */
+  offsets: Record<string, ProbeOffset> | null;
+  v2: boolean;
+  history: { entityId: string; points: { time: string; value: number }[] }[] | null;
   now: number;
+  open: string | null;
+  onOpen: (id: string | null) => void;
+  onCheckPlacement: () => void;
+  onChanged: () => void;
 }) {
+  const { view, zones } = group;
+  const rows = zones.flatMap((zone) => zone.rows);
+  const healthy = rows.filter((row) => row.vwc.health === "ok").length;
+  const counts = new Set(zones.map((zone) => zone.rows.length));
+  const sides = rows.every((row) => row.side === "Front" || row.side === "Back");
+  const layout =
+    counts.size === 1 && counts.has(1)
+      ? "1 probe per zone"
+      : counts.size === 1 && counts.has(2) && sides
+        ? "2 per zone, front and back"
+        : `${rows.length} moisture probes`;
+  const points = (id: string) => history?.find((series) => series.entityId === id)?.points;
   return (
-    <tr data-probe={probe.id} data-health={probe.health}>
-      <td>
-        <strong>{probe.name}</strong>
-        {probe.primary && (
-          <Pill tone="phase" data-probe-primary>
-            Primary
-          </Pill>
-        )}
-        <code className="cell-subtext">{probe.id}</code>
-      </td>
-      <td className="numeric">
-        {probe.value === null ? "—" : `${probe.value} ${probe.unit}`.trim()}
-      </td>
-      <td>
-        {probe.reported === null ? (
-          <span className="muted">Not known</span>
-        ) : (
-          <time
-            dateTime={new Date(probe.reported).toISOString()}
-            title={new Date(probe.reported).toLocaleString()}
-          >
-            {ageText(now - probe.reported)} ago
-          </time>
-        )}
-      </td>
-      <td data-sensor-trend={probe.id}>
-        {points && (
-          <Sparkline
-            points={recentReadings(points, RECENT_H, probe.value, now)}
-            width={110}
-            label={`${probe.name} over the last ${RECENT_H} hours`}
-          />
-        )}
-      </td>
-      <td>
-        <Pill dot tone={PROBE_TONE[probe.health]} data-probe-health={probe.health}>
-          {probe.text}
-        </Pill>
-        {probe.reason && (
-          <span className="cell-subtext" data-probe-reason={probe.reason}>
-            Reading: {READING_REASON[probe.reason] ?? probe.reason.replaceAll("_", " ")}
-            {probe.quality ? ` (${probe.quality})` : ""}
+    <tbody data-probes-room={view.room.id}>
+      <tr className="probes-room">
+        <th scope="colgroup" colSpan={8}>
+          <span className="probes-room-name">
+            <span className="probes-room-dot" aria-hidden="true" />
+            {view.room.name}
           </span>
+          <span className="muted">{layout}</span>
+          <span className="probes-room-health" data-tone={healthy < rows.length ? "warn" : "ok"}>
+            {healthy} of {rows.length} {rows.length === 1 ? "probe" : "probes"} healthy
+          </span>
+        </th>
+      </tr>
+      {zones.map(({ zone, rows }) => {
+        const usedRows = rows.filter((row) => row.vwc.used !== false && row.vwc.value !== null);
+        const values = usedRows.map((row) => row.vwc.value!);
+        const spread = values.length > 1 ? Math.max(...values) - Math.min(...values) : null;
+        const stuck = rows.some((row) => row.vwc.health === "stuck");
+        const sub =
+          spread !== null
+            ? `spread ${spread.toFixed(1)} points`
+            : rows.length > 1
+              ? `${usedRows.length} of ${rows.length} probes used`
+              : `1 probe${stuck ? " · stuck" : ""}`;
+        const editing = rows.find((row) => row.vwc.id === open);
+        return rows.map((row, index) => {
+          const offset = offsets ? (offsets[row.vwc.id]?.offset ?? 0) : null;
+          const raw = moisturePct(row.vwc.value, row.vwc.unit);
+          const temp = index === 0 ? rootZoneSensor(controller.states, view.room, zone.id) : null;
+          const tempState = temp ? controller.states[temp] : undefined;
+          const tempValue = numeric(tempState);
+          const tempC =
+            tempValue === null
+              ? null
+              : String(tempState?.attributes.unit_of_measurement ?? "").includes("F")
+                ? ((tempValue - 32) * 5) / 9
+                : tempValue;
+          const action =
+            placementProblem(row.vwc) ? (
+              <Button variant="link" size="sm" onClick={onCheckPlacement} data-check-placement={row.vwc.id}>
+                Check placement <ArrowRight size={14} aria-hidden="true" />
+              </Button>
+            ) : row.vwc.health === "stale" || row.vwc.health === "no-reading" ? (
+              <span className="muted small">Check cable</span>
+            ) : v2 && raw !== null && row.vwc.used !== null ? (
+              <Button
+                variant="outline"
+                size="sm"
+                aria-expanded={open === row.vwc.id}
+                aria-label={`Match ${zone.name} ${row.side} to a handheld reading`}
+                onClick={() => onOpen(open === row.vwc.id ? null : row.vwc.id)}
+                data-match-handheld={row.vwc.id}
+              >
+                Match handheld
+              </Button>
+            ) : rows.length === 1 && row.vwc.health === "stuck" ? (
+              <span className="muted small">Only probe here, still used</span>
+            ) : null;
+          return (
+            <Fragment key={row.vwc.id}>
+              <tr data-probe={row.vwc.id} data-health={row.vwc.health} className="probe-row">
+                {index === 0 && (
+                  <td rowSpan={rows.length + (editing ? 1 : 0)} className="probes-zone-value" data-zone-value={`${view.room.id}:${zone.id}`}>
+                    <span className="muted">{zone.name}</span>
+                    <strong>{pct(zone.vwc.value)}</strong>
+                    <SpreadBar values={values} value={zone.vwc.value} label={`${zone.name} probes from ${values.length ? Math.min(...values).toFixed(1) : "—"} to ${values.length ? Math.max(...values).toFixed(1) : "—"}%`} />
+                    <span className="small" data-tone={stuck ? "warn" : undefined}>{sub}</span>
+                  </td>
+                )}
+                <td data-label="Health">
+                  <Pill dot tone={PROBE_TONE[row.vwc.health]} data-probe-health={row.vwc.health} title={row.vwc.text}>
+                    {healthChip(row.vwc, now)}
+                  </Pill>
+                  {row.vwc.used === false && row.vwc.health !== "not-counted" && (
+                    <span className="cell-subtext">left out of zone</span>
+                  )}
+                  {row.vwc.reason && row.vwc.reason !== "fresh" && (
+                    <span className="cell-subtext" data-probe-reason={row.vwc.reason}>
+                      Reading: {READING_REASON[row.vwc.reason] ?? row.vwc.reason.replaceAll("_", " ")}
+                      {row.vwc.quality ? ` (${row.vwc.quality})` : ""}
+                    </span>
+                  )}
+                </td>
+                <td data-label="Probe">
+                  <strong title={row.vwc.id}>{row.side}</strong>
+                </td>
+                <td data-sensor-trend={row.vwc.id} data-label="Last 24 h">
+                  {points(row.vwc.id) && (
+                    <Sparkline
+                      points={recentReadings(points(row.vwc.id)!, PROBE_H, row.vwc.value, now)}
+                      width={80}
+                      label={`${zone.name} ${row.side} moisture over the last ${PROBE_H} hours`}
+                    />
+                  )}
+                </td>
+                <td className="numeric probes-vwc" data-label="VWC" data-tone={row.vwc.health === "out-of-range" ? "bad" : undefined}>
+                  {row.vwc.value === null ? "—" : `${row.vwc.value}${row.vwc.unit === "%" ? "%" : ` ${row.vwc.unit}`}`}
+                </td>
+                <td className="numeric" data-label={temp ? "EC · Temp" : "EC"} data-probe-ec={row.ec?.id}>
+                  {row.ec ? <EcCell probe={row.ec} now={now} /> : "—"}
+                  {tempC !== null && ` · ${formatTemp(tempC, Math.min(1, digits(tempState?.state)))}`}
+                </td>
+                <td className="numeric" data-label="Offset" data-offset={row.vwc.id}>
+                  {offset === null ? "—" : signedPoints(offset)}
+                </td>
+                <td data-label="">{action}</td>
+              </tr>
+              {editing === row && (
+                <tr className="probe-offset-row">
+                  <td colSpan={7}>
+                    <MatchHandheld
+                      controller={controller}
+                      roomId={view.room.id}
+                      room={view.room.name}
+                      zone={zone.name}
+                      row={row}
+                      raw={raw!}
+                      current={offset ?? 0}
+                      onClose={() => onOpen(null)}
+                      onChanged={onChanged}
+                      onCheckPlacement={onCheckPlacement}
+                    />
+                  </td>
+                </tr>
+              )}
+            </Fragment>
+          );
+        });
+      })}
+    </tbody>
+  );
+}
+
+/** A pore EC probe's reading in the display unit, its trouble said beside it. */
+function EcCell({ probe, now }: { probe: Probe; now: number }) {
+  const value = probe.value === null ? "—" : formatEc(probe.value, String(probe.value).split(".")[1]?.length ?? 0);
+  if (probe.health === "ok") return <>{value}</>;
+  return (
+    <span className="probes-ec-trouble" title={probe.text} data-probe-health={probe.health}>
+      {value} <TriangleAlert size={13} aria-hidden="true" /> {healthChip(probe, now)}
+    </span>
+  );
+}
+
+/** Where the zone's probes sit around the zone's value: the span from lowest to highest, a tick at the
+ * value. 10 points either side. */
+function SpreadBar({ values, value, label }: { values: number[]; value: number | null; label: string }) {
+  if (value === null || !values.length) return null;
+  const at = (v: number) => `${Math.max(0, Math.min(100, ((v - value + 10) / 20) * 100))}%`;
+  const low = Math.min(...values),
+    high = Math.max(...values);
+  return (
+    <span className="probes-spread" role="img" aria-label={label}>
+      <span className="probes-spread-range" style={{ left: at(low), width: `calc(${at(high)} - ${at(low)})` }} />
+      <span className="probes-spread-tick" style={{ left: at(value) }} />
+    </span>
+  );
+}
+
+/** Match handheld: the grower's handheld reading at the same spot, the offset it makes (the integration's
+ * own rule) and, from the integration's preview, what the zone would read. Review & apply writes exactly
+ * that offset; the receipt says what the zone read before and after, from the write's own answer. */
+function MatchHandheld({
+  controller,
+  roomId,
+  room,
+  zone,
+  row,
+  raw,
+  current,
+  onClose,
+  onChanged,
+  onCheckPlacement,
+}: {
+  controller: Controller;
+  roomId: string;
+  room: string;
+  zone: string;
+  row: ProbeRow;
+  raw: number;
+  current: number;
+  onClose: () => void;
+  onChanged: () => void;
+  onCheckPlacement: () => void;
+}) {
+  const [text, setText] = useState("");
+  const [preview, setPreview] = useState<{ text: string; outcome: V2Outcome<OffsetAnswer> } | null>(null);
+  const [tick, setTick] = useState(0);
+  const handheld = text.trim() === "" ? null : Number(text.replace(",", "."));
+  const valid = handheld !== null && Number.isFinite(handheld);
+  const offset = valid ? handheldOffset(raw, handheld) : null;
+  useEffect(() => {
+    if (!valid) return;
+    let current = true;
+    const timer = setTimeout(() => {
+      void previewOffset(controller, roomId, row.vwc.id, handheld).then((outcome) => {
+        if (current) setPreview({ text, outcome });
+      });
+    }, 250);
+    return () => {
+      current = false;
+      clearTimeout(timer);
+    };
+  }, [text, tick, roomId, row.vwc.id]);
+  const shown = preview && preview.text === text && valid ? preview.outcome : null;
+  const answer = shown?.kind === "ok" ? shown.data : null;
+  const name = `${zone} ${row.side}`;
+  const rows: ReviewRow[] = answer
+    ? [
+        answer.fused_before !== null && answer.fused_after !== null
+          ? { id: row.vwc.id, label: `${room} ${zone} value`, before: pct(answer.fused_before), after: pct(answer.fused_after) }
+          : { id: row.vwc.id, label: `${name} offset`, before: signedPoints(current), after: signedPoints(answer.offset) },
+      ]
+    : [];
+  const checks =
+    !valid && text.trim()
+      ? [{ ok: false, text: "Enter the handheld reading as a number from 0 to 100." }]
+      : shown?.kind === "error"
+        ? [{ ok: false, text: shown.message }]
+        : [];
+  return (
+    <div className="probe-offset" data-offset-editor={row.vwc.id} aria-label={`Match ${name} to a handheld reading`} role="group">
+      <div className="probe-offset-inputs">
+        <label>
+          <span>Handheld reading, same spot</span>
+          <span className="probe-offset-field">
+            <Input
+              inputMode="decimal"
+              value={text}
+              autoFocus
+              onChange={(event) => setText(event.target.value)}
+              aria-label="Handheld reading, same spot, %"
+            />
+            %
+          </span>
+        </label>
+        <div className="probe-offset-result" aria-live="polite">
+          <span className="muted">Probe reads {pct(raw)}</span>
+          <strong data-offset-preview>{offset === null ? "—" : signedPoints(offset)}</strong>
+          <span className="muted small">offset, VWC points</span>
+        </div>
+        <div className="probe-offset-links">
+          <Button variant="link" size="sm" onClick={onCheckPlacement} data-check-placement-editor>
+            Reads oddly? Check placement <ArrowRight size={14} aria-hidden="true" />
+          </Button>
+        </div>
+      </div>
+      {shown?.kind === "missing" ? (
+        <NeedsIntegration feature="Matching a probe to a handheld meter" compact />
+      ) : (
+        <ReviewApply
+          layout="bar"
+          rows={rows}
+          checks={checks}
+          summary={rows.length ? undefined : valid ? "Working out the zone value…" : "Type the handheld reading"}
+          applyLabel={answer ? `Apply ${signedPoints(answer.offset)} offset to ${name}` : undefined}
+          discardLabel="Cancel"
+          onDiscard={onClose}
+          consequence="The zone value updates once the controller holds the offset. Fusion re-baselines, so no step alert fires."
+          timeZone={controller.timeZone}
+          onReload={() => {
+            onChanged();
+            setTick((n) => n + 1);
+          }}
+          apply={async () => {
+            const receipt = await applyOffset(controller, {
+              roomId,
+              entityId: row.vwc.id,
+              offset: answer!.offset,
+              revision: answer!.revision,
+              room,
+              zone,
+              probe: name,
+              before: current,
+            });
+            if ("ok" in receipt && receipt.ok) setText("");
+            onChanged();
+            return receipt;
+          }}
+          undo={async (receipt) => {
+            if (!receipt.eventIds.length) throw new Error("Undo not available here: put the offset back from History › Changes.");
+            await revertEvents(controller, receipt.eventIds);
+            onChanged();
+          }}
+        />
+      )}
+      <p className="probe-offset-foot muted small">
+        Raw value kept · logged in History › Changes
+        {!text && (
+          <Button variant="ghost" size="sm" onClick={onClose}>
+            Close
+          </Button>
         )}
-      </td>
-    </tr>
+      </p>
+    </div>
+  );
+}
+
+/** The selected room's substrate curve: what turns a probe's raw reading into VWC. Generic curves stay
+ * off until they are signed off, so this says what the room's probes do and why a curve does not apply. */
+function SubstrateCurve({
+  room,
+  probes,
+  missing,
+  offsets,
+}: {
+  room: RoomView;
+  probes: Probe[];
+  missing: boolean;
+  offsets: Record<string, ProbeOffset> | null;
+}) {
+  const moisture = probes.filter((probe) => probe.kind === "vwc");
+  const reasons = [...new Set(moisture.map((probe) => curveDisabledReason({ unit: probe.unit })))];
+  const curves = [...new Set(moisture.map((probe) => offsets?.[probe.id]?.curve).filter(Boolean))];
+  return (
+    <section className="panel probe-curve" aria-labelledby="probe-curve-title" data-substrate-curve>
+      <h2 id="probe-curve-title">Substrate curve · {room.room.name}</h2>
+      <p className="muted">
+        Turns a probe’s raw reading into VWC. Applies to all {moisture.length} {room.room.name} moisture{" "}
+        {moisture.length === 1 ? "probe" : "probes"}.
+      </p>
+      {missing ? (
+        <NeedsIntegration feature="Probe curves" compact />
+      ) : (
+        <>
+          <p data-curve-in-use>
+            <strong>In use:</strong> {curves.length ? curves.join(", ").replaceAll("_", " ") : "none"}
+          </p>
+          {reasons.map((reason) => (
+            <p className="probe-curve-reason" key={reason ?? "none"} data-curve-reason>
+              {reason ?? "Substrate curves stay off until they are signed off for this grow. Match a handheld meter instead."}
+            </p>
+          ))}
+        </>
+      )}
+    </section>
+  );
+}
+
+/** A slab from the side: the dripper's wet cone, and a probe 5–8 cm away, prongs fully in. */
+function PlacementPicture() {
+  return (
+    <svg className="probe-placement-picture" viewBox="0 0 320 130" role="img" aria-label="A probe pushed straight down 5 to 8 cm from the dripper, out of the wet cone">
+      <rect x="4" y="52" width="312" height="62" rx="4" className="slab" />
+      <path d="M92 52 Q92 92 112 98 Q132 92 132 52 Z" className="cone" />
+      <rect x="96" y="24" width="32" height="28" rx="2" className="cube" />
+      <line x1="112" y1="10" x2="112" y2="24" className="dripper" />
+      <text x="70" y="108" className="label">not in the wet cone</text>
+      <rect x="208" y="30" width="12" height="20" rx="2" className="probe-head" />
+      <line x1="211" y1="50" x2="211" y2="96" className="prong" />
+      <line x1="217" y1="50" x2="217" y2="96" className="prong" />
+      <text x="230" y="80" className="label accent">prongs fully in</text>
+      <line x1="132" y1="122" x2="211" y2="122" className="measure" />
+      <text x="150" y="119" className="label accent">5–8 cm</text>
+    </svg>
   );
 }
 

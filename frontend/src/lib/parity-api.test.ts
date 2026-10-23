@@ -95,6 +95,7 @@ const ASKED: Partial<Record<string, Record<string, unknown>>> = {
   preset_apply: { preset_id: DEMO_PRESET_IDS.roomB, to: [{ room_id: "room:" }], preview: true },
   preset_delete: { id: DEMO_PRESET_IDS.timer, expected_revision: 1 },
   copy_config: { from: { room_id: "room:" }, to: [{ room_id: "room:room_b_" }], sections: ["targets"], preview: true },
+  probe_offset_set: { entity_id: "sensor.demo_z1_front_vwc", match_handheld: 60, preview: true },
 };
 test("demo 3.18 answers every parity action ok", async () => {
   for (const a of PARITY_ACTIONS) expect([a, (await callV2(demoController("?demo=1"), a, ASKED[a] ?? {})).kind]).toEqual([a, "ok"]);
