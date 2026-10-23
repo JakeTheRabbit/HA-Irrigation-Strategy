@@ -94,7 +94,7 @@ function roomDay(roomId: string, on: number, today: boolean): CsEvent[] {
     return id;
   };
   const p2At = on + 180 * MIN;
-  add(on - 230 * MIN, "stock.refilled", { tank: "part_a", litres: 20, level_l: 20 }, { actor: "manual" });
+  add(on - 230 * MIN, "stock.refilled", { tank: "part_a", level_l: 20, old_level_l: 3.4, full: true }, { actor: "manual" });
   add(on - 120 * MIN, "config.changed", { store: "setup", section: "zones", old: { plant_count: 39 }, new: { plant_count: 40 }, diff: [{ path: "zones.1.plant_count", old: 39, new: 40 }] }, { actor: "manual" });
   add(on - 60 * MIN, "calibration.committed", { probe: "feed_ph", slope_pct: 98.4, offset: 0.06, verdict: "pass", applied: true }, { actor: "manual" });
   add(on, "phase.changed", { from: "P3", to: "P0", how: "lights on" });
