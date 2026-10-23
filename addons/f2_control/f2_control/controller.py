@@ -5753,6 +5753,18 @@ class Controller:
         valve_started = None
         counted = False
         stopping = False
+        errored = False
+
+        def count_water_so_far():
+            # The shot ended without its close counting it (stopped or errored): count the water given
+            # since the valve opened, or the next pass waters the zone as if it had had none.
+            nonlocal counted
+            if valve_started is not None and not counted:
+                counted = True
+                run = (time.monotonic() - valve_started) / duration_s if duration_s > 0 else 1.0
+                self._advance_shot_counters(room, zone, size_pct * run, delivered_l=nominal_l * run,
+                                            steering=steering)
+
         commanded = False  # a switch has been sent ON: from here an error must close what may be open
         try:  # from the moment _busy is set: an error before any valve opens must not leave it set
             hw = room.hw
@@ -5918,16 +5930,13 @@ class Controller:
             # Count the water this shot delivered before the process goes, or the next start would water
             # the zone as if it had had none.
             stopping = True
-            if valve_started is not None and not counted:
-                counted = True
-                run = (time.monotonic() - valve_started) / duration_s if duration_s > 0 else 1.0
-                self._advance_shot_counters(room, zone, size_pct * run, delivered_l=nominal_l * run,
-                                            steering=steering)
+            count_water_so_far()
             raise
         except Exception as e:
             log("shot error", room.slug, zone, e)
             if not commanded:  # nothing opened: the room's pass stops here and says so (CS-212)
                 raise
+            errored = True
         finally:
             try:
                 # Early command failures and unexpected exceptions need the SAME hold
@@ -5962,6 +5971,8 @@ class Controller:
                     else:
                         room.shot_inflight = None
                         self._save_state()
+                if errored:  # after the close, as a normal shot is: its time counts too
+                    count_water_so_far()
             finally:
                 self._busy = False
                 self._shot_room = None
