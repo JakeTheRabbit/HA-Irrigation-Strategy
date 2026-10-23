@@ -2,7 +2,7 @@
 
 3.18 is a big upgrade. The update keeps every zone watering and dosing exactly as before, carries your
 settings into the new features where it can do that without guessing, and lists the rest in each room's
-**Upgrade report** (Crop Steering → Settings → System, and one card in Settings → Repairs, code CS-616).
+**Upgrade report** (Crop Steering → Settings → System status, and one card in Settings → Repairs, code CS-616).
 
 This page has one section per line of that report. Each section says what the update did, what it left
 for you, and how to set it, written so that you, or an AI assistant you give this page to, can do it
@@ -24,7 +24,7 @@ calibration.
 **did not save a supply**. Saving one turns on pump sharing: two rooms on one pump then take turns, and a
 zone that needs more water than its pump can give raises CS-214. Until you save, watering is as before.
 
-To set it: Crop Steering → Equipment → Setup → Supply, or `crop_steering.supply_get` then
+To set it: Crop Steering → Equipment → Setup: pumps & valves → Supply, or `crop_steering.supply_get` then
 `crop_steering.supply_save` with `expected_revision` and `irrigation_pumps`:
 `[{entity_id, max_flow_lph, max_concurrent_zones, flow_meter}]`.
 
@@ -48,7 +48,8 @@ as before.
 ## Presets
 
 *Report rows `presets.recipe`, `presets.snapshot`, `presets.recipe_keys`.* Presets save a room's or a zone's
-targets, phase timing, water limits and timer programs, and copy them to other rooms or zones.
+targets, phase timing, water limits and timer programs, and copy them to other rooms or zones. They are
+in Crop Steering → Irrigation → Grow plan & presets.
 
 - Each recipe stage you had edited (one that differs from the shipped default) was copied as a preset
   named `<room> – <stage> (from 3.17 recipe)`. The recipe itself is unchanged and still works.
@@ -61,7 +62,7 @@ A recipe key listed under `presets.recipe_keys` has no preset section: set it on
 
 ## Alerts
 
-*Report row `alerts.rules`.* Alert rules (Crop Steering → Alerts → Rules) are new and there are none. Your
+*Report row `alerts.rules`.* Alert rules (Crop Steering → Settings → Alert rules) are new and there are none. Your
 irrigation pH and EC limits (`number.crop_steering_<prefix>irrigation_ph_min/max`, `irrigation_ec_min/max`)
 still stop watering as before; a rule is only a notification. To add one: `crop_steering.alert_rule_preview`
 to see how often it would have fired, then `crop_steering.alert_rule_set`. Optional.
@@ -71,7 +72,7 @@ to see how often it would have fired, then `crop_steering.alert_rule_set`. Optio
 *Report rows `units.temperature`, `units.ec`, `units.clock`.* Display only: what the dashboard shows,
 never what is stored or what the controller uses. Temperatures follow Home Assistant (°F where Home
 Assistant uses °F). EC is shown in mS/cm; if you work in ppm, pick the 500 or 700 scale. Set them in
-Crop Steering → Settings → Display, or `crop_steering.display_get` then `crop_steering.display_save`
+Crop Steering → Settings → Dashboards & display, or `crop_steering.display_get` then `crop_steering.display_save`
 with `options: {ec_unit: "ppm500" | "ppm700" | "mS/cm", temp_unit: "C" | "F", clock: 12 | 24}`.
 
 ## Quiet hours
@@ -83,7 +84,7 @@ quiet hours end. Set them per phone in Crop Steering → Settings → Notificati
 ## Feed calibration
 
 *Report rows `calibration.feed_ph`, `calibration.feed_ec`.* Each feed probe reads raw, as before. The
-2-point calibration is new: Crop Steering → Equipment → Calibration, two buffer solutions, and the
+2-point calibration is new: Crop Steering → Equipment → Feed pH/EC calibration, two buffer solutions, and the
 correction is applied only when you commit it. While a calibration session is open, dosing and pH
 correction wait, and the source-water gate uses the corrected reading once committed. An old calibration
 check from before 3.18 is kept as a record and never applied. A person does this at the tank: an AI
@@ -93,7 +94,7 @@ assistant can explain it but cannot run it.
 
 *Report rows `dosing.ph_pumps`, `dosing.pump.<id>`.* The dosing setup was not changed. A pH up/down pump
 keeps its pH role. Each other pump is listed: pick its solution (nutrient or additive) in Crop Steering →
-Dosing → Pumps, and run a pump calibration (`pump_calibrate`, then `pump_calibration_commit`) so doses are
+Equipment → Feed & dosing, and run a pump calibration (Equipment → Pump calibration, `pump_calibrate`, then `pump_calibration_commit`) so doses are
 sized from a measured mL/min. Until then the pump doses from its flow sensor, as before.
 
 ## Feed EC fallback
@@ -103,13 +104,13 @@ sized from a measured mL/min. Until then the pump doses from its flow sensor, as
 high EC. 3.18 does not invent a feed EC, so the update keeps the old 3.0 for this room, and the controller
 says so (CS-907). It stops by itself when either of these is done:
 
-- map a feed EC probe (Crop Steering → Equipment → Setup, `hardware.feed_ec_sensor`), or
-- set the EC of the feed recipe in use (Crop Steering → Dosing → Feed).
+- map a feed EC probe (Crop Steering → Equipment → Setup: pumps & valves, `hardware.feed_ec_sensor`), or
+- set the EC of the feed recipe in use (Crop Steering → Equipment → Feed & dosing).
 
 ## New panels
 
 *Report row `panels.new`.* The camera, CO2 and light-level (PPFD, DLI) panels show once their entities are
-mapped in Setup. New dashboards (wall, tablet, dosing) are made from Settings → Dashboards; the ones you
+mapped in Setup. New dashboards (wall, tablet, dosing) are made from Settings → Dashboards & display; the ones you
 made yourself are never changed. Optional.
 
 ## Retired entities
@@ -120,7 +121,7 @@ reads. Settings → Repairs names each one (CS-614). Remove it from the automati
 ## History
 
 *Report row `history.import`.* Your earlier setting changes, stock moves, calibrations and overlays were
-added to History, beside everything recorded from now on. The controller adds its own dosing history and
+added to History (Crop Steering → History → Changes), beside everything recorded from now on. The controller adds its own dosing history and
 AI records after it updates.
 
 ## Browser recipes

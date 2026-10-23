@@ -1192,7 +1192,7 @@
         "The room was set up on a release before 3.18 and has just been updated."
       ],
       "fixes": [
-        "Open Crop Steering → Settings → System → Upgrade report. Each line under Needs you links to the page to open and to the section of the upgrade guide to read.",
+        "Open Crop Steering → Settings → System status → Upgrade report. Each line under Needs you links to the page to open and to the section of the upgrade guide to read.",
         "Mark the card as read to close it. The report stays in Settings."
       ]
     },

@@ -1530,7 +1530,7 @@ controller still reports a setup change (CS-201) and a hardware hold (CS-301, CS
 
 **What to do**
 
-- Open Crop Steering → Settings → System → Upgrade report. Each line under Needs you links to the page to open and to the section of the upgrade guide to read.
+- Open Crop Steering → Settings → System status → Upgrade report. Each line under Needs you links to the page to open and to the section of the upgrade guide to read.
 - Mark the card as read to close it. The report stays in Settings.
 
 ## AI assistant (CS-7xx)

@@ -279,7 +279,7 @@ async def step_irrigation_mode(hass, entry, room) -> list[dict]:
                 "needs_you",
                 f"Zone(s) {', '.join(map(str, unknown))} show no irrigation mode. Pick Steering to "
                 "keep watering them as before.",
-                "#/zones",
+                "#/all-zones",
                 "irrigation-mode",
             )
         ]
@@ -289,7 +289,7 @@ async def step_irrigation_mode(hass, entry, room) -> list[dict]:
             "Irrigation mode",
             "carried",
             f"Every zone waters by Steering, as before ({len(zones)} zones).",
-            "#/zones",
+            "#/all-zones",
             "irrigation-mode",
         )
     ]
@@ -365,7 +365,7 @@ async def step_recipe_presets(hass, entry, room) -> list[dict]:
                 "needs_you",
                 f"These recipe settings have no place in a preset: {', '.join(unmapped)}. Set them "
                 "on the room's settings if you use them.",
-                "#/plan/presets",
+                "#/plan/schedule",
                 "presets",
             )
         )
@@ -379,7 +379,7 @@ async def step_recipe_presets(hass, entry, room) -> list[dict]:
             "Recipe stages",
             "carried",
             f"Your recipe stages {stages} were copied as presets. Nothing was applied.",
-            "#/plan/presets",
+            "#/plan/schedule",
             "presets",
         )
     )
@@ -408,7 +408,7 @@ async def step_snapshot_preset(hass, entry, room) -> list[dict]:
                 "needs_you",
                 "Some settings could not be read at the update, so no preset of your settings was "
                 "saved. Save one yourself under Presets before you change anything.",
-                "#/plan/presets",
+                "#/plan/schedule",
                 "presets",
             )
         ]
@@ -434,7 +434,7 @@ async def step_snapshot_preset(hass, entry, room) -> list[dict]:
             "Rollback preset",
             "carried",
             "A preset of your current settings was saved as a point to go back to. Nothing was applied.",
-            "#/plan/presets",
+            "#/plan/schedule",
             "presets",
         )
     ]
@@ -448,7 +448,7 @@ async def step_alerts(hass, entry, room) -> list[dict]:
             "Alert rules",
             "needs_you",
             "No custom alert rules yet. Your pH and EC limits still stop watering as before.",
-            "#/alerts/rules",
+            "#/settings/alerts",
             "alerts",
         )
     ]
@@ -471,7 +471,7 @@ async def step_display_units(hass, entry, room) -> list[dict]:
             "EC unit",
             "needs_you",
             "EC is shown in mS/cm. If you work in ppm, pick the 500 or 700 scale.",
-            "#/settings/display",
+            "#/settings",
             "units",
         )
     ]
@@ -482,7 +482,7 @@ async def step_display_units(hass, entry, room) -> list[dict]:
                 "Clock",
                 "needs_you",
                 "Times are shown on a 24-hour clock. Pick 12-hour if you prefer it.",
-                "#/settings/display",
+                "#/settings",
                 "units",
             )
         )
@@ -512,7 +512,7 @@ async def step_display_units(hass, entry, room) -> list[dict]:
             "Temperature unit",
             "carried",
             "Temperatures are shown in °F, as Home Assistant uses.",
-            "#/settings/display",
+            "#/settings",
             "units",
         )
     )
@@ -564,7 +564,7 @@ async def step_feed_calibration(hass, entry, room) -> list[dict]:
                     "needs_you",
                     f"Feed {what} probe {probe} reads raw, as before. Run the 2-point calibration "
                     "to correct it.",
-                    "#/equipment/calibration",
+                    "#/equipment/feed-calibration",
                     "feed-calibration",
                 )
             )
@@ -586,7 +586,7 @@ async def step_dosing_pumps(hass, entry, room) -> list[dict]:
                 "pH pumps",
                 "carried",
                 f"{len(ph)} pH up/down pump(s) keep their pH role.",
-                "#/dosing/pumps",
+                "#/equipment/dosing",
                 "dosing-pumps",
             )
         )
@@ -600,7 +600,7 @@ async def step_dosing_pumps(hass, entry, room) -> list[dict]:
                 "needs_you",
                 f"Pump {pump.get('name') or pump.get('id')}: pick its solution and run a pump "
                 "calibration. It still doses from its flow sensor until then.",
-                "#/dosing/pumps",
+                "#/equipment/dosing",
                 "dosing-pumps",
             )
         )
@@ -644,7 +644,7 @@ async def step_feed_ec_fallback(hass, entry, room) -> list[dict]:
             "needs_you",
             "No feed EC probe: the old 3.0 mS/cm assumption is kept so flushing works as before. Map "
             "a feed EC probe or set a recipe feed EC.",
-            "#/dosing/feed",
+            "#/equipment/dosing",
             "feed-ec-fallback",
         )
     ]
@@ -870,7 +870,7 @@ async def note_history(hass, entry, added: int) -> None:
                     "carried",
                     f"History imported: {added} earlier setting changes, stock moves, calibrations "
                     "and overlays.",
-                    "#/history",
+                    "#/history/changes",
                     "history",
                 ),
             )

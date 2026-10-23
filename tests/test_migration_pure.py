@@ -86,3 +86,34 @@ def test_every_report_anchor_is_a_section_of_the_upgrade_guide():
     )
     used = set(re.findall(r'"#/[^"]*",\s*"([a-z-]+)",?\s*\)', source))
     assert used and used <= anchors, used - anchors
+
+
+# The dashboard's pages (frontend/src/lib/routes.ts RENDERED_PAGES on feat/parity-system): an address
+# that is not one of them opens Today.
+DASHBOARD_PAGES = {
+    "all-zones", "today", "zone", "today/ai", "plan/watering", "plan/targets", "plan/timers",
+    "plan/schedule", "history/explorer", "history/water", "history/compare", "history/changes",
+    "history/grows", "history/drivers", "equipment/probes", "equipment/dosing", "equipment/stock",
+    "equipment/pump-calibration", "equipment/feed-calibration", "equipment/setup", "settings",
+    "settings/alerts", "settings/notifications", "settings/system", "settings/ai",
+    "settings/features", "help",
+}  # fmt: skip
+
+
+def test_every_report_page_is_a_dashboard_page():
+    import re
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parent.parent
+    source = (root / "custom_components" / "crop_steering" / "migration.py").read_text(
+        encoding="utf-8"
+    )
+    used = set(re.findall(r'"#/([^"?]*)"', source))
+    assert used and used <= DASHBOARD_PAGES, used - DASHBOARD_PAGES
+    routes = (root / "frontend" / "src" / "lib" / "routes.ts").read_text(
+        encoding="utf-8"
+    )
+    # Once the frontend lane's menu is merged, read the pages from it too.
+    if "RENDERED_PAGES" in routes:
+        listed = routes.split("RENDERED_PAGES = [", 1)[1].split("]", 1)[0]
+        assert used <= set(re.findall(r'"([^"]+)"', listed)), used

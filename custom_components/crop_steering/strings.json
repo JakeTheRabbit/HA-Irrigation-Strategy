@@ -864,7 +864,7 @@
         "step": {
           "confirm": {
             "title": "Upgrade report",
-            "description": "Crop Steering 3.18 is a big upgrade. Watering carries on as before. {carried} things were carried across and {needs_you} need you: open the Upgrade report in Crop Steering → Settings → System. Each line there links to the page to open and to the section of the upgrade guide (docs/UPGRADING.md) to read.\n\nCode CS-616. What it means and what to do: Crop Steering → Help & tools → Error codes.\n\nMark as read to close this card. The report stays in Settings → System."
+            "description": "Crop Steering 3.18 is a big upgrade. Watering carries on as before. {carried} things were carried across and {needs_you} need you: open the Upgrade report in Crop Steering → Settings → System status. Each line there links to the page to open and to the section of the upgrade guide (docs/UPGRADING.md) to read.\n\nCode CS-616. What it means and what to do: Crop Steering → Help & tools → Error codes.\n\nMark as read to close this card. The report stays in Settings → System status."
           }
         }
       }
