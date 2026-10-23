@@ -36,6 +36,7 @@ import {
 } from "./parity-demo/targets";
 import { resetDemoTimers } from "./parity-demo/timers";
 import { answerPresets, resetDemoPresets } from "./parity-demo/presets";
+import { answerSupply, resetDemoSupply } from "./parity-demo/supply";
 import { sameValue } from "./utils";
 
 const clone = <T>(value: T): T => structuredClone(value);
@@ -72,6 +73,7 @@ export class OperatorDemo {
     resetDemoTargetWrites();
     resetDemoTimers();
     resetDemoPresets();
+    resetDemoSupply();
     this.whatsNewSeen =
       whatsNew === "unknown"
         ? null
@@ -481,6 +483,25 @@ export class OperatorDemo {
     // Presets read and write the demo's own states; an older integration has none of them.
     if (this.backend === "3.18" && ["preset_list", "preset_save", "preset_delete", "preset_apply", "copy_config"].includes(action))
       return answerPresets(action, data, this.getStates(), (entityId, value) => this.writeNumber(entityId, value), Date.now()) as T;
+    // The supply reads the demo rooms' own zone sizing.
+    if (this.backend === "3.18" && (action === "supply_get" || action === "supply_save")) {
+      const rooms = this.setup()
+        .rooms.filter((r) => r.active)
+        .map((r) => ({
+          room_id: "room:" + r.prefix,
+          pump: String(r.hardware.pump_switch || ""),
+          zones: Object.fromEntries(
+            r.zones
+              .filter((z) => z.active)
+              .map((z) => [String(z.id), z.plant_count * (z.drippers_per_plant ?? 1) * (z.dripper_flow_rate ?? 0)]),
+          ),
+        }));
+      const now = Date.now();
+      const { answer, states } = answerSupply(action, data, rooms, this.getStates(), now);
+      if (states) this.updateStates(states);
+      const envelope = typeof answer === "object" && answer !== null && (answer as { api?: unknown }).api === 2;
+      return (envelope ? answer : demoEnvelope(answer, now)) as T;
+    }
     if (isParityAction(action)) return (await parityDemo(action, data, Date.now(), this.backend)) as T;
     // An existing service asked for v2: a 3.18 integration wraps its v1 answer in the envelope; a
     // 3.17 one answers v1, which callV2 reads as missing.

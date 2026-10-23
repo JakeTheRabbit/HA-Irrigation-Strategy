@@ -39,6 +39,8 @@ export interface ApplyReceipt {
   undoUnavailable?: boolean;
   /** Rows the apply wrote that the reviewed rows did not show: the receipt then claims nothing. */
   alsoWritten?: string[];
+  /** The page's own sentence for a failed apply, in place of the composed one. */
+  message?: string;
   summary: string;
   by?: string;
   eventIds: string[];
@@ -388,6 +390,17 @@ export function ReviewApplyView(
                 Reload
               </Button>
             ) : n ? (
+              <Button variant="outline" size="sm" onClick={props.onApply} disabled={busy}>
+                Try again
+              </Button>
+            ) : null}
+          </div>
+        );
+      if (result.message)
+        return (
+          <div role="alert" className="review-apply-error">
+            <span>{result.message}</span>
+            {n ? (
               <Button variant="outline" size="sm" onClick={props.onApply} disabled={busy}>
                 Try again
               </Button>

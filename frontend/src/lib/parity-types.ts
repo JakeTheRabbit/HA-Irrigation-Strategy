@@ -154,7 +154,22 @@ export interface SupplyDoc {
     ok: boolean;
     suggest_max_concurrent: number | null;
     pairs: CapacityPair[];
+    /** Each pump's own row (site_store.capacity_check). */
+    pumps?: PumpCheck[];
   };
+}
+export interface PumpCheck {
+  entity_id: string;
+  worst_case_lph: number;
+  max_flow_lph: number | null;
+  max_concurrent_zones: number;
+  ok: boolean;
+  suggest_max_concurrent: number | null;
+}
+/** supply_save with `preview: true`: what would change and the check of the result; nothing saved. */
+export interface SupplyPreview {
+  diff: unknown;
+  capacity_check: SupplyDoc["capacity_check"];
 }
 
 // timer_program_* / timer_skip (backend Task 14)
