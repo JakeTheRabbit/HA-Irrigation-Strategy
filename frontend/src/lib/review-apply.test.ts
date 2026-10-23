@@ -64,6 +64,13 @@ describe("review & apply", () => {
     expect(html).toContain("Controller confirmed every value · by Ben");
     expect(html).toContain("Undo: write back the previous values");
   });
+  test("a write stored outside the controller says where it was confirmed", () => {
+    const last: ApplyReceipt = { at: AT, ok: true, failed: [], summary: "Run 12 dry weight none → 38.4 kg", eventIds: [] };
+    const html = render(props({ rows: [], last, confirmation: "Run records hold the value written" }));
+    expect(html).toContain("Written and read back 14:02");
+    expect(html).toContain("Run records hold the value written");
+    expect(html).not.toContain("Controller confirmed");
+  });
   test("a mixed write: read-back rows written, unconfirmed rows named, refused rows still held", () => {
     const rows = [...ROWS, row("peak", "Peak target", "63%", "64%")];
     const rowOf = (entityId: string) => entityId.split("_").at(-1)!;

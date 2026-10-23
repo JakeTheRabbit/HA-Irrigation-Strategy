@@ -8,6 +8,7 @@ import {
   comparisonRange,
   dailyStatistics,
   downsample,
+  harvestCleared,
   harvestResult,
   midnight,
   runCallout,
@@ -401,6 +402,14 @@ describe("compare runs callouts", () => {
       notes: null,
       lab: { thc_pct: null, terpenes: {} },
     });
+  });
+
+  it("an undo is put back only when the answered harvests no longer hold the run", () => {
+    const doc = (harvests: Record<string, Harvest>) => ({ room_id: "room:", revision: 4, harvests });
+    expect(() => harvestCleared(doc({}), "r")).not.toThrow();
+    expect(() => harvestCleared(doc({ r: harvestResult(38_400) }), "r")).toThrow(
+      "The harvest result is still stored. Reload and check before trying again.",
+    );
   });
 
   it("says what a run ended with, never more than was recorded", () => {

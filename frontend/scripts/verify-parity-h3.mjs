@@ -14,7 +14,11 @@
  * - a run registered in History › Grows without a harvest shows "No harvest result recorded";
  *   Add harvest result opens the form (Dry kg), and Cancel closes it while Dry kg is empty; saving
  *   reads it back ("Written and read back HH:MM") and the card says the run's end and the dry weight,
- *   never a harvest date that was not entered; Undo takes it back out. */
+ *   never a harvest date that was not entered; Undo takes it back out, and Add harvest result again
+ *   opens a fresh form without the old receipt;
+ * - one view: the zone-level week-by-week detail is a closed disclosure under the cards, so its
+ *   charts and run pickers are not on screen until opened;
+ * - the stage strips wear neutral greys, never a run's colour. */
 import assert from "node:assert/strict";
 import { runParity } from "./parity-harness.mjs";
 
@@ -41,6 +45,13 @@ await runParity({
     assert.equal(await align.locator('option[value="flower"]').isDisabled(), true, `${label}: day of flower disabled`);
     assert.match(await compare.locator(".rc-hedge").innerText(), /assume run day 1 was flower day 1/, `${label}: stage hedge`);
     region("header");
+
+    // One view: the zone detail waits, closed, under the room-wide one.
+    const detail = page.locator('details[data-section="zone-detail"]');
+    assert.equal(await detail.getAttribute("open"), null, `${label}: zone detail closed`);
+    assert.equal(await page.locator(".rw-charts").isVisible(), false, `${label}: week charts tucked away`);
+    assert.equal(await page.getByLabel("Current run", { exact: true }).isVisible(), false, `${label}: one run picker on screen`);
+    region("zone detail disclosure");
 
     // Run cards.
     const cards = compare.locator("[data-run-card]");
@@ -71,6 +82,14 @@ await runParity({
     for (const text of texts) assert.ok(text.includes(otherName), `${label}: callout names ${otherName}: ${text}`);
     assert.equal(await compare.locator("[data-callout-box]").count(), texts.length, `${label}: a box per callout`);
     region("small multiples");
+    const runHues = await cards.locator(".rc-tick-run i").evaluateAll((all) => all.map((el) => getComputedStyle(el).backgroundColor));
+    const stageHues = await compare.locator(".rc-stages span").evaluateAll((all) => all.map((el) => getComputedStyle(el).backgroundColor));
+    assert.ok(stageHues.length >= 2, `${label}: stage strips`);
+    for (const hue of stageHues) {
+      assert.ok(!runHues.includes(hue), `${label}: stage strip ${hue} is not a run colour`);
+      const [r, g, b] = hue.match(/\d+/g).map(Number);
+      assert.ok(Math.max(r, g, b) - Math.min(r, g, b) <= 24, `${label}: stage strip ${hue} is neutral`);
+    }
     region("callouts");
 
     // Unticking the other run removes its lines and its callouts.
@@ -119,6 +138,13 @@ await runParity({
     await review.getByText(/^Previous values written back/).waitFor();
     assert.equal((await card.locator(".rc-result").innerText()).trim(), "No harvest result recorded", `${label}: undone`);
     region("harvest receipt");
+    // Adding again starts clean: no receipt from the last save or its undo.
+    await card.getByRole("button", { name: "Add harvest result", exact: true }).click();
+    await kg.waitFor();
+    const fresh = await review.innerText();
+    assert.doesNotMatch(fresh, /Written and read back|Previous values written back/, `${label}: no stale receipt`);
+    await card.getByRole("button", { name: "Cancel", exact: true }).click();
+    region("add again");
     await page.evaluate(() => scrollTo(0, 0));
   },
 });

@@ -325,12 +325,16 @@
   }
 }
 /* Compare runs, room-wide (mockup 11): run cards and four small multiples. The run colours are the
-   grow-week charts' (above), so a run reads the same in both. */
+   grow-week charts' (above), so a run reads the same in both. The stage strips are three neutral
+   greys, so a stage never reads as a run's colour. */
 .run-compare {
   --rw-run-0: #0277bd;
   --rw-run-1: #a35f00;
   --rw-run-2: #7b4fc9;
   --rw-run-3: #00796b;
+  --rc-stage-0: #b4bac1;
+  --rc-stage-1: #858d96;
+  --rc-stage-2: #565e67;
   display: grid;
   gap: 0.8rem;
   margin-bottom: 1rem;
@@ -340,6 +344,9 @@
   --rw-run-1: #f0a83c;
   --rw-run-2: #b39ddb;
   --rw-run-3: #4db6ac;
+  --rc-stage-0: #4a5058;
+  --rc-stage-1: #737b85;
+  --rc-stage-2: #a3abb4;
 }
 .rc-head {
   display: flex;

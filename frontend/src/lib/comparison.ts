@@ -1,8 +1,9 @@
 import type { ComparedRun, DailyReading, HistoryPoint, RunRecord } from "./comparison-types";
 import { formatEc, formatVolume } from "./display-units";
-import { yieldFigures, type GrowDay, type Harvest } from "./grows";
+import { yieldFigures, type GrowDay, type Harvest, type HarvestsDocument } from "./grows";
 import type { Stage } from "./stage-arc";
-import { dayLabel } from "./time";
+import { dayLabel, daysBetween } from "./time";
+export { daysBetween };
 const DAY = 86_400_000;
 const formatters = new Map<string, Intl.DateTimeFormat>();
 function formatter(zone: string) {
@@ -34,8 +35,6 @@ export function addDays(value: string, days: number): string {
   if (!validDate(value) || !Number.isInteger(days)) throw new Error("Invalid calendar date.");
   return new Date(Date.parse(value + "T00:00:00Z") + days * DAY).toISOString().slice(0, 10);
 }
-export const daysBetween = (start: string, end: string) =>
-  (Date.parse(end + "T00:00:00Z") - Date.parse(start + "T00:00:00Z")) / DAY;
 const midnightCache = new Map<string, number>();
 /** First instant of a local date: accommodates 23/25-hour days and midnight offset changes. */
 export function midnight(value: string, zone: string): number {
@@ -399,4 +398,10 @@ export function harvestResult(dryG: number): Harvest {
     notes: null,
     lab: { thc_pct: null, terpenes: {} },
   };
+}
+/** An undo of a harvest result counts only when the harvests the service answered with no longer
+ * hold that run. */
+export function harvestCleared(answer: HarvestsDocument, runId: string): void {
+  if (answer.harvests[runId] != null)
+    throw new Error("The harvest result is still stored. Reload and check before trying again.");
 }

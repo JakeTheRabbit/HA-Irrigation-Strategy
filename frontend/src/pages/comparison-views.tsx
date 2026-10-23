@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ReviewApply, type ApplyReceipt, type ReviewRow } from "@/components/review-apply";
 import type { ComparedRun, RunsDocument } from "@/lib/comparison-types";
-import { comparedRun, harvestResult, runCallout, runResult, stageWord, type CalloutMetric } from "@/lib/comparison";
+import { comparedRun, harvestCleared, harvestResult, runCallout, runResult, stageWord, type CalloutMetric } from "@/lib/comparison";
 import { formatEc, formatVolume, getDisplayUnits } from "@/lib/display-units";
 import type { GrowDaysDocument, Harvest, HarvestsDocument } from "@/lib/grows";
 import { NOMINAL_FLOWER_DAYS, stageArc, type Stage } from "@/lib/stage-arc";
@@ -426,7 +426,8 @@ const METRICS: {
 ];
 /** A run keeps its colour while others are ticked and unticked: its card's place. */
 const runColour = (index: number) => `var(--rw-run-${Math.min(index, 3)})`;
-const STAGE_COLOURS = ["#2f6fb5", "#6450b0", "#7a8aa8"];
+/** Neutral greys (comparison.css), so a stage strip never reads as a run swatch. */
+const stageColour = (index: number) => `var(--rc-stage-${index % 3})`;
 const MAX_TICKED = 3;
 function niceStep(range: number) {
   const raw = range / 4 || 1;
@@ -561,7 +562,7 @@ function RunChart({
               style={{
                 left: percent(x(s.first)),
                 width: percent(x(Math.min(s.last, maxDay)) - x(s.first)),
-                background: STAGE_COLOURS[i % 3],
+                background: stageColour(i),
               }}
             />
           ))}
@@ -581,8 +582,17 @@ function RunChart({
 /** History › Compare runs, room-wide (mockup 11): a card per run with what it ended with, up to
  * three runs ticked, and four small multiples of whole-room daily values from the room's grow-day
  * summaries, each with one callout where two runs differ past the metric's floor. A finished run
- * without a harvest result takes its dry weight here, through review and apply. */
-export function RunCompare({ controller, runs }: { controller: Controller; runs: RunsDocument | null }) {
+ * without a harvest result takes its dry weight here, through review and apply. `refresh` is the
+ * page's Refresh history count: each press reloads the grow days and harvests. */
+export function RunCompare({
+  controller,
+  runs,
+  refresh,
+}: {
+  controller: Controller;
+  runs: RunsDocument | null;
+  refresh: number;
+}) {
   const [growDays, setGrowDays] = useState<GrowDaysDocument | null>(null),
     [harvests, setHarvests] = useState<HarvestsDocument | null>(null),
     [error, setError] = useState(""),
@@ -590,7 +600,9 @@ export function RunCompare({ controller, runs }: { controller: Controller; runs:
   const [ticked, setTicked] = useState<string[] | null>(null),
     [limit, setLimit] = useState<string | null>(null);
   const [adding, setAdding] = useState<{ runId: string; kg: string } | null>(null),
-    [saved, setSaved] = useState<{ runId: string; stored: Harvest | undefined; receipt: ApplyReceipt } | null>(null);
+    [saved, setSaved] = useState<{ runId: string; stored: Harvest | undefined; receipt: ApplyReceipt } | null>(null),
+    // A new Add starts a fresh review panel: no receipt or undo outcome from the last one.
+    [session, setSession] = useState(0);
   useEffect(() => {
     let live = true;
     setError("");
@@ -607,7 +619,7 @@ export function RunCompare({ controller, runs }: { controller: Controller; runs:
     return () => {
       live = false;
     };
-  }, [controller.roomId, controller.operator, reload]);
+  }, [controller.roomId, controller.operator, reload, refresh]);
   useEffect(() => {
     setTicked(null);
     setAdding(null);
@@ -697,13 +709,13 @@ export function RunCompare({ controller, runs }: { controller: Controller; runs:
       setHarvests(now);
       throw new Error("The harvest result changed since it was saved here. Reload and check before trying again.");
     }
-    setHarvests(
-      await controller.operator<HarvestsDocument>("runs_set_harvest", {
-        run_id: runId,
-        expected_revision: now.revision,
-        harvest: null,
-      }),
-    );
+    const answer = await controller.operator<HarvestsDocument>("runs_set_harvest", {
+      run_id: runId,
+      expected_revision: now.revision,
+      harvest: null,
+    });
+    setHarvests(answer);
+    harvestCleared(answer, runId);
   }
 
   if (!doc || !cards.length) return null;
@@ -743,7 +755,15 @@ export function RunCompare({ controller, runs }: { controller: Controller; runs:
                 {harvests ? result.text : error ? "Harvest results could not load" : "Reading harvest results…"}
               </span>
               {harvests && result.missing && adding?.runId !== run.id && (
-                <Button variant="outline" size="sm" onClick={() => setAdding({ runId: run.id, kg: "" })}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setAdding({ runId: run.id, kg: "" });
+                    setSaved(null);
+                    setSession((n) => n + 1);
+                  }}
+                >
                   Add harvest result
                 </Button>
               )}
@@ -775,6 +795,7 @@ export function RunCompare({ controller, runs }: { controller: Controller; runs:
       )}
       {(addingRun || saved) && (
         <ReviewApply
+          key={session}
           layout="panel"
           rows={rows}
           applyLabel={addingRun ? `Save to ${addingRun.name}` : undefined}
@@ -785,6 +806,7 @@ export function RunCompare({ controller, runs }: { controller: Controller; runs:
           onReload={() => setReload((n) => n + 1)}
           timeZone={controller.timeZone}
           undo={undoHarvest}
+          confirmation="Run records hold the value written"
         />
       )}
       {error && (
@@ -808,7 +830,7 @@ export function RunCompare({ controller, runs }: { controller: Controller; runs:
       <div className="rc-legend">
         {stages.map((s, i) => (
           <span key={s.name}>
-            <i aria-hidden="true" style={{ background: STAGE_COLOURS[i % 3] }} />
+            <i aria-hidden="true" style={{ background: stageColour(i) }} />
             {capital(stageWord(s.name))} · days {s.first}–{s.last}
           </span>
         ))}
