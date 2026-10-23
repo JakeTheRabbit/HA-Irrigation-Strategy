@@ -186,6 +186,8 @@ visible.
 
 ## History › Changes
 
+![History › Changes: every setting change, who made it and when](../screens/history-changes-desktop-light.png)
+
 This page answers who changed what, when, from what to what, why, and how it worked out. Open it from
 **History › Changes** (`#/history/changes`).
 
@@ -362,6 +364,8 @@ For Undos that do use the Journal:
   expires by itself 15 minutes after the shot's time. Change an alert rule back by editing it.
 
 ## Irrigation › Timeline
+
+![Irrigation › Timeline on a phone, dark theme: done, failed and planned shots per zone](../screens/irrigation-timeline-phone-dark.png)
 
 `#/plan/watering`. This page shows, for every room at once, what each zone did and what it is planned
 to do. Each room has a header row, then one row per zone.

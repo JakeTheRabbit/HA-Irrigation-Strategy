@@ -21,6 +21,8 @@ controller's holds stop watering exactly as before. An alert rule adds a message
 
 ## Alert rules
 
+![Settings › Alert rules: a new rule replayed over yesterday, and the room's rules with when each last fired](../screens/alert-rules-desktop-light.png)
+
 Find them under **Settings › Alert rules**. This is the default page of the Settings section.
 
 ### What a rule is
@@ -210,6 +212,8 @@ data:
 ---
 
 ## Quiet hours
+
+![Settings › Notifications: which alerts each phone gets, quiet hours and room mutes](../screens/notifications-desktop-light.png)
 
 Each phone (a notification recipient) can have quiet hours, `{from: "HH:MM", to: "HH:MM"}`. They use
 Home Assistant's time zone. They may cross midnight (`22:00` to `06:00`). The start time is

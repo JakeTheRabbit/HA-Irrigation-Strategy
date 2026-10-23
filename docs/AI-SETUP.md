@@ -337,6 +337,8 @@ them on.
 
 ## 8. Check its work
 
+![Settings › AI assistant: the judges and what each may do, today's budget, what it did, and its instructions and room notes](screens/ai-assistant-desktop-light.png)
+
 - **Changes list.** `get_changes` with the room and a `since` time lists who changed what, newest first.
   Your own check is the same list in the dashboard: **History › Changes**. Timer, alert rule, preset,
   copy, probe offset and supply saves are sent with `client: "mcp"` and recorded with actor `mcp`. Setup

@@ -97,6 +97,8 @@ a time it still waters, and CS-214 warns about it.
 
 ## Setting up a supply
 
+![Equipment › Setup: pumps & valves, with the pump supply](../screens/setup-pumps-valves-desktop-light.png)
+
 1. In each room's setup, map the pump (`pump_switch`) and set each zone's plant count, drippers per
    plant and dripper flow. Until the pump is mapped the editor says "This room has no pump mapped. Map Room pump
    under Rooms & mappings below."
@@ -232,6 +234,8 @@ dripper flow, or spread the room's shots so fewer zones fire in one pass. See
 [CS-214](../ERROR_CODES.md#cs-214).
 
 ## Flow meters and flow checks (CS-318, CS-319)
+
+![History › Water & flow: metered against asked per zone, the leak check, water per plant and litres by zone](../screens/water-and-flow-desktop-light.png)
 
 The flow checks run only for zones that have a meter in the supply: the zone's own `zone_meters` entry,
 else its pump's `flow_meter`. Without a meter nothing is checked and nothing is published.

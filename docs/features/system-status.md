@@ -17,6 +17,8 @@ Acknowledge button on an alert writes anything, and that write is read back.
 
 ## What the page shows
 
+![Settings › System status: health line, Upgrade report, software, heartbeat and every mapped device](../screens/system-status-desktop-light.png)
+
 ### Health line
 
 A ring with the site's percent online and one sentence, for example:

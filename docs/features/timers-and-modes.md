@@ -20,6 +20,8 @@ timeline. Every program save is checked, previewed, read back and written to the
 
 ## Irrigation modes (Watering by)
 
+![Irrigation › Timer programs: the programs, each zone's irrigation mode and the next 24 hours](../screens/timer-programs-desktop-light.png)
+
 Each zone has one select:
 
 `select.crop_steering_<prefix>zone_<n>_irrigation_mode`, named **Zone N Watering by**, with options

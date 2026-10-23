@@ -82,11 +82,17 @@ never imported without you. Export them as a backup from **Irrigation › Grow p
 
 ### Reading the report
 
-The report is in two places:
+![The Upgrade report for a room on Settings › System status: Needs you on the left, Carried across on the right](screens/upgrade-report-desktop-light.png)
+
+The report is in three places:
 
 - **HA Settings › Repairs**: one card per room, "Crop Steering 3.18: Upgrade report (CS-616)". It is
   raised only when the room has at least one Needs you row. Its fix flow, **Mark as read**, closes it for
   good.
+- **The dashboard**: **Settings › System status** shows each room's report above the Software panel,
+  Needs you beside Carried across, each line with a link to its page and to its section of
+  [UPGRADING.md](UPGRADING.md) (picture above). It reads the same service, so it stays there after you
+  mark the Repairs card as read.
 - **The service** `crop_steering.migration_report`. In HA, open **Developer tools › Actions**, pick
   *Crop Steering: Read the upgrade report*, set `room_id` and run it with the response shown:
 
@@ -100,11 +106,6 @@ It answers `{schema_version, release, room_id, acknowledged, carried: [...], nee
 `release` is `"3.18.0"` and `acknowledged` is when the report was marked as read (or `null`). Each row has `id`, `title`, `status`, `detail`, a
 dashboard `page` and a `doc` link into [UPGRADING.md](UPGRADING.md). It changes nothing and needs no
 administrator. You can hand it, with UPGRADING.md, to an AI assistant to work through one row at a time.
-
-The dashboard's **Settings › System status** page does not show the report in this build; use Repairs or
-the service. The Repairs card's own text says the opposite ("open the Upgrade report in Crop Steering →
-Settings → System status" and "The report stays in Settings → System status"). That text is wrong for
-this build: once you mark the card as read, the report is only in the service.
 
 <a id="calibration-pages"></a>
 ### Calibration pages

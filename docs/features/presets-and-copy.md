@@ -166,6 +166,10 @@ as before.
 
 ## On the dashboard
 
+![Irrigation › Grow plan & presets, with the Presets panel on the right](../screens/grow-plan-presets-desktop-light.png)
+
+![The Presets panel: saved presets, save the current plan, copy to another room](../screens/presets-desktop-light.png)
+
 The **Presets** panel sits beside the grow planner in **Irrigation › Grow plan & presets**
 (`#/plan/schedule`).
 

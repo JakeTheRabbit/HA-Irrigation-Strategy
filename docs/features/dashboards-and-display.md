@@ -24,6 +24,8 @@ Nothing on this page waters, opens a valve or changes a setpoint. Units, clock, 
 
 ### Phone (720 px and narrower)
 
+![Status › All rooms on a 390 px phone in the dark theme, the five sections in the bottom bar](../screens/status-all-rooms-phone-dark.png)
+
 - The sidebar is hidden. The **menu button** at the top left opens the same room tree as a sheet.
 - A **bottom bar** holds the five sections, within reach of your thumb. Each opens its first page: Status › All rooms, Irrigation › Timeline, History › Explorer, Equipment › Probes & offsets and Settings › Alert rules. A number on Irrigation counts the unsaved target drafts.
 - **Page tabs.** In a section with more than one page, a row of tabs above the page lists that section's pages. Wider screens hide this row because the sidebar shows the same pages.
@@ -39,6 +41,12 @@ Each page's address is shown after its name. `?zone=N` keeps a zone in focus on 
 
 ### Status
 
+![Status › All rooms: every room and zone on one page](../screens/status-all-rooms-desktop-light.png)
+
+![Status for one room](../screens/status-room-desktop-light.png)
+
+![A zone's page](../screens/zone-desktop-light.png)
+
 | Page | Address | What it shows |
 |---|---|---|
 | All rooms | `#/all-zones` | The whole facility: each room's run, water today, climate, feed and stock tanks, then a card per zone with its phase, automation state, VWC, dryback, pore EC, root temperature and sensor readings. Problems are flagged where they happen. Tap a zone to open it. |
@@ -47,6 +55,8 @@ Each page's address is shown after its name. `?zone=N` keeps a zone in focus on 
 | AI assistant | `#/today/ai` | The assistant's state, today's budget, its last decision, what it may do, its recent decisions, and its instructions with rebuild and rollback. Open it from the AI chip in the top bar. |
 
 ### Irrigation
+
+![Irrigation › Current day: the targets and the combined VWC/EC plan graph](../screens/irrigation-current-day-desktop-light.png)
 
 | Page | Address | What it shows |
 |---|---|---|
@@ -67,6 +77,8 @@ Each page's address is shown after its name. `?zone=N` keeps a zone in focus on 
 | Dryback drivers | `#/history/drivers` | For the last 14 nights, each zone's lights-off to lights-on dryback rate against the room's climate. Nights with a shot are left out. It shows how the two go together, not what caused what. There is no menu entry and nothing links to it: type `#/history/drivers` in the address. The page stays empty until `show_dryback_drivers` is turned on under Settings › Dashboards & display › More display options › Display. |
 
 ### Equipment
+
+![Equipment › Feed & dosing: each dosing pump with its solution, stock and doses](../screens/feed-dosing-desktop-light.png)
 
 | Page | Address | What it shows |
 |---|---|---|
@@ -90,6 +102,8 @@ Each page's address is shown after its name. `?zone=N` keeps a zone in focus on 
 | Capabilities | `#/settings/features` | A read-only, searchable list of every capability and setting with its current value. Each item links to the one page where you change it. There is no menu entry. Open it from System status. |
 
 ## Settings › Dashboards & display
+
+![Settings › Dashboards & display](../screens/dashboards-display-desktop-light.png)
 
 From top to bottom, the page holds:
 

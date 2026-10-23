@@ -138,6 +138,8 @@ A successful write is journaled as `config.changed`, with `store: calibration` a
 
 ## Feed pH/EC 2-point calibration
 
+![Equipment › Feed pH/EC calibration: the guided 2-point calibration at the tank](../screens/feed-calibration-desktop-light.png)
+
 ### What it does
 
 The wizard watches the room's raw feed pH or EC probe while it stands in two reference solutions.
@@ -270,6 +272,8 @@ check), `calibration.committed` (with `applied` and `superseded_record_id`) and
 ---
 
 ## Dosing pump prime and calibrate
+
+![Equipment › Prime & calibrate a pump: prime the line, run a timed dose and enter what came out](../screens/pump-calibration-desktop-light.png)
 
 ### What it does
 
