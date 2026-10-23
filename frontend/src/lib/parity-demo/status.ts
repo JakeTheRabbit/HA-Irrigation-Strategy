@@ -1,3 +1,4 @@
+import { DISPLAY_DEFAULTS, UNIT_KEYS } from "../display";
 import type { States } from "../types";
 import { demoId, demoJournal, demoLightsOn, demoZonePause } from "./journal";
 
@@ -107,6 +108,13 @@ export function demoParityStatus(states: States, now: number): States {
     out[switchId] = { ...out[switchId], last_changed: new Date(pause.at).toISOString() };
   // The Journal's shot size (1.21 L commanded); 0.96 L arrived.
   put("sensor.crop_steering_zone_2_flow_ratio", 0.79, { commanded_l: 1.21, metered_l: 0.96, shot_id: demoId(now - 600_000, "room::shot:2") });
+  // A 3.18 room's display store keeps the units and clock too, at their defaults.
+  for (const [id, entity] of Object.entries(out))
+    if (/^sensor\.crop_steering_[a-z0-9_]*display$/.test(id))
+      out[id] = {
+        ...entity,
+        attributes: { ...Object.fromEntries(UNIT_KEYS.map((key) => [key, DISPLAY_DEFAULTS[key]])), ...entity.attributes },
+      };
   return out;
 }
 

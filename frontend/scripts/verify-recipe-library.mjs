@@ -261,6 +261,8 @@ try {
       await page.evaluate(() => {
         window.location.hash = "#/settings";
       });
+      // Reset demo session sits under "More display options" (Task 29).
+      await page.locator("details.more-display summary").click();
       await page.getByRole("button", { name: "Reset demo session…", exact: true }).click();
       await page.getByRole("button", { name: "Keep exploring", exact: true }).click();
       assert.equal(await page.getByRole("dialog").count(), 0);

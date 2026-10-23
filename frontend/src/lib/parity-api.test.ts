@@ -102,6 +102,7 @@ const ASKED: Partial<Record<string, Record<string, unknown>>> = {
   alert_rule_delete: { expected_revision: 4, id: "01JDEMRULE0000000000000002" },
   alert_rule_test: { rule: TANK_RULE },
   alert_rule_preview: { rule: TANK_RULE },
+  dashboard_create: { template: "facility_wall", rooms: ["room:"] },
 };
 test("demo 3.18 answers every parity action ok", async () => {
   for (const a of PARITY_ACTIONS) expect([a, (await callV2(demoController("?demo=1"), a, ASKED[a] ?? {})).kind]).toEqual([a, "ok"]);
@@ -214,4 +215,15 @@ test("NeedsIntegration says which version and keeps the page working", () => {
   const compact = renderToStaticMarkup(createElement(NeedsIntegration, { feature: "Timer programs", compact: true }));
   expect(compact).toContain("Needs integration 3.18");
   expect(compact).toContain('aria-label="About Needs integration 3.18"');
+});
+test("demo dashboard_create lists the dashboard it made; a room tablet takes one room", async () => {
+  const c = demoController("?demo=1");
+  const made = await callV2<{ url_path: string }>(c, "dashboard_create", { template: "room_tablet", rooms: ["room:"] });
+  if (made.kind !== "ok") throw new Error("not ok");
+  expect(made.data.url_path).toMatch(/^crop-steering-room_tablet-\d+$/);
+  const list = await callV2<{ dashboards: { url_path: string; exists: boolean }[] }>(c, "dashboard_list", {});
+  if (list.kind !== "ok") throw new Error("not ok");
+  expect(list.data.dashboards).toContainEqual(expect.objectContaining({ url_path: made.data.url_path, exists: true }));
+  const two = await callV2(c, "dashboard_create", { template: "room_tablet", rooms: ["room:", "room:room_b_"] });
+  expect(two.kind === "error" && two.code).toBe("invalid");
 });

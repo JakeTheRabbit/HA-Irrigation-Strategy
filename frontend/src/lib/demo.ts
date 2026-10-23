@@ -14,7 +14,7 @@ import { dateForDay, localDate } from "./grow-plan";
 import { numeric } from "./model";
 import { demoStock, stockAttributes, stockLinks } from "./stock-demo";
 import { TANK_KEYS } from "./tank-level";
-import { DISPLAY_DEFAULTS } from "./display";
+import { DISPLAY_DEFAULTS, UNIT_KEYS } from "./display";
 
 /** The demo room camera's still image: a plain frame, no photo. */
 const DEMO_CAMERA =
@@ -169,7 +169,11 @@ export function createDemo(now = Date.now()): States {
       options: ["Zone total", "Per plant"],
     });
     // What the dashboard shows in the room (Settings → Display): every option off until turned on.
-    put(`sensor.crop_steering_${prefix}display`, 0, { ...DISPLAY_DEFAULTS });
+    // The units and clock are 3.18 options: demoParityStatus adds them, an older integration has none.
+    const panels = Object.fromEntries(
+      Object.entries(DISPLAY_DEFAULTS).filter(([key]) => !(UNIT_KEYS as readonly string[]).includes(key)),
+    );
+    put(`sensor.crop_steering_${prefix}display`, 0, panels);
     put(`sensor.crop_steering_${prefix}ai_heartbeat`, "online", {
       enable_flag: enable,
       last_beat: new Date(now - 18_000).toISOString(),

@@ -24,7 +24,7 @@ import type { Overlay } from "./overlays";
 import { DEMO_WHATS_NEW } from "./whats-new-demo";
 import { compareVersions } from "./whats-new";
 import { InstructionsDemo } from "./brain-instructions";
-import { DISPLAY_DEFAULTS, displayEntityId, readDisplay, type DisplayOptions } from "./display";
+import { DISPLAY_DEFAULTS, displayEntityId, readDisplay, validDisplayValue, type DisplayOptions } from "./display";
 import type { DemoBackend } from "./demo";
 import { isParityAction } from "./parity-api";
 import { demoEnvelope, parityDemo } from "./parity-demo";
@@ -436,16 +436,17 @@ export class OperatorDemo {
       throw new Error("Display options changed elsewhere. Reload before saving.");
     const changes = (data.options ?? {}) as Record<string, unknown>;
     for (const [key, value] of Object.entries(changes)) {
-      if (!(key in DISPLAY_DEFAULTS)) throw new Error(`Unknown display option: ${key}`);
-      const choice = key === "today_zone_layout";
-      if (choice ? value !== "cards" && value !== "table" : typeof value !== "boolean")
-        throw new Error(`${key}: invalid value`);
+      // An option the room's sensor does not carry is one this integration does not know (the
+      // units before 3.18).
+      if (!(key in DISPLAY_DEFAULTS) || !(key in states[id].attributes))
+        throw new Error(`Unknown display option: ${key}`);
+      if (!validDisplayValue(key as keyof DisplayOptions, value)) throw new Error(`${key}: invalid value`);
     }
     const options = { ...current.options, ...changes } as DisplayOptions;
     const revision = current.revision + 1;
     this.updateStates({
       ...states,
-      [id]: { ...states[id], state: String(revision), attributes: { ...options } },
+      [id]: { ...states[id], state: String(revision), attributes: { ...states[id].attributes, ...changes } },
     });
     return response(revision, options);
   }

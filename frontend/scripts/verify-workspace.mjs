@@ -1643,6 +1643,8 @@ try {
               .trim() === "#fafafa",
         );
         await navigate("Settings", frame);
+        // Appearance sits under "More display options", closed until opened (Task 29).
+        await frame.locator("details.more-display > summary").click();
         await frame.getByRole("button", { name: "Light", exact: true }).click();
         await frame.waitForFunction(
           () => document.documentElement.dataset.themeSource === "override",

@@ -86,6 +86,13 @@ async function go(route, room = "f2") {
   await page.goto(`${base}/dashboard.html?demo&room=${room}#/${route}`, {
     waitUntil: "networkidle",
   });
+  if (route === "settings") await openMoreDisplay();
+}
+/** Dashboards & display keeps the connection, appearance and display options under "More display
+ * options", closed until opened (Task 29). */
+async function openMoreDisplay() {
+  const more = page.locator("details.more-display");
+  if ((await more.count()) && !(await more.evaluate((d) => d.open))) await more.locator("summary").click();
 }
 /** Opens a page from the tree menu: its section opened first if it is closed. */
 async function openFromMenu(menu, section, label) {
@@ -204,7 +211,7 @@ try {
     await page.goto(`${base}/dashboard.html?demo&room=f2`, { waitUntil: "networkidle" });
     await expectVisible(page.getByRole("heading", { name: "All rooms", exact: true, level: 1 }));
     await go("settings");
-    const landing = page.getByLabel("Landing page", { exact: true });
+    const landing = page.getByLabel("On this browser", { exact: true });
     assert.equal(await landing.inputValue(), "all-zones");
     await landing.selectOption("plan/schedule");
     await page.reload({ waitUntil: "networkidle" });
@@ -280,7 +287,7 @@ try {
     ["equipment/pump-calibration", "Pump calibration"],
     ["equipment/feed-calibration", "Feed pH/EC calibration"],
     ["equipment/setup", "Rooms and setup"],
-    ["settings", "Settings"],
+    ["settings", "Dashboards & display"],
     ["settings/alerts", "Alert rules"],
     ["settings/features", "Capabilities"],
     ["settings/notifications", "Notifications"],
@@ -2000,6 +2007,7 @@ try {
     await expectVisible(water);
     assert.match(await water.innerText(), /^Water today\s+\d+ mL\/plant\s+[\d.]+ L in the zone/);
     await page.evaluate(() => (location.hash = "#/settings"));
+    await openMoreDisplay();
     await choice.getByRole("button", { name: "Zone total", exact: true }).click();
   });
   await check(
@@ -2529,6 +2537,8 @@ try {
       path: path.join(out, "dashboard-dark.png"),
       fullPage: true,
     });
+    // The reload closed More display options again.
+    await openMoreDisplay();
     await page.getByRole("button", { name: "Light", exact: true }).click();
   });
   await check("keyboard skip retains page and browser history works", async () => {
