@@ -6290,7 +6290,9 @@ class Controller:
                 if self.__dict__.get("_flow_late", {}).pop(meter, None):  # a dict, no Home Assistant call (R5)
                     log(f"[{room.slug}] flow meter {meter}: the last shot through it is not reconciled, the meter "
                         "did not report before this one")
-                meter_before = self._meter_litres(meter, METER_READ_TIMEOUT_S)
+                # this pass's reading, or the last shot's after it (_meter_fresh): never a read that waits (R5);
+                # with neither, no baseline and no flow check for this shot
+                meter_before = self.__dict__.get("_meter_fresh", {}).get(meter)
             # WRITE-AHEAD: what this shot is about to open, and when, saved BEFORE anything opens. If the
             # controller dies, is killed or loses Home Assistant mid-shot, the next loop closes exactly what
             # this shot opened, from this record, and nothing else (see _reconcile_room_inflight).
@@ -6424,12 +6426,23 @@ class Controller:
                 if after is not None and after >= meter_before:
                     if reported is None or reported >= closing_at:
                         journaled["metered_l"] = after - meter_before
+                        journaled.setdefault("meters_after", {})[meter] = after  # next baseline (_meters_fresh_after)
                     else:  # not reported since the close: judged once it has (_flow_late_check), never on part of it
                         journaled["meter_late"] = (meter, meter_before, closing_at)
                     # CS-319 moves past this shot's water, not past what leaked before it: what the meter saw, or
                     # what the shot counted when the meter has yet to report all of it (_meters_rebase)
                     journaled["meter_moved"] = (meter, max(after - meter_before, nominal_l * min(
                         1.0, elapsed / duration_s if duration_s > 0 else 1.0)))
+            if meter and not aborted and "close" not in journaled:
+                # the room's other meters after the close (a pump's, through which this water ran too): the next
+                # shot's baselines, when read in full since the close or unmoved since this pass's reading
+                fresh = self.__dict__.get("_meter_fresh", {})
+                for other, _zone in self._room_meters(room):
+                    if other != meter:
+                        litres, reported = self._meter_reading(other, METER_READ_TIMEOUT_S)
+                        if litres is not None and (reported is None or reported >= closing_at
+                                                   or litres == fresh.get(other)):
+                            journaled.setdefault("meters_after", {})[other] = litres
             if aborted:
                 stopped_early(aborted, elapsed)
         except _ShotStopped as stopped:
@@ -6515,6 +6528,7 @@ class Controller:
                 self._shot_room = None
                 if commanded:  # this shot's water is no leak (_watch_meters)
                     self._meters_rebase(room, journaled.get("meter_moved"))
+                    self._meters_fresh_after(room, journaled.get("meters_after"))
                 if journaled["intent_id"] is not None:  # its end, after its water is counted (#197)
                     self._journal_shot_end(room, zone, journaled, valve_started)
 
@@ -6733,6 +6747,19 @@ class Controller:
         except Exception as e:
             log("flow meter error", room.slug, e)
 
+    def _meters_fresh_after(self, room, after=None):
+        """A shot of this room ran: every meter of the room loses this pass's reading (its water may have moved
+        it), but those the shot read in full after its close (`after`: {entity: litres}), which are the next
+        shot's baselines. No Home Assistant call."""
+        fresh = self.__dict__.get("_meter_fresh")
+        try:
+            for entity, _zone in self._room_meters(room) if fresh else ():
+                fresh.pop(entity, None)
+            if fresh is not None:
+                fresh.update(after or {})
+        except Exception as e:
+            log("flow meter error", room.slug, e)
+
     # ---------- CS-319: water through a meter with no shot in flight (alert only) ----------
     def _watch_meters(self):
         """Once a pass, before any room waters: each flow meter of the supply is read. Its baseline moves past each
@@ -6742,6 +6769,7 @@ class Controller:
         that falls (a reset) starts again. A meter, or a zone's meter, no longer in the supply takes its CS-319, or
         the zone's CS-318, down. Only tells."""
         watch = self.__dict__.setdefault("_meter_watch", {})
+        fresh = self._meter_fresh = {}  # meter -> litres read this pass: each shot's baseline (_execute_shot)
         listed = {}  # meter -> [(room, zone)] of every room that reads it; none with no supply
         for room in self.rooms:
             for entity, zone in self._room_meters(room):
@@ -6762,6 +6790,7 @@ class Controller:
             litres = self._meter_litres(entity, METER_READ_TIMEOUT_S)
             if litres is None:
                 continue
+            fresh[entity] = litres
             st = watch.get(entity)
             if st is None or litres < st["last"]:
                 watch[entity] = {"base": litres, "last": litres}

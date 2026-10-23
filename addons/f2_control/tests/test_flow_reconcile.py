@@ -388,3 +388,46 @@ def test_a_later_shot_through_the_meter_drops_the_unjudged_one(rig, fire, monkey
     _pass(c)
     assert [e["correlation"]["intent_id"] for e in _events(c, "flow.reconciled")] == [
         _events(c, "shot.completed")[1]["correlation"]["intent_id"]]
+
+
+# --------------------------------------------------------------------------------------- the baseline (R5)
+def test_no_meter_is_read_between_the_pass_reading_and_the_valves_close(rig, fire, monkeypatch):
+    """The baseline is this pass's _watch_meters reading, or the shot before's after-reading: nothing waits on Home
+    Assistant before a pump opens. Zone 2 shares the pump's meter with zone 1, so its baseline is zone 1's
+    after-reading, not the pass's (which zone 1's water has moved)."""
+    c, fake = rig
+    fake.set_state(PUMP_METER, "100.0", {"unit_of_measurement": "L"})
+    _supply(fake, pump_meter=PUMP_METER)
+    _meters_flow(c, fake, monkeypatch, {V1: [PUMP_METER], V2: [PUMP_METER]}, 0.5)
+    order = []
+    real_get, real_call, real_watch = controller.ha_get, controller.ha_call, c._watch_meters
+    monkeypatch.setattr(controller, "ha_get", lambda e, timeout=8: (order.append(("get", e)), real_get(e, timeout))[1])
+    monkeypatch.setattr(controller, "ha_call", lambda d, s, **k: (order.append((s, k.get("entity_id"))),
+                                                                  real_call(d, s, **k))[1])
+    monkeypatch.setattr(c, "_watch_meters", lambda: (real_watch(), order.append(("watched", None)))[0])
+    _pass(c)
+    watched = order.index(("watched", None))
+    reads = [i for i, step in enumerate(order) if step == ("get", PUMP_METER) and i > watched]
+    closes = [order.index(("turn_off", V1)), order.index(("turn_off", V2))]
+    assert len(reads) == 2 and all(r > close for r, close in zip(reads, closes))  # each shot's after-read only
+    by_zone = {e["zone"]: e for e in _events(c, "flow.reconciled")}
+    assert by_zone[1]["data"]["ratio"] == pytest.approx(0.5) and by_zone[2]["data"]["ratio"] == pytest.approx(0.5)
+
+
+def test_with_no_reading_this_pass_the_shot_records_no_baseline(rig, fire, monkeypatch):
+    c, fake = rig
+    fire.discard(2)
+    fake.set_state(METER, "unavailable", {"unit_of_measurement": "L"})  # _watch_meters reads nothing
+    _supply(fake, zone_meters={"1": METER})
+    real_watch = c._watch_meters
+
+    def watch():  # it reads again once the pass's reading is taken
+        real_watch()
+        fake.set_state(METER, "100.0", {"unit_of_measurement": "L"})
+
+    monkeypatch.setattr(c, "_watch_meters", watch)
+    _meters_flow(c, fake, monkeypatch, {V1: [METER]}, 1.0)
+    _pass(c)
+    done, = _events(c, "shot.completed")
+    assert done["outcome"] == "ok" and done["data"]["metered_l"] is None
+    assert _events(c, "flow.reconciled") == []
