@@ -10,3 +10,272 @@
 .settings-zones h3 {
   font-size: var(--text-sm);
 }
+
+/* Dashboards & display (mockup 23): units and where the app opens side by side, the wall and
+ * tablet dashboards under them, everything else in "More display options". */
+.display-top {
+  display: grid;
+  grid-template-columns: minmax(0, 2.3fr) minmax(0, 1fr);
+  gap: 20px;
+  align-items: stretch;
+}
+.display-units,
+.where-opens {
+  padding: 20px 24px;
+  min-width: 0;
+}
+.unit-settings {
+  display: grid;
+  gap: 0;
+}
+.unit-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+.unit-head h2,
+.where-opens h2,
+.wall-head h2 {
+  margin: 0;
+  font-size: var(--text-lg);
+}
+.unit-head p,
+.wall-head p {
+  margin: 0;
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+}
+.unit-row {
+  display: grid;
+  grid-template-columns: 140px auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px 20px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+.unit-label {
+  font-weight: 600;
+}
+.unit-choice {
+  display: inline-flex;
+  padding: 3px;
+  gap: 2px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+.unit-choice button {
+  min-width: 84px;
+  min-height: 40px;
+  padding: 6px 14px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--foreground);
+  font-weight: 600;
+}
+.unit-choice button.chosen {
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+.unit-choice button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+.unit-example {
+  color: var(--muted-foreground);
+  min-width: 0;
+}
+.unit-result {
+  grid-column: 2 / -1;
+  margin: 0;
+}
+.unit-undo {
+  border: 0;
+  background: none;
+  padding: 0 0 0 6px;
+  color: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+}
+.unit-foot {
+  margin: 12px 0 0;
+}
+.where-opens {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+}
+.where-opens select {
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--foreground);
+  font-weight: 600;
+}
+.where-opens-foot {
+  margin: 12px 0 0;
+}
+.wall-dashboards {
+  display: grid;
+  gap: 14px;
+  margin-top: 24px;
+}
+.wall-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 14px;
+}
+.wall-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 20px;
+}
+.wall-card {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  padding: 18px;
+  min-width: 0;
+}
+.wall-card h3 {
+  margin: 0;
+  font-size: var(--text-lg);
+}
+.wall-card-copy {
+  margin: 0;
+  color: var(--muted-foreground);
+}
+.wall-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.wall-rooms {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.wall-rooms button {
+  min-height: 40px;
+  min-width: 52px;
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--foreground);
+  font-weight: 600;
+}
+.wall-rooms button.chosen {
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 18%, transparent);
+}
+.wall-created {
+  flex-wrap: wrap;
+  margin: 0;
+}
+.wall-created a {
+  color: var(--primary);
+  font-weight: 600;
+}
+/* The drawing of a template: slabs, gauges or a tank, in the card's own colours. */
+.wall-sketch {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+  justify-content: center;
+  height: 120px;
+  padding: 14px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--foreground) 6%, var(--surface));
+}
+.sketch-room {
+  display: flex;
+  gap: 4px;
+  align-items: flex-end;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.sketch-slab {
+  width: 16px;
+  height: 56px;
+  border-radius: 3px;
+  background: linear-gradient(to top, color-mix(in srgb, var(--primary) 70%, transparent) 60%, var(--muted) 60%);
+}
+.sketch-gauge {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  border: 7px solid var(--muted);
+  border-top-color: var(--primary);
+  border-right-color: var(--primary);
+  align-self: center;
+}
+.sketch-tank {
+  width: 52px;
+  height: 92px;
+  border-radius: 6px;
+  background: linear-gradient(to top, color-mix(in srgb, var(--primary) 70%, transparent) 68%, var(--muted) 68%);
+}
+.keep-awake {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 20px;
+  min-height: 44px;
+}
+.keep-awake input {
+  width: 20px;
+  height: 20px;
+}
+.more-display {
+  margin-top: 20px;
+}
+.more-display > summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: var(--text-md);
+}
+.more-display[open] > summary {
+  margin-bottom: 12px;
+}
+
+@media (max-width: 1100px) {
+  .display-top {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 720px) {
+  .display-units,
+  .where-opens {
+    padding: 16px;
+  }
+  .unit-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+  .unit-result {
+    grid-column: auto;
+  }
+  .unit-choice {
+    display: flex;
+  }
+  .unit-choice button {
+    flex: 1;
+    min-width: 0;
+    padding: 6px 8px;
+  }
+}

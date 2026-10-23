@@ -267,7 +267,22 @@ const DEFAULTS: Record<Exclude<ParityAction, StatefulAction>, (data: Record<stri
     return { preview, shots: preview.length, total_s: preview.length * 120 };
   },
   timer_skip: (d) => ({ skip: { zone: d.zone ?? null, at: d.at ?? null, until: typeof d.at === "string" ? iso(Date.parse(d.at) + 15 * 60_000) : null }, revision: 2 }),
-  dashboard_create: (d) => ({ url_path: `crop-steering-${String(d.template ?? "facility_wall")}-1`, title: d.title ?? "Crop Steering" }),
+  dashboard_create: (d, now) => {
+    // As the integration does: crop-steering-<template>-<n>, n the lowest free; listed from then on.
+    const template = String(d.template ?? "facility_wall");
+    const info = DASHBOARDS.templates.find((t) => t.id === template);
+    if (!info) return { api: 2, ok: false, error: { code: "invalid", message: `Unknown dashboard template '${template}'` } };
+    const rooms = Array.isArray(d.rooms) ? d.rooms.map(String) : [];
+    if (!rooms.length) return { api: 2, ok: false, error: { code: "invalid", message: "Choose at least one room" } };
+    if (template === "room_tablet" && rooms.length !== 1)
+      return { api: 2, ok: false, error: { code: "invalid", message: "room_tablet shows one room: choose exactly one" } };
+    let n = 1;
+    while (DASHBOARDS.dashboards.some((x) => x.url_path === `crop-steering-${template}-${n}`)) n += 1;
+    const url_path = `crop-steering-${template}-${n}`;
+    const title = typeof d.title === "string" && d.title.trim() ? d.title.trim() : info.name;
+    DASHBOARDS.dashboards.push({ url_path, title, template, rooms, created_at: iso(now), exists: true });
+    return { url_path, title };
+  },
   dashboard_list: () => structuredClone(DASHBOARDS),
   system_status_get: (_d, now) => status(now),
 };

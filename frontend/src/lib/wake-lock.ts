@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 
 /** Whether this browser can keep the screen on. */
 export function wakeLockSupported(nav: Navigator | undefined): boolean {
@@ -52,4 +52,39 @@ export function useWakeLock(active: boolean): { supported: boolean } {
     };
   }, [active, supported]);
   return { supported };
+}
+
+/** "Keep this screen on while open" (Settings), kept in this browser. */
+export const KEEP_AWAKE_KEY = "crop-steering.keep-awake";
+let keepAwake: boolean | null = null;
+const keepAwakeListeners = new Set<() => void>();
+function readKeepAwake(): boolean {
+  if (keepAwake === null)
+    try {
+      keepAwake = localStorage.getItem(KEEP_AWAKE_KEY) === "on";
+    } catch {
+      keepAwake = false;
+    }
+  return keepAwake;
+}
+/** The browser's choice and its setter; every user of the hook follows a change. */
+export function useKeepAwake(): [boolean, (on: boolean) => void] {
+  const value = useSyncExternalStore(
+    (listener) => {
+      keepAwakeListeners.add(listener);
+      return () => keepAwakeListeners.delete(listener);
+    },
+    readKeepAwake,
+    () => false,
+  );
+  const set = (on: boolean) => {
+    keepAwake = on;
+    try {
+      localStorage.setItem(KEEP_AWAKE_KEY, on ? "on" : "off");
+    } catch {
+      /* Blocked storage: on for this visit only. */
+    }
+    keepAwakeListeners.forEach((listener) => listener());
+  };
+  return [value, set];
 }

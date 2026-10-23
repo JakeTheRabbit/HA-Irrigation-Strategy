@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/sheet";
 import { useController } from "@/lib/use-controller";
 import { useDisplayUnits } from "@/lib/display-units";
+import { useKeepAwake, useWakeLock } from "@/lib/wake-lock";
 import { useHaTheme } from "@/lib/ha-theme";
 import { useHaShell } from "@/lib/ha-shell";
 import { errorText } from "@/lib/utils";
@@ -82,6 +83,8 @@ function readRoute(): Route {
 export default function App() {
   const controller = useController();
   useDisplayUnits(controller);
+  // Settings › "Keep this screen on while open": a wall screen or tablet stays on.
+  useWakeLock(useKeepAwake()[0]);
   const [route, setRoute] = useState<Route>(readRoute);
   const [mobile, setMobile] = useState(false);
   const [drafts, setDrafts] = useState<Drafts>({});
