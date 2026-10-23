@@ -5,7 +5,7 @@
     "title": "Find your room, zone and next action",
     "summary": "Find a zone by its full address, check how old each report is, and read the Controller’s reason for what it does next.",
     "outcomes": [
-      "Go from Overview › All zones to the right room and zone page.",
+      "Go from Status › All rooms to the right room and zone page.",
       "Read the Controller’s report age and each probe’s report time separately.",
       "Read phase, last shot and Why / next action together.",
       "Explain what Watering, Stop all, a shared pump and an unknown state mean.",
@@ -19,16 +19,16 @@
       {
         "title": "A zone needs its full address",
         "body": [
-          "Overview › All zones: every zone, grouped by room.",
-          "Selected room: one room, chosen with its room chip."
+          "Status › All rooms: every zone, grouped by room.",
+          "Room: one room, chosen with its room chip."
         ],
         "narration": "Think of a block of flats. Flat two in one building is not flat two in the building next door. Zones work the same way. Remember from A one: a zone is a group of plants watered together. A room is a space with its own lights, and it holds one or more zones. Open the isolated demo, the practice copy that runs no equipment, and select Overview, the screen for checking rooms and zones. Its first tab, All zones, shows a card for every zone, grouped by room. The second tab, Selected room, shows one room at a time. Across the top, each room has a small button with its name, called a room chip. Select a chip, then select a zone card. That opens the zone page: one page about one zone. Zone two in Room A and Zone two in Room B are different addresses. Next, you check how fresh the information on that page is.",
         "visual": {
           "type": "navigation",
           "title": "A zone needs its full address",
           "labels": [
-            "Overview › All zones: every zone, grouped by room.",
-            "Selected room: one room, chosen with its room chip."
+            "Status › All rooms: every zone, grouped by room.",
+            "Room: one room, chosen with its room chip."
           ],
           "caption": "Fictional learning example. Practise software actions only in the isolated demo.",
           "asset": "assets/screens/demo-overview-r3.png",
@@ -44,7 +44,7 @@
               "feedback": "Right. The room chip sets the room; the zone number only means something inside that room."
             },
             {
-              "text": "Any Zone 2 card in All zones.",
+              "text": "Any Zone 2 card in All rooms.",
               "correct": false,
               "feedback": "Two cards say Zone 2. Read the room name too, or select the Room B chip first."
             },
@@ -227,7 +227,7 @@
         "title": "Find another zone independently",
         "body": [
           "Record room, zone, phase, last shot, report ages, next action.",
-          "Settings & help › Settings › Display › Default view."
+          "Settings › Settings › Display › Default view."
         ],
         "narration": "Now find a zone without the example, like finding a friend’s flat with only the address. Choose any other demo zone. Write six things: the room, the zone number, the phase, the last shot time, the report ages and the next action. Then choose where the app opens. Open Settings and help, then Settings, then Display, then Default view. The default view is the page this browser shows first when you open the app. For example, choose Selected room if you check one room every morning. This choice lives only in this browser. Another person’s phone keeps its own choice, and nothing about watering changes. A saved bookmark still opens the page it points to. Return to Overview and say the selected room’s name aloud before you read any card. That habit stops you reading one room’s numbers while thinking of another. The last slide checks what you remember.",
         "visual": {
@@ -235,7 +235,7 @@
           "title": "Find another zone independently",
           "labels": [
             "Record room, zone, phase, last shot, report ages, next action.",
-            "Settings & help › Settings › Display › Default view."
+            "Settings › Settings › Display › Default view."
           ],
           "caption": "Fictional learning example. Practise software actions only in the isolated demo.",
           "asset": "assets/screens/demo-settings-defaultview-r3.png",
@@ -314,17 +314,17 @@
     },
     "quiz": [
       {
-        "prompt": "All zones is visible and Training West is selected. What does Stop all in the top bar act on?",
+        "prompt": "All rooms is visible and Training West is selected. What does Stop all in the top bar act on?",
         "options": [
           {
             "text": "The selected room, plus any pump it shares with another room.",
             "correct": true,
-            "feedback": "Correct. All zones changes what you see, not what Stop all acts on."
+            "feedback": "Correct. All rooms changes what you see, not what Stop all acts on."
           },
           {
-            "text": "Every room shown in All zones.",
+            "text": "Every room shown in All rooms.",
             "correct": false,
-            "feedback": "All zones changes the view. Top bar controls still act on the selected room."
+            "feedback": "All rooms changes the view. Top bar controls still act on the selected room."
           },
           {
             "text": "Only the nearest zone card.",
