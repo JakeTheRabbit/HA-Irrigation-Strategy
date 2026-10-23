@@ -614,8 +614,8 @@ export function projectDay(
 }
 /** The rest of today on the same rules, from now instead of lights-on: `hour` hours after lights-on,
  * in the zone's current phase and at its current VWC. P0 ends at its maximum wait from `since`,
- * sooner once VWC dries to the dryback target below `peak`, at once when VWC is already at the P2
- * threshold (the engine's bypass). P1 fires the shots it has left `p1_time_between_shots` apart,
+ * sooner once VWC dries to the dryback target below `peak`, at once when VWC is already at the rescue
+ * floor (the engine's bypass). P1 fires the shots it has left `p1_time_between_shots` apart,
  * from the last one. The day ends `end` hours after lights-on, the next lights-on: 23 or 25 hours
  * across a clock change. Null without the targets or a reading to start from. */
 export function projectFrom(
@@ -657,7 +657,7 @@ export function projectFrom(
     const level =
       now.peak !== null && Number.isFinite(dryback) ? now.peak * (1 - dryback / 100) : null;
     p1Start = at(
-      now.value <= threshold
+      plan.emergencyFloor !== null && now.value <= plan.emergencyFloor
         ? now.hour
         : Math.min(
             now.since + (hours("p0_maximum_wait_time") ?? 1),

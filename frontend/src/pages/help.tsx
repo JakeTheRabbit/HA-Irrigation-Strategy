@@ -34,7 +34,7 @@ const glossary = [
   ],
   [
     "P0 · Morning dryback",
-    "From lights-on to the first shot: the plants drink before the day’s watering starts. It ends at the latest first shot, or sooner if moisture falls to the re-water point.",
+    "From lights-on to the first shot: the plants drink before the day’s watering starts. It ends at the latest first shot, or sooner if moisture falls to the rescue floor.",
   ],
   [
     "P1 · Ramp",
