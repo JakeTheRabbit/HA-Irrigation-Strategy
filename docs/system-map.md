@@ -306,24 +306,43 @@ Local suites at the audit: integration `tests/` 1064 pass; add-on 2116 pass, 3 W
 
 ## 15. In flight
 
-Open PRs into `testing` (all by JakeTheRabbit):
+Open PRs into `testing` (all by JakeTheRabbit, none merged yet, 2026-10-23). Merge order and the decisions waiting on Ben are in [system-audit.md](system-audit.md#merge-order).
 
 | PR | Branch | Subject | Audit |
 |---|---|---|---|
-| [#196](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/pull/196) | `fix/ui-polish` | Dashboard visual All rooms, no duplicate pickers | FE-011 related |
-| [#197](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/pull/197) | `fix/count-water-when-a-shot-errors` | Count water of a shot that errors | CTL-005 |
-| [#198](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/pull/198) | `docs/match-3-17-section-names` | Match 3.17.0 section names | WEB-011 |
-| [#199](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/pull/199) | `fix/water-volumes-read-their-unit` | Water volumes in HA's unit | FE-003 |
-| [#200](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/pull/200) | `fix/dosing-form-uses-the-room-limits` | Dosing form uses room limits | FE-002 |
-| [#201](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/pull/201) | `fix/shot-cap-survives-read-blip` | Cap survives a read blip | CTL-004 |
-| [#202](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/pull/202) | `fix/unreadable-feed-band-holds` | Hold on unreadable feed band | CTL-003 |
-| [#203](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/pull/203) | `fix/blind-fallback-only-with-lights-on` | Blind fallback only with lights on | CTL-001 |
-| [#204](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/pull/204) | `fix/one-room-error-does-not-stop-the-others` | Per-room error isolation | CTL-006 |
-| [#205](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/pull/205) | `fix/recipe-services-take-a-room` | Recipe services take a room | INT-002 |
-| [#206](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/pull/206) | `fix/stage-select-only-shows-what-applied` | Stage select shows what applied | INT-001 |
-| [#207](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/pull/207) | `fix/phase-sensor-never-invents-p2` | Phase sensor never invents a phase | INT-006 |
-| [#208](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/pull/208) | `fix/read-back-switches-on-at-shot-start` | Read ON back at shot start | CTL-002 |
-| [#209](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/pull/209) | `fix/equal-light-hours-mean-24h-light` | Equal light hours are not used | CTL-030 |
-| [#210](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/pull/210) | `fix/shot-start-error-cannot-wedge-the-controller` | Shot-start error cannot wedge the controller | CTL-032 |
+| [#196](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/pull/196) | `fix/ui-polish` | Dashboard: visual All rooms (slabs, tanks), no duplicate pickers, consistent type | FE-011 |
+| [#197](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/pull/197) | `fix/count-water-when-a-shot-errors` | fix: count the water of a shot that errors after its valve opened | CTL-005 |
+| [#198](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/pull/198) | `docs/match-3-17-section-names` | docs: match 3.17.0 section names (Status, Settings) | WEB-011 |
+| [#199](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/pull/199) | `fix/water-volumes-read-their-unit` | Dashboard reads water volumes in the unit Home Assistant reports | FE-003 |
+| [#200](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/pull/200) | `fix/dosing-form-uses-the-room-limits` | fix: dosing form uses the room's own dose limits | FE-002 |
+| [#201](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/pull/201) | `fix/shot-cap-survives-read-blip` | A failed read of the shot-length cap no longer lifts it to 900 s | CTL-004 |
+| [#202](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/pull/202) | `fix/unreadable-feed-band-holds` | fix: hold the shots when a feed EC/pH band setting can't be read | CTL-003 |
+| [#203](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/pull/203) | `fix/blind-fallback-only-with-lights-on` | fix(controller): blind fallback shot only with the lights on, in P1/P2 | CTL-001 |
+| [#204](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/pull/204) | `fix/one-room-error-does-not-stop-the-others` | fix: an error in one room's pass no longer stops the other rooms | CTL-006 |
+| [#205](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/pull/205) | `fix/recipe-services-take-a-room` | fix: scope apply_recipe and save_recipe to one room | INT-002 |
+| [#206](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/pull/206) | `fix/stage-select-only-shows-what-applied` | Recipe stage select shows a stage only once it is applied | INT-001, INT-004 |
+| [#207](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/pull/207) | `fix/phase-sensor-never-invents-p2` | fix: current_phase sensor never invents a phase | INT-006 |
+| [#208](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/pull/208) | `fix/read-back-switches-on-at-shot-start` | fix(controller): read pump, main line and valve back ON at shot start | CTL-002 |
+| [#209](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/pull/209) | `fix/equal-light-hours-mean-24h-light` | fix(controller): lights-on and lights-off at the same hour are not used | CTL-030 |
+| [#210](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/pull/210) | `fix/shot-start-error-cannot-wedge-the-controller` | fix: a shot-start error can no longer wedge the controller (CTL-032) | CTL-032 |
+| [#211](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/pull/211) | `fix/dryback-from-the-controller` | fix(dashboard): show the controller's own dryback, peak and next shot | FE-001, FE-004, FE-034 |
+| [#212](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/pull/212) | `docs/system-map-audit` | docs: system map and ranked system audit | this audit |
+| [#213](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/pull/213) | `docs/academy-link-and-unused-images` | docs: academy local URL as code, screenshot date agrees with manifest | WEB-009, WEB-019 |
+| [#214](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/pull/214) | `fix/mcp-accepts-what-the-integration-accepts` | MCP: accept what the integration accepts (pumps, valves, probe units) | INT-019, INT-020 |
+| [#215](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/pull/215) | `fix/controller-reads-fail-closed` | fix(controller): a failed Home Assistant read or write is never taken as a real value | CTL-007, 017, 019, 023 (CTL-018, 024 justified) |
+| [#216](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/pull/216) | `fix/blind-zones-get-the-daily-floor` | fix: blind zones get the minimum daily water; no invented feed EC (CTL-031, CTL-008) | CTL-031, CTL-008 |
+| [#217](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/pull/217) | `ci/run-every-browser-check` | ci: run every dashboard and Academy browser check on pull requests | CI-008, CI-009, FE-023, FE-024 |
+| [#218](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/pull/218) | `fix/controller-says-when-it-has-no-estimate` | Controller says so when it has no next-shot estimate | CTL-034 |
+| [#219](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/pull/219) | `fix/dashboard-links-land-where-they-say` | fix(dashboard): links land where they say | FE-005, FE-007 |
+| [#220](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/pull/220) | `fix/history-long-reads-old-run-sensors` | history_long: read sensors from this room's archived runs | INT-023 |
+| [#221](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/pull/221) | `fix/deprecate-the-unused-recipe-system` | fix: deprecate the unused recipe system, apply a stage once, dashboard follows the controller's steering mode | INT-003, 005, 009, 014 |
+| [#222](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/pull/222) | `fix/one-source-for-derived-watering-values` | fix: one source of truth for derived watering values | CTL-009, 010, 011, INT-007, 008, 010, 011, 013 |
+| [#223](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/pull/223) | `fix/failed-write-releases-its-claim` | fix: a failed controller setpoint write takes back its claim (CTL-035) | CTL-035 |
+| [#224](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/pull/224) | `ci/pin-actions-and-honest-local-ci` | ci: pin actions to commits, honest local CI script, faster container smoke | CI-001, 010, 011, 013 (CI-002, 004 justified) |
+| [#225](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/pull/225) | `fix/dashboard-limits-from-one-source` | fix(dashboard): one source for limits, bands, time and readability | FE-008, 009, 010, 013, 014, 015, 017 |
+| [#226](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/pull/226) | `docs/features-story` | docs: README and feature matrix tell one story | README and feature matrix (pairs with site #5) |
+| [#227](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/pull/227) | `fix/p0-waits-for-transpiration` | fix: P0 waits for transpiration; only the rescue floor bypasses it (#195) | issue #195 |
 
-No PR is open on `cropsteering-site`. Parity plans live on `feat/parity-system` (frontend) and `feat/parity-backend` (backend) in `docs/superpowers/plans/2026-10-22-parity-*.md`: a Journal store, GuardChain refactor, pump queue, timer programs, feed calibration, API v2 envelope, MCP read/preview tools, tree menu and eight new pages. They rebase onto the fixes above.
+Website (`cropsteering-site`, into `main`): [#4](https://github.com/JakeTheRabbit/cropsteering-site/pull/4) builds and describes 3.17.0 (WEB-001, 003 to 008, 010, 012 to 014, 016); [#5](https://github.com/JakeTheRabbit/cropsteering-site/pull/5) tells the features page as one story. Both wait on Ben's approval to merge and deploy.
+
+Parity plans live on `feat/parity-system` (frontend) and `feat/parity-backend` (backend) in `docs/superpowers/plans/2026-10-22-parity-*.md`: a Journal store, GuardChain refactor, pump queue, timer programs, feed calibration, API v2 envelope, MCP read/preview tools, tree menu and eight new pages. They rebase onto the fixes above.
