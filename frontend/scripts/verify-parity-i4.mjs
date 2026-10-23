@@ -18,6 +18,8 @@
  * - 3.18 desktop: from Room B to Room A, Room B has no timer programs: the receipt names the rows
  *   written and the timers not copied, and says Undo is not available here (History › Changes);
  * - 3.18: the browser recipe library sits under "On this browser";
+ * - 3.18: Import as presets previews one preset per end of each browser recipe's profiles and gives a
+ *   receipt per row;
  * - 3.17: the presets panel shows "Needs integration 3.18"; the grow plan and the browser recipes work.
  * Also writes full-page light and dark screenshots of each run beside the harness's own. */
 import assert from "node:assert/strict";
@@ -179,8 +181,23 @@ await runParity({
       await shoot("from-room-b");
       region("not copied receipt");
     }
+
+    // Recipes kept in this browser, imported as presets: a preview first, then a receipt per row.
+    await openTab("Recipes");
+    const importing = main.locator("[data-recipe-import]");
+    await importing.waitFor();
+    await importing.getByRole("button", { name: "Preview the import" }).click();
+    const rows = importing.locator("[data-recipe-import-preview] tbody tr");
+    await rows.first().waitFor();
+    const count = await rows.count();
+    assert.ok(count >= 2, `${label}: one preset per end of each profile`);
+    await importing.getByRole("button", { name: new RegExp(`^Save ${count} presets?$`) }).click();
+    const receipts = importing.getByRole("status", { name: "Import receipts" });
+    await receipts.waitFor();
+    assert.equal(await receipts.locator('[data-receipt="saved"]').count(), count, `${label}: every row saved`);
+    region("recipe import");
   },
 });
 console.log(
-  "PASS: I4 grow plan & presets (head + Arm at lights-on, one-edit draft bar + discard, exception in draft, controller presets + save, tree pick without the source room, preview with struck values + not copied, copy read back + not copied named + undo, Room B timers not copied without undo, On this browser recipes, 3.17 note; clock pinned 14:10)",
+  "PASS: I4 grow plan & presets (head + Arm at lights-on, one-edit draft bar + discard, exception in draft, controller presets + save, tree pick without the source room, preview with struck values + not copied, copy read back + not copied named + undo, Room B timers not copied without undo, On this browser recipes, recipes imported as presets with a receipt per row, 3.17 note; clock pinned 14:10)",
 );

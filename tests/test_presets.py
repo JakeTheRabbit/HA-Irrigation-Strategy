@@ -457,3 +457,28 @@ def test_a_source_setting_that_cannot_be_read_is_named_as_skipped():
     assert captured["phase_timing"] == {}
     # The room's timer programs are not loaded here either.
     assert skipped == ["p2_time_between_shots", "timer"]
+
+
+def test_given_values_keep_only_what_the_scope_holds_and_refuse_the_rest():
+    """preset_save with `values` (a grow plan imported from a browser): each value is checked as a
+    capture would hold it; nothing outside the scope's sections, no unknown key, no timers."""
+    given = presets.given_values(
+        {"targets": {"p2_shot_size": 6.5, "vegetative_dryback_target": 12, "p2_mode": "vwc"}},
+        ("targets",),
+    )
+    assert given == {
+        "targets": {"p2_shot_size": 6.5, "vegetative_dryback_target": 12.0, "p2_mode": "vwc"}
+    }
+    for bad in (
+        {},
+        {"targets": {}},
+        {"phase_timing": {"p0_minimum_wait": 10}},  # not in scope targets
+        {"targets": {"plant_count": 4}},  # never copied
+        {"targets": {"p2_shot_size": float("nan")}},
+        {"targets": {"p2_shot_size": True}},
+        {"targets": {"p2_shot_size": "6"}},
+        {"timers": {"timers": []}},
+        ["targets"],
+    ):
+        with pytest.raises(ValueError):
+            presets.given_values(bad, ("targets", "timers"))

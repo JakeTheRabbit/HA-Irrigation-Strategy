@@ -28,6 +28,7 @@ import { Empty, number } from "@/components/dashboard";
 import { GrowByStage } from "@/components/grow-by-stage";
 import { PlanCellContext } from "@/components/plan-cell-context";
 import { RecipeLibrary } from "@/components/recipe-library";
+import { RecipeImport } from "@/components/recipe-import";
 import { PresetsPanel } from "@/components/presets-panel";
 import { FieldSuggestionLine, useSensorContext } from "@/components/sensor-context";
 import { fieldCapacitySuggestion, suggestedDraft } from "@/lib/sensor-context";
@@ -799,6 +800,7 @@ export function GrowPlanner({
                         );
                       }}
                     />
+                    <RecipeImport key={`import:${controller.roomId}`} controller={controller} />
                   </>
                 )}
                 {tab === "calendar" && (

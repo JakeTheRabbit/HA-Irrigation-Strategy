@@ -1754,6 +1754,16 @@ preset_save:
           min: 0
           max: 1000000
           mode: box
+    values:
+      name: Values
+      description: >-
+        Optional. The settings to save, by section, instead of reading them from the room: what the
+        dashboard sends when it imports a grow-plan recipe saved in a browser. Only the sections of
+        the scope (never timers), only their settings, numbers (P2 mode a text). From names the room
+        the preset is for. Example: {"targets": {"p2_shot_size": 6.5}}.
+      required: false
+      selector:
+        object:
 
 preset_delete:
   name: Delete a preset

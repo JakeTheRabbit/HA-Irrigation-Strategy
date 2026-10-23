@@ -88,6 +88,37 @@ def capture(values: dict, sections) -> dict:
     }
 
 
+def given_values(values, sections) -> dict:
+    """{section: {key: value}} a caller gives preset_save instead of reading a room (a grow plan
+    imported from a browser), checked as capture() would hold it: only the scope's sections, only
+    their keys, finite numbers (p2_mode a text). Timer programs are never given. Raises ValueError."""
+    if not isinstance(values, dict) or not values:
+        raise ValueError("values must name at least one section")
+    out = {}
+    for section, keys in values.items():
+        if section not in sections or section == "timers":
+            raise ValueError(f"values cannot hold the section {section}")
+        if not isinstance(keys, dict) or not keys:
+            raise ValueError(f"values.{section} must hold at least one setting")
+        out[section] = {}
+        for key, value in keys.items():
+            if key not in SECTIONS[section]:
+                raise ValueError(f"{key} is not a setting of {section}")
+            if key in SELECTS:
+                if not isinstance(value, str) or not value.strip():
+                    raise ValueError(f"{key} must be a text")
+                out[section][key] = value
+                continue
+            if (
+                isinstance(value, bool)
+                or not isinstance(value, (int, float))
+                or not math.isfinite(value)
+            ):
+                raise ValueError(f"{key} must be a finite number")
+            out[section][key] = float(value)
+    return out
+
+
 def same(a, b) -> bool:
     numbers = all(
         isinstance(v, (int, float)) and not isinstance(v, bool) for v in (a, b)

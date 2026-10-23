@@ -331,3 +331,40 @@ async def test_a_copy_refused_in_part_answers_the_events_of_what_it_wrote(
     written = {e["data"]["key"] for e in mine if e["outcome"] == "ok"}
     assert "p2_shot_size" in written and "p2_time_between_shots" not in written
     assert float(hass.states.get(number(1, "p2_shot_size")).state) == 6.5
+
+
+async def test_a_preset_saved_with_given_values_holds_them_and_reads_nothing(
+    hass, hass_admin_user
+):
+    """A grow-plan recipe imported from a browser: preset_save takes its values as given, keeps
+    only the scope's settings and refuses anything else before saving."""
+    from homeassistant.exceptions import HomeAssistantError
+
+    await _three_zones(hass)
+    saved = await _call(
+        hass,
+        hass_admin_user,
+        "preset_save",
+        name="Recipe · Veg end",
+        scope="targets",
+        expected_revision=0,
+        values={"targets": {"p2_shot_size": 4.5, "vegetative_dryback_target": 9}},
+        **{"from": {"room_id": ROOM}},
+    )
+    assert saved["preset"]["values"] == {
+        "targets": {"p2_shot_size": 4.5, "vegetative_dryback_target": 9.0}
+    }
+    assert saved["skipped"] == []
+    with pytest.raises(HomeAssistantError):
+        await _call(
+            hass,
+            hass_admin_user,
+            "preset_save",
+            name="Bad",
+            scope="targets",
+            expected_revision=1,
+            values={"phase_timing": {"p0_minimum_wait": 10}},
+            **{"from": {"room_id": ROOM}},
+        )
+    listed = await _call(hass, hass_admin_user, "preset_list")
+    assert [p["name"] for p in listed["presets"]] == ["Recipe · Veg end"]

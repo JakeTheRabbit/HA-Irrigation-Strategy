@@ -196,4 +196,9 @@ adds its own dosing history and AI records after it updates. In full: [History](
 ## Browser recipes
 
 Grow-plan recipes saved "on this browser" before 3.18 stay in that browser. They are not presets and are
-never imported without you. Export them as a backup from Irrigation › Grow plan & presets.
+never imported without you. Export them as a backup from Irrigation › Grow plan & presets › Recipes, or
+import them there with **Import as presets**: a preview names each preset first (one for the vegetative
+and one for the generative end of each profile, with its targets), each is saved on its own with a
+receipt, a name the controller already has is not saved again, and nothing is applied. An administrator
+does it; for an AI assistant it is `crop_steering.preset_save` with `scope: "targets"`, the room in `from`
+and the settings in `values`.

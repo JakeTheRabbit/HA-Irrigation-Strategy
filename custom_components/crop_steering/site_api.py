@@ -1193,7 +1193,10 @@ async def async_setup_site(hass, entry) -> None:
                 return await site.save(args, who)
             if call.service == "preset_save":
                 sections = presets.SCOPES.get(args["scope"], ())
-                values, skipped = presets.read_source(hass, args["from"], sections)
+                if "values" in args:  # given, not read: a grow plan imported from a browser
+                    values, skipped = presets.given_values(args["values"], sections), []
+                else:
+                    values, skipped = presets.read_source(hass, args["from"], sections)
                 saved = await site.save_preset(args, values, who)
                 return {**saved, "skipped": skipped}
             if call.service == "preset_delete":
@@ -1250,6 +1253,7 @@ async def async_setup_site(hass, entry) -> None:
             vol.Required("scope"): vol.In(list(presets.SCOPES)),
             vol.Required("from"): dict,
             vol.Required("expected_revision"): whole,
+            vol.Optional("values"): dict,
             **common,
         },
         "preset_delete": {

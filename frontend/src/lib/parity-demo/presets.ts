@@ -167,6 +167,27 @@ const failure = (code: string, message: string, data?: unknown, current?: number
 
 /** What a 3.18 integration answers for the preset services and copy_config. `write`
  * sets one number entity and returns the states after it. */
+/** presets.given_values: only the scope's sections (never timers), only their keys, finite numbers
+ * (p2_mode a text). */
+function givenValues(value: unknown, sections: string[]): Record<string, Record<string, unknown>> {
+  if (!value || typeof value !== "object" || Array.isArray(value) || !Object.keys(value).length)
+    throw new Error("values must name at least one section");
+  const out: Record<string, Record<string, unknown>> = {};
+  for (const [section, keys] of Object.entries(value as Record<string, unknown>)) {
+    if (!sections.includes(section) || section === "timers") throw new Error(`values cannot hold the section ${section}`);
+    if (!keys || typeof keys !== "object" || Array.isArray(keys) || !Object.keys(keys).length)
+      throw new Error(`values.${section} must hold at least one setting`);
+    out[section] = {};
+    for (const [key, v] of Object.entries(keys as Record<string, unknown>)) {
+      if (!SECTIONS[section].includes(key)) throw new Error(`${key} is not a setting of ${section}`);
+      if (key === "p2_mode" ? typeof v !== "string" : typeof v !== "number" || !Number.isFinite(v))
+        throw new Error(`${key} must be a ${key === "p2_mode" ? "text" : "finite number"}`);
+      out[section][key] = v;
+    }
+  }
+  return out;
+}
+
 export function answerPresets(
   action: string,
   data: Record<string, unknown>,
@@ -186,7 +207,9 @@ export function answerPresets(
       const from = ref(data.from);
       if (data.expected_revision !== site.revision)
         return failure("stale_revision", "Presets changed elsewhere. Reload before saving.", undefined, site.revision);
-      const { values, unread } = read(states, from);
+      // Given values (a browser recipe imported) are checked as the integration's given_values does.
+      const given = data.values === undefined ? null : givenValues(data.values, SCOPES[scope]);
+      const { values, unread } = given ? { values: given, unread: [] as string[] } : read(states, from);
       const at = new Date(now).toISOString();
       const preset: StoredPreset = {
         id: demoId(now, `preset:${name}:${site.presets.length}`),
@@ -194,7 +217,7 @@ export function answerPresets(
         scope: scope as StoredPreset["scope"],
         sections: SCOPES[scope],
         from,
-        values: capture(values, SCOPES[scope]),
+        values: given ? Object.fromEntries(SCOPES[scope].filter((x) => x in given).map((x) => [x, given[x]])) : capture(values, SCOPES[scope]),
         created_at: at,
         updated_at: at,
         deleted_at: null,
