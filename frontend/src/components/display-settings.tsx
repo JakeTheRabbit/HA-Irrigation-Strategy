@@ -49,7 +49,12 @@ export function DisplaySettings({ controller }: { controller: Controller }) {
               ? row.choice.map((c) => ({ value: c.value, label: c.label, icon: undefined }))
               : ON_OFF;
             return (
-              <div key={row.key} className="display-row" data-display-option={row.key}>
+              <div
+                key={row.key}
+                id={`config-${row.key}`}
+                className="display-row"
+                data-display-option={row.key}
+              >
                 <span className="label-with-tip">
                   <span id={`display-${row.key}`}>{row.label}</span>
                   <InfoTip label={row.label} copy={row.copy} />
