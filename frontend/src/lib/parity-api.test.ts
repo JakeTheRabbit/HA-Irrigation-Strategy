@@ -91,6 +91,8 @@ const DAY_TIMER = { id: DEMO_TIMER_PROGRAM_ID, name: "Zone 3 day timer", type: "
 const TANK_RULE = { room_id: "room:", source: "tank.level", op: "below", threshold: 25 };
 const ASKED: Partial<Record<string, Record<string, unknown>>> = {
   timer_program_set: { expected_revision: 1, program: DAY_TIMER },
+  // The demo keeps the supply as the integration does: a save names the pumps and the revision.
+  supply_save: { expected_revision: 1, irrigation_pumps: [], preview: true },
   timer_program_preview: { program: DAY_TIMER },
   timer_program_delete: { expected_revision: 1, id: DEMO_TIMER_PROGRAM_ID },
   preset_save: { name: "Room A now", scope: "all", from: { room_id: "room:" }, expected_revision: 1 },
@@ -143,7 +145,7 @@ test("preview: true skips the write lock only on the four previewable services",
       program: DAY_TIMER,
     }),
     callV2(c, "pump_prime", { pump: "a", seconds: 10, preview: true }),
-    callV2(c, "supply_save", { expected_revision: 1, preview: true }),
+    callV2(c, "supply_save", { expected_revision: 1, irrigation_pumps: [], preview: true }),
   ];
   expect((await Promise.all(calls)).map((o) => o.kind)).toEqual(["ok", "error", "ok"]);
 });

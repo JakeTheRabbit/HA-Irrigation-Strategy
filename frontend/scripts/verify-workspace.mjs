@@ -280,6 +280,9 @@ async function liveSetup(run, history = false, blockers = []) {
       Object.assign(room, { zones: data.zones, revision: room.revision + 1 });
       return reply({ changed_states: [], service_response: room });
     }
+    // An integration before 3.18, as Home Assistant answers a service it does not have: the
+    // pumps & valves editor at the top of Setup reads its supply once and shows Needs integration.
+    if (action === "supply_get") return reply({ message: "Service crop_steering.supply_get not found." }, 400);
     return reply({ message: "The sizing fixture has no such service" }, 400);
   });
   const lp = await live.newPage();
@@ -295,8 +298,9 @@ async function liveSetup(run, history = false, blockers = []) {
     );
     await run(lp, calls);
     assert.deepEqual(
-      // The dashboard asks once per visit whether there is anything new to show: not the helpers.
-      [...new Set(calls.map((call) => call.action))].filter((a) => a !== "whats_new_get").sort(),
+      // The dashboard asks once per visit whether there is anything new to show, and the pumps &
+      // valves editor reads the supply once: neither is the helpers.
+      [...new Set(calls.map((call) => call.action))].filter((a) => a !== "whats_new_get" && a !== "supply_get").sort(),
       history
         ? ["history_connection_get", "setup_read", "setup_save"]
         : ["setup_read", "setup_save"],
