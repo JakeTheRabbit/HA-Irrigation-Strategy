@@ -1,5 +1,6 @@
 import type { PumpCheck, SupplyDoc } from "../parity-types";
 import type { States } from "../types";
+import { DEMO_MAIN_METER } from "./journal";
 
 /** The demo's supply (G1), kept as the integration keeps it (site_api.py, site_store.py): one
  * site-wide document with a revision, supply_get answering it with a capacity check worked out from
@@ -20,7 +21,8 @@ const START: Section & { revision: number } = {
   irrigation_pumps: [{ entity_id: "switch.demo_pump", max_flow_lph: 1200, max_concurrent_zones: 1, flow_meter: null }],
   water_sources: [],
   zone_groups: {},
-  zone_meters: {},
+  // Room A's main-line meter counts each of its zones' shots (they run one at a time).
+  zone_meters: { "room:": { "1": DEMO_MAIN_METER, "2": DEMO_MAIN_METER, "3": DEMO_MAIN_METER } },
 };
 let stored = structuredClone(START);
 export function resetDemoSupply(): void {

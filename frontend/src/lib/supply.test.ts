@@ -2,6 +2,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, test } from "vitest";
 import { ReviewApplyView, type ReviewRow } from "@/components/review-apply";
+import { DEMO_MAIN_METER } from "./parity-demo/journal";
 import { answerSupply, demoCapacityCheck, resetDemoSupply } from "./parity-demo/supply";
 import { setDisplayUnits } from "./display-units";
 import type { V2Outcome } from "./parity-api";
@@ -333,6 +334,12 @@ describe("the demo supply", () => {
     );
     expect(saved.answer).toMatchObject({ revision: 2, readback: { status: "ok" } });
     expect(saved.states?.["sensor.crop_steering_supply_config"]?.attributes.zone_demand_lph).toEqual({ "room:f2_": rooms[0].zones });
+  });
+  test("starts with Room A's main-line meter counting each of its zones (H2 Water & flow)", () => {
+    resetDemoSupply();
+    const got = answerSupply("supply_get", {}, [], {}, AT);
+    expect((got.answer as SupplyDoc).zone_meters).toEqual({ "room:": { "1": DEMO_MAIN_METER, "2": DEMO_MAIN_METER, "3": DEMO_MAIN_METER } });
+    expect(got.states?.["sensor.crop_steering_supply_config"]?.attributes.zone_meters).toEqual((got.answer as SupplyDoc).zone_meters);
   });
 });
 

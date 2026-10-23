@@ -159,7 +159,7 @@ try {
   await open("#/settings");
   await page.locator("#landing-view").selectOption("history/water");
   await open();
-  await page.getByRole("heading", { name: "Water use", exact: true }).waitFor();
+  await page.getByRole("heading", { level: 1, name: "Water & flow", exact: true }).waitFor();
   await open("#/history/timeline?zone=2");
   await page.waitForURL((url) => url.hash === "#/history/explorer?zone=2");
   // The old timeline link opens the Explorer on zone 2's detail; the room list is the zone picker.
