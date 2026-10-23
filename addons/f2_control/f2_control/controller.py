@@ -6520,8 +6520,8 @@ class Controller:
 
     def _journal_shot_started(self, room, zone, journaled, intent, duration_s, size_pct, nominal_l, actor,
                               program_id, reason_text, requested_at):
-        """shot.started, fsynced to the outbox before the pump opens (_execute_shot), with a new intent id that
-        its end carries too. A journal problem never stops the shot."""
+        """shot.started, flushed to the OS (no fsync, ruling R5) before the pump opens (_execute_shot), with a new
+        intent id that its end carries too. A journal problem never stops the shot."""
         try:
             st, snap = room.state[zone], intent.get("snap")
             started = datetime.now().astimezone()
