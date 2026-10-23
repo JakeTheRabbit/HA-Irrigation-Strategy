@@ -50,6 +50,7 @@ import {
   leftWords,
   levelFall,
   levelFallUnknown,
+  mixChecked,
   nextBatch,
   protections,
   pumpStock,
@@ -428,6 +429,8 @@ export function MixCheckCard({
   now,
   tz,
   block,
+  room,
+  warning,
   onTopUp,
   error,
 }: {
@@ -439,6 +442,10 @@ export function MixCheckCard({
   now: number;
   tz: string;
   block: string | null;
+  /** The room's name: watering in it is held while the batch runs. */
+  room: string;
+  /** A dosed pump that is not ready: the controller would refuse the batch. */
+  warning: string | null;
   onTopUp: () => void;
   error: string;
 }) {
@@ -524,6 +531,11 @@ export function MixCheckCard({
         disabledReason={block ?? undefined}
         onStart={onTopUp}
       />
+      <p className="muted small">
+        {warning ? `${warning} ` : ""}
+        While the batch runs, watering in {room}, and in any room whose pump or valves the batch uses,
+        is held.
+      </p>
       {error && (
         <p className="form-error" role="alert">
           {error}
@@ -838,6 +850,9 @@ export function Dosing({
   const [setupOpen, setSetupOpen] = useState(false);
   const [reads, setReads] = useState(0);
   const [topUpError, setTopUpError] = useState("");
+  // A Top up hold sent and not yet on the controller's request line: true while sending, then the
+  // request's id until the line shows it.
+  const [topUpSent, setTopUpSent] = useState<string | true | null>(null);
   const connected = ["live", "demo"].includes(controller.connection);
   useEffect(() => {
     setDoc(null);
@@ -1061,11 +1076,22 @@ export function Dosing({
   // is the confirmation). The request line then follows it.
   const topUp = () => {
     setTopUpError("");
+    setTopUpSent(true);
     controller
       .operator<DosingRequestResult>("dosing_request", { action: "batch" })
-      .then((result) => result.error && setTopUpError(dosingError(result.error)))
-      .catch((err) => setTopUpError(errorText(err)));
+      .then((result) => {
+        if (result.error) setTopUpError(dosingError(result.error));
+        setTopUpSent(result.error ? null : (result.request?.id ?? null));
+      })
+      .catch((err) => {
+        setTopUpError(errorText(err));
+        setTopUpSent(null);
+      });
   };
+  const sentId = stage?.request.id ?? null;
+  useEffect(() => {
+    if (typeof topUpSent === "string" && (sentId === topUpSent || batchRunning)) setTopUpSent(null);
+  }, [topUpSent, sentId, batchRunning]);
 
   const current = steps.find((step) => step.state === "running");
   const dosingNow = views.find((item) => item.state === "dosing");
@@ -1140,7 +1166,7 @@ export function Dosing({
           litresPerPct: guard.litresPerPct,
           pctPerHour: fall,
           atPct,
-          checks: !!engine.feed_ec_sensor || !!engine.feed_ph_sensor,
+          checks: mixChecked(states, prefix, engine),
         })
       : null;
   const ec = (value: number) => formatEc(value, 2);
@@ -1296,7 +1322,13 @@ export function Dosing({
               calibration={{ ec: calibratedAt("ec"), ph: calibratedAt("ph") }}
               now={now}
               tz={tz}
-              block={batchBlock ?? (canAct ? null : "The controller cannot take a request now.")}
+              block={
+                topUpSent
+                  ? "Sending the batch request."
+                  : (batchBlock ?? (canAct ? null : "The controller cannot take a request now."))
+              }
+              room={room.room.name}
+              warning={batchWarning}
               onTopUp={topUp}
               error={topUpError}
             />

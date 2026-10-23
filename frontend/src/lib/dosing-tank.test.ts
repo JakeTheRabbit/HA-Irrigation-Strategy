@@ -135,6 +135,8 @@ describe("Equipment › Feed & dosing: the mix check names its probe", () => {
         now: Date.parse("2026-10-23T00:00:00Z"),
         tz: "UTC",
         block: null,
+        room: "Room A",
+        warning: null,
         onTopUp: () => {},
         error: "",
       }),
@@ -148,6 +150,39 @@ describe("Equipment › Feed & dosing: the mix check names its probe", () => {
     expect(html).toContain("Want pH 5.60–6.20; it read 7.20.");
     expect(html).toContain("Feed pH probe calibrated 3 days ago");
     expect(html).not.toContain("Feed EC probe");
+    // The hold makes a batch at once: the card says watering is held while it runs.
+    expect(html).toContain(
+      "While the batch runs, watering in Room A, and in any room whose pump or valves the batch uses, is held.",
+    );
+  });
+  test("a dosed pump that is not ready is said under the hold", () => {
+    const html = renderToStaticMarkup(
+      createElement(MixCheckCard, {
+        mix: {
+          batch: null,
+          due: null,
+          verdict: "off target",
+          checked_at: null,
+          why: null,
+          gave_up_at: null,
+          ec: 3.7,
+          ph: 5.8,
+          probes: ["ec", "ph"],
+        },
+        states: bands,
+        prefix: "",
+        calibration: { ec: null, ph: null },
+        now: Date.parse("2026-10-23T00:00:00Z"),
+        tz: "UTC",
+        block: null,
+        room: "Room A",
+        warning: "Part B is not calibrated: the controller would refuse a batch now.",
+        onTopUp: () => {},
+        error: "",
+      }),
+    );
+    const after = html.slice(html.indexOf("Top up and re-check"));
+    expect(after).toContain("Part B is not calibrated: the controller would refuse a batch now.");
   });
   test("not read: the unreadable probe stays named beside an off-band reading", () => {
     const html = card({

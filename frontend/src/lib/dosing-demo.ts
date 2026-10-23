@@ -3,6 +3,8 @@ import {
   STEP_LABELS,
   dosingConfigId,
   dosingStatusId,
+  MIX_SETTLE_MIN,
+  mixChecked,
   parseConfig,
   readConfig,
   readStatus,
@@ -491,8 +493,6 @@ export class DosingDemo {
       ended_at: null,
     };
     status.handled_result = "making a batch";
-    // A new batch replaces the last one's mix check (dosing_runner._plan_mix).
-    status.mix = null;
     this.enterStep(tx, room, config, 0);
   }
 
@@ -746,5 +746,23 @@ export class DosingDemo {
     };
     this.remember(room, "batch", batch, batch.doses, result, tx.stamp);
     room.batch = null;
+    // Only a finished batch replaces the last one's mix check (dosing_runner._plan_mix): due 5 min
+    // on, or none in a room that checks nothing. A stopped batch keeps it.
+    if (result.startsWith("finished")) {
+      const engine = tx.get(`sensor.crop_steering_${room.prefix}engine_config`)?.attributes ?? {};
+      room.status.mix = mixChecked(this.getStates(), room.prefix, engine)
+        ? {
+            batch: room.status.batch.started_at,
+            due: new Date(tx.now + MIX_SETTLE_MIN * 60_000).toISOString(),
+            verdict: null,
+            checked_at: null,
+            why: null,
+            gave_up_at: null,
+            ec: null,
+            ph: null,
+            probes: [],
+          }
+        : null;
+    }
   }
 }

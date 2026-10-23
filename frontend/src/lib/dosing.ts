@@ -1181,10 +1181,34 @@ export function protections(doc: DosingDocument, states: States): { label: strin
     { label: `Minimum ${minimum}%`, ok: levelRead },
     {
       label: batch.mix_pump ? `Mix pump ${mixOn ? "on" : "off"}${kw}` : "Mix pump on",
-      ok: !!batch.mix_pump && !!batch.mix_power_sensor && batch.mix_min_w > 0,
+      ok:
+        !!batch.mix_pump &&
+        !!batch.mix_power_sensor &&
+        readable(states[batch.mix_power_sensor]) &&
+        batch.mix_min_w > 0,
     },
     { label: `Timeout ${batch.fill_timeout_min} min`, ok: !!batch.fill_valve },
   ];
+}
+
+/** Whether the controller checks a finished batch's mix (dosing_runner._mix_bands): a feed EC or pH
+ * probe mapped (engine_config `feed_<q>_sensor`) whose band has a bound above 0, or a band that can't
+ * be read (the check is planned and waits for it). A band setting the room does not have is no bound. */
+export function mixChecked(
+  states: States,
+  prefix: string,
+  engine: Record<string, unknown>,
+): boolean {
+  return (["ec", "ph"] as const).some(
+    (quantity) =>
+      !!engine[`feed_${quantity}_sensor`] &&
+      (["min", "max"] as const).some((end) => {
+        const setting = states[`number.crop_steering_${prefix}irrigation_${quantity}_${end}`];
+        if (!setting) return false;
+        const value = Number(setting.state);
+        return !readable(setting) || !Number.isFinite(value) || value > 0;
+      }),
+  );
 }
 
 /** The recipe the room doses today: the feed recipe in use, else the batch's own. */
@@ -1274,15 +1298,25 @@ export function nextBatch(
   };
 }
 
+/** A rise of the recorded level smaller than this (%) is the level sensor's jitter, not a fill. */
+const LEVEL_JITTER_PCT = 1;
+/** Where the newest run of the recorded level that does not rise (past jitter) starts. */
+function fallStart(points: readonly { time: number; value: number }[]): number {
+  let start = points.length - 1;
+  while (start > 0 && points[start - 1].value >= points[start].value - LEVEL_JITTER_PCT) start--;
+  return start;
+}
+
 /** How fast the tank's level falls, % per hour, since its last rise (a fill): the newest run of the
- * recorded level that only goes down, from the last reading at its peak. Null with under an hour of
- * it, or a level that is not falling. */
+ * recorded level that does not rise past jitter, from the last reading at its peak. Null with under
+ * an hour of it, or a level that is not falling. */
 export function levelFall(points: readonly { time: number; value: number }[]): number | null {
   if (points.length < 2) return null;
-  let start = points.length - 1;
-  while (start > 0 && points[start - 1].value >= points[start].value) start--;
-  // A tank that sat full is not falling yet: the run starts where it last left its peak.
-  while (start < points.length - 1 && points[start + 1].value === points[start].value) start++;
+  let start = fallStart(points);
+  // A tank that sat full is not falling yet: the run starts where it last left its peak (within
+  // jitter of it).
+  const peak = Math.max(...points.slice(start).map((point) => point.value));
+  while (start < points.length - 1 && points[start + 1].value >= peak - LEVEL_JITTER_PCT) start++;
   const first = points[start],
     last = points[points.length - 1];
   const hours = (last.time - first.time) / 3_600_000;
@@ -1304,8 +1338,7 @@ export function levelFallUnknown(
   const span = points.length ? points[points.length - 1].time - points[0].time : 0;
   if (span < 3_600_000) return "Not known yet: less than an hour of tank level is recorded";
   // The last run that does not rise, as levelFall walks it: below its start, the tank is falling.
-  let start = points.length - 1;
-  while (start > 0 && points[start - 1].value >= points[start].value) start--;
+  const start = fallStart(points);
   return points[start].value > points[points.length - 1].value
     ? "Not known yet: the tank has been falling for less than an hour"
     : "Not known yet: the tank level is not falling";
