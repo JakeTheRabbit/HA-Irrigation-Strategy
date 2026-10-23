@@ -368,6 +368,40 @@ async def test_running_it_again_changes_nothing(hass, hass_storage):
     assert [e["source"]["detail"] for e in after[changes:]] == ["migration:feed_ec_fallback"]
 
 
+async def test_history_noted_while_the_ledger_loads_keeps_what_the_ledger_held(hass, hass_storage, monkeypatch):
+    """The journal backfill runs beside the room's setup: noting history before the ledger has loaded must
+    not save an empty ledger over the stored one (Mark as read, the kept feed EC)."""
+    import asyncio
+
+    from custom_components.crop_steering import migration
+
+    entry, _seed, _stores = await _upgrade(hass, hass_storage, V3_17)
+    await migration.acknowledge(hass, entry.entry_id)
+    room = hass.data[DOMAIN]["_migration"].document["rooms"][entry.entry_id]
+    room["report"]["carried"] = [r for r in room["report"]["carried"] if r["id"] != "history.import"]
+    await hass.data[DOMAIN]["_migration"].save()
+    hass.data[DOMAIN].pop("_migration")  # the next start
+    hass.services.async_remove(DOMAIN, "migration_report")
+    real, gate = migration.Ledger.async_init, asyncio.Event()
+
+    async def slow(self):
+        await gate.wait()
+        await real(self)
+
+    monkeypatch.setattr(migration.Ledger, "async_init", slow)
+    setup = hass.async_create_task(migration.async_setup_migration(hass))
+    await asyncio.sleep(0)
+    noted = hass.async_create_task(migration.note_history(hass, entry, 5))
+    await asyncio.sleep(0)
+    gate.set()
+    await setup
+    await noted
+    stored = hass_storage[migration.STORAGE_KEY]["data"]
+    assert entry.entry_id in stored["acknowledged"]
+    assert stored["rooms"][entry.entry_id]["legacy_feed_ec_fallback"] == 3.0
+    assert "history.import" in _ids(stored["rooms"][entry.entry_id]["report"]["carried"])
+
+
 async def test_a_step_that_failed_runs_again_at_the_next_start(hass, hass_storage, monkeypatch):
     from custom_components.crop_steering import migration
 

@@ -772,7 +772,9 @@ async def async_setup_migration(hass) -> Ledger:
     if "_migration" in data:
         return data["_migration"]
     ledger = data["_migration"] = Ledger(hass)
-    await ledger.async_init()
+    # Under its lock: a caller that finds it in hass.data meanwhile waits until it has loaded.
+    async with ledger.lock:
+        await ledger.async_init()
 
     import voluptuous as vol
     from homeassistant.core import SupportsResponse
@@ -854,9 +856,9 @@ async def note_history(hass, entry, added: int) -> None:
     History. Listed once; never raises."""
     try:
         ledger = await async_setup_migration(hass)
-        if ledger.error:
-            return
         async with ledger.lock:
+            if ledger.error:
+                return
             room = ledger.room(entry.entry_id)
             if any(r.get("id") == "history.import" for r in room["report"]["carried"]):
                 return
