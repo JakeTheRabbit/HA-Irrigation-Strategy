@@ -132,6 +132,7 @@ def test_a_refusal_answered_rather_than_raised_comes_from_the_service_s_own_hook
             "message": "changed",
             "current_revision": 9,
         },
+        "event_ids": [],  # nothing was journaled before it refused
         "data": answer,
     }
     # No hook, no sniffing: the same answer from another service is ok, its revision as given.
@@ -425,3 +426,70 @@ def test_a_hook_covers_only_the_service_it_names():
     assert wrapped.error_of.keys() == {"thing"}
     assert _run(wrapped(_call({"api": 2}, service="other")))["ok"] is True
     assert _run(wrapped(_call({"api": 2}, service="thing")))["ok"] is False
+
+
+def test_a_partly_applied_refusal_answers_the_ids_of_the_events_it_wrote(
+    tmp_path, monkeypatch
+):
+    from .test_journal_api import _rig
+
+    hass, journal_api = _rig(monkeypatch, tmp_path)
+    from custom_components.crop_steering import api_v2
+    from custom_components.crop_steering.site_api import _rows_refused
+
+    async def go():
+        hub = journal_api.JournalHub(hass, str(tmp_path / "journal.db"))
+        hass.data.setdefault("crop_steering", {})["_journal"] = hub
+        ids = []
+
+        async def handler(call):
+            # One value written (and journaled), one refused: the UI can Undo the one written.
+            ids.append(journal_api.emit(hass, ROOM, "target.changed", zone=1))
+            return {
+                "diff": [],
+                "missing": [],
+                "applied": [
+                    {"key": "p1", "readback": "verified", "error": None},
+                    {"key": "p2", "readback": "refused", "error": "out of range"},
+                ],
+            }
+
+        wrapped = api_v2.wrap(handler, error_of={"preset_apply": _rows_refused})
+        out = await wrapped(_call({"api": 2}, service="preset_apply"))
+        await hub.async_init()
+        assert out["ok"] is False and out["error"]["code"] == "guard_refused"
+        assert out["event_ids"] == ids and None not in ids
+
+    asyncio.run(go())
+
+
+def test_a_source_with_no_timer_program_is_missing_not_a_refused_write():
+    _, api_v2 = _stubs()
+    from custom_components.crop_steering.site_api import _rows_refused
+
+    answer = {
+        "diff": [],
+        "missing": [{"key": "timer", "reason": "source zone has no timer program"}],
+        "applied": [
+            {"key": "p1", "readback": "verified", "error": None},
+            {
+                "key": "timer",
+                "readback": "refused",
+                "error": "source zone has no timer program",
+                "missing": True,
+            },
+        ],
+    }
+
+    async def handler(call):
+        return answer
+
+    wrapped = api_v2.wrap(handler, error_of={"copy_config": _rows_refused})
+    out = _run(wrapped(_call({"api": 2}, service="copy_config")))
+    assert out["ok"] is True and out["data"]["missing"] == answer["missing"]
+    assert out["readback"]["status"] == "verified"  # every write it made read back
+    # A real write refusal beside it still refuses the whole answer.
+    answer["applied"][0].update(readback="refused", error="out of range")
+    out = _run(wrapped(_call({"api": 2}, service="copy_config")))
+    assert out["ok"] is False and out["error"]["code"] == "guard_refused"
+    assert out["error"]["message"] == "Not applied: p1: out of range"

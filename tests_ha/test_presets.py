@@ -233,3 +233,101 @@ async def test_all_covers_every_per_zone_number(hass):
     zone_keys = {k.removeprefix("zone_1_") for k in numbers if k.startswith("zone_1_")}
     covered = {k for s in presets.SCOPES["all"] for k in presets.SECTIONS[s]}
     assert zone_keys and zone_keys - covered - set(presets.NOT_COPIED) == set()
+
+
+async def test_a_copy_from_a_zone_with_no_timer_is_ok_and_keeps_the_target_in_its_own(
+    hass, hass_admin_user
+):
+    await _three_zones(hass)
+    await _set(hass, number(2, "p2_shot_size"), 7.5)
+    program = {
+        "name": "Mothers AM",
+        "type": "recycle",
+        "zones": [1],
+        "duration_s": 120,
+        "interval_min": 30,
+        "window": {"kind": "custom", "from": "08:00", "to": "12:00"},
+    }
+    await _call(
+        hass,
+        hass_admin_user,
+        "timer_program_set",
+        room_id=ROOM,
+        expected_revision=0,
+        program=program,
+    )
+    out = await _call(
+        hass,
+        hass_admin_user,
+        "copy_config",
+        api=2,
+        preview=False,
+        to=[{"room_id": ROOM, "zone": 1}],
+        sections=["targets", "timers"],
+        **{"from": {"room_id": ROOM, "zone": 2}},
+    )
+    # Zone 2 has no timer program: named in `missing`, never a refusal of the copy.
+    assert out["ok"] is True, out
+    assert out["readback"]["status"] == "verified"
+    assert out["data"]["missing"] == [
+        {
+            "target": {"room_id": ROOM, "zone": 1},
+            "key": "timer",
+            "reason": "source zone has no timer program",
+        }
+    ]
+    assert float(hass.states.get(number(1, "p2_shot_size")).state) == 7.5
+    (timer,) = (await _call(hass, hass_admin_user, "timer_program_list", room_id=ROOM))[
+        "programs"
+    ]
+    assert timer["zones"] == [1]
+
+
+async def test_a_copy_refused_in_part_answers_the_events_of_what_it_wrote(
+    hass, hass_admin_user, monkeypatch
+):
+    from custom_components.crop_steering import presets
+
+    await _three_zones(hass)
+    await _set(hass, number(3, "p2_shot_size"), 6.5)
+    await _set(hass, number(3, "p2_time_between_shots"), 45)
+    write_all = presets._write_all
+
+    async def refuse_spacing(hass, writes, pending, errors, context):
+        spacing = [i for i in pending if writes[i]["key"] == "p2_time_between_shots"]
+        for i in spacing:
+            errors[i] = "out of range"
+        await write_all(
+            hass, writes, [i for i in pending if i not in spacing], errors, context
+        )
+
+    monkeypatch.setattr(presets, "_write_all", refuse_spacing)
+    out = await _call(
+        hass,
+        hass_admin_user,
+        "copy_config",
+        api=2,
+        preview=False,
+        to=[{"room_id": ROOM, "zone": 1}],
+        sections=["targets", "phase_timing"],
+        **{"from": {"room_id": ROOM, "zone": 3}},
+    )
+    assert out["ok"] is False and out["error"]["code"] == "guard_refused", out
+    assert "p2_time_between_shots: out of range" in out["error"]["message"]
+    await hass.data[DOMAIN]["_journal"]._ready.wait()
+    await hass.async_block_till_done()
+    events = (
+        await _call(
+            hass,
+            hass_admin_user,
+            "journal_query",
+            room_id=ROOM,
+            since=SINCE,
+            kinds=["target.changed"],
+        )
+    )["events"]
+    by_id = {e["id"]: e for e in events}
+    mine = [by_id[i] for i in out["event_ids"]]
+    written = {e["data"]["key"] for e in mine if e["outcome"] == "ok"}
+    assert "p2_shot_size" in written and "p2_time_between_shots" not in written
+    assert float(hass.states.get(number(1, "p2_shot_size")).state) == 6.5

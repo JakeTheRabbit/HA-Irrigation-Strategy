@@ -2,7 +2,8 @@
 
 A caller that sends `api: 2` and asks for the answer gets
 `{api: 2, ok: true, room_id, revision, readback: {status, at}, event_ids, data}`, `data` being the
-v1 answer, or `{api: 2, ok: false, error: {code, message, current_revision?}}`. Without `api` the
+v1 answer, or `{api: 2, ok: false, error: {code, message, current_revision?}}` (with `event_ids` and
+`data` too when the service answered a refusal, as a partly applied write does). Without `api` the
 service answers exactly as before. An error is answered only to a caller that asked for the answer:
 any other caller gets the exception v1 raised, so a refused write never looks like it went through.
 An exception this module does not know is raised as it is.
@@ -105,10 +106,13 @@ def nested_revision(result):
 
 
 def _readback(call, result) -> str:
-    """The handler's own read-back: `applied` rows (presets) or a `readback` status (supply_save)."""
+    """The handler's own read-back: `applied` rows (presets; a row marked `missing` was never written)
+    or a `readback` status (supply_save)."""
     if not isinstance(result, dict):
         return "none"
     rows = result.get("applied")
+    if isinstance(rows, list):
+        rows = [r for r in rows if not (isinstance(r, dict) and r.get("missing"))]
     if isinstance(rows, list) and rows:
         marks = [row.get("readback") for row in rows if isinstance(row, dict)]
         if "refused" in marks:
@@ -288,7 +292,14 @@ def wrap(
         hook = refusals.get(call.service)
         refused = hook(call, result) if hook is not None else None
         if refused is not None:
-            return {"api": 2, "ok": False, "error": refused, "data": result}
+            # A refusal can follow writes that landed (a preset or copy): their events, for Undo.
+            return {
+                "api": 2,
+                "ok": False,
+                "error": refused,
+                "event_ids": [event_id for event_id, _ in events],
+                "data": result,
+            }
         return {
             "api": 2,
             "ok": True,

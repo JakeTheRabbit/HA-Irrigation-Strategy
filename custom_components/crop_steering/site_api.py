@@ -1138,12 +1138,15 @@ async def _alert_rule(hass, site, call) -> dict:
 
 
 def _rows_refused(call, result):
-    """API v2: an apply or copy whose target refused a value (or a timer it may not take out). The
-    other values are written; every row is in `data.applied`."""
+    """API v2: an apply or copy whose target refused a value. The other values are written; every
+    row is in `data.applied`. A timer the source has none of (`missing`) was never written, so it
+    refuses nothing; it stays in `data.missing`."""
     from .api_v2 import failure
 
     refused = [
-        row for row in result.get("applied") or () if row.get("readback") == "refused"
+        row
+        for row in result.get("applied") or ()
+        if row.get("readback") == "refused" and not row.get("missing")
     ]
     if not refused:
         return None

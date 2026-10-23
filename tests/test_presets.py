@@ -408,8 +408,16 @@ def test_a_source_zone_with_no_timer_program_never_pulls_the_target_from_its_own
     assert preview["diff"] == []
     assert preview["missing"] == [{"target": to[0], "key": "timer", "reason": reason}]
     out = run(presets.apply(hass, wanted, to, False, WHO))
+    assert out["missing"] == preview["missing"]
+    # Nothing was written for it: the row is marked missing, so it is no write refusal.
     assert out["applied"] == [
-        {"target": to[0], "key": "timer", "readback": "refused", "error": reason}
+        {
+            "target": to[0],
+            "key": "timer",
+            "readback": "refused",
+            "error": reason,
+            "missing": True,
+        }
     ]
 
 

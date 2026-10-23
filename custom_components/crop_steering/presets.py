@@ -424,6 +424,8 @@ async def apply(hass, wanted: dict, targets: list, preview: bool, actor: dict) -
                         "key": row["key"],
                         "readback": "refused",
                         "error": reason,
+                        # nothing was written: not a write the target refused (api_v2)
+                        "missing": True,
                     }
                 )
                 continue
