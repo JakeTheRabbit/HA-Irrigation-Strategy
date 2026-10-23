@@ -2,8 +2,7 @@
  * #/equipment/stock in the demo (Room A: Silica 10 L, Part B 20 L at 5.4 L, Part A 20 L, Line
  * cleaner 5 L).
  *
- * The clock is pinned to today 14:10 local, so the demo's refill this morning is in the past and
- * "Written and read back" reads 14:10 at any real hour.
+ * The clock is pinned to today 14:10 local, so "Written and read back" reads 14:10 at any real hour.
  *
  * Interactions asserted, at 1440 and 390, on both backends:
  * - the heading "Stock tanks · Room A"; four tank cards, each bottle drawn by volume (the cube root
@@ -11,10 +10,11 @@
  * - Part B reads "5.4 L of 20 L" and its batches left; Part B runs out first (highlighted);
  * - "Log refill to 20 L" on Part B applies at once: "20 L of 20 L" and the toast "Part B refilled to
  *   20 L. Written and read back 14:10."; Refills lists Part B; its Undo puts 5.4 L back ("Part B put
- *   back to 5.4 L.") and Refills no longer lists Part B;
+ *   back to 5.4 L. Written and read back 14:10.") and Refills no longer lists Part B;
  * - Set level on Line cleaner to 0.8 L: its card says "Below the low line. Order now.", its percent
  *   label sits clear of the dashed low line, and Refills lists no refill for it on 3.18;
- * - Used per week draws a bar chart with a legend of the four tanks;
+ * - Used per week draws a bar chart with a legend of the four tanks, labelled "Used per week: …"
+ *   (no unit in the words) and with ticks like "2.0 L" in the display unit;
  * - Refills: 3.18 lists the Journal's refill "Part A … +16.6 L, to 20 L"; 3.17 lists each tank's
  *   last refill to full and says that is all the integration keeps.
  * Only requests to the page's own origin are made (the harness fails any other). */
@@ -63,7 +63,7 @@ await runParity({
     await refillOf("Part B").waitFor();
     if (backend === "3.18") assert.match(await refillOf("Part B").innerText(), /\+14\.6 L, to 20 L$/, `${label}: refill listed`);
     await done.getByRole("button", { name: "Undo" }).click();
-    await page.locator("[data-sonner-toast]").filter({ hasText: "Part B put back to 5.4 L." }).waitFor();
+    await page.locator("[data-sonner-toast]").filter({ hasText: "Part B put back to 5.4 L. Written and read back 14:10." }).waitFor();
     assert.equal(await level("part_b"), "5.4 L of 20 L", `${label}: undone`);
     await refillOf("Part B").waitFor({ state: "detached" });
     region("refill undo");
@@ -84,6 +84,9 @@ await runParity({
     await weekly.getByRole("heading", { name: "Used per week" }).waitFor();
     assert.deepEqual(await weekly.locator(".stock-legend li").allInnerTexts(), ["Silica", "Part B", "Part A", "Line cleaner"]);
     await weekly.locator(".recharts-bar-rectangle").first().waitFor();
+    assert.match(await weekly.locator(".stock-weekly-chart").getAttribute("aria-label"), /^Used per week: /, `${label}: unit-neutral chart label`);
+    const ticks = await weekly.locator(".recharts-cartesian-axis-tick-value").allTextContents();
+    assert.ok(ticks.some((t) => /^\d+\.\d L$/.test(t)), `${label}: ticks in the display unit (${ticks})`);
     region("used per week");
 
     await refills.getByRole("heading", { name: "Refills" }).waitFor();

@@ -1,6 +1,9 @@
 import { dayKey } from "./time";
+import { formatVolume, getDisplayUnits } from "./display-units";
+import type { ParityState } from "./parity-api";
 import type { CsEvent } from "./parity-types";
 import type { Controller } from "./types";
+import { LITRES_PER_US_GALLON } from "./units";
 import { sameValue } from "./utils";
 
 /** A room's stock tanks, as the integration's stock services return them (stock_api.py). */
@@ -271,6 +274,30 @@ export function refillRows(
       );
   return rows.filter((row) => Number.isFinite(row.at)).sort((a, b) => b.at - a.at);
 }
+
+/** What Refills lists: `older` when the integration has no Journal. While the Journal reloads (after
+ * every write) it keeps `last`, so the rows never flash empty; an older integration's rows need no
+ * answer, so they follow `undone` at once. Null: nothing to list yet, or the Journal failed. */
+export interface RefillsView {
+  rows: RefillRow[];
+  older: boolean;
+}
+export function refillsView(
+  state: ParityState,
+  events: readonly CsEvent[] | null,
+  tanks: readonly StockTank[],
+  undone: ReadonlySet<string>,
+  last: RefillsView | null,
+): RefillsView | null {
+  if (state === "ready") return { rows: refillRows(tanks, events ?? []), older: false };
+  if (state === "missing" || (state === "loading" && last?.older))
+    return { rows: refillRows(tanks, null, undone), older: true };
+  return state === "loading" ? last : null;
+}
+
+/** A Used per week tick: the chart's values are already in the display unit. */
+export const weeklyTick = (shown: number) =>
+  formatVolume(getDisplayUnits().volume === "gal" ? shown * LITRES_PER_US_GALLON : shown, 1);
 
 /** Undo a refill: the refilled tank back at `priorLevel` through stock_refill (so the Journal records
  * the put-back), at `current`'s revision, so a change since refuses. Refuses itself when the tank no

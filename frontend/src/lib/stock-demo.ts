@@ -1,6 +1,6 @@
 import { dosingConfigId, dosingStatusId, readConfig, readStatus, stockSensorId } from "./dosing";
 import type { OperatorAction } from "./operator-types";
-import { recordDemoEvent } from "./parity-demo/journal";
+import { demoRefilledAt, recordDemoEvent } from "./parity-demo/journal";
 import {
   batchesLeft,
   draftErrors,
@@ -42,6 +42,9 @@ const prefixOf = (roomId: string) => (roomId.startsWith("room:") ? roomId.slice(
 export function demoStock(roomId: string, now: number, states: States): StockDocument {
   const prefix = prefixOf(roomId);
   const hoursAgo = (hours: number) => new Date(now - hours * 3_600_000).toISOString();
+  // The refill the room's Journal holds (Part A's, nine days ago), on every tank.
+  const refilledMs = demoRefilledAt(roomId, now);
+  const refilled = refilledMs === null ? hoursAgo(24 * 9) : new Date(refilledMs).toISOString();
   const tanks = (DEMO_TANKS[prefix] ?? []).map(
     ([id, name, capacity, level, dose, low]): StockTank => ({
       id,
@@ -51,7 +54,7 @@ export function demoStock(roomId: string, now: number, states: States): StockDoc
       dose_ml: dose,
       dose_entity: null,
       low_l: low,
-      refilled_at: hoursAgo(24 * 9),
+      refilled_at: refilled,
       updated_at: hoursAgo(20),
     }),
   );

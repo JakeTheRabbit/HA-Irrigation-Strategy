@@ -52,12 +52,14 @@ import {
   batchEveryDays,
   draftErrors,
   nextToRunOut,
-  refillRows,
+  refillsView,
   stockOutlook,
   stockShare,
   undoRefill,
   weeklyUse,
   weeksShown,
+  weeklyTick,
+  type RefillsView,
   type StockBatch,
   type StockDocument,
   type StockTank,
@@ -279,7 +281,6 @@ function TankCard({
 function UsedPerWeek({ doc, tz }: { doc: StockDocument; tz: string }) {
   const weeks = weeksShown(doc.history, tz, HISTORY_KEPT, WEEKS_SHOWN);
   const gal = getDisplayUnits().volume === "gal";
-  const unit = gal ? "gal" : "L";
   const shown = (litres: number) => (gal ? litres / LITRES_PER_US_GALLON : litres);
   const rows = weeks.map((week) => ({
     label: week.partial ? "This week" : shortDate(Date.parse(`${week.week}T00:00:00Z`), "UTC"),
@@ -318,7 +319,7 @@ function UsedPerWeek({ doc, tz }: { doc: StockDocument; tz: string }) {
                   axisLine={false}
                   stroke="var(--muted-foreground)"
                   fontSize={12}
-                  tickFormatter={(value: number) => `${number(value, 1)} ${unit}`}
+                  tickFormatter={weeklyTick}
                 />
                 <Tooltip
                   cursor={{ fill: "color-mix(in srgb, var(--foreground) 6%, transparent)" }}
@@ -360,7 +361,7 @@ function UsedPerWeek({ doc, tz }: { doc: StockDocument; tz: string }) {
   );
 }
 const weeklyWords = (weeks: ReturnType<typeof weeklyUse>, tanks: StockTank[]) =>
-  `Litres used per week: ${weeks
+  `Used per week: ${weeks
     .map(
       (week) =>
         `${week.partial ? "this week so far" : `week of ${shortDate(Date.parse(`${week.week}T00:00:00Z`), "UTC")}`} ${tanks
@@ -392,12 +393,10 @@ function Refills({
     },
     [controller.roomId, doc.revision],
   );
-  const rows =
-    journal.state === "ready"
-      ? refillRows(doc.tanks, journal.data?.events ?? [])
-      : journal.state === "missing"
-        ? refillRows(doc.tanks, null, undone)
-        : [];
+  // The list last shown, kept while the Journal reloads after a write.
+  const last = useRef<RefillsView | null>(null);
+  const view = refillsView(journal.state, journal.data?.events ?? null, doc.tanks, undone, last.current);
+  last.current = view;
   return (
     <section
       className="panel stock-refills"
@@ -406,11 +405,11 @@ function Refills({
     >
       <h2 id="stock-refills-title">Refills</h2>
       {journal.state === "error" && <p className="workspace-message error">{journal.error}</p>}
-      {journal.state === "loading" && <p className="muted small">Loading refills…</p>}
-      {(journal.state === "ready" || journal.state === "missing") &&
-        (rows.length ? (
+      {!view && journal.state !== "error" && <p className="muted small">Loading refills…</p>}
+      {view &&
+        (view.rows.length ? (
           <ul className="stock-refill-list">
-            {rows.map((row) => (
+            {view.rows.map((row) => (
               <li key={row.key} data-stock-hue={row.hue % 8} data-stock-refill>
                 <span className="stock-refill-tank">
                   <span className="stock-swatch" aria-hidden="true" />
@@ -427,7 +426,7 @@ function Refills({
         ) : (
           <p className="muted small">No refills logged in the last {REFILL_DAYS} days.</p>
         ))}
-      {journal.state === "missing" && (
+      {view?.older && (
         <p className="muted small" data-stock-refills-older>
           This integration keeps only each tank's last refill to full.
         </p>
@@ -654,7 +653,9 @@ export function StockTanks({
         try {
           setDoc(await undoRefill(controller, latest.current, tank.id, read.level_l, before));
           setUndone((done) => new Set(done).add(`${tank.id}@${read.refilled_at}`));
-          toast.success(`${tank.name} put back to ${volume(before)}.`);
+          toast.success(
+            `${tank.name} put back to ${volume(before)}. Written and read back ${clock(Date.now(), tz)}.`,
+          );
         } finally {
           setBusy(false);
         }

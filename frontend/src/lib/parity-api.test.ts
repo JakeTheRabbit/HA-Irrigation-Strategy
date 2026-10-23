@@ -183,7 +183,10 @@ test("journal fixture filters by kinds and pages by cursor", async () => {
   const kinds = new Set(all.map((e) => e.kind));
   for (const k of ["shot.started", "shot.completed", "flow.reconciled", "phase.changed", "intent.queued", "intent.held",
     "alert.raised", "alert.cleared", "target.changed", "config.changed", "calibration.committed", "ai.judgement",
-    "ai.outcome", "stock.refilled"]) expect(kinds).toContain(k);
+    "ai.outcome"]) expect(kinds).toContain(k);
+  // The room's last refill is older: the one its stock tanks read (stock-demo.ts).
+  const refills = (await ask({ room_id: "room:", since: new Date(now - 10 * 86_400_000).toISOString(), kinds: ["stock.refilled"] })).data.events;
+  expect(refills.map((e) => e.data.tank)).toEqual(["part_a"]);
   expect(all.every((e) => Date.parse(e.ts) <= now && e.room_id === "room:")).toBe(true);
   const shots = (await ask({ room_id: "room:", since, kinds: ["shot.completed"] })).data.events;
   expect(shots.length).toBeGreaterThan(5);

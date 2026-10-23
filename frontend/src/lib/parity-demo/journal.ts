@@ -67,6 +67,11 @@ export function demoZonePause(roomId: string, now: number) {
   return { zone: paused.zone, at, reason: paused.reason };
 }
 
+/** When the demo room last refilled its stock tanks to full: nine days before this grow-day's
+ * lights-on, less 230 minutes. The Journal holds Part A's (from 3.4 L); its stock tanks read it. */
+export const demoRefilledAt = (roomId: string, now: number) =>
+  ROOMS[roomId] ? demoLightsOn(roomId, now) - 9 * 86_400_000 - 230 * MIN : null;
+
 function roomDay(roomId: string, on: number, today: boolean): CsEvent[] {
   const room = ROOMS[roomId];
   const out: CsEvent[] = [];
@@ -94,7 +99,6 @@ function roomDay(roomId: string, on: number, today: boolean): CsEvent[] {
     return id;
   };
   const p2At = on + 180 * MIN;
-  add(on - 230 * MIN, "stock.refilled", { tank: "part_a", level_l: 20, old_level_l: 3.4, full: true }, { actor: "manual" });
   add(on - 120 * MIN, "config.changed", { store: "setup", section: "zones", old: { plant_count: 39 }, new: { plant_count: 40 }, diff: [{ path: "zones.1.plant_count", old: 39, new: 40 }] }, { actor: "manual" });
   add(on - 60 * MIN, "calibration.committed", { probe: "feed_ph", slope_pct: 98.4, offset: 0.06, verdict: "pass", applied: true }, { actor: "manual" });
   add(on, "phase.changed", { from: "P3", to: "P0", how: "lights on" });
@@ -178,12 +182,27 @@ export function recordDemoEvent(roomId: string, kind: string, data: Record<strin
   });
 }
 
-/** Yesterday's and today's demo events for one room, ordered and numbered. */
+/** Yesterday's and today's demo events for one room, and its last refill, ordered and numbered. */
 export function demoJournal(roomId: string, now: number): CsEvent[] {
   const room = ROOMS[roomId];
   if (!room) return [];
   const today = lightsOnBefore(now, room.lightsOn);
+  const refilled = demoRefilledAt(roomId, now)!;
+  const refill: CsEvent = {
+    v: 1,
+    id: demoId(refilled, `${roomId}:stock.refilled::${refilled}`),
+    ts: iso(refilled),
+    room_id: roomId,
+    zone: null,
+    kind: "stock.refilled",
+    outcome: "ok",
+    code: null,
+    source: { actor: "manual", detail: null, program_id: null, user_id: "demo-user" },
+    correlation: {},
+    data: { tank: "part_a", level_l: 20, old_level_l: 3.4, full: true },
+  };
   const events = [
+    refill,
     ...roomDay(roomId, today - 86_400_000, false),
     ...roomDay(roomId, today, true),
     ...recorded.filter((e) => e.room_id === roomId).map((e) => ({ ...e })),

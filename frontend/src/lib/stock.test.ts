@@ -10,6 +10,8 @@ import {
   stockShare,
   stockOutlook,
   refillRows,
+  refillsView,
+  weeklyTick,
   undoRefill,
   weeklyUse,
   weeksShown,
@@ -21,6 +23,7 @@ import {
 import { createDemo } from "./demo";
 import { StockDemo } from "./stock-demo";
 import { journalQuery } from "./parity-demo/journal";
+import { setDisplayUnits } from "./display-units";
 import type { CsEvent } from "./parity-types";
 
 const draft = (change: Partial<StockTankDraft> = {}): StockTankDraft => ({
@@ -457,5 +460,66 @@ describe("refills, weeks and the bottle label (E5 review 1)", () => {
     expect(Math.abs(percentTop(6, 20, 3, 1) - bottleTop(3, 20, 1))).toBeGreaterThanOrEqual(8);
     // A well-filled bottle keeps it in the middle of the liquid.
     expect(percentTop(15, 20, 4, 1)).toBeCloseTo(bottleTop(7.5, 20, 1), 6);
+  });
+});
+
+describe("refills while reloading, chart ticks and the demo refill (E5 review 2)", () => {
+  const tank = (id: string, refilled_at: string | null): StockTank => ({
+    id,
+    name: id,
+    capacity_l: 20,
+    level_l: 10,
+    dose_ml: 0,
+    dose_entity: null,
+    low_l: 4,
+    refilled_at,
+    updated_at: "u",
+  });
+  const tanks = [tank("part_b", "2026-10-20T09:00:00Z"), tank("silica", "2026-10-19T09:00:00Z")];
+  const event = {
+    id: "e",
+    ts: "2026-10-21T10:00:00Z",
+    kind: "stock.refilled",
+    data: { tank: "part_b", level_l: 20, old_level_l: 5.4, full: true },
+  } as unknown as CsEvent;
+  it("keeps the rows it last showed while the Journal reloads, and has none before the first answer", () => {
+    const ready = refillsView("ready", [event], tanks, new Set(), null);
+    expect(ready).toEqual({ rows: [expect.objectContaining({ key: "e" })], older: false });
+    expect(refillsView("loading", null, tanks, new Set(), ready)).toBe(ready);
+    expect(refillsView("loading", null, tanks, new Set(), null)).toBeNull();
+    expect(refillsView("idle", null, tanks, new Set(), null)).toBeNull();
+    expect(refillsView("error", null, tanks, new Set(), ready)).toBeNull();
+  });
+  it("on an older integration, a reload already leaves out the refill Undo took back", () => {
+    const older = refillsView("missing", null, tanks, new Set(), null);
+    expect(older?.rows.map((r) => r.key)).toEqual(["part_b", "silica"]);
+    const undone = new Set(["part_b@2026-10-20T09:00:00Z"]);
+    expect(refillsView("loading", null, tanks, undone, older)).toEqual({
+      rows: [expect.objectContaining({ key: "silica" })],
+      older: true,
+    });
+  });
+  it("writes the weekly chart's ticks in the display unit, from values already in it", () => {
+    setDisplayUnits({ volume: "gal" });
+    expect(weeklyTick(2)).toBe("2.0 gal");
+    setDisplayUnits({ volume: "L" });
+    expect(weeklyTick(7.5)).toBe("7.5 L");
+  });
+  it("journals the demo's refill of Part A once, when its stock says, to the level it says", () => {
+    const now = Date.now();
+    for (const room of ["room:", "room:room_b_"]) {
+      const doc = new StockDemo(() => createDemo(now)).call("stock_get", { room_id: room });
+      const since = new Date(now - 90 * 86_400_000).toISOString();
+      const events = journalQuery({ room_id: room, since, kinds: ["stock.refilled"] }, now).events.filter(
+        (e) => e.source.user_id === "demo-user" && Date.parse(e.ts) < now - 3_600_000,
+      );
+      const partA = doc.tanks.find((t) => t.id === "part_a")!;
+      expect(events).toHaveLength(1);
+      expect(Date.parse(events[0].ts)).toBe(Date.parse(partA.refilled_at!));
+      expect(events[0].data).toMatchObject({ tank: "part_a", level_l: partA.capacity_l });
+      // Drawn down since, over days: never a refill this morning beside a tank a third empty.
+      expect(partA.level_l).toBeLessThan(partA.capacity_l);
+      expect(now - Date.parse(events[0].ts)).toBeGreaterThan(7 * 86_400_000);
+    }
   });
 });
