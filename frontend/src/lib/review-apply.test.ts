@@ -63,6 +63,10 @@ describe("review & apply", () => {
     expect(html).toContain("Re-water point 57% → 56% · Dryback by lights-on 50% → 52%");
     expect(html).toContain("Controller confirmed every value · by Ben");
     expect(html).toContain("Undo: write back the previous values");
+    // A page whose writes another part answers names it, and the demo says it is one.
+    const own = render(props({ rows: [], last: receipt, confirmedBy: "Demo only. The integration" }));
+    expect(own).toContain("Demo only. The integration confirmed every value");
+    expect(own).not.toContain("Controller confirmed");
   });
   test("a write stored outside the controller says where it was confirmed", () => {
     const last: ApplyReceipt = { at: AT, ok: true, failed: [], summary: "Run 12 dry weight none → 38.4 kg", eventIds: [] };

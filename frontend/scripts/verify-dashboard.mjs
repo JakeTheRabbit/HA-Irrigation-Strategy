@@ -2029,7 +2029,7 @@ try {
     await choice.getByRole("button", { name: "Zone total", exact: true }).click();
   });
   await check(
-    "notifications: a checkbox per phone and kind, saved through the review, a test push, others' phones read-only; only notify_save and notify_test are sent",
+    "notifications: a checkbox per phone and kind, applied from the bottom bar, a test push, others' phones read-only; only notify_save and notify_test are sent",
     async () => {
       const table = page.locator("table.notify-table");
       const rows = table.locator("tbody tr");
@@ -2041,10 +2041,11 @@ try {
           .evaluateAll((boxes) =>
             boxes.filter((item) => item.checked).map((item) => item.dataset.kind),
           );
-      const review = page.getByRole("dialog", { name: "Save notifications?" });
-      const saveDraft = () => page.getByRole("button", { name: /^Review and save/ }).click();
-      const discard = () =>
-        page.getByRole("button", { name: "Discard draft", exact: true }).click();
+      const bar = page.locator(".notify-bar");
+      const summary = () => bar.locator("[data-draft-summary]").innerText();
+      const applyDraft = () => bar.getByRole("button", { name: /^Apply \d+ changes?$/ }).click();
+      const receipt = bar.locator(".review-apply-receipt", { hasText: /^Written and read back / });
+      const discard = () => bar.getByRole("button", { name: "Discard", exact: true }).click();
       await go("settings/notifications");
       await expectVisible(table);
       // The demo's saved setup: Owner everything, Grower hardware lockouts, stock tanks and dosing,
@@ -2086,31 +2087,37 @@ try {
         /A zone changing phase, as a push/,
       );
       await page.keyboard.press("Escape");
-      // Grower ticks Phase changes and keeps to Room B: a draft, reviewed phone by phone, saved.
+      // Grower ticks Phase changes and keeps to Room B (every room shows each chip on: Room A
+      // goes out): a draft, said in the bottom bar, applied, read back.
       await box("Grower (Phone 2): Phase changes").check();
-      await rooms("Grower (Phone 2)").getByRole("button", { name: "Room B" }).click();
-      await expectVisible(page.locator(".draft-bar", { hasText: "Unsaved changes to 1 phone" }));
-      await saveDraft();
-      await expectVisible(review);
-      assert.deepEqual(await review.locator(".review-row").allInnerTexts(), [
-        "Grower (Phone 2)\nNew alert kinds: Phase changes\nRooms: All rooms → Room B",
+      await rooms("Grower (Phone 2)").getByRole("button", { name: "Room A" }).click();
+      assert.equal(
+        await summary(),
+        "2 changes not applied yet: Grower gets Phase changes · Grower: Room B only",
+      );
+      assert.deepEqual(await bar.locator(".review-apply-rows .review-apply-label").allInnerTexts(), [
+        "Grower (Phone 2): New alert kinds",
+        "Grower (Phone 2): Rooms",
+      ]);
+      assert.deepEqual(await bar.locator(".review-apply-rows .review-apply-diff").allInnerTexts(), [
+        "— → Phase changes",
+        "All rooms → Room B",
       ]);
       await axe("notifications: the review");
-      await review.getByRole("button", { name: "Save notifications", exact: true }).click();
-      await review.waitFor({ state: "hidden" });
-      await expectVisible(page.getByText("Saved as revision 4. The next push follows it."));
+      await applyDraft();
+      await expectVisible(receipt);
       assert.equal(await box("Grower (Phone 2): Phase changes").isChecked(), true);
-      assert.equal(await page.locator(".draft-bar").count(), 0);
+      assert.equal(await bar.locator("[data-draft-summary]").count(), 0);
       // A test push, its answer beside the button.
       await page
-        .getByRole("button", { name: "Send a test to Manager (Phone 3)", exact: true })
+        .getByRole("button", { name: "Send test to Manager (Phone 3)", exact: true })
         .click();
       await expectVisible(
         page.locator('tr[data-notify-row="notify.mobile_app_phone_3"] [data-test-result="sent"]'),
       );
       // A room nobody gets emergencies for is named above the grid.
       await box("Owner (Phone 1): Emergencies").uncheck();
-      await rooms("Manager (Phone 3)").getByRole("button", { name: "Room A" }).click();
+      await rooms("Manager (Phone 3)").getByRole("button", { name: "Room B" }).click();
       assert.deepEqual(await page.locator("[data-uncovered] strong").allInnerTexts(), [
         "Nobody gets emergencies for Room B",
       ]);
@@ -2141,13 +2148,7 @@ try {
       );
       await page.getByRole("button", { name: "Remove Manager (Phone 3)", exact: true }).click();
       assert.equal(await rows.count(), 3);
-      await saveDraft();
-      assert.deepEqual(await review.locator(".review-row > strong").allInnerTexts(), [
-        "Assistant (Phone 4) · added",
-        "Manager (Phone 3) · removed",
-      ]);
-      await review.getByRole("button", { name: "Back to editing", exact: true }).click();
-      await review.waitFor({ state: "hidden" });
+      assert.equal(await summary(), "2 changes not applied yet: Assistant added · Manager removed");
       await discard();
       // Both themes, and a phone: a card per phone with the same checkboxes.
       await inBothThemes("notifications", async () => {
@@ -2199,10 +2200,13 @@ try {
       await noOverflow();
       await page.screenshot({ path: path.join(out, "mobile-notifications.png"), fullPage: true });
       await box("Grower (Phone 2): AI assistant").check();
-      await expectVisible(page.locator(".draft-bar"));
+      await bar.getByRole("button", { name: "Review 1 change", exact: true }).click();
+      const sheet = page.getByRole("dialog", { name: "Review and apply" });
+      await expectVisible(sheet);
       await noOverflow();
       await axe("notifications on a phone");
-      await discard();
+      await sheet.getByRole("button", { name: "Discard", exact: true }).click();
+      await sheet.waitFor({ state: "hidden" });
       await page.setViewportSize({ width: 1440, height: 1000 });
       // Grower, who is not an administrator (the demo as them): their own phone's row, nothing else.
       await page.goto(`${base}/dashboard.html?demo&notify-user=grower#/settings/notifications`, {
@@ -2216,10 +2220,13 @@ try {
       );
       for (const name of ["Owner (Phone 1)", "Manager (Phone 3)"]) {
         assert.equal(await box(`${name}: Emergencies`).isDisabled(), true, `${name} is read-only`);
-        assert.equal(await box(`${name}: High priority for emergencies`).isDisabled(), true);
+        assert.equal(
+          await page.getByRole("switch", { name: `${name}: Emergencies loud`, exact: true }).isDisabled(),
+          true,
+        );
         assert.equal(
           await page
-            .getByRole("button", { name: `Send a test to ${name}`, exact: true })
+            .getByRole("button", { name: `Send test to ${name}`, exact: true })
             .isDisabled(),
           true,
         );
@@ -2227,13 +2234,12 @@ try {
       assert.equal(await page.getByRole("button", { name: "Add a phone" }).count(), 0);
       assert.equal(await page.getByRole("button", { name: /^Remove / }).count(), 0);
       assert.equal(
-        await page.getByRole("spinbutton", { name: /^Alert after no shot for/ }).isDisabled(),
+        await page.getByRole("spinbutton", { name: /^Send Shots stopped after/ }).isDisabled(),
         true,
       );
       await box("Grower (Phone 2): Emergencies").check();
-      await saveDraft();
-      await review.getByRole("button", { name: "Save notifications", exact: true }).click();
-      await expectVisible(page.getByText("Saved as revision 4. The next push follows it."));
+      await applyDraft();
+      await expectVisible(receipt);
       await axe("notifications, not an administrator");
       await page.screenshot({
         path: path.join(out, "dashboard-notifications-not-admin.png"),
@@ -2349,16 +2355,14 @@ try {
         "Owner",
       ]);
       await box("Grower (Pixel 7): Phase changes", live).check();
-      await live.getByRole("spinbutton", { name: /^Alert after no shot for/ }).fill("4");
-      await live.getByRole("button", { name: /^Review and save/ }).click();
-      const liveReview = live.getByRole("dialog", { name: "Save notifications?" });
-      const liveSave = liveReview.getByRole("button", { name: "Save notifications", exact: true });
+      await live.getByRole("spinbutton", { name: /^Send Shots stopped after/ }).fill("4");
+      const liveBar = live.locator(".notify-bar");
+      const liveSave = liveBar.getByRole("button", { name: "Apply 2 changes", exact: true });
       await liveSave.click();
       // Saved elsewhere meanwhile: read again with this draft kept on top, and said so.
-      await expectVisible(liveReview.getByText(/^Someone else saved the notifications meanwhile/));
+      await expectVisible(liveBar.getByText(/^Someone else changed this since you started editing/));
       await liveSave.click();
-      await liveReview.waitFor({ state: "hidden" });
-      await expectVisible(live.getByText("Saved as revision 9. The next push follows it."));
+      await expectVisible(liveBar.locator(".review-apply-receipt", { hasText: /^Written and read back / }));
       const callum = { ...pixel, kinds: ["stock", "phases"] };
       assert.deepEqual(
         posts.filter((post) => post.path.endsWith("/notify_save")).map((post) => post.body),
@@ -2368,7 +2372,7 @@ try {
         ],
       );
       await live
-        .getByRole("button", { name: "Send a test to Owner (iPhone)", exact: true })
+        .getByRole("button", { name: "Send test to Owner (iPhone)", exact: true })
         .click();
       await expectVisible(
         live.locator(`tr[data-notify-row="${iphone.service}"] [data-test-result="sent"]`),

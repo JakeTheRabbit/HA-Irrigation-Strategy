@@ -1,31 +1,58 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { QuietPhones } from "../pages/notifications";
 import { HaClient } from "./client";
 import { createDemo } from "./demo";
+import { setDisplayUnits } from "./display-units";
 import { errorCodes } from "./error-codes";
 import {
+  IDLE_NOTE,
+  NO_PHONES_WARNING,
   NOTIFY_CONFIG_ID,
+  NotifyRefusal,
+  quietNote,
+  restoreDraft,
+  muteRereads,
+  parseNotifyConfig,
+  applyChecks,
+  fieldErrors,
+  muteUndoTarget,
+  saveRefusal,
   canEditRow,
   draftChanges,
   draftErrors,
+  draftSummary,
   hasNotifyConfig,
   kindCoverage,
+  lightSpans,
   liveRevision,
+  muteEndWords,
+  mutePayload,
   newRecipient,
   notifyError,
-  notifyReducer,
   parseNotifyDocument,
   parseTestResult,
+  parseTestResults,
   phoneLabel,
+  pressRoom,
+  quietSpans,
   rebaseDraft,
+  reviewRows,
+  roomChipWords,
   roomWords,
   roomsWithoutEmergencies,
   rowLabel,
   sameDraft,
+  sameMuteEnd,
+  saveReceipt,
   savePayload,
   serviceFromText,
+  spanMinutes,
+  testLine,
+  testPhones,
   toDraft,
   toggleKind,
-  toggleRoom,
   unlistedPhones,
   updateRow,
   type NotifyConfig,
@@ -53,12 +80,14 @@ const recipient = (
   kinds,
   rooms: [],
   urgent_high_priority: true,
+  quiet_hours: null,
   ...change,
 });
 const config = (recipients: NotifyRecipient[], revision = 3, idle_hours = 3): NotifyConfig => ({
   revision,
   idle_hours,
   recipients,
+  mutes: {},
 });
 const doc = (change: Partial<NotifyDocument> = {}): NotifyDocument => ({
   schema_version: 1,
@@ -68,6 +97,7 @@ const doc = (change: Partial<NotifyDocument> = {}): NotifyDocument => ({
   can_edit_all: true,
   user_id: "demo-user-owner",
   error: null,
+  quietAndMutes: false,
   ...change,
 });
 const OWNER = "notify.mobile_app_phone_1";
@@ -121,8 +151,10 @@ describe("reading what notify_get returns", () => {
             kinds: ["stock", "dosing"],
             rooms: ["room_b_"],
             urgent_high_priority: true,
+            quiet_hours: null,
           },
         ],
+        mutes: {},
       },
       kinds: [
         {
@@ -139,6 +171,7 @@ describe("reading what notify_get returns", () => {
       can_edit_all: false,
       user_id: "7f21",
       error: null,
+      quietAndMutes: false,
     });
   });
   it("falls back on anything missing or garbled, and never grants editing it cannot read", () => {
@@ -174,8 +207,10 @@ describe("reading what notify_get returns", () => {
           kinds: ["emergency"],
           rooms: ["", "room_b_"],
           urgent_high_priority: false,
+          quiet_hours: null,
         },
       ],
+      mutes: {},
     });
     expect(read.kinds).toEqual([
       { id: "x", name: "x", detail: "", codes: ["CS-101", "CS-102", "CS-103"], events: [] },
@@ -188,12 +223,13 @@ describe("reading what notify_get returns", () => {
     // Nothing at all: an empty setup, three hours, and nothing editable.
     expect(parseNotifyDocument(null)).toEqual({
       schema_version: 0,
-      config: { revision: 0, idle_hours: 3, recipients: [] },
+      config: { revision: 0, idle_hours: 3, recipients: [], mutes: {} },
       kinds: [],
       phones: [],
       can_edit_all: false,
       user_id: null,
       error: null,
+      quietAndMutes: false,
     });
     expect(parseNotifyDocument({ config: { idle_hours: 0.2 } }).config.idle_hours).toBe(1);
   });
@@ -307,17 +343,10 @@ describe("the draft", () => {
     toDraft(saved).recipients[0].kinds.push("dosing");
     expect(saved.recipients[0].kinds).toEqual(["stock"]);
   });
-  it("ticks and unticks a kind, and presses a room chip", () => {
+  it("ticks and unticks a kind", () => {
     expect(toggleKind(["stock"], "dosing", true)).toEqual(["stock", "dosing"]);
     expect(toggleKind(["stock", "dosing"], "dosing", true)).toEqual(["stock", "dosing"]);
     expect(toggleKind(["stock", "dosing"], "stock", false)).toEqual(["dosing"]);
-    // All covers every room; a room chip from All covers that room only.
-    expect(toggleRoom(["room_b_"], null)).toEqual([]);
-    expect(toggleRoom([], "room_b_")).toEqual(["room_b_"]);
-    expect(toggleRoom(["room_b_"], "")).toEqual(["room_b_", ""]);
-    expect(toggleRoom(["room_b_", ""], "room_b_")).toEqual([""]);
-    // The last room taken out covers every room again: a row covers at least one.
-    expect(toggleRoom([""], "")).toEqual([]);
   });
   it("adds a phone with Emergencies ticked for every room, from the site's phones or by name", () => {
     expect(newRecipient(ASSISTANT, DEMO_PHONES)).toEqual({
@@ -327,6 +356,7 @@ describe("the draft", () => {
       kinds: ["emergency"],
       rooms: [],
       urgent_high_priority: true,
+      quiet_hours: null,
     });
     expect(newRecipient("notify.family", DEMO_PHONES)).toMatchObject({
       service: "notify.family",
@@ -456,45 +486,6 @@ describe("saving", () => {
     ]);
     expect(untouched.idle_hours).toBe(3);
   });
-  it("keeps the page's state: a draft back to what is saved is none, and a re-read rebases it", () => {
-    const first = doc();
-    let state = notifyReducer({ doc: null, draft: null }, { type: "loaded", doc: first });
-    expect(state).toEqual({ doc: first, draft: null });
-    const tick = (on: boolean) => ({
-      type: "edit" as const,
-      edit: (draft: ReturnType<typeof toDraft>) =>
-        updateRow(draft, GROWER, {
-          kinds: toggleKind(draft.recipients[1].kinds, "phases", on),
-        }),
-    });
-    state = notifyReducer(state, tick(true));
-    expect(state.draft!.recipients[1].kinds).toEqual(["hardware", "stock", "dosing", "phases"]);
-    expect(notifyReducer(state, tick(false)).draft).toBeNull();
-    expect(notifyReducer(state, { type: "discard" }).draft).toBeNull();
-    // Saved elsewhere: the manager gets stock tanks too. The draft stays on top of it.
-    const elsewhere = doc({
-      config: {
-        ...first.config,
-        revision: 4,
-        recipients: first.config.recipients.map((row) =>
-          row.service === MANAGER ? { ...row, kinds: ["emergency", "stock"] } : row,
-        ),
-      },
-    });
-    const reread = notifyReducer(state, { type: "loaded", doc: elsewhere });
-    expect(reread.doc).toBe(elsewhere);
-    expect(reread.draft!.recipients[1].kinds).toContain("phases");
-    expect(reread.draft!.recipients[2].kinds).toEqual(["emergency", "stock"]);
-    // The same change saved elsewhere leaves nothing to save.
-    const same = doc({ config: { ...toDraft(first.config), ...state.draft!, revision: 4 } });
-    expect(notifyReducer(state, { type: "loaded", doc: same }).draft).toBeNull();
-    expect(notifyReducer(state, { type: "saved", doc: same })).toEqual({ doc: same, draft: null });
-    // Nothing read yet: nothing to edit.
-    expect(notifyReducer({ doc: null, draft: null }, tick(true))).toEqual({
-      doc: null,
-      draft: null,
-    });
-  });
   it("lists what a save changes, phone by phone", () => {
     const base = DEMO_NOTIFY;
     let draft = toDraft(base);
@@ -522,7 +513,7 @@ describe("saving", () => {
           { label: "New alert kinds", before: null, after: "Phase changes" },
           { label: "Removed alert kinds", before: null, after: "Dosing" },
           { label: "Rooms", before: "All rooms", after: "Room B" },
-          { label: "High priority for emergencies", before: "Off", after: "On" },
+          { label: "Emergencies loud", before: "Off", after: "On" },
         ],
       },
       {
@@ -532,7 +523,7 @@ describe("saving", () => {
         lines: [
           { label: "Gets", before: null, after: "Emergencies" },
           { label: "Rooms", before: null, after: "All rooms" },
-          { label: "High priority for emergencies", before: null, after: "On" },
+          { label: "Emergencies loud", before: null, after: "On" },
         ],
       },
       {
@@ -752,5 +743,331 @@ describe("the controller store", () => {
     });
     expect(getStates).toHaveBeenCalledTimes(1);
     store.disconnect();
+  });
+});
+
+describe("quiet hours, mutes, the bottom bar and test pushes (Task 26)", () => {
+  const NZ = "Pacific/Auckland";
+  afterEach(() => setDisplayUnits({ clock: "24" }));
+  it("parse tolerates missing quiet_hours and loud", () => {
+    const read = parseNotifyDocument({
+      config: {
+        revision: 2,
+        recipients: [
+          { service: "notify.a", urgent_high_priority: true, quiet_hours: { from: "22:00", to: "06:00" } },
+          { service: "notify.b" },
+          { service: "notify.c", quiet_hours: { from: "7:00", to: "06:00" } },
+          { service: "notify.d", quiet_hours: { from: "06:00", to: "06:00" } },
+        ],
+        mutes: { room_b_: "2026-10-23T03:00:00+00:00", "": "not a time", "F 2": "2026-10-23T03:00:00Z" },
+      },
+    });
+    expect(read.config.recipients.map((row) => [row.service, row.quiet_hours, row.urgent_high_priority])).toEqual([
+      ["notify.a", { from: "22:00", to: "06:00" }, true],
+      ["notify.b", null, false],
+      ["notify.c", null, false],
+      ["notify.d", null, false],
+    ]);
+    expect(read.config.mutes).toEqual({ room_b_: Date.parse("2026-10-23T03:00:00Z") });
+    // Quiet hours and mutes are the 3.18 integration's: an answer without `mutes` has neither.
+    expect(read.quietAndMutes).toBe(true);
+    const old = parseNotifyDocument({ config: { revision: 2, recipients: [{ service: "notify.a" }] } });
+    expect(old.quietAndMutes).toBe(false);
+    expect(old.config.mutes).toEqual({});
+    expect(old.config.recipients[0].quiet_hours).toBeNull();
+  });
+  it("draftSummary words each change", () => {
+    const context = { kinds: DEMO_KINDS, phones: DEMO_PHONES, rooms: ROOMS };
+    const saved = DEMO_NOTIFY;
+    let draft = updateRow(toDraft(saved), MANAGER, { kinds: ["emergency", "dosing"], rooms: ["room_b_"] });
+    expect(draftSummary(draft, saved, context)).toBe(
+      "2 changes not applied yet: Manager gets Dosing · Manager: Room B only",
+    );
+    draft = updateRow(toDraft(saved), GROWER, {
+      kinds: ["hardware"],
+      urgent_high_priority: true,
+      quiet_hours: { from: "22:00", to: "06:00" },
+    });
+    draft = { ...draft, idle_hours: 4 };
+    expect(draftSummary(draft, saved, context)).toBe(
+      "4 changes not applied yet: Grower stops getting Stock tanks, Dosing · Grower: emergencies loud · Grower: quiet 22:00–06:00 · Shots stopped after 4 h",
+    );
+    draft = { ...toDraft(saved), recipients: [...toDraft(saved).recipients.slice(1), newRecipient(ASSISTANT, DEMO_PHONES)] };
+    expect(draftSummary(draft, saved, context)).toBe(
+      "2 changes not applied yet: Assistant added · Owner removed",
+    );
+    setDisplayUnits({ clock: "12" });
+    const quiet = updateRow(toDraft(saved), OWNER, { quiet_hours: { from: "22:00", to: "06:30" } });
+    expect(draftSummary(quiet, saved, context)).toBe(
+      "1 change not applied yet: Owner: quiet 10:00 pm–6:30 am",
+    );
+    expect(draftSummary(toDraft(saved), saved, context)).toBe("");
+  });
+  it("testLine accepted and failed", () => {
+    const at = Date.parse("2026-10-23T00:58:00Z"); // 13:58 in Auckland
+    expect(testLine({ sent: true, error: null }, at, NZ)).toBe("Accepted 13:58");
+    expect(testLine({ sent: false, error: "notify.x is not a notify service in Home Assistant" }, at, NZ)).toBe(
+      "Failed 13:58 · notify.x is not a notify service in Home Assistant",
+    );
+    expect(testLine({ sent: false, error: null }, at, NZ)).toBe("Failed 13:58 · no reason given");
+    setDisplayUnits({ clock: "12" });
+    expect(testLine({ sent: true, error: null }, at, NZ)).toBe("Accepted 1:58 pm");
+  });
+  it("reads a Test all answer, phone by phone", () => {
+    expect(
+      parseTestResults({
+        results: [
+          { service: "notify.a", sent: true, error: null },
+          { service: "notify.b", sent: false, error: "timed out" },
+          { service: "light.x", sent: true },
+        ],
+      }),
+    ).toEqual({
+      "notify.a": { sent: true, error: null },
+      "notify.b": { sent: false, error: "timed out" },
+    });
+    expect(parseTestResults({ sent: true })).toBeNull();
+  });
+  it("draws the union of every phone's quiet hours on the day, across midnight", () => {
+    expect(quietSpans([{ from: "22:00", to: "06:00" }, null])).toEqual([
+      [0, 360],
+      [1320, 1440],
+    ]);
+    expect(quietSpans([{ from: "22:00", to: "06:00" }, { from: "05:00", to: "07:30" }, { from: "12:00", to: "13:00" }])).toEqual([
+      [0, 450],
+      [720, 780],
+      [1320, 1440],
+    ]);
+    expect(quietSpans([null])).toEqual([]);
+    expect(spanMinutes(quietSpans([{ from: "22:00", to: "06:00" }]))).toBe(480);
+    // Lights on 18:00 to 06:00 crosses midnight too.
+    expect(lightSpans(18, 6)).toEqual([
+      [0, 360],
+      [1080, 1440],
+    ]);
+    expect(lightSpans(6, 18)).toEqual([[360, 1080]]);
+    expect(lightSpans(Number.NaN, 18)).toEqual([]);
+  });
+  it("presses a room chip: every room shows each chip on, and the last room off is every room again", () => {
+    const all = ["", "room_b_"];
+    expect(pressRoom([], "room_b_", all)).toEqual([""]);
+    expect(pressRoom([""], "room_b_", all)).toEqual([]);
+    expect(pressRoom([""], "", all)).toEqual([]);
+    expect(pressRoom(["room_b_"], "", all)).toEqual([]);
+    expect(roomChipWords([], ROOMS)).toBe("every room");
+    expect(roomChipWords(["room_b_"], ROOMS)).toBe("Room B only");
+  });
+  it("saves quiet hours on a 3.18 setup only, and mutes are a save of their own", () => {
+    const d = doc({ quietAndMutes: true });
+    const draft = updateRow(toDraft(d.config), OWNER, { quiet_hours: { from: "22:00", to: "06:00" } });
+    const sent = savePayload(d, draft).recipients as Record<string, unknown>[];
+    expect(sent[0].quiet_hours).toEqual({ from: "22:00", to: "06:00" });
+    expect(sent[1].quiet_hours).toBeNull();
+    expect((savePayload(doc(), draft).recipients as Record<string, unknown>[])[0]).not.toHaveProperty("quiet_hours");
+    const until = Date.parse("2026-10-23T03:00:00Z");
+    expect(mutePayload(d, { room_b_: until })).toEqual({
+      expected_revision: 3,
+      recipients: savePayload(d, toDraft(d.config)).recipients,
+      mutes: { room_b_: "2026-10-23T03:00:00.000Z" },
+    });
+    expect(draftErrors(updateRow(toDraft(d.config), OWNER, { quiet_hours: { from: "06:00", to: "06:00" } }))).toEqual([
+      "Quiet hours need a start and an end that differ.",
+    ]);
+  });
+});
+
+describe("mutes and the save's receipt (Task 26)", () => {
+  const NZ = "Pacific/Auckland";
+  it("words when a mute ends and checks the one read back", () => {
+    const now = Date.parse("2026-10-23T01:00:00Z"); // 14:00 Friday in Auckland
+    expect(muteEndWords(Date.parse("2026-10-23T03:00:00Z"), now, NZ)).toBe("16:00");
+    expect(muteEndWords(Date.parse("2026-10-23T19:00:00Z"), now, NZ)).toBe("08:00 tomorrow");
+    expect(muteEndWords(Date.parse("2026-10-25T19:00:00Z"), now, NZ)).toBe("08:00 Mon 26 Oct");
+    expect(sameMuteEnd(now + 400, now)).toBe(true);
+    expect(sameMuteEnd(undefined, now)).toBe(false);
+    expect(sameMuteEnd(undefined, null)).toBe(true);
+    expect(sameMuteEnd(now, null)).toBe(false);
+  });
+  it("claims a row written and read back only when its phone reads back as sent", () => {
+    const saved = DEMO_NOTIFY;
+    const draft = { ...updateRow(toDraft(saved), MANAGER, { kinds: ["emergency", "dosing"] }), idle_hours: 4 };
+    const changes = draftChanges(saved, draft, { kinds: DEMO_KINDS, phones: DEMO_PHONES, rooms: ROOMS });
+    const rows = reviewRows(changes);
+    expect(rows.map((row) => [row.key, row.label, row.before, row.after])).toEqual([
+      [MANAGER, "Manager (Phone 3): New alert kinds", "—", "Dosing"],
+      ["idle", "Shots stopped after", "3 h", "4 h"],
+    ]);
+    const at = 1;
+    const all = saveReceipt(rows, draft, { ...saved, ...draft, revision: 4 }, at);
+    expect(all).toMatchObject({ ok: true, summary: "Manager (Phone 3): New alert kinds — → Dosing · Shots stopped after 3 h → 4 h" });
+    expect(all).not.toHaveProperty("notConfirmed");
+    // The integration kept the old threshold: that row is not confirmed, the phone's still is.
+    const part = saveReceipt(rows, draft, { ...saved, recipients: draft.recipients, revision: 4 }, at);
+    expect(part).toMatchObject({ ok: false, notConfirmed: ["idle"] });
+    expect(part.summary).toBe("Manager (Phone 3): New alert kinds — → Dosing");
+  });
+});
+
+describe("Task 26 review round 1", () => {
+  it("refuses quiet hours that are not HH:MM", () => {
+    const draft = updateRow(toDraft(DEMO_NOTIFY), MANAGER, { quiet_hours: { from: "", to: "06:00" } });
+    expect(draftErrors(draft)).toEqual(["Quiet hours need a start and an end as HH:MM."]);
+  });
+  it("reads a row back as sent after the integration trims and cuts its name and fills its user", () => {
+    const long = "  A very long phone name that goes on past forty letters  ";
+    const draft = {
+      ...toDraft(DEMO_NOTIFY),
+      recipients: [...DEMO_NOTIFY.recipients, recipient("notify.mobile_app_new", ["emergency"], { name: long })],
+    };
+    const rows = reviewRows(draftChanges(DEMO_NOTIFY, draft, { kinds: DEMO_KINDS, phones: DEMO_PHONES, rooms: ROOMS }));
+    const back = {
+      ...DEMO_NOTIFY,
+      revision: 4,
+      recipients: [
+        ...DEMO_NOTIFY.recipients,
+        recipient("notify.mobile_app_new", ["emergency"], { name: long.trim().slice(0, 40), user_id: "u-new" }),
+      ],
+    };
+    expect(saveReceipt(rows, draft, back, 1)).toMatchObject({ ok: true });
+    // A different name than the one sent is still not confirmed.
+    const other = {
+      ...back,
+      recipients: [...DEMO_NOTIFY.recipients, recipient("notify.mobile_app_new", ["emergency"], { name: "Else" })],
+    };
+    expect(saveReceipt(rows, draft, other, 1).ok).toBe(false);
+  });
+  it("tests every phone in one call on 3.18 and shows its error on each phone, never a second push", async () => {
+    const call = vi.fn(async () => {
+      throw new Error("timed out");
+    });
+    expect(await testPhones(["notify.a", "notify.b"], true, call)).toEqual({
+      "notify.a": { sent: false, error: "timed out" },
+      "notify.b": { sent: false, error: "timed out" },
+    });
+    expect(call).toHaveBeenCalledTimes(1);
+  });
+  it("tests phone by phone on 3.17, or when the integration refuses services", async () => {
+    const one = vi.fn(async (data: Record<string, unknown>) => {
+      if ("services" in data) throw new Error("extra keys not allowed @ data['services']");
+      return { sent: true, error: null };
+    });
+    const ok = { sent: true, error: null };
+    expect(await testPhones(["notify.a", "notify.b"], false, one)).toEqual({ "notify.a": ok, "notify.b": ok });
+    expect(one).toHaveBeenCalledTimes(2);
+    one.mockClear();
+    expect(await testPhones(["notify.a", "notify.b"], true, one)).toEqual({ "notify.a": ok, "notify.b": ok });
+    expect(one).toHaveBeenCalledTimes(3);
+    const many = vi.fn(async () => ({ results: [{ service: "notify.a", sent: true, error: null }] }));
+    expect(await testPhones(["notify.a", "notify.b"], true, many)).toEqual({
+      "notify.a": ok,
+      "notify.b": { sent: false, error: "No answer for this phone." },
+    });
+  });
+});
+
+describe("notifications review round 2 (Task 26)", () => {
+  it("the quiet-hours note says what the integration lets through and what a restart drops", () => {
+    const note = quietNote([]);
+    expect(note).toMatch(/emergencies/i);
+    expect(note).toMatch(/Keep and Undo/);
+    expect(note).toMatch(/one summary when that phone's quiet hours end/);
+    expect(note).toMatch(/restart.*drops what is waiting/i);
+    expect(note).not.toMatch(/only emergencies/i);
+  });
+  it("field errors sit on their own fields", () => {
+    const base = toDraft(DEMO_NOTIFY);
+    expect(fieldErrors(base)).toEqual({ idle: null, quiet: null });
+    expect(fieldErrors({ ...base, idle_hours: 0 }).idle).toBe("Shots stopped needs 1 to 12 whole hours.");
+    const same = updateRow(base, OWNER, { quiet_hours: { from: "06:00", to: "06:00" } });
+    expect(fieldErrors(same)).toEqual({ idle: null, quiet: "Quiet hours need a start and an end that differ." });
+  });
+  it("bar checks warn when no phone is listed, and block on errors", () => {
+    const base = toDraft(DEMO_NOTIFY);
+    expect(applyChecks(base)).toEqual([]);
+    expect(applyChecks({ ...base, recipients: [] })).toEqual([{ ok: "warn", text: NO_PHONES_WARNING }]);
+    expect(NO_PHONES_WARNING).toMatch(/notify_service option/);
+    expect(applyChecks({ ...base, idle_hours: 0 })).toEqual([
+      { ok: false, text: "Shots stopped needs 1 to 12 whole hours." },
+    ]);
+  });
+  it("the idle note keeps CS-209 and that only P1 and P2 count", () => {
+    expect(IDLE_NOTE).toMatch(/CS-209/);
+    expect(IDLE_NOTE).toMatch(/P1 or P2/);
+  });
+  it("only the integration's own refusals are refusals; anything else may have landed", () => {
+    expect(saveRefusal(new NotifyRefusal("revision"))).toMatchObject({ code: "stale_revision" });
+    expect(saveRefusal(new NotifyRefusal("not allowed: only an administrator can mute a room"))).toMatchObject({
+      code: "forbidden",
+    });
+    expect(saveRefusal(new NotifyRefusal("Quiet hours need a start and an end that differ"))).toEqual({
+      kind: "error",
+      code: "guard_refused",
+      message: "Quiet hours need a start and an end that differ",
+    });
+    expect(saveRefusal({ code: "invalid_format", message: "extra keys not allowed" })).toMatchObject({
+      code: "guard_refused",
+    });
+    expect(saveRefusal({ code: "unauthorized", message: "Unauthorized" })).toMatchObject({ code: "forbidden" });
+    expect(saveRefusal(new Error("Connection lost"))).toBeNull();
+    expect(saveRefusal({ code: 3, message: "Home Assistant request timed out." })).toBeNull();
+  });
+  it("Undo of a mute whose earlier end has passed unmutes", () => {
+    const now = Date.parse("2026-10-23T00:00:00Z");
+    expect(muteUndoTarget(null, now)).toBeNull();
+    expect(muteUndoTarget(now - 1000, now)).toBeNull();
+    expect(muteUndoTarget(now + 60_000, now)).toBe(now + 60_000);
+  });
+  it("the quiet-hours phones are one radio group", () => {
+    const html = renderToStaticMarkup(
+      createElement(QuietPhones, {
+        phones: [
+          { service: "notify.a", title: "Owner", window: "23:00–05:00" },
+          { service: "notify.b", title: "Grower", window: null },
+        ],
+        value: "notify.b",
+        onChange: () => undefined,
+      }),
+    );
+    expect(html).toContain('role="radiogroup"');
+    expect(html).toContain('aria-label="Quiet hours for"');
+    expect(html).not.toContain("aria-pressed");
+    expect(html).toMatch(/role="radio" aria-checked="false" tabindex="-1"[^>]*data-quiet-phone="notify.a"/);
+    expect(html).toMatch(/role="radio" aria-checked="true" tabindex="0"[^>]*data-quiet-phone="notify.b"/);
+    expect(html).toContain("no quiet hours");
+  });
+});
+
+describe("notifications review round 3 (Task 26)", () => {
+  const A = recipient("notify.a", ["emergency"]);
+  const B = recipient("notify.b", ["stock"]);
+  it("a draft kept in the tab is carried onto a setup saved elsewhere since, not over it", () => {
+    const base = config([A, B], 3, 3);
+    // Mine: B also gets dosing. Elsewhere since: A got stock, the threshold went to 5.
+    const kept = { ...updateRow(toDraft(base), "notify.b", { kinds: ["stock", "dosing"] }), base };
+    const fresh = config([{ ...A, kinds: ["emergency", "stock"] }, B], 4, 5);
+    const restored = restoreDraft(kept, fresh)!;
+    expect(restored.base).toEqual(fresh);
+    expect(restored.idle_hours).toBe(5);
+    expect(restored.recipients).toEqual([
+      { ...A, kinds: ["emergency", "stock"] },
+      { ...B, kinds: ["stock", "dosing"] },
+    ]);
+    // On the same revision it is kept as it was.
+    expect(restoreDraft(kept, base)).toEqual(kept);
+    // Nothing left of mine once carried: no draft.
+    expect(restoreDraft({ ...toDraft(base), base }, fresh)).toBeNull();
+    // A copy with no base cannot be placed: dropped, never sent over the fresh setup.
+    expect(restoreDraft(toDraft(base), fresh)).toBeNull();
+  });
+  it("the quiet-hours note names the phones that take a digest, and says nothing of one with none", () => {
+    expect(quietNote([])).not.toMatch(/digest/);
+    expect(quietNote(["Owner (Phone 1)"])).toMatch(/Keep and Undo \(not to Owner \(Phone 1\), which takes a digest\)/);
+    const parsed = parseNotifyConfig({ revision: 1, recipients: [{ service: "notify.a", digest: true }, { service: "notify.b" }] });
+    expect(parsed.recipients.map((row) => row.digest)).toEqual([true, undefined]);
+  });
+  it("a mute that may have landed reads the setup again; a refusal does not", () => {
+    expect(muteRereads(new Error("socket closed"))).toBe(true);
+    expect(muteRereads(new NotifyRefusal("revision"))).toBe(true);
+    expect(muteRereads(new NotifyRefusal("not allowed: only an administrator can mute a room"))).toBe(false);
   });
 });

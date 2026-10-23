@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "vitest";
-import { clock, dayKey, dayLabel, daysBefore, hourTicks, lightsWindow, startOfDay } from "./time";
+import { clock, dayEndText, dayKey, dayLabel, daysBefore, hourClock, hourTicks, lightsWindow, startOfDay } from "./time";
 import { setDisplayUnits } from "./display-units";
 
 const NZ = "Pacific/Auckland";
@@ -67,5 +67,22 @@ describe("zoned time", () => {
   test("dayLabel names the zone's date", () => {
     // 20:00 UTC on the 21st is already Thursday the 22nd in Auckland.
     expect(dayLabel(Date.parse("2026-10-21T20:00:00Z"), NZ)).toBe("Thu 22 Oct");
+  });
+});
+
+describe("hourClock (Task 26)", () => {
+  test("writes a lights hour as HH:MM, rounding to the minute without 60", () => {
+    expect(hourClock(6.5)).toBe("06:30");
+    expect(hourClock(6.999)).toBe("07:00");
+    expect(hourClock(23.999)).toBe("00:00");
+    expect(hourClock(22)).toBe("22:00");
+  });
+});
+
+describe("dayEndText (Task 26 round 2)", () => {
+  test("the day's last tick: 24:00 on the 24-hour clock, the display clock's midnight otherwise", () => {
+    expect(dayEndText()).toBe("24:00");
+    setDisplayUnits({ clock: "12" });
+    expect(dayEndText()).toBe("12:00 am");
   });
 });

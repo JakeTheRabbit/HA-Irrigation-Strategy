@@ -640,7 +640,7 @@ export class OperatorDemo {
       return result as T;
     }
     if (action.startsWith("notify_")) {
-      this.notifyDemo ||= new NotifyDemo(this.getStates, this.updateStates, this.notifyUser);
+      this.notifyDemo ||= new NotifyDemo(this.getStates, this.updateStates, this.notifyUser, this.backend);
       return this.notifyDemo.call(action, data) as T;
     }
     let result: unknown;

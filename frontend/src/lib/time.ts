@@ -58,6 +58,21 @@ export function clock(ms: number, tz: string): string {
   if (getDisplayUnits().clock === "24") return `${pad(h)}:${pad(min)}`;
   return `${h % 12 || 12}:${pad(min)} ${h < 12 ? "am" : "pm"}`;
 }
+/** A wall time "HH:MM" as the display units' clock writes it: "22:00", or "10:00 pm". */
+export function wallText(hhmmText: string): string {
+  if (getDisplayUnits().clock === "24") return hhmmText;
+  const { h, m } = hhmm(hhmmText);
+  return `${h % 12 || 12}:${pad(m)} ${h < 12 ? "am" : "pm"}`;
+}
+/** The end of a day strip: "24:00", or the 12-hour clock's midnight "12:00 am". */
+export function dayEndText(): string {
+  return getDisplayUnits().clock === "24" ? "24:00" : wallText("00:00");
+}
+/** An hour of the day as a number (6.5 is 06:30) as "HH:MM", to the nearest minute. */
+export function hourClock(hour: number): string {
+  const minutes = Math.round(hour * 60);
+  return `${pad(Math.floor(minutes / 60) % 24)}:${pad(minutes % 60)}`;
+}
 /** The zone's calendar date: "2026-10-22". */
 export function dayKey(ms: number, tz: string): string {
   const { y, m, d } = wall(ms, tz);
