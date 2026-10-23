@@ -37,7 +37,9 @@ pump name or recipe is assumed.
       "flow_entity": "number.x",       // number.* | input_number.* | sensor.*   calibrated flow, mL/s
                                        // (or mL/min, L/h: Units and hardware, below). It wins over
                                        // calibrated_ml_min; a pump with no flow_entity and a calibrated_ml_min
-                                       // is dosed at calibrated_ml_min / 60 mL/s (pump_calibration_commit)
+                                       // is dosed at calibrated_ml_min / 60 mL/s (pump_calibration_commit).
+                                       // Optional once the pump has a calibrated_ml_min; a pump with
+                                       // neither is refused at save
       "max_ml": 2000,                  // 1..5000; a request above it is refused
       "restore_volume": true,          // put the volume number back after a single dose (firmware that
                                        // keeps its batch recipe in that number); default true
@@ -229,7 +231,8 @@ read has no request taken.
 - `stop_pump`: one pump. Its prime or calibration running in the room ends within one tick (1 s); a
   dose, batch or pH correction running in the room is left alone ("refused: a batch is running, and a
   pump's stop leaves it alone": the room's `stop` ends those); otherwise the pump's `power_entity` is
-  switched off and read back. Like a `stop`, it is acted on however old it is while the room is busy
+  switched off and read back, and one that does not read off is held and raises **CS-801** as a timed
+  run's does (A timed run, step 6). Like a `stop`, it is acted on however old it is while the room is busy
   or held.
 - `batch`: the batch sequence. Refused while `hold_entity` is already on (something else is
   dosing) or can't be read, or while the room has a latched hardware fault.
@@ -237,6 +240,11 @@ read has no request taken.
   `batch` is refused (a `stop` is always acted on), and so is one for a room held by dosing hardware
   that does not read off ("refused: <entity> does not read off yet"). A request refused meanwhile
   keeps its own `handled_result`: the end of the running dose or batch never takes its place.
+- A pump whose published setup can't be read (a pump from an older setup with neither a flow entity
+  nor a calibrated flow) is refused on its own ("refused: the setup of pump <id> can't be read"), and
+  the controller's status lists it under `unreadable_pumps`; the room's other pumps work as before,
+  and a `stop` or `stop_pump` still switches its `power_entity` off. A pump list or batch that can't
+  be read still leaves the whole room's dosing untouched.
 - One room's error never stops the others: each room is read in its own turn, and a room that fails
   15 passes in a row (30 s) raises CS-806 ("dosing in this room keeps failing").
 
@@ -328,8 +336,9 @@ request with `seconds`. It is the one thing that switches a dosing pump's power 
    "feed probe calibration in progress"), or the room's kill switch is off. The run is at most its
    `seconds`, and never longer than 30 s for a prime or 120 s for a calibration.
 2. Write it to `dosing_state.json` (its pump's power to switch off) before anything moves.
-3. Switch `power_entity` on and read it back on. One that does not read on is switched off and read
-   back: "refused: <entity> did not read on".
+3. Switch `power_entity` on and read it back on, waiting at most the run's own `seconds` (and never
+   more than 6 s), so a short run never runs long waiting for its on. One that does not read on is
+   switched off and read back: "refused: <entity> did not read on".
 4. Every second: the app stopping, a `stop` or `stop_pump` (read now), the room's kill switch off, a
    hardware fault latched, a shot in flight in the room. Any of them ends it: "stopped".
 5. At `seconds`, or on any end (an error in the controller included): switch `power_entity` off and

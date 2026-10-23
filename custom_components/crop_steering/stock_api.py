@@ -180,6 +180,14 @@ class StockStore:
         state = self.hass.states.get(entity) if entity else None
         return state.state if state is not None else None
 
+    def _flow(self, pump):
+        """The pump's flow in mL/s: its flow entity's reading, or with none its calibrated_ml_min / 60
+        (as the controller doses it)."""
+        if pump.get("flow_entity"):
+            return self._read(pump["flow_entity"])
+        ml_min = pump.get("calibrated_ml_min")
+        return ml_min / 60 if isinstance(ml_min, (int, float)) else None
+
     def _watch(self):
         """Follow the pumps linked to stock tanks (docs/DOSING.md, Stock tanks): their power and
         dosing entities, as the dosing setup names them. A pump already running when it is first
@@ -224,7 +232,7 @@ class StockStore:
                 ]
                 self._runs[pump_id] = {
                     "since": min([t for t in changed_at if t] or [_utcnow()]),
-                    "flow": self._read(pump.get("flow_entity")),
+                    "flow": self._flow(pump),
                 }
 
     def _changed(self, new_state):
@@ -238,7 +246,7 @@ class StockStore:
             if on and run is None:
                 self._runs[pump_id] = {
                     "since": at,
-                    "flow": self._read(pump.get("flow_entity")),
+                    "flow": self._flow(pump),
                 }
             elif run is not None and not on:
                 del self._runs[pump_id]
@@ -267,7 +275,7 @@ class StockStore:
         seconds = (end - run["since"]).total_seconds()
         flow = run["flow"]
         if stock.pumped_ml(seconds, flow) is None:
-            flow = self._read(pump.get("flow_entity"))
+            flow = self._flow(pump)
         ml = stock.pumped_ml(seconds, flow)
         tank = pump["stock_tank"]
         if ml is None:

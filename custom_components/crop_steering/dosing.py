@@ -294,8 +294,9 @@ def _pump(raw, taken, exists, stock_tanks=None) -> dict:
         "power_entity": _entity(
             raw.get("power_entity"), POWER, f"{label}: power switch", exists
         ),
+        # Optional for a pump with a calibrated flow: the controller then sizes its doses by that.
         "flow_entity": _entity(
-            raw.get("flow_entity"), FLOW, f"{label}: flow entity", exists
+            raw.get("flow_entity"), FLOW, f"{label}: flow entity", exists, optional=True
         ),
         "max_ml": _number(raw.get("max_ml"), 1, MAX_ML, f"{label}: max mL"),
         "restore_volume": restore,
@@ -319,6 +320,8 @@ def _pump(raw, taken, exists, stock_tanks=None) -> dict:
         "primed_at": _moment(raw.get("primed_at"), f"{label}: primed at"),
     }
     pump.update({key: value for key, value in extra.items() if value})
+    if pump["flow_entity"] is None and "calibrated_ml_min" not in pump:
+        raise DosingError(f"{label}: a flow entity or a calibrated flow is required")
     return pump
 
 

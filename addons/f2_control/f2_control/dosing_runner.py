@@ -661,7 +661,7 @@ class DosingRunner:
         not read off is released once all of it does."""
         job = busy if busy is not None and busy.room.slug == room.slug else None
         entities = [p["power_entity"] for p in job.config["pumps"]] if job is not None else []
-        entities += [p["power_entity"] for p in config["pumps"]]
+        entities += [p["power_entity"] for p in config["pumps"]] + self._unreadable_powers(config)
         with self._lock:
             stuck = deepcopy(self._stuck.get(room.slug))
         if stuck:
@@ -681,7 +681,7 @@ class DosingRunner:
         """A stop of one pump (the integration's pump_stop): that pump's prime or calibration running in the room
         ends at its next tick (_timed_run), which switches it off and reads it back off; a dose, batch or pH
         correction running in the room is left alone (the room's stop ends it); else the pump's power is switched
-        off and read back."""
+        off and read back, and a power that does not read off latches the room and raises CS-801, as a run's does."""
         job = busy if busy is not None and busy.room.slug == room.slug else None
         if job is not None and job.kind in TIMED_S and job.pump["id"] == request.get("pump"):
             job.stopped, job.stopped_by = True, request.get("by")
@@ -691,9 +691,22 @@ class DosingRunner:
         if job is not None and job.kind not in TIMED_S:
             return f"refused: a {_KIND[job.kind]} is running, and a pump's stop leaves it alone"
         pump = next((p for p in config["pumps"] if p["id"] == request.get("pump")), None)
-        if pump is None:
-            return f"refused: there is no pump {request.get('pump')} in this room's setup"
+        if pump is None:  # a pump whose setup can't be read is still switched off by its name's power
+            power = next(iter(self._unreadable_powers(config, request.get("pump"))), None)
+            if power is None:
+                return self._no_pump(config, request.get("pump"))
+            pump = {"id": request.get("pump"), "name": request.get("pump"), "power_entity": power}
         left = self._switch_off([pump["power_entity"]])
+        if left:
+            event = _event(pump["id"], self._now().isoformat())
+            self._alert(room.slug, "CS-801", "a dosing pump does not read off after a stop",
+                        f"A stop of {pump['name']} set its power ({pump['power_entity']}) to off, but it does not "
+                        "read off. The shots of this room are held, and the controller sends the off again each "
+                        "2 s until it reads off. If the pump still runs, stop it by hand. Check the tank before "
+                        "the next dose.", event)
+            self._hold_stuck(room, left, None, {room.slug}, "CS-801", "a dosing pump does not read off",
+                             f"A stop of {pump['name']} did not read its power off.",
+                             "Check the pump and the tank before the next dose.", event, alerted=True)
         return "stopped" + (f"; {_does(left)} not read off" if left else "")
 
     # ------------------------------------------------------------------ a timed run (prime, calibrate)
@@ -709,8 +722,7 @@ class DosingRunner:
         action = request["action"]
         pump = next((p for p in config["pumps"] if p["id"] == request.get("pump")), None)
         if pump is None:
-            return self._settle(room, config, request,
-                                f"refused: there is no pump {request.get('pump')} in this room's setup")
+            return self._settle(room, config, request, self._no_pump(config, request.get("pump")))
         seconds = request.get("seconds")
         if (isinstance(seconds, bool) or not isinstance(seconds, (int, float)) or not math.isfinite(seconds)
                 or seconds <= 0):
@@ -804,7 +816,7 @@ class DosingRunner:
         except _Ended:  # a stop came first: nothing was switched on
             return "stopped"
         job.pressed = self._mono()
-        if self._confirm([power], "on"):
+        if self._confirm([power], "on", min(CONFIRM_TIMEOUT_S, seconds)):  # never longer than the run itself
             return f"refused: {power} did not read on"
         end = job.pressed + seconds
         while True:
@@ -841,8 +853,7 @@ class DosingRunner:
         holds the room's watering until it does (_release_stuck)."""
         pump = next((p for p in config["pumps"] if p["id"] == request.get("pump")), None)
         if pump is None:
-            return self._settle(room, config, request,
-                                f"refused: there is no pump {request.get('pump')} in this room's setup")
+            return self._settle(room, config, request, self._no_pump(config, request.get("pump")))
         job = _Job(room, config, request, "dose")
         job.pump = pump
         with self._lock:
@@ -2493,6 +2504,9 @@ class DosingRunner:
                  else "batch" if job.kind in ("batch", "correct") else "dosing")
         return state, {
             "pumps": pumps,
+            # the pumps whose setup can't be read: each refused, the others working (_config)
+            "unreadable_pumps": [p.get("id") if isinstance(p, dict) else None
+                                 for p in (config.get("unreadable") or () if config else ())],
             "batch": batch,
             "handled": block["handled"],
             "handled_result": block["handled_result"],
@@ -2508,17 +2522,20 @@ class DosingRunner:
     def _config(self, room):
         """The room's dosing setup as the integration publishes it: None with no dosing_config at all
         (an integration from before dosing), False when it can't be read (never acted on), else
-        {"revision", "pumps", "batch", "request", "profile"}."""
+        {"revision", "pumps", "unreadable", "batch", "request", "profile"}. A pump that can't be read is left out
+        of `pumps` and kept in `unreadable`: a request for it is refused (_no_pump) and a stop still switches its
+        power off (_unreadable_powers), while the room's other pumps work as before."""
         state, attributes, _updated = self._get(f"sensor.crop_steering_{room.prefix}dosing_config")
         if state is None:
             return None
         if str(state).strip().lower() in DEAD or not isinstance(attributes, dict):
             return False
         pumps, batch = attributes.get("pumps"), attributes.get("batch")
-        if not (isinstance(pumps, list) and all(self._pump_readable(p) for p in pumps)
-                and isinstance(batch, dict) and self._batch_readable(batch)):
+        if not (isinstance(pumps, list) and isinstance(batch, dict) and self._batch_readable(batch)):
             return False
-        return {"revision": state, "pumps": pumps, "batch": batch, "request": attributes.get("request"),
+        return {"revision": state, "pumps": [p for p in pumps if self._pump_readable(p)],
+                "unreadable": [p for p in pumps if not self._pump_readable(p)],
+                "batch": batch, "request": attributes.get("request"),
                 "profile": attributes.get("profile"), "calibrating": attributes.get("calibrating")}
 
     @staticmethod
@@ -2530,6 +2547,20 @@ class DosingRunner:
         ) and (isinstance(pump.get("flow_entity"), str) and bool(pump["flow_entity"])
                or not pump.get("flow_entity") and _ml_s(pump.get("calibrated_ml_min")) is not None
                ) and isinstance(pump.get("max_ml"), (int, float))
+
+    @staticmethod
+    def _no_pump(config, pump_id):
+        """The refusal of a request for a pump `config` has none of: its setup can't be read, or there is none."""
+        if any(isinstance(p, dict) and p.get("id") == pump_id for p in config.get("unreadable") or ()):
+            return f"refused: the setup of pump {pump_id} can't be read"
+        return f"refused: there is no pump {pump_id} in this room's setup"
+
+    @staticmethod
+    def _unreadable_powers(config, pump_id=None):
+        """The power switches the room's unreadable pumps (or the one `pump_id`) name: a stop still switches them off."""
+        return [p["power_entity"] for p in config.get("unreadable") or ()
+                if isinstance(p, dict) and isinstance(p.get("power_entity"), str) and "." in p["power_entity"]
+                and (pump_id is None or p.get("id") == pump_id)]
 
     @staticmethod
     def _batch_readable(batch):
@@ -2606,12 +2637,13 @@ class DosingRunner:
         at = _aware(request.get("at"))
         return (self._now() - at).total_seconds() if at else None
 
-    @staticmethod
-    def _dosing_hardware(config):
-        """What a stop, an interrupted batch or a restart switches off: every pump's power, then the
-        fill valve, the mix pump and the mix valves."""
+    @classmethod
+    def _dosing_hardware(cls, config):
+        """What a stop, an interrupted batch or a restart switches off: every pump's power (an unreadable pump's
+        too), then the fill valve, the mix pump and the mix valves."""
         batch = config["batch"]
-        return [e for e in (*(p["power_entity"] for p in config["pumps"]), batch.get("fill_valve"),
+        return [e for e in (*(p["power_entity"] for p in config["pumps"]), *cls._unreadable_powers(config),
+                            batch.get("fill_valve"),
                             batch.get("mix_pump"), *(batch.get("mix_valves") or [])) if e]
 
     # ------------------------------------------------------------------ switching, with read-back
@@ -2636,8 +2668,9 @@ class DosingRunner:
         0.5 s up to `timeout` (CONFIRM_TIMEOUT_S) -> the ones that don't."""
         if not entities:
             return []
-        deadline = self._mono() + (CONFIRM_TIMEOUT_S if timeout is None else timeout)
-        self._sleep(CONFIRM_FIRST_S)
+        timeout = CONFIRM_TIMEOUT_S if timeout is None else timeout
+        deadline = self._mono() + timeout
+        self._sleep(min(CONFIRM_FIRST_S, timeout))
         while True:
             left = [e for e in entities if self._hw_state(e) != want]
             if not left or self._mono() >= deadline:

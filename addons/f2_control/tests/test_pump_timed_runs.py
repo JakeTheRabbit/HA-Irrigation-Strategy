@@ -131,12 +131,13 @@ def test_next_dose_uses_calibrated_flow_when_no_flow_entity(rig):
     r.ask(ml=50)
     r.poll()
     assert _report(r) == "refused: Balance is not calibrated (flow 0.01)"
-    # Neither a flow entity nor a calibration: the setup can't be read, as before (nothing is acted on).
+    # Neither a flow entity nor a calibration: that pump's setup can't be read, and nothing is acted on for it.
     r.config(pumps=(pump,), revision="3")
     r.ask(ml=50)
     r.fake.calls.clear()
     r.poll()
-    assert r.status()[0] == "unavailable" and r.actions() == []
+    assert _report(r) == "refused: the setup of pump balance can't be read"
+    assert r.actions() == []
 
 
 def test_flow_entity_still_wins_over_calibrated_flow(rig):
@@ -506,3 +507,83 @@ def test_the_last_ten_answers_are_kept(rig):
     answers = r.status()[1]["handled_results"]
     assert list(answers) == asked[2:]
     assert set(answers.values()) == {"refused: Balance is not calibrated (flow 0)"}
+
+
+# ------------------------------------------------------------------------------------------------- Task BX
+def test_a_short_run_never_waits_longer_than_itself_for_its_power_to_read_on(rig):
+    r = rig()
+    r.config()
+    r.deaf[POWER] = 1  # the on is taken late: the power reads on only after 4 s
+    r.clock.at(4, lambda: r.set(POWER, "on"))
+    request = _timed(r, seconds=2)
+    r.poll()
+    # Waiting the full CONFIRM_TIMEOUT_S for ON would have left it on 4 s for a 2 s prime.
+    assert _off_at(r) and _off_at(r)[0] <= 2.0
+    assert _report(r) == {"id": request["id"], "action": "prime", "pump": "balance", "ran_s": 0,
+                          "result": f"refused: {POWER} did not read on"}
+    assert r.fake.states[POWER][0] == "off"
+
+
+def test_an_idle_stop_pump_that_does_not_read_off_latches_and_alerts_cs_801(rig):
+    r = rig()
+    r.config(pumps=(BALANCE, BLOOM))
+    r.set(POWER, "on")
+    r.stuck[POWER] = 99
+    _timed(r, "stop_pump")
+    r.poll()
+    assert _report(r) == f"stopped; {POWER} does not read off"
+    assert "CS-801" in r.codes()
+    assert r.runner.holds(r.c.rooms[0]) == "dosing hardware still on: " + POWER
+    # Latched as a run's would be: the off goes again each pass until it reads off, then the room is free.
+    r.stuck[POWER] = 0
+    for _ in range(2):
+        r.clock.t += dosing_runner.POLL_S
+        r.poll()
+    assert r.runner.holds(r.c.rooms[0]) is None and r.fake.states[POWER][0] == "off"
+
+
+def _unreadable(pump):
+    """The pump with neither a flow entity nor a calibrated flow: its setup can't be read."""
+    return {k: v for k, v in pump.items() if k != "flow_entity"}
+
+
+def test_one_unreadable_pump_leaves_the_rooms_other_pumps_working(rig):
+    r = rig()
+    r.config(pumps=(BALANCE, _unreadable(BLOOM)))
+    r.ask(ml=50)
+    r.poll()
+    assert _report(r) == "finished"  # Balance doses as it would alone
+    assert r.status()[1]["unreadable_pumps"] == ["bloom"]
+    assert "bloom" not in r.status()[1]["pumps"]
+    for ask in (lambda: r.ask(pump="bloom", ml=50), lambda: _timed(r, pump="bloom")):
+        ask()
+        r.fake.calls.clear()
+        r.poll()
+        result = _report(r)
+        assert (result if isinstance(result, str) else result["result"]) == (
+            "refused: the setup of pump bloom can't be read")
+        assert r.actions() == []
+
+
+def test_a_rooms_stop_switches_an_unreadable_pumps_power_off_too(rig):
+    r = rig()
+    r.config(pumps=(BALANCE, _unreadable(BLOOM)))
+    r.set("switch.bloom_power", "on")
+    r.ask("stop", by="Sam")
+    r.poll()
+    assert ("turn_off", "switch.bloom_power") in r.actions()
+    assert r.fake.states["switch.bloom_power"][0] == "off"
+    # And a stop of that pump alone.
+    r.set("switch.bloom_power", "on")
+    _timed(r, "stop_pump", pump="bloom")
+    r.poll()
+    assert _report(r) == "stopped" and r.fake.states["switch.bloom_power"][0] == "off"
+
+
+def test_a_setup_whose_pump_list_or_batch_cant_be_read_is_still_not_acted_on(rig):
+    r = rig()
+    r.config(pumps=(BALANCE,), batch="not a batch")
+    r.ask(ml=50)
+    r.fake.calls.clear()
+    r.poll()
+    assert r.status()[0] == "unavailable" and r.actions() == []
