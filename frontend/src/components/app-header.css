@@ -1,75 +1,115 @@
-/* The top bar (its box: styles.css): rooms on the left, then the data's age, the recent records,
-   refresh and the safety switches. */
-.room-chips {
+/* The top bar (its box: styles.css): the data's age and the AI's state, Jump to…, the recent
+   records and refresh, then the selected room's name and its safety switches, all to the right. */
+.topbar-status {
   display: flex;
   align-items: center;
-  gap: 8px;
   min-width: 0;
-  flex: 1;
-  overflow: hidden;
+  margin-left: auto;
 }
-.room-chip {
+/* The page's title leads only a phone's header; a desktop has the page's own heading. */
+.topbar-title {
+  display: none;
+}
+.topbar-facts {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  font-size: var(--text-xs);
+}
+.topbar-facts-dot {
+  display: none;
+}
+.jump-to {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  min-width: 0;
-  max-width: 280px;
   height: 32px;
-  padding: 0 12px 0 10px;
+  padding: 0 10px 0 12px;
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: 8px;
   background: var(--surface);
   color: var(--muted-foreground);
-  font-size: var(--text-sm);
+  font-size: var(--text-xs);
   white-space: nowrap;
 }
-.room-chip[aria-pressed="true"] {
-  border-color: color-mix(in srgb, var(--foreground) 35%, var(--border));
+.jump-to:hover {
   background: var(--muted);
   color: var(--foreground);
-  cursor: default;
 }
-.room-chip:not([aria-pressed="true"]):hover {
+.jump-to kbd {
+  padding: 0 5px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font: inherit;
+  font-size: var(--text-xs);
+}
+/* The palette: a modal box near the top, a search field over at most twelve places. */
+.command-palette {
+  width: min(600px, calc(100vw - 32px));
+  max-height: min(560px, calc(100vh - 32px));
+  margin: 12vh auto auto;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--foreground);
+  box-shadow: 0 18px 48px rgb(0 0 0 / 0.35);
+}
+.command-palette[open] {
+  display: flex;
+  flex-direction: column;
+}
+.command-palette::backdrop {
+  background: rgb(0 0 0 / 0.5);
+}
+.command-palette-input {
+  flex: none;
+  width: 100%;
+  height: 48px;
+  padding: 0 16px;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  background: transparent;
+  color: var(--foreground);
+  font: inherit;
+  font-size: var(--text-md);
+  outline: none;
+}
+.command-palette ul {
+  margin: 0;
+  padding: 6px;
+  overflow-y: auto;
+  list-style: none;
+}
+.command-palette li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 40px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.command-palette li[aria-selected="true"] {
   background: var(--muted);
 }
-.room-chip-dot {
-  width: 8px;
-  height: 8px;
-  flex: none;
-  border-radius: 50%;
-  background: var(--muted-foreground);
+.command-palette-label {
+  font-size: var(--text-sm);
+  font-weight: 500;
 }
-.room-chip[data-tone="holding"] .room-chip-dot {
-  background: var(--success);
-}
-.room-chip[data-tone="watering"] .room-chip-dot {
-  background: var(--primary);
-}
-.room-chip[data-tone="stopped"] .room-chip-dot,
-.room-chip[data-tone="stale"] .room-chip-dot {
-  background: var(--destructive);
-}
-.room-chip-words {
-  display: inline-flex;
-  gap: 6px;
-  min-width: 0;
-}
-.room-chip-name {
-  font-weight: 600;
-}
-.room-chip-state {
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.room-chip-state::before {
-  content: "·";
-  margin-right: 6px;
+.command-palette-hint {
   color: var(--muted-foreground);
+  font-size: var(--text-xs);
+  text-align: right;
 }
-.room-chip[data-tone="stopped"] .room-chip-state,
-.room-chip[data-tone="stale"] .room-chip-state {
-  color: var(--destructive);
-  font-weight: 600;
+.command-palette-empty {
+  margin: 0;
+  padding: 14px 16px;
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
 }
 .demo-pill {
   padding: 1px 9px;
@@ -186,13 +226,8 @@
 .stale-banner-link:hover {
   text-decoration: underline;
 }
-@media (max-width: 1200px) {
-  .room-chip {
-    max-width: 220px;
-  }
-}
-/* A phone: the selected room in words, the others as dots, and the data's age on the first row;
-   the two switches, in words, share the second. */
+/* A phone: the page's title over "Updated 12 s ago · AI acting" and the room's name on the first
+   row; the two switches, in words, share the second. */
 @media (max-width: 720px) {
   header.topbar {
     flex-wrap: wrap;
@@ -209,29 +244,45 @@
     padding: 9px 16px;
     flex-wrap: wrap;
   }
-  .room-chips {
-    gap: 4px;
+  .topbar-status {
+    flex: 1;
+    flex-direction: column;
+    align-items: flex-start;
+    margin-left: 0;
   }
-  .room-chip {
-    height: 30px;
-    padding: 0 9px;
-    font-size: var(--text-xs);
-  }
-  .room-chip:not([aria-pressed="true"]) {
-    padding: 0 8px;
-  }
-  .room-chip:not([aria-pressed="true"]) .room-chip-words {
-    position: absolute;
-    width: 1px;
-    height: 1px;
+  .topbar-title {
+    display: block;
+    max-width: 100%;
     overflow: hidden;
-    clip: rect(0 0 0 0);
+    font-size: 17px;
+    font-weight: 600;
+    line-height: 22px;
+    text-overflow: ellipsis;
     white-space: nowrap;
   }
-  /* Recent records and refresh stay a menu away (History; the page keeps itself current), and the
-     menu's footer says the demo is one. */
+  .topbar-facts {
+    gap: 4px;
+    color: var(--muted-foreground);
+  }
+  .topbar-facts-dot {
+    display: inline;
+  }
+  /* The AI's state reads as words in the line; it still opens the assistant. */
+  .topbar-facts .brain-chip {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font-weight: 400;
+  }
+  .topbar-facts .brain-chip-dot {
+    display: none;
+  }
+  /* Recent records, refresh and Jump to… stay a menu away (History; the page keeps itself
+     current; a phone has no Ctrl K), and the menu's footer says the demo is one. */
   .topbar .connection-info > [aria-label="Recent activity"],
   .topbar .connection-info > [aria-label="Refresh controller data"],
+  .topbar .jump-to,
   .topbar .wide-only,
   .demo-pill {
     display: none;

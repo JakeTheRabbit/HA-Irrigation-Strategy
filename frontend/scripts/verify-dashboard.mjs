@@ -363,11 +363,13 @@ try {
     },
   );
   await check(
-    "the header: each room's state, the data's age and the two safety switches",
+    "the header: the data's age, Jump to…, the room's name and the two safety switches",
     async () => {
       await go("today");
-      // On a desktop the menu's room tree is the room picker; the header chips step aside.
-      assert.ok(!(await page.locator(".topbar .room-chips").isVisible()), "chips hidden");
+      // The menu's room tree is the room picker; the header has no room chips at all.
+      assert.equal(await page.locator(".topbar [data-room], .topbar .room-chip").count(), 0);
+      await expectVisible(page.getByRole("button", { name: /^Jump to…/ }));
+      assert.equal((await page.locator(".topbar .header-safety-scope").innerText()).trim(), "Room A");
       const rooms = page.locator(".desktop-sidebar .room-tree-room");
       assert.equal(await rooms.count(), 2, "one tree entry per room");
       const chip = (id) =>
@@ -2695,8 +2697,11 @@ try {
   await check("mobile navigation and every page fit 390px", async () => {
     await page.setViewportSize({ width: 390, height: 844 });
     await go("today");
-    // The phone header in words: the room and the data's age, then both switches and Stop all labelled.
+    // The phone header in words: the page's title over the data's age, then both switches and Stop
+    // all labelled; Jump to… stays on a desktop.
     assert.match(await page.locator(".data-age").innerText(), /^Updated \d+ (s|min) ago$/);
+    assert.ok(await page.locator(".topbar-title").isVisible(), "phone header names the page");
+    assert.equal(await page.getByRole("button", { name: /^Jump to…/ }).isVisible(), false);
     assert.deepEqual(await page.locator(".safety-switch-text").allInnerTexts(), [
       "Watering on",
       "Stop all",

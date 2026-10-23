@@ -26,6 +26,7 @@ import { discardDrafts } from "@/lib/drafts";
 import { resolveRequestedRoom, runningVersions } from "@/lib/model";
 import {
   canonicalHash,
+  parseRoute,
   routeHash,
   sameRoute,
   SECTION_PAGES,
@@ -187,14 +188,6 @@ export default function App() {
     setDrafts({});
     // This tab's copies only: another tab may be editing another room.
     discardDrafts("targets:", false);
-  }
-  function selectRoom(id: string) {
-    confirmNavigation(() => {
-      dropDrafts();
-      setFocusZone(undefined);
-      controller.changeRoom(id);
-      setMobile(false);
-    });
   }
   function openRoomPage(id: string, next: Page, zone?: number) {
     confirmNavigation(() => {
@@ -504,9 +497,19 @@ export default function App() {
       <div className="app-main">
         <AppHeader
           controller={controller}
+          title={zoneName ?? pageLabel(page)}
+          roomName={controller.room.room.name}
           haMenu={haShell.available ? haShell.toggle : null}
           openNavigation={() => setMobile(true)}
-          selectRoom={selectRoom}
+          jump={(entry) => {
+            // Another room's page opens in that room; an address with more than a page in it
+            // (`?rule=new`) goes through the address, so the page reads it.
+            const { route: target } = parseRoute(entry.hash);
+            if (entry.room && entry.room !== controller.roomId)
+              openRoomPage(entry.room, target.page, target.zone ?? undefined);
+            else if (routeHash(target) !== entry.hash) window.location.hash = entry.hash;
+            else navigate(target.page, target.zone ?? undefined);
+          }}
           openLog={() => navigate("history/explorer")}
           openBrain={() => navigate("today/ai")}
           refresh={() => void refresh()}
