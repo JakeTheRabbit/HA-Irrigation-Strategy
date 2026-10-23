@@ -202,8 +202,14 @@ async def test_without_the_notifications_helper_alerts_stay_open_and_ack_works(
     hass, hass_admin_user, freezer, monkeypatch, caplog
 ):
     """A Home Assistant without the private notifications getter: no notification closes
-    anything, one warning, and rule alerts and alert_ack carry on."""
-    monkeypatch.delattr(persistent_notification, "_async_get_or_create_notifications")
+    anything, one warning, and rule alerts and alert_ack carry on.
+
+    The integration's own lookup answers None, as it does when the getter is missing. Deleting
+    the getter from Home Assistant itself would also break Home Assistant's own config flow on
+    the oldest supported release, which calls it."""
+    from custom_components.crop_steering import alerts_inbox
+
+    monkeypatch.setattr(alerts_inbox, "live_notifications", lambda hass: None)
     await _install(hass)
     await _controller_alert(hass, hass_admin_user)
     rule_id, binary = await _firing_rule(hass, hass_admin_user, freezer)

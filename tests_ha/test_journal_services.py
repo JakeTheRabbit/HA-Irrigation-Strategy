@@ -4,7 +4,9 @@ auth store, and the crop_steering/subscribe websocket feed for a user who may no
 import asyncio
 from unittest.mock import AsyncMock, MagicMock
 
+import aiohttp.connector
 import pytest
+from aiohttp.resolver import ThreadedResolver
 from homeassistant.core import Context, SupportsResponse
 from homeassistant.exceptions import HomeAssistantError
 from test_setup_entry import _install
@@ -20,6 +22,16 @@ REFUSED = "requires an authenticated Home Assistant administrator"
 def _custom_integrations(hass, enable_custom_integrations):
     hass.config.components.add("frontend")
     yield
+
+
+@pytest.fixture(autouse=True)
+def _no_aiodns_resolver(monkeypatch):
+    """The websocket client (hass_ws_client) is an aiohttp client. Its connector builds aiohttp's
+    default resolver, which with aiodns installed creates a pycares channel, and a recent pycares
+    starts a process-long thread (_run_safe_shutdown_loop) that the oldest supported test plugin's
+    leaked-thread check fails on. The client only dials 127.0.0.1, which aiohttp never resolves,
+    so the threaded resolver (which starts nothing until it is asked) changes nothing else."""
+    monkeypatch.setattr(aiohttp.connector, "DefaultResolver", ThreadedResolver)
 
 
 def _event(kind="shot.completed", **over):
