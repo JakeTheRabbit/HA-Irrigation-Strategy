@@ -341,7 +341,7 @@ export interface CalibrationCommitResult {
 
 // pump_* (backend Tasks 19, 20)
 export type PumpBlockerCode =
-  | "no_power_entity" | "batch_running" | "mix_pump_on" | "tank_filling" | "calibrating" | "controller_offline";
+  | "no_power_entity" | "batch_running" | "mix_pump_on" | "tank_filling" | "calibrating" | "pump_calibrating" | "controller_offline";
 export interface PumpPrecheck {
   ok: boolean;
   blockers: { code: PumpBlockerCode; message: string }[];
@@ -352,8 +352,10 @@ export interface PumpPrimeResult {
   blockers: PumpPrecheck["blockers"];
 }
 export interface PumpCalibrateStart {
-  session_id: string;
-  outcome: string;
+  session_id: string | null;
+  request_id: string | null;
+  outcome: "requested" | "refused";
+  blockers: PumpPrecheck["blockers"];
 }
 export interface PumpCalibrationResult {
   ml_min: number;

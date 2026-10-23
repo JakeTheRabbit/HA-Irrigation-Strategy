@@ -1,6 +1,8 @@
 import { GrowsDemo } from "./grows-demo";
 import { RunDemo } from "./comparison-demo";
 import { DosingDemo } from "./dosing-demo";
+import type { DosingDocument } from "./dosing";
+import { PumpDemo } from "./pump-demo";
 import { NotifyDemo } from "./notify-demo";
 import { StockDemo } from "./stock-demo";
 import { CalibrationDemo } from "./calibration";
@@ -47,6 +49,7 @@ export class OperatorDemo {
   private stockDemo: StockDemo;
   private dosingDemo?: DosingDemo;
   private calibrationDemo?: CalibrationDemo;
+  private pumpDemo?: PumpDemo;
   private notifyDemo?: NotifyDemo;
   private plans = new Map<string, StrategyDocument>();
   private rooms: SetupRoom[] | null = null;
@@ -481,6 +484,11 @@ export class OperatorDemo {
     // Presets read and write the demo's own states; an older integration has none of them.
     if (this.backend === "3.18" && ["preset_list", "preset_save", "preset_delete", "preset_apply", "copy_config"].includes(action))
       return answerPresets(action, data, this.getStates(), (entityId, value) => this.writeNumber(entityId, value), Date.now()) as T;
+    // Pump prime and calibration act on the demo's own dosing setup and flow numbers.
+    if (this.backend === "3.18" && action.startsWith("pump_")) {
+      const answer = (this.pumpDemo ||= new PumpDemo(this.getStates, this.updateStates)).call(action, data);
+      if (answer !== undefined) return answer as T;
+    }
     if (isParityAction(action)) return (await parityDemo(action, data, Date.now(), this.backend)) as T;
     // An existing service asked for v2: a 3.18 integration wraps its v1 answer in the envelope; a
     // 3.17 one answers v1, which callV2 reads as missing.
@@ -586,6 +594,9 @@ export class OperatorDemo {
         this.stockDemo.call(name, args),
       );
       const result = this.dosingDemo.call(action, data);
+      // A 3.18 integration's dosing_get carries the pump catalogue, calibrations and open sessions.
+      if (action === "dosing_get" && this.backend === "3.18")
+        return (this.pumpDemo ||= new PumpDemo(this.getStates, this.updateStates)).decorate(result as DosingDocument) as T;
       // A saved setup can link a pump to another tank: the integration rewrites the stock sensor.
       if (action === "dosing_save" && !result.error) this.stockDemo.publish(String(data.room_id));
       return result as T;

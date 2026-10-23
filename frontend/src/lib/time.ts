@@ -117,3 +117,14 @@ export function dayLabel(ms: number, tz: string): string {
   }
   return f.format(ms);
 }
+const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+/** The zone's date as "30 Sep". */
+export function dayMonth(ms: number, tz: string): string {
+  const { m, d } = wall(ms, tz);
+  return `${d} ${MONTHS[m - 1].slice(0, 3)}`;
+}
+/** The zone's month as "March", or "March 2025" when `withYear`. */
+export function monthName(ms: number, tz: string, withYear = false): string {
+  const { y, m } = wall(ms, tz);
+  return withYear ? `${MONTHS[m - 1]} ${y}` : MONTHS[m - 1];
+}
