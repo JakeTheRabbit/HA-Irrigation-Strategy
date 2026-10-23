@@ -17,7 +17,7 @@ import { copyDemoTimers, demoTimerShapes } from "./timers";
  * apply is refused for that one row (`guard_refused`, the other writes stand). */
 
 const MODE_KEYS = ["vegetative_dryback_target", "generative_dryback_target", ...[0, 1, 2].flatMap((p) => [`ec_target_veg_p${p}`, `ec_target_gen_p${p}`])];
-const SECTIONS: Record<string, readonly string[]> = {
+export const DEMO_PRESET_SECTIONS: Record<string, readonly string[]> = {
   targets: [
     ...MODE_KEYS,
     "p1_target_vwc",
@@ -56,7 +56,7 @@ const SECTIONS: Record<string, readonly string[]> = {
   water_limits: ["min_daily_ml_per_plant", "max_shot_duration"],
   timers: ["timers", "timer"],
 };
-const SCOPES: Record<string, string[]> = { targets: ["targets"], timers: ["timers"], all: Object.keys(SECTIONS) };
+const SCOPES: Record<string, string[]> = { targets: ["targets"], timers: ["timers"], all: Object.keys(DEMO_PRESET_SECTIONS) };
 const NO_TIMER: Record<string, string> = { timer: "source zone has no timer program", timers: "source room has no timer programs" };
 /** Settings a room has outside the demo's states (see above). */
 const OFF_STATES: Record<string, Record<string, number>> = { "room:": { p2_dilute_ratio: 0.5 } };
@@ -86,7 +86,7 @@ function read(states: States, t: PresetTarget): { values: Values; unread: string
   const values: Values = {},
     unread: string[] = [];
   for (const section of ["targets", "phase_timing", "water_limits"])
-    for (const key of SECTIONS[section]) {
+    for (const key of DEMO_PRESET_SECTIONS[section]) {
       const id = entityOf(states, t, key);
       if (!id) continue;
       const value = numberIn(states, id);
@@ -104,7 +104,7 @@ function read(states: States, t: PresetTarget): { values: Values; unread: string
   return { values, unread };
 }
 const capture = (values: Values, sections: string[]): Wanted =>
-  Object.fromEntries(sections.map((s) => [s, Object.fromEntries(SECTIONS[s].filter((k) => k in values).map((k) => [k, structuredClone(values[k])]))]));
+  Object.fromEntries(sections.map((s) => [s, Object.fromEntries(DEMO_PRESET_SECTIONS[s].filter((k) => k in values).map((k) => [k, structuredClone(values[k])]))]));
 const same = (a: unknown, b: unknown) =>
   typeof a === "number" && typeof b === "number" ? Math.abs(a - b) <= 1e-9 : JSON.stringify(a) === JSON.stringify(b);
 const ref = (target: unknown): PresetTarget => {
@@ -179,7 +179,7 @@ function givenValues(value: unknown, sections: string[]): Record<string, Record<
       throw new Error(`values.${section} must hold at least one setting`);
     out[section] = {};
     for (const [key, v] of Object.entries(keys as Record<string, unknown>)) {
-      if (!SECTIONS[section].includes(key)) throw new Error(`${key} is not a setting of ${section}`);
+      if (!DEMO_PRESET_SECTIONS[section].includes(key)) throw new Error(`${key} is not a setting of ${section}`);
       if (key === "p2_mode" ? typeof v !== "string" : typeof v !== "number" || !Number.isFinite(v))
         throw new Error(`${key} must be a ${key === "p2_mode" ? "text" : "finite number"}`);
       out[section][key] = v;
@@ -224,7 +224,7 @@ export function answerPresets(
       };
       site.presets.push(preset);
       site.revision += 1;
-      const keys = SCOPES[scope].flatMap((s) => SECTIONS[s]);
+      const keys = SCOPES[scope].flatMap((s) => DEMO_PRESET_SECTIONS[s]);
       return ok({ preset: structuredClone(preset), revision: site.revision, skipped: unread.filter((k) => keys.includes(k)) }, now, "none");
     }
     if (action === "preset_delete") {
@@ -245,12 +245,12 @@ export function answerPresets(
       wanted = structuredClone(preset.values);
     } else {
       const sections = Array.isArray(data.sections) ? data.sections.map(String) : [];
-      if (!sections.length || sections.some((s) => !SECTIONS[s])) throw new Error("sections must name one or more of " + Object.keys(SECTIONS).join(", "));
+      if (!sections.length || sections.some((s) => !DEMO_PRESET_SECTIONS[s])) throw new Error("sections must name one or more of " + Object.keys(DEMO_PRESET_SECTIONS).join(", "));
       const source = ref(data.from);
       if (!known(states, source.room_id)) throw new Error(`Room ${source.room_id} is unknown or ambiguous`);
       const { values, unread } = read(states, source);
       wanted = capture(values, sections);
-      const keys = sections.flatMap((s) => SECTIONS[s]);
+      const keys = sections.flatMap((s) => DEMO_PRESET_SECTIONS[s]);
       skipped = unread.filter((k) => keys.includes(k));
     }
     if (!Array.isArray(data.to) || !data.to.length) throw new Error("Give at least one target");

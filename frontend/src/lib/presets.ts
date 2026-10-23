@@ -30,10 +30,28 @@ export function parseTarget(key: string): PresetTarget {
   return zoned ? { room_id: zoned[1], zone: Number(zoned[2]) } : { room_id: key };
 }
 
+/** The settings a preset or a copy holds that have no setting words of their own, named as the
+ * integration names their entities (number.py, select.py), so a receipt never shows a key. */
 const KEY_LABELS: Record<string, string> = {
   timers: "Timer programs",
   timer: "Timer program",
   p2_mode: "P2 mode",
+  p0_minimum_wait: "Morning dryback minimum wait",
+  p0_dryback_drop_percent: "P0 dryback drop (not used)",
+  p1_minimum_shots: "Minimum ramp shots",
+  p1_rise_pts: "Extra shot minimum rise",
+  p1_maximum_extra_shots: "Maximum extra ramp shots",
+  p2_time_between_shots: "Maintenance shot interval",
+  p2_timed_interval_min: "Timed P2 shot interval",
+  p2_timed_shot_size: "Timed P2 shot size",
+  p2_timed_first_hours: "Timed P2 first shot after lights-on",
+  p2_end_hours_before_off: "P2 ends before lights-off",
+  p3_time_between_shots: "Rescue shot interval",
+  ec_min_interval: "EC correction interval",
+  ec_flush_target: "EC flush target",
+  p2_dilute_ratio: "P2 dilute ratio",
+  min_daily_ml_per_plant: "Daily minimum water per plant",
+  max_shot_duration: "Longest shot",
 };
 const decimals = (value: number) => String(value).split(".")[1]?.length ?? 0;
 

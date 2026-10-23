@@ -14,6 +14,7 @@ import {
   targetKey,
   type PresetWords,
 } from "./presets";
+import { DEMO_PRESET_SECTIONS } from "./parity-demo/presets";
 import { demoController } from "./test-helpers";
 import { revertEvents } from "./undo";
 
@@ -525,4 +526,18 @@ describe("fix round 1: a copy never claims more than it did", () => {
     expect(html).toContain('href="#/history/changes"');
     expect(html).not.toContain("Written and read back");
   });
+});
+
+test("every setting a preset or a copy can hold is named in words, never by its key", () => {
+  const words = presetWords({}, []);
+  for (const keys of Object.values(DEMO_PRESET_SECTIONS))
+    for (const key of keys) {
+      const label = words.label(key);
+      expect(label, key).not.toMatch(/_/);
+      expect(label, key).toMatch(/^[A-Z]/);
+    }
+  // The words the integration and the setting pages use, not the key with its underscores dropped.
+  expect(words.label("maximum_ec")).toBe("Maximum pore EC");
+  expect(words.label("p1_rise_pts")).toBe("Extra shot minimum rise");
+  expect(words.label("min_daily_ml_per_plant")).toBe("Daily minimum water per plant");
 });
