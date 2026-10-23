@@ -5,10 +5,11 @@ import { number } from "@/components/dashboard";
 import { AutoBadge } from "@/components/room-controls";
 import { FieldSuggestionLine, type SensorContextData } from "@/components/sensor-context";
 import { SettingHelp } from "@/components/setting-help";
+import { SettingHistory } from "@/components/setting-history";
 import { validateSetpoint } from "@/lib/setpoint-preview";
 import { fieldHint, setpointMetric, setpointParam, suggestedDraft } from "@/lib/sensor-context";
 import { settingWords, type SettingDetail } from "@/lib/setting-words";
-import type { Setting } from "@/lib/types";
+import type { Controller, Setting } from "@/lib/types";
 import "./setting-row.css";
 
 /** A setting's "?": its full help where there is one, else its one line. */
@@ -35,6 +36,7 @@ export function SettingRow({
   readOnly,
   disabled,
   other,
+  controller,
   onEdit,
 }: {
   setting: Setting;
@@ -52,6 +54,8 @@ export function SettingRow({
   disabled: boolean;
   /** The other steering mode's value, muted in its own column; undefined for a table without one. */
   other?: string | null;
+  /** With it, the clock beside the name shows the setting's last changes. */
+  controller?: Controller;
   onEdit: (setting: Setting, value: string) => void;
 }) {
   const error = draft ? validateSetpoint(setting, draft.value) : "";
@@ -79,10 +83,11 @@ export function SettingRow({
   const context = draft || hint?.suggestion || hint?.warning;
   return (
     <Fragment>
-      <tr className={draft ? "is-draft" : undefined} data-setting={param ?? undefined}>
+      <tr className={draft ? "is-draft" : undefined} data-setting={param ?? undefined} data-setting-row>
         <th scope="row">
           <label htmlFor={`setting-${setting.entityId}`}>{label}</label>
           {help && param && <SettingHelp label={label} param={param} detail={help} />}
+          {controller && <SettingHistory controller={controller} entityId={setting.entityId} />}
           {draft && <span className="draft-dot" title="Unsaved draft" />}
         </th>
         <td className="targets-input">

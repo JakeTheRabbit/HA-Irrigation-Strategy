@@ -32,6 +32,8 @@ import {
   demoTargetWrite,
   journalDemoTargetWrite,
   resetDemoTargetWrites,
+  demoSetpointLog,
+  seedDemoChanges,
   settleDemoTargetWrite,
 } from "./parity-demo/targets";
 import { resetDemoTimers } from "./parity-demo/timers";
@@ -476,6 +478,7 @@ export class OperatorDemo {
     return demoEnvelope({ reverted_event_id: eventId, new_event_id: newId, readback: "verified" }, now, roomId);
   }
   async call<T>(action: OperatorAction, data: Record<string, unknown>): Promise<T> {
+    if (action === "history_changes" && this.backend === "3.18") seedDemoChanges(this.getStates(), Date.now());
     if (action === "history_revert" && this.backend === "3.18" && demoTargetWrite(String(data.event_id)))
       return this.revertTarget(String(data.event_id), data.room_id) as T;
     // Presets read and write the demo's own states; an older integration has none of them.
@@ -551,7 +554,12 @@ export class OperatorDemo {
       return { seen: this.whatsNewSeen } as T;
     }
     if (action === "setpoint_log_get")
-      return { schema_version: 1, room_id: data.room_id, changes: [], error: null } as T;
+      return {
+        schema_version: 1,
+        room_id: data.room_id,
+        changes: data.room_id === "room:" ? demoSetpointLog(this.getStates(), Date.now()) : [],
+        error: null,
+      } as T;
     if (action.startsWith("brain_prompt_")) return this.instructions.call(action, data) as T;
     if (action.startsWith("overlay_")) return this.overlay(action, data) as T;
     if (action === "display_get" || action === "display_save")

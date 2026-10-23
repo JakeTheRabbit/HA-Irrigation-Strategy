@@ -136,11 +136,26 @@ function summary(data: Record<string, unknown>, now: number): TimelineSummary {
 
 function changes(data: Record<string, unknown>, now: number): { changes: HistoryChange[] } {
   const rooms = typeof data.room_id === "string" ? [data.room_id] : DEMO_ROOMS;
+  const since = typeof data.since === "string" ? Date.parse(data.since) : -Infinity;
+  const until = typeof data.until === "string" ? Date.parse(data.until) : Infinity;
+  const kinds = Array.isArray(data.kinds) ? data.kinds.map(String) : null;
+  // Room A's grow plan moved to its next step at this morning's lights-on: a plan step, not put back.
+  const plan: HistoryChange[] = rooms.includes("room:") && data.zone == null
+    ? [{
+        id: demoId(now, "plan-step"), room_id: "room:", ts: iso(now - 8 * 3_600_000), actor: "plan", kind: "plan", section: "plan",
+        scope: "room", old: null, new: "activated", reason: "The grow plan “F2 Bulk 63 d” moved to its day 38–44 targets at lights-on.",
+        outcome: null, limits: null, revertible: false, user_id: null, user_name: null,
+      }]
+    : [];
+  return { changes: allChanges(data, rooms, now, plan).filter((c) => Date.parse(c.ts) >= since && Date.parse(c.ts) < until && (!kinds || kinds.includes(c.kind)) && (typeof data.key !== "string" || c.key === data.key)) };
+}
+
+function allChanges(data: Record<string, unknown>, rooms: string[], now: number, plan: HistoryChange[]): HistoryChange[] {
   const kinds = { "target.changed": "setpoint", "config.changed": "setup", "calibration.committed": "calibration" } as const;
   // The panel's own writes this session (parity-demo/targets.ts), then the Journal's day.
   const written = demoTargetChanges(rooms).filter((c) => data.zone == null || c.scope === `zone:${Number(data.zone)}`);
-  return {
-    changes: [
+  return [
+      ...plan,
       ...written,
       ...dayEvents(rooms, now)
       .filter((e): e is CsEvent & { kind: keyof typeof kinds } => e.kind in kinds)
@@ -155,8 +170,7 @@ function changes(data: Record<string, unknown>, now: number): { changes: History
         revertible: e.kind !== "calibration.committed",
         user_id: e.source.user_id ?? null, user_name: e.source.actor === "manual" ? "Ben" : null,
       })),
-    ].sort((a, b) => Date.parse(b.ts) - Date.parse(a.ts)),
-  };
+    ].sort((a, b) => Date.parse(b.ts) - Date.parse(a.ts));
 }
 
 const SUPPLY: SupplyDoc = {

@@ -14,17 +14,13 @@ import "./explorer.css";
 /** History › Explorer (mockup 09): the room's readings on stacked charts under its phase and shot
  * lanes, notes where something happened, one crosshair, the last run beside it and a CSV of what is
  * charted. A zone picked in the room list adds its probes, its targets and its other grows below.
- * Who changed which setting will live on History › Changes. */
+ * Who changed which setting is on History › Changes. */
 export function Explorer({ controller, zone }: { controller: Controller; zone?: number }) {
   const { room } = controller;
   const picked = room.zones.find((item) => item.id === zone);
   return (
     <>
       <RoomExplorer key={controller.roomId} controller={controller} zone={picked?.id} />
-      {/* Until History › Changes is built (Task 24); remove this line when it lands. */}
-      <p className="muted small explorer-changes-note" data-changes-note>
-        Setting changes will show on History › Changes.
-      </p>
       {room.display.options.show_equipment_lanes && <DayLanes controller={controller} mode="equipment" />}
       {room.display.options.show_room_day_lanes && <DayLanes controller={controller} mode="zones" />}
       {picked ? (

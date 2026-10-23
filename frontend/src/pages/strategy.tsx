@@ -360,6 +360,7 @@ export function Strategy({
         readOnly={planEngaged}
         disabled={!canEdit}
         other={other}
+        controller={controller}
         onEdit={edit}
       />
     );

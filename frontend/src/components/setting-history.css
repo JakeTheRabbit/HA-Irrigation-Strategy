@@ -1,0 +1,21 @@
+/* A setting's clock popover: its last changes. */
+.setting-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0 0 10px;
+  padding: 0;
+  list-style: none;
+}
+.setting-history-list li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.setting-history-list s {
+  color: var(--muted-foreground);
+}
+.setting-history-when {
+  color: var(--muted-foreground);
+  font-variant-numeric: tabular-nums;
+}
