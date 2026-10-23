@@ -74,8 +74,8 @@ def S(**kw):
         (S(phase="P3", lights_just_on=True), "lights on"),
         (S(phase="P2", new_grow_day=True), "a new grow-day began before this zone finished the last one"),
         (
-            S(phase="P0", vwc=44),
-            "VWC 44% is at or under the maintenance trigger (45%), no morning dryback needed",
+            S(phase="P0", vwc=40),
+            "VWC 40% is at or under the rescue floor (40%), too dry to wait for the morning dryback",
         ),
         (S(phase="P0", vwc=50, dryback_pct=25), "the morning dryback reached 25%"),
         (S(phase="P0", vwc=55, phase_minutes=50), "the latest first shot came, 50 min into P0"),

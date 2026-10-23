@@ -2,7 +2,7 @@
 
 [Open the interactive demo](https://jaketherabbit.github.io/HA-Irrigation-Strategy/dashboard.html?demo=1).
 
-Captured on 21 October 2026 from `www/dashboard.html?demo=1`, with isolated sample data, a fixed 15:50 local clock and the light theme. These are current UI examples, not photographs or live facility readings.
+Captured between 18 and 21 October 2026 from `www/dashboard.html?demo=1`, with isolated sample data, the app clock fixed at 15:50 on 18 October 2026 (the manifest in `img/screenshots.json` records it) and the light theme. These are current UI examples, not photographs or live facility readings.
 
 ## Status: all rooms
 

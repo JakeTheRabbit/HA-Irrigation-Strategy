@@ -44,7 +44,7 @@ Room and zone removal means archive. Archived IDs remain reserved, so restoring 
 
 With engines still off, confirm each room loads in the sidebar, the selected room has a current controller heartbeat, mappings show **Mapping acknowledged**, and **Equipment › Probes** shows the intended entities/units. Open **Irrigation → Current day** and verify the existing values. An upgrade should retain each room's current values, zone identities and plant/dripper sizing.
 
-Open **Overview** and a zone detail panel. A missing optional tank mapping may remain **Not mapped**; a missing required control sensor or controller acknowledgement needs resolution before commissioning. **Last irrigation** is an event record and may legitimately be absent on a new installation. Do not generate a physical shot just to fill that display.
+Open **Status** and a zone detail panel. A missing optional tank mapping may remain **Not mapped**; a missing required control sensor or controller acknowledgement needs resolution before commissioning. **Last irrigation** is an event record and may legitimately be absent on a new installation. Do not generate a physical shot just to fill that display.
 
 The documented live evidence covers an in-place upgrade of an existing two-room installation. A completely blank installation, physical delivery and a complete live plan-boundary handoff remain separate commissioning checks. The [feature matrix](FEATURE_MATRIX.md) identifies those limits.
 
@@ -132,7 +132,7 @@ The existing app slug `f2_control` and entity IDs are deliberately stable. Exist
 
 In **Rooms & setup → Shared room hardware**, map tank fill level to a percentage sensor, tank EC to mS/cm or dS/m, tank pH to pH, and tank temperature to a temperature sensor. These tank-quality display mappings do not enable feed-water safety gates. Choose a fill valve or binary sensor for filling status and a timestamp sensor or full date-and-time helper for **Last recorded tank fill**. Use an actual recorded fill event; an automation trigger time or sensor `last_changed` is not proof of filling. Shared tanks can be explicitly mapped to more than one room. The [tank mapping table](USER_GUIDE.md#tank-and-feed) lists the exact labels and configuration keys. A recorded fill can be operator-confirmed or float-confirmed according to its producer; it is not proof that dosing finished. Filling status must represent the fill valve or a genuine fill-active signal, not a mode-enable or dosing-lock helper.
 
-Save setup with the affected engines and irrigation equipment off, then verify the readings in **Overview** before restoring the previous engine state. Missing mappings remain labelled; an unavailable pump is never displayed as off. Existing controllers must be updated to publish irrigation timestamps with a timezone offset.
+Save setup with the affected engines and irrigation equipment off, then verify the readings in **Status** before restoring the previous engine state. Missing mappings remain labelled; an unavailable pump is never displayed as off. Existing controllers must be updated to publish irrigation timestamps with a timezone offset.
 
 ## Optional AI assistant
 

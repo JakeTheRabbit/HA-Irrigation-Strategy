@@ -595,10 +595,14 @@ describe("the rest of today, projected from now on the same rules", () => {
     // Past lights-off it is P3 whatever the recorded phase says.
     expect(from({ hour: 13, phase: "P2", since: 4, value: 35 }).points[0].phase).toBe("P3");
   });
-  it("P0: at once when already at the threshold, at the dryback target, or at its maximum wait", () => {
-    const bypass = from({ hour: 0.2, phase: "P0", since: 0, value: 33 });
+  it("P0: at once when already at the rescue floor, at the dryback target, or at its maximum wait", () => {
+    const bypass = from({ hour: 0.2, phase: "P0", since: 0, value: 22 });
     expect(bypass.shots[0]).toMatchObject({ phase: "P1", size: 2 });
     expect(bypass.shots[0].hour).toBeCloseTo(0.2, 9);
+    // Under the re-water point but over the floor, P0 waits: the plants drink before the first shot.
+    const under = from({ hour: 0.2, phase: "P0", since: 0, value: 33 });
+    expect(under.shots[0]).toMatchObject({ phase: "P1", size: 2 });
+    expect(under.shots[0].hour).toBeCloseTo(1, 9);
     // 36 from a 36.5 peak dries to the 2 % dryback target (35.77) in 0.32 h
     const drying = from(
       { hour: 0.2, phase: "P0", since: 0, value: 36, peak: 36.5 },

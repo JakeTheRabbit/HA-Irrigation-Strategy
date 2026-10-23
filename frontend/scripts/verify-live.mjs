@@ -190,19 +190,19 @@ const menu = async (name) => {
     .getByRole("button", { name: name === "Today" ? "Status" : name, exact: true })
     .click();
   if (name === "Today")
-    await page
-      .getByRole("navigation", { name: "Status views" })
-      .getByRole("button", { name: "Room", exact: true })
-      .click();
+    // The Status tabs give way to the room tree on a desktop; open the room page directly.
+    await page.evaluate(() => {
+      location.hash = "#/today";
+    });
 };
 async function check(name, run) {
   await run();
   checks.push(name);
   console.log("PASS " + name);
 }
-const roomChip = (id) => page.locator(`header.topbar [data-room="${id}"]`);
+const roomChip = (id) => page.locator(`.desktop-sidebar .room-tree-row[data-room="${id}"]`);
 const selectedRoom = () =>
-  page.locator("header.topbar [data-room][aria-pressed=true]").getAttribute("data-room");
+  page.locator(".desktop-sidebar .room-tree-row[data-selected]").getAttribute("data-room");
 const field = (key) =>
   page.locator(`input[id="setting-number.crop_steering_room_b_zone_1_${key}"]`);
 try {
@@ -658,7 +658,7 @@ try {
     await page.goto(`${base}/dashboard.html?room=missing-room#/strategy`, {
       waitUntil: "networkidle",
     });
-    assert.equal(await page.locator("header.topbar [data-room][aria-pressed=true]").count(), 0);
+    assert.equal(await page.locator(".desktop-sidebar .room-tree-row[data-selected]").count(), 0);
     assert.equal(await page.locator('input[type="number"]').count(), 0);
   });
   await check(

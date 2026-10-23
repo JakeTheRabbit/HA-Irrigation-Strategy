@@ -137,6 +137,19 @@ export async function mockHa(t) {
       state: "21",
       unit: "°C",
     },
+    // What the integration accepts that a switch and a plain % / mS/cm probe do not cover.
+    ...[
+      ["input_boolean." + r.prefix + "bool_pump", "input_boolean", "off", ""],
+      ["valve." + r.prefix + "valve_entity", "valve", "closed", ""],
+      ["sensor." + r.prefix + "vwc_fraction", "sensor", "0.6", "m³/m³"],
+      ["sensor." + r.prefix + "ec_us", "sensor", "3000", "µS/cm"],
+    ].map(([entity_id, domain, state, unit]) => ({
+      entity_id,
+      name: entity_id,
+      domain,
+      state,
+      unit,
+    })),
   ]);
   const plans = Object.fromEntries(
     rooms.map((r) => [

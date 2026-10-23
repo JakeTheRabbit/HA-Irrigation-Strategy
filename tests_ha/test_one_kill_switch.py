@@ -88,12 +88,15 @@ async def test_a_fresh_install_waters_with_no_helper(hass, controller_for):
 
 
 # ------------------------------------------------------------------ OFF mid-shot closes the valve
-def _turn_off_mid_shot(monkeypatch, clock, fake, gate):
+def _turn_off_mid_shot(monkeypatch, clock, fake, gate, valve):
     import controller
 
     def sleep(seconds):
         clock.sleep(seconds)
-        fake.set_state(gate, "off")  # the operator, after the shot has started
+        # the operator, once the valve is on (the gate is also read while the shot opens, and OFF
+        # then stops the shot before the valve)
+        if ("turn_on", valve) in switch_calls(fake):
+            fake.set_state(gate, "off")
 
     monkeypatch.setattr(controller.time, "sleep", sleep)
 
@@ -101,7 +104,7 @@ def _turn_off_mid_shot(monkeypatch, clock, fake, gate):
 async def test_the_engine_switch_off_mid_shot_closes_the_valve_of_a_2_25_1_room(hass, controller_for, monkeypatch):
     c, fake, clock, room = await _f2251(hass, controller_for, helper="on", switch="on")
     fake.calls.clear()
-    _turn_off_mid_shot(monkeypatch, clock, fake, OWN)
+    _turn_off_mid_shot(monkeypatch, clock, fake, OWN, "switch.zone_1_valve")
     c._execute_shot(room, 1, 10, 30, flow_lps=0.05)
     calls = switch_calls(fake)
     assert calls[:3] == [
@@ -117,7 +120,7 @@ async def test_the_engine_switch_off_mid_shot_closes_the_valve_of_a_2_25_1_room(
 async def test_the_helper_off_mid_shot_closes_the_valve_of_an_env_era_room(hass, controller_for, monkeypatch):
     c, fake, clock, room = await _env_era(hass, controller_for, helper="on")
     fake.calls.clear()
-    _turn_off_mid_shot(monkeypatch, clock, fake, LEGACY)
+    _turn_off_mid_shot(monkeypatch, clock, fake, LEGACY, "switch.veg_valve")
     c._execute_shot(room, 1, 10, 30, flow_lps=0.05)
     calls = switch_calls(fake)
     assert ("turn_on", "switch.veg_valve") in calls and ("turn_off", "switch.veg_valve") in calls

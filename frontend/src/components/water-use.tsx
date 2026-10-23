@@ -14,7 +14,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Empty, number } from "@/components/dashboard";
 import { UiTip } from "@/components/info-tip";
-import { numeric } from "@/lib/model";
+import { waterLitres } from "@/lib/model";
 import type { StrategyDocument } from "@/lib/operator-types";
 import type { Controller, Zone } from "@/lib/types";
 import { errorText } from "@/lib/utils";
@@ -152,7 +152,7 @@ export function WaterUsePanel({
       zone,
       days: mergeDays(
         ...ids.map((id) => {
-          const value = numeric(controller.states[id]);
+          const value = waterLitres(controller.states[id]);
           const samples = loaded.record.samples[id] ?? [];
           return growDayTotals(
             value === null ? samples : [...samples, { time: now, value }],

@@ -5,6 +5,6 @@
   border-radius: 8px;
   background: var(--warning-bg);
   color: color-mix(in srgb, var(--warning) 75%, var(--foreground));
-  font-size: 13px;
+  font-size: var(--text-sm);
   overflow-wrap: anywhere;
 }

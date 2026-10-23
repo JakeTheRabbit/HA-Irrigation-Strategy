@@ -17,7 +17,7 @@
 }
 .probes-status strong {
   font-size: 17px;
-  font-weight: 650;
+  font-weight: 600;
 }
 .probes-status + .jev-trouble {
   margin-bottom: 16px;
@@ -31,7 +31,7 @@
   padding-top: 14px;
   color: var(--foreground);
   font-size: var(--text-sm);
-  font-weight: 650;
+  font-weight: 600;
 }
 .probes-zone .pill {
   margin-left: 10px;
@@ -109,7 +109,7 @@
 .insight-mapping > strong {
   display: block;
   font-weight: 500;
-  font-size: 12px;
+  font-size: var(--text-xs);
   margin-top: 6px;
   overflow-wrap: anywhere;
 }
@@ -190,7 +190,7 @@
 .probe-picker legend {
   padding: 0 4px;
   font-size: var(--text-sm);
-  font-weight: 650;
+  font-weight: 600;
 }
 .probe-choice {
   display: flex;

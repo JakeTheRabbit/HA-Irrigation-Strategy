@@ -33,16 +33,16 @@
   gap: 6px 10px;
 }
 .day-timeline .timeline-compare {
-  font-size: 12px;
+  font-size: var(--text-xs);
   color: var(--muted-foreground);
 }
 .day-timeline .timeline-heading-side select {
   height: 26px;
   padding: 0 28px 0 8px;
-  font-size: 12px;
+  font-size: var(--text-xs);
 }
 .day-timeline .timeline-age {
-  font-size: 12px;
+  font-size: var(--text-xs);
   color: var(--muted-foreground);
   white-space: nowrap;
 }
@@ -78,8 +78,8 @@
   border-radius: 8px;
   background: var(--surface);
   box-shadow: 0 4px 16px rgb(0 0 0 / 14%);
-  font-size: 12px;
-  line-height: 1.45;
+  font-size: var(--text-xs);
+  line-height: 1.5;
   white-space: pre-line;
   overflow-wrap: anywhere;
   pointer-events: none;
@@ -95,8 +95,8 @@
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--surface);
-  font-size: 12px;
-  line-height: 1.45;
+  font-size: var(--text-xs);
+  line-height: 1.5;
   overflow-wrap: anywhere;
 }
 .day-timeline .grow-readout strong {
@@ -147,7 +147,7 @@
 .day-timeline .axis-title,
 .day-timeline .ref-label,
 .day-timeline .badge-word {
-  font-size: 12px;
+  font-size: var(--text-xs);
   fill: var(--muted-foreground);
 }
 .day-timeline .axis-title {
@@ -288,7 +288,7 @@
   fill: var(--gd-ink);
 }
 .day-timeline .phase-badge .badge-text {
-  font-size: 12px;
+  font-size: var(--text-xs);
   font-weight: 700;
   fill: var(--gd-on-ink);
 }
@@ -318,7 +318,7 @@
   margin: 0;
   padding: 0;
   list-style: none;
-  font-size: 12px;
+  font-size: var(--text-xs);
   color: var(--muted-foreground);
 }
 .day-timeline .grow-legend li {
@@ -357,13 +357,13 @@
   flex: none;
   align-items: center;
   gap: 6px;
-  font-size: 12px;
+  font-size: var(--text-xs);
   color: var(--muted-foreground);
 }
 .day-timeline .grow-readout-choice select {
   height: 26px;
   padding: 0 28px 0 8px;
-  font-size: 12px;
+  font-size: var(--text-xs);
 }
 .day-timeline .grow-legend i {
   display: inline-block;
@@ -438,7 +438,7 @@
 .day-timeline .timeline-events {
   flex: none;
   margin-left: auto;
-  font-size: 13px;
+  font-size: var(--text-sm);
 }
 .day-timeline .timeline-events[open] {
   flex-basis: 100%;
@@ -457,7 +457,7 @@
 .day-timeline .timeline-events li,
 .day-timeline .timeline-events p {
   overflow-wrap: anywhere;
-  line-height: 1.45;
+  line-height: 1.5;
 }
 @media (max-width: 720px) {
   .day-timeline .timeline-body {

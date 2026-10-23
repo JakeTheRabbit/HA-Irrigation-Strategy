@@ -11,6 +11,7 @@ import registry from "./features.json";
 import restored from "./features-restore.json";
 import type { Page } from "./routes";
 import type { EntityState, States } from "./types";
+import { unreadableState } from "./utils";
 
 export type Domain = "switch" | "select" | "number";
 export type Scope = "room" | "zone" | "room+zone";
@@ -93,7 +94,7 @@ export function registeredControl(
 
 /** The value an entity holds, in the control's type; null when it has none. */
 export function valueOf(control: Control, entity?: EntityState): Value | null {
-  if (!entity || ["unavailable", "unknown", ""].includes(entity.state)) return null;
+  if (!entity || unreadableState(entity.state)) return null;
   if (control.domain === "switch") return entity.state === "on";
   if (control.domain === "number") {
     const n = Number(entity.state);

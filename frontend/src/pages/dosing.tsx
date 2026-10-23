@@ -36,7 +36,7 @@ import {
   canEdit,
   controllerReach,
   doseDeadline,
-  MAX_DOSE_S,
+  exceedsDoseLimit,
   dosingConfigId,
   dosingError,
   dosingStatusId,
@@ -44,6 +44,7 @@ import {
   leftWords,
   pumpStock,
   pumpView,
+  parseConfig,
   readConfig,
   readStatus,
   recipeRows,
@@ -68,7 +69,8 @@ import {
 } from "@/lib/dosing";
 import { tankTelemetry, type TankReading } from "@/lib/tank-telemetry";
 import type { Controller } from "@/lib/types";
-import { dayWord, errorText } from "@/lib/utils";
+import { dayWord, errorText, unreadableState } from "@/lib/utils";
+import { formatClock } from "@/lib/clock";
 import "./dosing.css";
 
 const mL = (value: number) =>
@@ -83,7 +85,7 @@ const seconds = (value: number) =>
 const when = (iso: string | null, now: number) => {
   const at = Date.parse(iso ?? "");
   if (!Number.isFinite(at)) return "time not reported";
-  const time = new Date(at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  const time = formatClock(at);
   const day = dayWord(at, now);
   return day ? `${day} ${time}` : time;
 };
@@ -478,7 +480,7 @@ export function Dosing({
   const status = readStatus(states[dosingStatusId(prefix)]);
   const now = Date.now();
   const reach = controllerReach(states, prefix, status, now);
-  const views = (config?.pumps ?? []).map((pump) => pumpView(pump, status, reach, states, now));
+  const views = (config?.pumps ?? []).map((pump) => pumpView(pump, status, reach, states, now, config!.profile));
   const running = views.some((view) => view.state === "dosing");
   const batchRunning = !!status && status.batch.step !== "idle";
   useTicker(running || batchRunning);
@@ -517,6 +519,7 @@ export function Dosing({
   // The dose form.
   const ml = amount.trim() === "" ? Number.NaN : Number(amount);
   const max = view?.pump.max_ml ?? 0;
+  const profile = (config ?? parseConfig({})!).profile;
   const validMl = Number.isFinite(ml) && ml > 0 && ml <= max;
   const expected = view && validMl && view.flow && view.flow > 0 ? ml / view.flow : null;
   const doseBlock = !view
@@ -537,8 +540,8 @@ export function Dosing({
                   ? view.reason
                   : !validMl
                     ? `Enter more than 0 and at most ${mL(max)} mL.`
-                    : expected !== null && expected > MAX_DOSE_S
-                      ? `That dose would take ${seconds(expected)}: the controller refuses a dose longer than 20 minutes.`
+                    : expected !== null && exceedsDoseLimit(expected, profile)
+                      ? `That dose would take ${seconds(expected)}: the controller refuses a dose longer than ${seconds(profile.max_dose_s)} in this room.`
                       : null;
   const reviewDose = () => {
     if (!view || !validMl) return;
@@ -556,7 +559,7 @@ export function Dosing({
         {
           label: "How it stops",
           value: expected
-            ? `by itself: the pump times the dose. Still running after ${seconds(doseDeadline(expected))}, its power is switched off.`
+            ? `by itself: the pump times the dose. Still running after ${seconds(doseDeadline(expected, profile.max_dose_s))}, its power is switched off.`
             : "by itself: the pump times the dose.",
         },
       ],
@@ -663,7 +666,7 @@ export function Dosing({
   const tank = tankTelemetry(states, room.room);
   const fullId = config?.batch.full_entity ?? null;
   const full = fullId
-    ? !states[fullId] || ["unknown", "unavailable"].includes(states[fullId].state)
+    ? unreadableState(states[fullId]?.state)
       ? "Unavailable"
       : states[fullId].state === config!.batch.full_state
         ? "Full"

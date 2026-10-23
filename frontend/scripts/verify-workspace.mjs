@@ -5,6 +5,7 @@ import { mkdir, writeFile, readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
 import AxeBuilder from "@axe-core/playwright";
+import { readmeImage } from "./readme-images.mjs";
 const out = fileURLToPath(new URL("../../output/playwright/", import.meta.url));
 await mkdir(out, { recursive: true });
 // CI must exercise the checked-out artifact without relying on a developer's server.
@@ -485,11 +486,11 @@ try {
       await visible(page.getByRole("heading", { name: "Discard unsaved workspace changes?" }));
       await page.getByRole("button", { name: "Keep editing" }).click();
       assert.equal(new URL(page.url()).hash, "#/plan/schedule");
-      await page.locator('.room-chip[data-room="room:room_b_"]').click();
+      await page.locator('.desktop-sidebar .room-tree-row[data-room="room:room_b_"]').click();
       await visible(page.getByRole("heading", { name: "Discard unsaved workspace changes?" }));
       await page.getByRole("button", { name: "Keep editing" }).click();
       assert.equal(
-        await page.locator('.room-chip[data-room="room:"]').getAttribute("aria-pressed"),
+        await page.locator('.desktop-sidebar .room-tree-row[data-room="room:"]').getAttribute("data-selected"),
         "true",
       );
       await navigate("Today");
@@ -575,7 +576,7 @@ try {
       await fresh("setup");
       await visible(page.locator("#room-name"));
       await page.locator("#room-name").fill("Must be discarded");
-      await page.locator('.room-chip[data-room="room:room_b_"]').click();
+      await page.locator('.desktop-sidebar .room-tree-row[data-room="room:room_b_"]').click();
       await visible(page.getByRole("heading", { name: "Discard unsaved workspace changes?" }));
       await page.getByRole("button", { name: "Discard and continue" }).click();
       assert.equal(await page.locator("#room-name").inputValue(), "Room B");
@@ -1604,29 +1605,28 @@ try {
           await frame.locator("script[data-font-license=Roboto]").textContent(),
           /SIL OPEN FONT LICENSE/,
         );
-        await mkdir(fileURLToPath(new URL("../../img/", import.meta.url)), { recursive: true });
         await tp.screenshot({
-          path: fileURLToPath(new URL("../../img/operator-dashboard.png", import.meta.url)),
+          path: readmeImage("operator-dashboard.png"),
         });
         await navigateSchedule(frame);
         // Capture the unified calendar and its shared planning canvas.
         const panel = frame.locator(".irrigation-workspace");
         await tp.evaluate(() => (document.querySelector("iframe").style.height = "3000px"));
         await panel.screenshot({
-          path: fileURLToPath(new URL("../../img/grow-plan.png", import.meta.url)),
+          path: readmeImage("grow-plan.png"),
         });
         await tp.evaluate(() => (document.querySelector("iframe").style.height = "100vh"));
         await tp.screenshot({ path: out + "workspace-ha-native-dark.png", fullPage: true });
         await navigateTo("Equipment", "Setup", frame);
         await visible(frame.locator("#setup-room"));
         await tp.screenshot({
-          path: fileURLToPath(new URL("../../img/rooms-setup.png", import.meta.url)),
+          path: readmeImage("rooms-setup.png"),
         });
         await navigate("Today", frame);
         await visible(frame.getByRole("heading", { level: 1, name: / today$/ }));
         await tp.setViewportSize({ width: 390, height: 844 });
         await tp.screenshot({
-          path: fileURLToPath(new URL("../../img/mobile-overview.png", import.meta.url)),
+          path: readmeImage("mobile-overview.png"),
         });
         await tp.setViewportSize({ width: 1440, height: 1000 });
 

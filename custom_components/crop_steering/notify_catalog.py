@@ -21,7 +21,7 @@ KINDS = (
         "when the controller marks it critical.",
         # Every code whose severity is critical in docs/error-codes.json.
         "codes": _codes(
-            "CS-201 CS-202 CS-203 CS-204 CS-207 CS-211 CS-301 CS-308 CS-310 CS-311 "
+            "CS-201 CS-202 CS-203 CS-204 CS-207 CS-211 CS-212 CS-301 CS-308 CS-310 CS-311 "
             "CS-315 CS-402 CS-601 CS-606 CS-801 CS-809 CS-811 CS-901 CS-902"
         ),
         "events": (),
@@ -48,10 +48,11 @@ KINDS = (
         "detail": "Alerts about a VWC or EC reading that the controller cannot use, "
         "a probe set aside for its unit, and a zone without a probe. Also a zone "
         "whose probes disagree or whose primary probe is offline, and a zone that "
-        "steers on bulk EC. Also a probe that the AI assistant doubts or sets aside.",
+        "steers on bulk EC. Also a probe that the AI assistant doubts or sets aside, "
+        "and a room with no feed EC, so no EC flush.",
         "codes": _codes(
             "CS-101 CS-102 CS-103 CS-104 CS-502 CS-503 CS-504 CS-505 CS-603 CS-604 CS-703 "
-            "CS-704"
+            "CS-704 CS-907"
         ),
         "events": (),
     },
@@ -59,14 +60,15 @@ KINDS = (
         "id": "watering",
         "name": "Shots stopped",
         "detail": "Alerts when something stops the shots in a room or a zone. Also a "
-        "controller that does not run, a second controller on the room, and a room "
-        "with no shots for some time, and shots held for too long. Also a tank at "
+        "controller that does not run or stops on an error in a room, a second "
+        "controller on the room, and a room with no shots for some time, and shots "
+        "held for too long. Also a tank at "
         "its minimum, due for a refill or above its full mark, and a batch tank to "
         "refill. Also a waste valve that holds the shots, and a low estimated tank "
         "level.",
         "codes": _codes(
-            "CS-202 CS-203 CS-204 CS-205 CS-206 CS-207 CS-208 CS-209 CS-210 CS-211 CS-316 "
-            "CS-602 CS-609 CS-901 CS-902 CS-903 CS-904 CS-905 CS-906"
+            "CS-202 CS-203 CS-204 CS-205 CS-206 CS-207 CS-208 CS-209 CS-210 CS-211 CS-212 "
+            "CS-316 CS-602 CS-609 CS-901 CS-902 CS-903 CS-904 CS-905 CS-906"
         ),
         "events": (),
     },
@@ -124,11 +126,12 @@ KINDS = (
         "name": "Setup and settings",
         "detail": "Alerts about a setup change that waits, and a setting that is "
         "missing, out of range or read from a new place. Also the grow plan, and an "
-        "Engine Enabled switch that does not stop water. A push with no code or an "
-        "unknown code that is not critical also comes here.",
+        "Engine Enabled switch that does not stop water. Also a retired entity that "
+        "an automation or a script still uses. A push with no code or an unknown code "
+        "that is not critical also comes here.",
         "codes": _codes(
             "CS-201 CS-401 CS-402 CS-403 CS-405 CS-601 CS-605 CS-606 CS-607 CS-610 CS-611 "
-            "CS-713"
+            "CS-613 CS-614 CS-713"
         ),
         "events": (),
     },
@@ -139,7 +142,7 @@ EMERGENCY = KINDS[0]["codes"]
 # Every code whose severity is info in docs/error-codes.json: a digest lists them apart from the warnings.
 INFO = _codes("CS-205 CS-305 CS-403 CS-501 CS-702 CS-705 CS-711 CS-712 CS-906")
 
-# The integration's own Repairs cards (health.py, stock_api.py, bounds.py) by translation key, with the code each one
+# The integration's own Repairs cards (health.py, stock_api.py, bounds.py, deprecation.py) by translation key, with the code each one
 # carries in its title (strings.json). tests/test_notify_catalog.py keeps the two in step.
 REPAIRS = {
     "kill_switch_missing": "CS-601",
@@ -153,6 +156,8 @@ REPAIRS = {
     "stock_low": "CS-608",
     "engine_switch_not_gate": "CS-610",
     "outside_zone_bounds": "CS-611",
+    "deprecated_feature": "CS-613",
+    "deprecated_entities": "CS-614",
 }
 
 

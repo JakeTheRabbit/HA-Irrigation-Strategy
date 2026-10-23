@@ -5,32 +5,34 @@
 ![HACS](https://img.shields.io/badge/HACS-Custom-orange)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
-**Crop Steering waters a grow room automatically from Home Assistant. An optional AI assistant gives a second opinion on the decisions that need judgement.**
+**Crop Steering waters each zone of a grow room from what its probes read, inside Home Assistant. It refuses to water when something is wrong, and it shows you every shot.**
 
 ![All rooms across both demo rooms, grouped by room with current VWC, pore EC, water delivery and feed supply](img/all-zones.png)
 
-Crop Steering controls the water of a grow room from Home Assistant. The controller measures the water and the salt in each group of plants. It decides when the plants need water and how much water they need. Then it operates your pump and your valves. These fixed decisions are the rules of the controller.
+[The whole system, part by part](https://cropsteering.growlabs.nz/features) · [Try the released demo](https://jaketherabbit.github.io/HA-Irrigation-Strategy/dashboard.html?demo=1) · [Take the free beginner course](https://jaketherabbit.github.io/HA-Irrigation-Strategy/learn/) · [Safety first](#safety-first) · [New to crop steering?](#new-to-crop-steering) · [Install](#install) · [First-run setup](#first-run-setup) · [Daily use](#daily-use) · [The AI assistant](#the-ai-assistant) · [Upgrade](#upgrade) · [Troubleshooting](#troubleshooting) · [Documents](#documents)
 
-You can also use the AI assistant. The AI assistant is optional and uses Claude Haiku with your own Anthropic API key. The controller asks it a question when a decision needs a grower's judgement. The dashboard shows each answer, the action of the controller, and the result.
+## What it does
 
-[Take the free beginner course](https://jaketherabbit.github.io/HA-Irrigation-Strategy/learn/) · [Try the released demo](https://jaketherabbit.github.io/HA-Irrigation-Strategy/dashboard.html?demo=1) · [Safety first](#safety-first) · [New to crop steering?](#new-to-crop-steering) · [Install](#install) · [First-run setup](#first-run-setup) · [Daily use](#daily-use) · [The AI assistant](#the-ai-assistant) · [Upgrade](#upgrade) · [Troubleshooting](#troubleshooting) · [Documents](#documents)
+1. **Why.** A timer waters at fixed times, whatever the plants did overnight. Crop steering lets the substrate dry back by a set amount, then brings it back up, so you choose whether the plants lean vegetative or generative.
+2. **It watches.** Moisture (VWC) and pore EC probes in each zone, the feed tank and the lights. Several probes in one zone become one reading, and a probe that goes quiet is left out.
+3. **It decides.** Each day runs in [four phases, P0 to P3](#new-to-crop-steering). You set targets per zone, or a plan for the whole grow, and the engine sizes each shot from how fast that zone is drying.
+4. **It stays safe.** A fixed list of checks runs before every shot. Every pump and valve switch is read back, and one that does not answer stops watering and raises an alert. An unreadable kill switch or room switch counts as off.
+5. **It acts.** A shot switches the pump, the main line and one zone valve in order, then closes them and counts the water. It can also mix a batch tank and keep track of stock.
+6. **You see it.** All rooms, then a room, then a zone with every shot on its day chart. History compares runs. It works on a phone.
+7. **You change it.** Edits stay a draft until you review and apply them, and each value is read back so you see what the controller now holds.
+8. **The AI layer.** Optional AI judges work inside hard limits, and an AI client can prepare setup or plan changes through the [MCP connector](docs/MCP.md) for you to review.
+9. **You can trust it.** Alerts with a code go to the phones you choose, as Home Assistant notifications and Repairs cards.
+10. **Start.** [Install](#install) below, or try the demo first.
+
+**In progress, not in a release yet:** a shot timeline, timer programs, a pump queue, feed probe and dosing pump calibration, a change journal with put back and undo, presets and copy, alert rules tested against yesterday, an alerts inbox, quiet hours per phone, display units and a system status page.
+
+The [feature matrix](docs/FEATURE_MATRIX.md) lists each released feature with how it was tested and what is still unproven.
 
 ## Learn crop steering from zero
 
-**[Open Crop Steering Academy →](https://jaketherabbit.github.io/HA-Irrigation-Strategy/learn/)**
-
-A free course for people who have never used a substrate probe or crop-steering controller. Start with water, roots and air; learn VWC and EC; then practise reading graphs, calculating delivered water, mapping equipment and planning a grow.
+**[Open Crop Steering Academy →](https://jaketherabbit.github.io/HA-Irrigation-Strategy/learn/)** A free course for people who have never used a substrate probe: 24 captioned video lessons with practice and a glossary, from water and roots to planning a grow. Practice never operates Home Assistant. [Course guide](docs/ACADEMY.md) · [Learner workbook](docs/training/crop-steering-from-zero/WORKBOOK.md).
 
 ![Crop Steering Academy: beginner lessons, learning routes and practical exercises](img/academy-home.png)
-
-- **24 lessons:** a captioned 480p video for each lesson, with generated teaching illustrations, real demo screens, exact calculation diagrams, worked examples, practice and answer-specific feedback.
-- **Choose a route:** use an existing installation, or build with Raspberry Pi or x86-64. Host lessons are alternatives.
-- **Learn at your pace:** transcripts, captions, playback speed, a glossary and recall reminders. Progress stays in your browser; export it to keep a copy.
-- **Practise safely:** synthetic calculations and graphs never operate Home Assistant. Physical setup and commissioning require competent local supervision. Quiz passes are knowledge-practice records, not hardware certification.
-
-All lessons use locally generated Kokoro `af_heart` narration. Every lesson has a video. Five longer, chaptered parts let you watch related lessons together; the Pi and x86 setup parts are alternatives. Jump directly between lessons or video sections. Scripts use ASD-STE100 principles; full formal conformance and learner outcomes have not been certified. [Course guide and production details](docs/ACADEMY.md) · [Learner workbook](docs/training/crop-steering-from-zero/WORKBOOK.md).
-
-![A3 capacity lesson with the drainage illustration, captions and direct section controls](img/academy-lesson.png)
 
 ## Safety first
 
@@ -220,7 +222,7 @@ Do these steps each day:
 
 ### Landing page and room overview
 
-**All rooms** is the default landing page. It shows each room separately, with the room's water today (total litres and litres per plant), and each zone's phase, VWC, pore EC, last irrigation, zone litres and average litres per plant. Tap anywhere on a zone card to open the zone. The feed strip opens that room’s detailed tank view. The watering and stop controls in the header apply only to the selected room, whose name appears beside them.
+**All rooms** is the default landing page. It is organised room → zones → sensors. Each room shows its run day and stage, water drunk today (per plant and in total), air temperature, humidity and VPD,, with its feed tank (level, usable litres, pH, EC, pump, and a held-shots warning) and its stock tanks side by side at the top right. Each zone is a card with its slab drawing (water = moisture, dashed line = today's peak, specks = pore EC), its phase and its automation state (Automated, Watering now, Paused, Watering off, Offline, Room off), water per plant, VWC, dryback, pore EC and root-zone temperature (▲▼ outside their band), and every sensor in it with its readings. A problem shows on the room, zone, sensor or tank it belongs to. A zone being watered glows; a zone out of the automation is greyed. Tap a zone to open it.
 
 Choose **Settings › Settings › Display › Default view** to open another workspace by default. The preference is saved in this browser. Bookmarks and notification links take precedence; choosing a default never redirects an explicit page link. **Status › Room** opens Today for the selected room.
 

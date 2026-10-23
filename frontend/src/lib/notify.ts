@@ -2,7 +2,7 @@ import { asCode, errorCodes } from "./error-codes";
 import type { Room, States } from "./types";
 
 /** Who gets a phone push for which alerts (docs/NOTIFICATIONS.md): the site's notification setup as
- * `notify_get` returns it, and what Settings & help › Notifications works out from it. Nothing here
+ * `notify_get` returns it, and what Settings › Notifications works out from it. Nothing here
  * sends anything: a test push is `notify_test`, a save is `notify_save`, and the integration decides
  * who each push goes to. */
 

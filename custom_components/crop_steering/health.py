@@ -35,6 +35,10 @@ ISSUE_IDS = (
     "stock_low",
     # Raised and cleared by bounds.py, when the room sets up and when a setting changes.
     "outside_zone_bounds",
+    # Raised by deprecations.py, once per Home Assistant run, as deprecated_<service or select>.
+    "deprecated_feature",
+    # Raised and cleared by deprecation.py, once Home Assistant has started.
+    "deprecated_entities",
 )
 # The platforms whose entities the controller reads by exact id and has no other way to find.
 # Fused sensors are left out: the controller tolerates their legacy naming and an add-on option
@@ -218,7 +222,12 @@ def run_health_check(hass: HomeAssistant, entry: ConfigEntry) -> None:
             for base in ISSUE_IDS:
                 # Stock runs low whether or not anything grows, and only its own store
                 # raises that card again; the same goes for a setting held above its limit.
-                if base not in ("entities_moved", "stock_low", "outside_zone_bounds"):
+                if base not in (
+                    "entities_moved",
+                    "stock_low",
+                    "outside_zone_bounds",
+                    "deprecated_entities",
+                ):
                     _issue(hass, False, _iid(base, slug), ir.IssueSeverity.WARNING)
             return
 

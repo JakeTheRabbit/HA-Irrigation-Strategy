@@ -168,6 +168,10 @@ export function createDemo(now = Date.now()): States {
     put(`sensor.crop_steering_${prefix}ai_heartbeat`, "online", {
       enable_flag: enable,
       last_beat: new Date(now - 18_000).toISOString(),
+      // What the controller judges with, as its heartbeat publishes it.
+      max_sensor_age_s: 1200,
+      max_shot_s: 900,
+      pore_ec_neutral: [0.8, 1.0],
     });
     put(`sensor.crop_steering_${prefix}app_status`, "safe_idle");
     const fired = index ? [] : [`Z1 P1 ramp shot ${demoRampShot(now)}/6 (demo)`];
@@ -203,6 +207,9 @@ export function createDemo(now = Date.now()): States {
           below_minimum: false,
           over_full: false,
           minimum_pct: 8,
+          release_pct: 12,
+          over_pct: 102,
+          over_release_pct: 98,
         },
       );
     number(prefix, "irrigation_ec_min", 2.3, 0, 6, 0.1, "mS/cm");
@@ -259,6 +266,31 @@ export function createDemo(now = Date.now()): States {
         unit_of_measurement: "L",
       });
       put(`${base}${key}irrigation_count_app`, 5 + id + index);
+      // The controller's own dryback, from the same peak and VWC as its waiting-for conditions;
+      // in P2 its estimate of the next top-up; zone 1 has a detected ramp ceiling.
+      const peak = 64 + index * 2,
+        vwc = 54 + id * 2 + index * 3;
+      put(`${base}${key}dryback_app`, (((peak - vwc) / peak) * 100).toFixed(2), {
+        unit_of_measurement: "%",
+        peak_vwc: peak,
+        dryback_points: peak - vwc,
+        rate_points_per_h: 0.6,
+        drying_back: true,
+        friendly_name: `Zone ${id} dryback`,
+      });
+      // As the controller works it out: to the re-water point (the trigger above) at that rate.
+      if (id !== 1)
+        put(
+          `${base}prediction_${key}next_irrigation_hours`,
+          Math.max(0, (vwc - 61 - index * 2) / 0.6).toFixed(2),
+          { unit_of_measurement: "h", friendly_name: `Zone ${id} next irrigation` },
+        );
+      else
+        put(`${base}${key}vmax_detected`, peak + 1.5, {
+          confidence: 0.8,
+          unit_of_measurement: "%",
+          friendly_name: `Zone ${id} detected Vmax (advisory)`,
+        });
       put(`switch.crop_steering_${prefix}${key}enabled`, index && id === 3 ? "off" : "on");
       put(`switch.crop_steering_${prefix}${key}manual_override`, "off");
       put(
@@ -489,6 +521,7 @@ function demoDosing(
     friendly_name: `${room} dosing configuration`,
     pumps,
     batch,
+    profile: { min_flow_ml_s: 0.05, max_dose_s: 1200 },
     request: null,
     updated_at: at(24 * 6),
     // The feed schedule's pick today (Room B has none, so its batch recipe has no name either).
@@ -1517,6 +1550,8 @@ export function demoDay(states: States, request: TimelineRequest, now = Date.now
         {
           state: past && id.endsWith("room_active") ? "on" : states[id].state,
           time: request.start,
+          // Asked for with attributes (the controller's dryback with its peak): as they are now.
+          ...(request.attributeIds.includes(id) ? { attributes: states[id].attributes } : {}),
         },
       ]);
   for (const config of Object.values(states)) {

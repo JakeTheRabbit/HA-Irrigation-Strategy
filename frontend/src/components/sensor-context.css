@@ -29,7 +29,7 @@
   border-radius: 6px;
   background: var(--surface);
   color: var(--foreground);
-  font-size: 12px;
+  font-size: var(--text-xs);
   cursor: pointer;
 }
 .sensor-window button[aria-pressed="true"] {
@@ -50,12 +50,12 @@
 .sensor-context-note {
   margin: 0 16px 16px;
   color: var(--muted-foreground);
-  font-size: 12px;
-  line-height: 1.55;
+  font-size: var(--text-xs);
+  line-height: 1.5;
 }
 .sensor-context-loading {
   min-height: 170px;
-  font-size: 12px;
+  font-size: var(--text-xs);
 }
 .sensor-context-body[data-refreshing] .sensor-chart {
   opacity: 0.5;
@@ -104,8 +104,8 @@
   margin-bottom: 8px;
 }
 .sensor-chart-heading h3 {
-  font-size: 13px;
-  font-weight: 650;
+  font-size: var(--text-sm);
+  font-weight: 600;
 }
 .sensor-chart-heading h3 span {
   color: var(--muted-foreground);
@@ -114,7 +114,7 @@
 }
 .sensor-chart-empty {
   color: var(--muted-foreground);
-  font-size: 12px;
+  font-size: var(--text-xs);
   padding: 6px 0 14px;
 }
 /* Two fixed rows (readings, then typical values) so labels never wrap out of step. */
@@ -249,14 +249,14 @@
   pointer-events: none;
 }
 .sensor-tooltip strong {
-  font-size: 13px;
+  font-size: var(--text-sm);
 }
 .sensor-tooltip span {
   color: var(--muted-foreground);
 }
 .sensor-table {
   margin: 10px 16px 0;
-  font-size: 12px;
+  font-size: var(--text-xs);
 }
 .sensor-table summary {
   cursor: pointer;
@@ -279,7 +279,7 @@
   margin: 10px 16px 16px;
   color: var(--muted-foreground);
   font-size: var(--text-xs);
-  line-height: 1.6;
+  line-height: 1.5;
 }
 /* A suggested value under a field, beside the button that copies it into the local draft. */
 .setting-suggestion {

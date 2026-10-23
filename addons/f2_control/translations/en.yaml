@@ -37,7 +37,7 @@ configuration:
     name: Notification service
     description: >-
       The Home Assistant notify action for the vitals reports and the alerts. The controller
-      uses it when no phone in Crop Steering > Settings & help > Notifications takes the
+      uses it when no phone in Crop Steering > Settings > Notifications takes the
       message, or when the integration cannot send it. Blank: the controller sends no push
       through this option. Write the action in the form notify/<service>, for example
       notify/mobile_app_my_phone. To find the name of your service, open Developer Tools >

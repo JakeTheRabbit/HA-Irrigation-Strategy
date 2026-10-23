@@ -174,6 +174,7 @@ export function SafetySwitches({ controller }: { controller: Controller }) {
     <div className="safety-switches" role="group" aria-label={`${room.room.name} safety switches`}>
       <button
         type="button"
+        id="config-engine"
         className="safety-switch"
         data-safety="watering"
         data-state={wateringState}
@@ -332,7 +333,12 @@ export function AutoSetpointsControl({
   const what = jevManaged ? "AI assistant: P2 shot size, re-water point" : "Auto setpoints";
   return (
     <>
-      <div className="room-power" role="group" aria-label={`${name} auto setpoints`}>
+      <div
+        id="config-auto_setpoints"
+        className="room-power"
+        role="group"
+        aria-label={`${name} auto setpoints`}
+      >
         <Status
           enabled={enabled === true ? true : null}
           label={

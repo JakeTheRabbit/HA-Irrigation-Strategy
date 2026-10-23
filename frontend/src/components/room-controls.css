@@ -25,12 +25,12 @@
   min-width: 0;
 }
 .room-off-banner strong {
-  font-size: 13px;
+  font-size: var(--text-sm);
 }
 .room-off-banner p {
   margin-top: 2px;
   color: var(--muted-foreground);
-  font-size: 12px;
+  font-size: var(--text-xs);
 }
 .heading-actions {
   display: flex;
@@ -48,11 +48,11 @@
   gap: 6px 14px;
   margin-top: 10px;
   color: var(--muted-foreground);
-  font-size: 12px;
+  font-size: var(--text-xs);
 }
 .auto-chip b {
   color: var(--foreground);
-  font-weight: 550;
+  font-weight: 500;
 }
 .auto-badge {
   margin-left: 6px;

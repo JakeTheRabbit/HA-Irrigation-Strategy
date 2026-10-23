@@ -7,16 +7,16 @@
 }
 .comparison-page h2 {
   font-size: 1rem;
-  font-weight: 650;
+  font-weight: 600;
   margin-bottom: 0.4rem;
 }
 .comparison-page h3 {
-  font-weight: 650;
+  font-weight: 600;
 }
 .comparison-page .small {
   color: var(--muted-foreground);
   font-size: 0.8rem;
-  line-height: 1.55;
+  line-height: 1.5;
 }
 .comparison-controls,
 .comparison-range {
@@ -141,7 +141,7 @@
 .rw-table th[scope="row"] {
   color: var(--foreground);
   font-size: var(--text-sm);
-  font-weight: 650;
+  font-weight: 600;
   white-space: nowrap;
 }
 .rw-table th[scope="row"] .pill {

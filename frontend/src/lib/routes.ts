@@ -171,3 +171,9 @@ export function canonicalHash(hash: string, search = ""): string | null {
   const query = hash.includes("?") ? hash.slice(hash.indexOf("?")) : "";
   return routeHash(route) + query;
 }
+
+/** The zone a zone page shows: the addressed one, the room's first for a bare `#/zone`, and none
+ * when the address names a zone the room does not have (a stale bookmark or notification). */
+export function zoneOnPage<T extends { id: number }>(zones: T[], zoneId: number | null): T | undefined {
+  return zoneId === null ? zones[0] : zones.find((zone) => zone.id === zoneId);
+}

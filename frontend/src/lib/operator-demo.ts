@@ -169,6 +169,13 @@ export class OperatorDemo {
       rooms: this.rooms,
       candidates,
       limits: { max_zones: 24 },
+      // The integration's defaults table (generated/defaults.py), as its setup_read sends it.
+      sizing_defaults: {
+        plant_count: 4,
+        substrate_volume: 10,
+        drippers_per_plant: 2,
+        dripper_flow_rate: 1.2,
+      },
     });
   }
   private plan(roomId: string): StrategyDocument {

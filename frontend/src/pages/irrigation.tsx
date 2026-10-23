@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Heading, type Page } from "@/components/dashboard";
+import { featureOf, roomOnlyFeature, useHashFeature } from "@/lib/feature-focus";
 import type { Controller } from "@/lib/types";
 import { Strategy, type Drafts } from "./strategy";
 import { GrowPlanner } from "./grow-planner";
@@ -25,7 +26,16 @@ export function Irrigation({
 }) {
   const [view, setView] = useState(initialView);
   const [zone, setZone] = useState(zoneId ?? controller.room.zones[0]?.id ?? 1);
-  const [roomScope, setRoomScope] = useState(false);
+  const [roomScope, setRoomScope] = useState(() =>
+    roomOnlyFeature(featureOf(window.location.hash)),
+  );
+  // A `?feature=` link opens the room for a room-only feature, the zone for any other.
+  const feature = useHashFeature();
+  useEffect(() => {
+    if (!feature) return;
+    setRoomScope(roomOnlyFeature(feature));
+    if (roomOnlyFeature(feature)) setView("current");
+  }, [feature]);
   const [canvas, setCanvas] = useState<HTMLDivElement | null>(null);
   const [scheduleDirty, setScheduleDirty] = useState(false);
   const [canonicalDirty, setCanonicalDirty] = useState(false);

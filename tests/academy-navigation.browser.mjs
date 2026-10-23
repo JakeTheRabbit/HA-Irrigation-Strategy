@@ -31,6 +31,7 @@ try {
   const drawerButton = name => page.locator('.lp-drawer').getByRole('button', {name});
   await page.goto(base + '#/lesson/A1');
   await waitLesson('A1');
+  await page.locator('.lp-drawer select option').first().waitFor({state:'attached'});
   assert.equal(await page.locator('.lp-drawer select option').count(),24,'All lessons remain directly available');
   await menu();
   assert.equal(await drawerButton(/^Previous lesson:/).count(),0,'First lesson has no previous lesson');

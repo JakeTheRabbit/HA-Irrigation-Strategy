@@ -204,7 +204,9 @@ def test_a_fresh_controllers_first_pass_reports_before_its_shot_and_through_it(l
     its first pass had nothing to repeat and the room still went quiet. The pass reports the room
     before its first shot, and the shot repeats that."""
     build, clock_class = looping
+    clock_class.current = clock_class(2026, 9, 19, 14, 0)  # the blind schedule waters only with the lights on
     c, _fake, clock, writes = build("on")
+    c.rooms[0].state[1].update(phase="P2", last_daily_reset=clock_class.now().date())
     c.rooms[0].state[1]["last_shot"] = None  # never watered: the blind schedule waters it now
     start = clock.seconds
     c.loop_once(clock_class.now())

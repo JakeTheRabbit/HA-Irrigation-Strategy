@@ -108,8 +108,8 @@ def test_phase_transitions_extended():
     assert ph(S(phase="P3", lights_just_on=True, vwc=42), P()) == "P0"
     assert ph(S(phase="P0", vwc=55, peak_vwc=70, dryback_pct=21), P()) == "P1"
     assert (
-        ph(S(phase="P0", vwc=44, peak_vwc=70, dryback_pct=5), P()) == "P1"
-    )  # already-dry bypass
+        ph(S(phase="P0", vwc=40, peak_vwc=70, dryback_pct=5), P()) == "P1"
+    )  # at the rescue floor: the bypass
     assert (
         ph(S(phase="P0", vwc=58, dryback_pct=5, phase_minutes=50), P()) == "P1"
     )  # timeout

@@ -1352,7 +1352,7 @@
         "id": "6",
         "title": "Read the accepted setup back",
         "body": [
-          "Check Overview → Selected room and Equipment → Probes",
+          "Check Status → Room and Equipment → Probes",
           "Unknown is not OFF. Watering stays OFF until C5 and C6"
         ],
         "narration": "After the acknowledgement arrives, read the setup back. Open Overview, the main status screen, then Selected room, its view of one room. Next open Equipment, then Probes. Compare each reading, its units and its age with your written setup sheet. Check the sizing, the measured flow, the light hours and the one owner of each output. A state that reads unknown means the software cannot tell, so treat it as a fault to fix, not as OFF. The card shows the accepted revision and the live values. Lesson C five checks the physical protections, and lesson C six proves the water starts and stops. Until those pass with the responsible people present, Watering stays OFF.",

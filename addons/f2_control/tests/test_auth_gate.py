@@ -224,8 +224,9 @@ def test_a_403_mid_shot_closes_the_shot_parks_and_carries_on_once_accepted(rig, 
 
 def test_a_403_that_clears_before_the_close_reopens_at_once(rig):
     c, fake, session, clock = rig()
-    refuse_from(session, 20, 403, until=21)
+    refuse_from(session, 20, 403, until=21, only=lambda method, _path: method == "GET")  # a read, not the close
     shot(c, clock)
+    assert session.refused()
     assert controller._GATE.state is None
     assert c.rooms[0].shot_inflight is None and fake.states[VALVE][0] == "off"
     assert switched(fake)[-3:] == [("turn_off", VALVE), ("turn_off", MAIN), ("turn_off", PUMP)]
@@ -340,3 +341,46 @@ def test_the_log_shows_home_assistants_address_without_a_password():
     assert '"| base:", BASE)' not in source
     shown = runtime_env._shown("http://grower:hunter2@ha:8123/api")
     assert "hunter2" not in shown and shown.endswith("@ha:8123/api")
+
+
+# ------------------------------------------------------------------ refused while a shot opens (CTL-002)
+@pytest.mark.parametrize("when, start", [("pump-on", 0), ("main-line-stage", 2.5), ("valve-read-back", 3.5)])
+def test_a_token_refused_while_a_shot_opens_is_not_a_hardware_fault(rig, monkeypatch, when, start):
+    """A refused token is not a switch that failed: no CS-302 to CS-304, no backoff, no CS-301 hold. The
+    shot's offs are sent and its record is left for the reconciler, as after a refusal mid-shot."""
+    c, fake, session, clock = rig()
+    room, codes, alert = c.rooms[0], [], c._alert
+    monkeypatch.setattr(c, "_alert", lambda key, cs, *a, **k: (codes.append(cs), alert(key, cs, *a, **k))[1])
+    refuse_from(session, start, 401)
+    shot(c, clock)
+    assert controller._GATE.state == "all"
+    assert not {"CS-301", "CS-302", "CS-303", "CS-304"} & set(codes)
+    assert room.hardware_fault is None and room.state[1]["on_failures"] is None
+    assert room.shot_inflight is not None  # left recorded for the reconciler
+    offs = {p for _t, m, p, _s in session.sent if m == "POST"} & {"/services/switch/turn_off"}
+    assert offs  # the shot's offs were sent
+    assert (("turn_on", VALVE) in switched(fake)) == (when == "valve-read-back")
+
+
+def test_a_token_refused_late_in_the_valve_read_back_is_not_a_dead_valve(rig, monkeypatch):
+    """CTL-002 final review: refused in the read-back's last seconds (after its last operator check) is still
+    a refusal: no CS-304, no backoff; the valve was sent ON, so its water is counted."""
+    c, fake, session, clock = rig()
+    room, codes, alert = c.rooms[0], [], c._alert
+    real = fake.ha_call
+
+    def stuck(domain, service, **data):
+        if (service, data.get("entity_id")) == ("turn_on", VALVE):
+            fake.calls.append((domain, service, data))
+            return True  # the valve takes the command and stays off
+        return real(domain, service, **data)
+
+    monkeypatch.setattr(fake, "ha_call", stuck)
+    monkeypatch.setattr(c, "_alert", lambda key, cs, *a, **k: (codes.append(cs), alert(key, cs, *a, **k))[1])
+    refuse_from(session, 3 + 15.2, 401)  # the valve went ON at 3 s; its read-back ends at 19 s
+    shot(c, clock)
+    assert controller._GATE.state == "all"
+    assert not {"CS-301", "CS-302", "CS-303", "CS-304"} & set(codes)
+    assert not {"CS-302", "CS-303", "CS-304"} & set((room.state[1].get("day_acc") or {}).get("alerts", []))
+    assert room.state[1]["on_failures"] is None and room.hardware_fault is None
+    assert room.state[1]["daily_vol"] > 0  # sent ON, maybe open: counted

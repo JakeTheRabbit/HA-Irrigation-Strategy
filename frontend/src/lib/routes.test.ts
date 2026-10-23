@@ -4,6 +4,7 @@ import {
   LEGACY_PAGES,
   PAGES,
   parseRoute,
+  zoneOnPage,
   routeHash,
   sameRoute,
   sectionOf,
@@ -119,7 +120,7 @@ describe("the menu", () => {
     expect(routeHash({ page: "equipment/dosing" })).toBe("#/equipment/dosing");
     expect(canonicalHash("#/equipment/dosing")).toBeNull();
   });
-  it("opens the site's notifications under Settings & help", () => {
+  it("opens the site's notifications under Settings", () => {
     expect(parseRoute("#/settings/notifications")).toEqual({
       route: { page: "settings/notifications" },
       canonical: true,
@@ -146,4 +147,15 @@ describe("zone context survives reload", () => {
       expect(sameRoute(route, { page, zone: 1 })).toBe(false);
     },
   );
+});
+
+describe("zoneOnPage", () => {
+  const zones = [{ id: 1 }, { id: 2 }];
+  it("shows the addressed zone, or the room's first for a bare #/zone", () => {
+    expect(zoneOnPage(zones, 2)).toEqual({ id: 2 });
+    expect(zoneOnPage(zones, null)).toEqual({ id: 1 });
+  });
+  it("shows no zone for a zone the room does not have, never its first", () => {
+    expect(zoneOnPage(zones, 99)).toBeUndefined();
+  });
 });

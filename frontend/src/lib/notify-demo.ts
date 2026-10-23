@@ -40,8 +40,8 @@ export const DEMO_KINDS: NotifyKind[] = [
     id: "sensors",
     name: "Sensors and drift",
     detail:
-      "A probe the controller cannot use, a probe set aside for its unit, a zone without one, a zone whose probes disagree or whose primary probe is offline, a zone steering on bulk EC, and a probe that the AI assistant set aside.",
-    codes: [...codes(101, 104), "CS-502", "CS-503", "CS-504", "CS-505", "CS-603", "CS-604", "CS-703", "CS-704"],
+      "A probe the controller cannot use, a probe set aside for its unit, a zone without one, a zone whose probes disagree or whose primary probe is offline, a zone steering on bulk EC, a probe that the AI assistant set aside, and a room with no feed EC, so no EC flush.",
+    codes: [...codes(101, 104), "CS-502", "CS-503", "CS-504", "CS-505", "CS-603", "CS-604", "CS-703", "CS-704", "CS-907"],
     events: [],
   },
   {
@@ -49,7 +49,7 @@ export const DEMO_KINDS: NotifyKind[] = [
     name: "Shots stopped",
     detail:
       "Something stopping the shots in a room or a zone, a room that has watered nothing for a while with the lights on, the tank it waters from at its minimum, due a refill or over its full mark, and a batch tank to refill.",
-    codes: [...codes(202, 208), "CS-602", "CS-609", "CS-209", "CS-210", "CS-211", "CS-316", ...codes(901, 906)],
+    codes: [...codes(202, 208), "CS-602", "CS-609", "CS-209", "CS-210", "CS-211", "CS-212", "CS-316", ...codes(901, 906)],
     events: [],
   },
   {
@@ -105,7 +105,7 @@ export const DEMO_KINDS: NotifyKind[] = [
     id: "setup",
     name: "Setup and settings",
     detail:
-      "A setup change waiting, settings missing or out of range, a grow plan holding, and an Engine Enabled switch that does not stop water.",
+      "A setup change waiting, settings missing or out of range, a grow plan holding, an Engine Enabled switch that does not stop water, and a retired entity an automation still uses.",
     codes: [
       "CS-201",
       ...codes(401, 405, [404]),
@@ -115,6 +115,8 @@ export const DEMO_KINDS: NotifyKind[] = [
       "CS-607",
       "CS-610",
       "CS-611",
+      "CS-613",
+      "CS-614",
       "CS-713",
     ],
     events: [],

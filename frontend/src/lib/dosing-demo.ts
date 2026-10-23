@@ -232,6 +232,7 @@ export class DosingDemo {
       revision: config.revision + 1,
       pumps: data.pumps,
       batch: data.batch,
+      profile: config.profile,
       request: config.request,
       updated_at: new Date().toISOString(),
     })!;
@@ -295,6 +296,7 @@ export class DosingDemo {
           ...(states[id]?.attributes ?? { friendly_name: "Dosing configuration" }),
           pumps: config.pumps,
           batch: config.batch,
+          profile: config.profile,
           request: config.request,
           updated_at: config.updated_at,
         },

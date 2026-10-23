@@ -345,6 +345,24 @@
       ]
     },
     {
+      "code": "CS-212",
+      "title": "Controller error in room",
+      "source": "notification",
+      "severity": "critical",
+      "meaning": "An error stopped the controller in the pass of this room. The alert gives the error. The heartbeat and the status of the room show error. The other rooms continue.",
+      "watering": "The room gets no shots, also no rescue shots, until the error stops. The controller tries the room again each minute. The alert comes again every 30 minutes while the error continues, and clears after the next pass of the room without an error.",
+      "causes": [
+        "A fault in the controller, for example a setting or a state of the room that it cannot use.",
+        "An entity of the room that gives a value of a type that the controller does not expect."
+      ],
+      "fixes": [
+        "CAUTION: Do not leave the room in this state for a long time. The substrate dries out and the plants can wilt.",
+        "Read the controller log near the time of the alert.",
+        "Report the error with the log.",
+        "Until the error stops, water the room by hand."
+      ]
+    },
+    {
       "code": "CS-301",
       "title": "Hardware fault latch",
       "source": "notification",
@@ -371,10 +389,11 @@
       "title": "Pump command error",
       "source": "notification",
       "severity": "warning",
-      "meaning": "Home Assistant returned an error when the controller tried to start the pump. A device that reads \"unavailable\" does not cause this alert, because no shot starts then.",
-      "watering": "The controller cancels the shot and does not count it. It closes the pump, the main-line valve and the zone valve, and reads them back. If they do not read off, it latches a hardware hold (CS-301). If they read off, the next shot runs as usual.",
+      "meaning": "The pump did not start. Home Assistant returned an error when the controller tried to start it, or took the command but the pump did not read on within 16 s. A device that already reads \"unavailable\" does not cause this alert, because no shot starts then.",
+      "watering": "The controller cancels the shot and does not count it. It closes the pump, the main-line valve and the zone valve, and reads them back. If they do not read off, it latches a hardware hold (CS-301). If they read off, the next shot runs as usual. After 3 such shots of a zone in a row (CS-302, CS-303 or CS-304), the controller tries that zone at most once every 30 min, rescue shots too, until its switches read on again. A Test Shot is not held.",
       "causes": [
         "Home Assistant did not reply (it restarted, or the network has a fault), or it returned an error for the command.",
+        "The device took the command but did not switch: a dead relay, or an offline Zigbee plug that still accepts commands. Or it reports its new state more than 16 s late.",
         "A switch that reads \"unavailable\" does not cause this alert. No shot starts while a switch on the feed path reads neither on nor off. The status of the zone names the offline switch. The zone gets water again when the switch reads again."
       ],
       "fixes": [
@@ -390,10 +409,11 @@
       "title": "Main-line valve command error",
       "source": "notification",
       "severity": "warning",
-      "meaning": "Home Assistant returned an error when the controller tried to start the main-line valve. A device that reads \"unavailable\" does not cause this alert, because no shot starts then.",
-      "watering": "The controller cancels the shot and does not count it. It closes the pump, the main-line valve and the zone valve, and reads them back. If they do not read off, it latches a hardware hold (CS-301). If they read off, the next shot runs as usual.",
+      "meaning": "The main-line valve did not open. Home Assistant returned an error when the controller tried to open it, or took the command but the main-line valve did not read on within 16 s. A device that already reads \"unavailable\" does not cause this alert, because no shot starts then.",
+      "watering": "The controller cancels the shot and does not count it. It closes the pump, the main-line valve and the zone valve, and reads them back. If they do not read off, it latches a hardware hold (CS-301). If they read off, the next shot runs as usual. After 3 such shots of a zone in a row (CS-302, CS-303 or CS-304), the controller tries that zone at most once every 30 min, rescue shots too, until its switches read on again. A Test Shot is not held.",
       "causes": [
         "Home Assistant did not reply (it restarted, or the network has a fault), or it returned an error for the command.",
+        "The device took the command but did not switch: a dead relay, or an offline Zigbee plug that still accepts commands. Or it reports its new state more than 16 s late.",
         "A switch that reads \"unavailable\" does not cause this alert. No shot starts while a switch on the feed path reads neither on nor off. The status of the zone names the offline switch. The zone gets water again when the switch reads again."
       ],
       "fixes": [
@@ -408,10 +428,11 @@
       "title": "Zone valve command error",
       "source": "notification",
       "severity": "warning",
-      "meaning": "Home Assistant returned an error when the controller tried to start the zone valve. A device that reads \"unavailable\" does not cause this alert, because no shot starts then.",
-      "watering": "The controller cancels the shot and does not count it. It closes the pump, the main-line valve and the zone valve, and reads them back. If they do not read off, it latches a hardware hold (CS-301). If they read off, the next shot runs as usual.",
+      "meaning": "The zone valve did not open. Home Assistant returned an error when the controller tried to open it, or took the command but the zone valve did not read on within 16 s, or by the end of a shorter shot (at least 6 s). A device that already reads \"unavailable\" does not cause this alert, because no shot starts then.",
+      "watering": "The controller cancels the shot. If every read of the valve was a definite off, no water went to the zone and the controller does not count the shot. If a read was anything else (unavailable, unknown, opening, or on too late), water may have flowed, so the controller counts the time from opening the valve to closing it. It closes the pump, the main-line valve and the zone valve, and reads them back. If they do not read off, it latches a hardware hold (CS-301). If they read off, the next shot runs as usual. After 3 such shots of a zone in a row (CS-302, CS-303 or CS-304), the controller tries that zone at most once every 30 min, rescue shots too, until its switches read on again. A Test Shot is not held.",
       "causes": [
         "Home Assistant did not reply (it restarted, or the network has a fault), or it returned an error for the command.",
+        "The device took the command but did not switch: a dead relay, or an offline Zigbee plug that still accepts commands. Or it reports its new state more than 16 s late.",
         "A switch that reads \"unavailable\" does not cause this alert. No shot starts while a switch on the feed path reads neither on nor off. The status of the zone names the offline switch. The zone gets water again when the switch reads again."
       ],
       "fixes": [
@@ -1060,6 +1081,37 @@
       ]
     },
     {
+      "code": "CS-613",
+      "title": "Deprecated feature in use",
+      "source": "repairs",
+      "severity": "warning",
+      "meaning": "Something called a service or chose a select that the integration will remove. The Repairs card names it, says what to use instead and gives the release that removes it.",
+      "watering": "Water continues. The service or the select works as before until it is removed.",
+      "causes": [
+        "A person, an automation or a script called apply_recipe or save_recipe, or chose a value in the Recipe stage or Irrigation phase select."
+      ],
+      "fixes": [
+        "Open the card and read what it names and what to use instead.",
+        "Change the automation or script that makes the call. For a stage of the grow, set the targets of the room in the dashboard or use a grow plan. To move one zone to a phase, use its Set phase select.",
+        "The card does not come back until Home Assistant restarts."
+      ]
+    },
+    {
+      "code": "CS-614",
+      "title": "Retired entities in use",
+      "source": "repairs",
+      "severity": "warning",
+      "meaning": "An automation or a script uses an entity of Crop Steering that is retired. Nothing in Crop Steering reads it, and the controller never used it: the EC ratio, the adjusted re-water point, the high and low P2 EC ratios, the P3 EC targets and the irrigation phase select. The integration keeps these entities, hidden, so that the automation or the script still loads.",
+      "watering": "Water continues as before. The retired entities do not change the shots.",
+      "causes": [
+        "An automation or a script was made when these entities showed values of their own."
+      ],
+      "fixes": [
+        "Remove the entities that the card names from the automations and scripts that it names. The re-water point in force for each zone is on its zone page, under Waiting for.",
+        "The card clears at the next start of Home Assistant after no automation or script uses one."
+      ]
+    },
+    {
       "code": "CS-701",
       "title": "No water at the zone",
       "source": "notification",
@@ -1629,6 +1681,22 @@
       "fixes": [
         "Refill the tank by hand, or make a batch.",
         "To stop the reminders, set the refill reminder to 0% in the dosing setup."
+      ]
+    },
+    {
+      "code": "CS-907",
+      "title": "EC flushing off, feed EC unknown",
+      "source": "notification",
+      "severity": "warning",
+      "meaning": "The room has no feed EC probe, and the feed recipe in use declares no feed EC. The controller does not know the EC of the feed water.",
+      "watering": "The zones get water on their VWC only. The controller does not flush high pore EC and does not hold a zone for high EC, because it cannot tell if the feed can decrease the pore EC. The alert comes once and goes when the room gets a feed EC.",
+      "causes": [
+        "No feed EC probe is set for the room in the controller app options (feed_ec_sensor).",
+        "The feed recipe in use has no EC, or the room has no dosing setup."
+      ],
+      "fixes": [
+        "CAUTION: Do not ignore this alert for many days. Salt can build up in the substrate when the controller cannot flush.",
+        "Set the feed EC on the feed recipe in use (Crop Steering → Dosing), or set a feed EC probe in the controller app options."
       ]
     }
   ]

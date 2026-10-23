@@ -235,15 +235,8 @@ export function p1WaterBudget(parameters: WaterParameters) {
 /** Reported daily volume / current configured count: an average, never individual plant flow. */
 export function dailyWater(zone: Zone, plants: number | null) {
   const value = zone.water.value;
-  const unit = zone.water.unit.trim().toLowerCase();
-  const zoneL =
-    finite(value) && value >= 0
-      ? ["l", "litre", "litres", "liter", "liters"].includes(unit)
-        ? value
-        : unit === "ml"
-          ? value / 1000
-          : null
-      : null;
+  // The room model already holds zone water in litres.
+  const zoneL = finite(value) && value >= 0 ? value : null;
   const mlPerPlant = zoneL !== null && positiveCount(plants) ? (zoneL * 1000) / plants : null;
   return {
     zoneL,

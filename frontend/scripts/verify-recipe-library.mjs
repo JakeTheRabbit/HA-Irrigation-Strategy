@@ -5,6 +5,7 @@ import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
 import AxeBuilder from "@axe-core/playwright";
+import { readmeImage } from "./readme-images.mjs";
 const out = fileURLToPath(new URL("../../output/playwright/", import.meta.url));
 await mkdir(out, { recursive: true });
 const html = await readFile(new URL("../../www/dashboard.html", import.meta.url));
@@ -161,7 +162,7 @@ try {
         window.scrollTo(0, 0);
       });
       await library().screenshot({
-        path: fileURLToPath(new URL("../../img/recipe-library.png", import.meta.url)),
+        path: readmeImage("recipe-library.png"),
       });
     },
   );
@@ -169,11 +170,11 @@ try {
     const exported = await downloadPlan(
       page.getByRole("button", { name: "Export recipe My saved plan", exact: true }),
     );
-    await page.locator('.room-chip[data-room="room:room_b_"]').click();
+    await page.locator('.desktop-sidebar .room-tree-row[data-room="room:room_b_"]').click();
     await page.getByRole("heading", { name: "Irrigation", exact: true }).waitFor();
     await openLibrary();
     assert.equal(await library().locator(".recipe-list li").count(), 2);
-    await page.locator('.room-chip[data-room="room:"]').click();
+    await page.locator('.desktop-sidebar .room-tree-row[data-room="room:"]').click();
     await page.getByRole("heading", { name: "Irrigation", exact: true }).waitFor();
     await openLibrary();
     await page.getByRole("button", { name: "Remove recipe My saved plan", exact: true }).click();

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ControllerStore } from "./use-controller";
+import { ControllerStore, inLitres } from "./use-controller";
 import { HaClient, haTimeZone } from "./client";
 import { viewerTimeZone } from "./comparison";
 import { createDemo } from "./demo";
@@ -199,6 +199,28 @@ describe("controller lifecycle", () => {
       (await store.history(["sensor.demo_room_b_tank_ph"], 24))[0].points.length,
     ).toBeGreaterThan(0);
   });
+  it("lets every history entry point read the same sensors of the room, and none of another's", async () => {
+    browser();
+    const store = new ControllerStore(true);
+    const end = Date.now(),
+      start = end - 3_600_000;
+    const span = { start: new Date(start).toISOString(), end: new Date(end).toISOString() };
+    const reads = (id: string) => [
+      () => store.history([id], 1),
+      () => store.timeline({ entityIds: [id], attributeIds: [], start, end }),
+      () => store.historyWindow({ entityIds: [id], ...span, timeZone: "UTC" }),
+      () => store.dailyRanges({ entityIds: [id], ...span, timeZone: "UTC" }),
+      () => store.sensorStatistics({ entityIds: [id], ...span, timeZone: "UTC" }),
+      () => store.waterRecord({ entityIds: [id], start, end }),
+    ];
+    // The room's tank probe and a room sensor: allowed by all six (the run comparisons read sensors
+    // only, whatever the room maps).
+    for (const id of ["sensor.demo_tank_ec", "sensor.crop_steering_vwc_zone_1"])
+      for (const [index, read] of reads(id).entries())
+        await expect(read(), `${id} #${index}`).resolves.toBeDefined();
+    for (const [index, read] of reads("sensor.demo_room_b_tank_ec").entries())
+      await expect(read(), `#${index}`).rejects.toThrow();
+  });
   it("reads a long history one day per request and joins the days in order", async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(Date.parse("2026-09-24T12:00:00Z"));
@@ -392,5 +414,31 @@ describe("Home Assistant's time zone", () => {
     const [, init] = fetch.mock.calls.find(([input]) => String(input).endsWith("/api/config"))!;
     expect(init?.headers).toMatchObject({ Authorization: "Bearer inherited" });
     stop();
+  });
+});
+
+describe("recorded water in litres", () => {
+  const counter = (unit: string) => ({
+    entity_id: "x",
+    state: "1",
+    attributes: unit ? { unit_of_measurement: unit } : {},
+  });
+  it("scales each water counter by its own unit and never passes gallons off as litres", () => {
+    const samples = {
+      "sensor.crop_steering_zone_1_daily_water_app": [{ time: 1, value: 10 }],
+      "sensor.crop_steering_zone_1_daily_water_usage": [{ time: 1, value: 2 }],
+      "sensor.crop_steering_zone_2_daily_water_usage": [{ time: 1, value: 2 }],
+      "sensor.crop_steering_zone_1_irrigation_count_app": [{ time: 1, value: 3 }],
+    };
+    const out = inLitres(samples, {
+      "sensor.crop_steering_zone_1_daily_water_app": counter("L"),
+      "sensor.crop_steering_zone_1_daily_water_usage": counter("gal"),
+      "sensor.crop_steering_zone_2_daily_water_usage": counter("bushels"),
+      "sensor.crop_steering_zone_1_irrigation_count_app": counter(""),
+    });
+    expect(out["sensor.crop_steering_zone_1_daily_water_app"][0].value).toBe(10);
+    expect(out["sensor.crop_steering_zone_1_daily_water_usage"][0].value).toBeCloseTo(7.570823568);
+    expect(out["sensor.crop_steering_zone_2_daily_water_usage"]).toEqual([]);
+    expect(out["sensor.crop_steering_zone_1_irrigation_count_app"][0].value).toBe(3);
   });
 });

@@ -6,7 +6,6 @@ import {
   alignToCurrent,
   chunks,
   DEFAULT_CHOICE,
-  drybackMarkers,
   explorerSensors,
   pickRuns,
   previousWindow,
@@ -230,6 +229,14 @@ describe("the room's sensors", () => {
     expect(ids).toContain("sensor.demo_vpd");
     expect(ids).toContain("sensor.demo_tank_ph");
     expect(sensors.find((sensor) => sensor.entityId === "sensor.demo_vpd")?.unit).toBe("kPa");
+    // Each zone's dryback is the controller's published sensor, recorded: never worked out here.
+    expect(sensors.find((sensor) => sensor.entityId === "sensor.crop_steering_zone_1_dryback_app")).toMatchObject({
+      label: `${room.zones[0].name} dryback`,
+      group: room.zones[0].name,
+      kind: "dryback",
+      zone: 1,
+      unit: "% of peak",
+    });
     expect(new Set(sensors.map((sensor) => sensor.group))).toEqual(
       new Set([...room.zones.map((zone) => zone.name), "Room climate", "Feed and tank"]),
     );
@@ -241,13 +248,11 @@ describe("the room's sensors", () => {
   });
 });
 
-describe("the 30 d range and the dryback markers", () => {
-  it("offers 30 d, kept in the address with the dryback overlay", () => {
+describe("the 30 d range", () => {
+  it("offers 30 d, and drops an old link's dryback markers from the address", () => {
     const choice = readChoice("#/zone/1?range=30d&dryback=1");
     expect(choice.preset).toBe("30d");
-    expect(choice.dryback).toBe(true);
-    expect(readChoice("#/zone/1").dryback).toBe(false);
-    expect(writeChoice("#/zone/1", { ...choice, dryback: false })).not.toContain("dryback");
+    expect(writeChoice("#/zone/1?range=30d&dryback=1", choice)).not.toContain("dryback");
     const now = Date.parse("2026-09-28T16:00:00Z");
     const span = resolveRange(choice, {
       now,
@@ -257,17 +262,5 @@ describe("the 30 d range and the dryback markers", () => {
       run: null,
     })!;
     expect(span.end - span.start).toBe(30 * DAY);
-  });
-  it("marks each grow day's peak and the low after it, in percent of the peak", () => {
-    const H = 3_600_000;
-    const times = [0, 2, 4, 10, 20, 24, 26, 30, 44].map((h) => h * H);
-    const values = [40, 60, 58, 55, 48, 50, 62, 59, 49.6];
-    const markers = drybackMarkers(times, values, [0, 24 * H]);
-    expect(markers.map((m) => [m.peak.value, m.low.value])).toEqual([
-      [60, 48],
-      [62, 49.6],
-    ]);
-    expect(markers[0].percent).toBeCloseTo(20, 6);
-    expect(drybackMarkers(times, values.map(() => null), [0])).toEqual([]);
   });
 });

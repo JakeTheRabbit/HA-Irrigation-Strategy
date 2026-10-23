@@ -5,7 +5,9 @@ import {
   numeric,
   roomSlug,
   runningVersions,
+  shotRunning,
   validateChange,
+  waterLitres,
 } from "./model";
 import { applyChanges, HaClient } from "./client";
 import { createDemo, demoHistory } from "./demo";
@@ -111,6 +113,34 @@ describe("room model", () => {
     expect(older.zones[0].status).toBe("Older integration status");
   });
   it("requires an actual room descriptor", () => expect(discoverRooms({})).toEqual([]));
+  it("reads the EC target family the way the controller does: zone mode, else growth stage, else generative", () => {
+    const states = fixture();
+    const room = discoverRooms(states)[0];
+    const num = (id: string, v: string) =>
+      (states[id] = entity(id, v, { min: 0, max: 10, step: 0.1 }));
+    states["sensor.crop_steering_zone_1_phase"] = entity("sensor.crop_steering_zone_1_phase", "P1");
+    num("number.crop_steering_ec_target_veg_p1", "1.5");
+    num("number.crop_steering_ec_target_gen_p1", "3.5");
+    // The room's steering_mode select is not what the controller reads.
+    states["select.crop_steering_steering_mode"] = entity(
+      "select.crop_steering_steering_mode",
+      "Generative",
+    );
+    states["select.crop_steering_growth_stage"] = entity(
+      "select.crop_steering_growth_stage",
+      "Vegetative",
+    );
+    expect(buildRoom(states, room).zones[0].ecTarget.value).toBe(1.5);
+    states["select.crop_steering_zone_1_steering_mode"] = entity(
+      "select.crop_steering_zone_1_steering_mode",
+      "Generative",
+    );
+    expect(buildRoom(states, room).zones[0].ecTarget.value).toBe(3.5);
+    states["select.crop_steering_zone_1_steering_mode"].state = "unavailable";
+    expect(buildRoom(states, room).zones[0].ecTarget.value).toBe(1.5);
+    delete states["select.crop_steering_growth_stage"];
+    expect(buildRoom(states, room).zones[0].ecTarget.value).toBe(3.5);
+  });
   it("selects phase-specific thresholds and leaves unresolved EC mode unknown", () => {
     const states = fixture();
     const room = discoverRooms(states)[0];
@@ -550,5 +580,78 @@ describe("every new room has a slug", () => {
     });
     const both = discoverRooms({ ...fresh, [upgraded.entity_id]: upgraded });
     expect(both.map((r) => r.id)).toEqual(["room:", "room:tent_"]);
+  });
+});
+
+describe("water today units", () => {
+  const roomWith = (unit: string | undefined, state: string) => {
+    const states = fixture();
+    const id = "sensor.crop_steering_zone_1_daily_water_usage";
+    states[id] = entity(id, state, unit === undefined ? {} : { unit_of_measurement: unit });
+    return buildRoom(states, discoverRooms(states)[0]);
+  };
+  it("shows a zone's water in litres whatever unit Home Assistant displays it in", () => {
+    for (const [unit, state, litres] of [
+      ["L", "10", 10],
+      ["mL", "10000", 10],
+      ["m³", "0.01", 10],
+      ["gal", "2", 2 * 3.785411784],
+    ] as const) {
+      const room = roomWith(unit, state);
+      expect(room.zones[0].water.unit).toBe("L");
+      expect(room.zones[0].water.value).toBeCloseTo(litres, 9);
+      const total = room.metrics.find((m) => m.key === "water")!;
+      expect(total.unit).toBe("L");
+      expect(total.value).toBeCloseTo(litres, 9);
+    }
+  });
+  it("keeps litres when the entity names no unit, and shows nothing for a unit it cannot convert", () => {
+    expect(roomWith(undefined, "10").zones[0].water.value).toBe(10);
+    expect(roomWith("bushels", "10").zones[0].water.value).toBeNull();
+  });
+});
+
+describe("waterLitres", () => {
+  it("reads a live counter in litres from its own unit", () => {
+    const at = (state: string, unit?: string) =>
+      entity("sensor.w", state, unit ? { unit_of_measurement: unit } : {});
+    expect(waterLitres(at("2", "gal"))).toBeCloseTo(7.570823568);
+    expect(waterLitres(at("5", "L"))).toBe(5);
+    expect(waterLitres(at("unavailable", "L"))).toBeNull();
+    expect(waterLitres(undefined)).toBeNull();
+  });
+});
+
+describe("a running shot, by the controller's own longest shot", () => {
+  const open = (minutes: number, published: number | null, cap?: string) => {
+    const states = createDemo();
+    const room = discoverRooms(states)[0];
+    const valves = states["sensor.crop_steering_engine_config"].attributes.valves;
+    const valve = (valves as Record<string, string>)["1"];
+    const now = Date.parse("2026-10-01T12:00:00Z");
+    const ago = new Date(now - minutes * 60_000).toISOString();
+    states[valve] = { ...states[valve], state: "on", last_changed: ago };
+    delete states["number.crop_steering_max_shot_duration"];
+    delete states["number.crop_steering_maximum_shot_duration"];
+    if (cap !== undefined)
+      states["number.crop_steering_max_shot_duration"] = entity(
+        "number.crop_steering_max_shot_duration",
+        cap,
+      );
+    const beat = states["sensor.crop_steering_ai_heartbeat"].attributes;
+    if (published === null) delete beat.max_shot_s;
+    else beat.max_shot_s = published;
+    return shotRunning(states, room, now);
+  };
+  it("counts a valve open no longer than the cap the controller last sized a shot with", () => {
+    expect(open(9, 600, "900")).toBe("1");
+    expect(open(11, 600, "900")).toBeNull();
+  });
+  it("uses the room's cap setting when the controller publishes none", () => {
+    expect(open(9, null, "600")).toBe("1");
+    expect(open(11, null, "600")).toBeNull();
+  });
+  it("never reads as watering without a known cap: no copy of the controller's fallback", () => {
+    expect(open(1, null)).toBeNull();
   });
 });

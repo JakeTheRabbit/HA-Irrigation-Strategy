@@ -3,7 +3,8 @@ import { demoDisplay } from "./display";
 import type { DailyRanges, HistoryRequest, HistoryWindow, RunsDocument } from "./comparison-types";
 import { demoHistoryWindow } from "./comparison-demo";
 import type { TimelineRequest } from "./day-timeline";
-import { explorerSensors } from "./history-explorer";
+import { allowedHistoryIds } from "./history-allow";
+import { setClockTimeZone } from "./clock";
 import type { OperatorAction } from "./operator-types";
 import { OperatorDemo } from "./operator-demo";
 import { useEffect, useRef, useSyncExternalStore } from "react";
@@ -19,11 +20,11 @@ import {
 } from "./client";
 import {
   buildRoom,
-  descriptor,
   discoverRooms,
   emptyRoom,
   resolveRequestedRoom,
   validateChange,
+  waterLitres,
 } from "./model";
 import {
   createDemo,
@@ -48,7 +49,12 @@ import {
 } from "./live";
 import { roomProbeIds } from "./probes";
 import { TANK_KEYS } from "./tank-level";
-import { historySamples, type WaterRecord, type WaterRecordRequest } from "./water-use";
+import {
+  historySamples,
+  type CounterSample,
+  type WaterRecord,
+  type WaterRecordRequest,
+} from "./water-use";
 
 type Listener = () => void;
 const SESSION_KEY = "crop-steering-connection-tab";
@@ -109,7 +115,7 @@ export class ControllerStore {
         // ?whats-new=2.22.0: the demo as an installation updated from 2.22.0, ?whats-new=unknown
         // from one running before What's new existed. Otherwise it has nothing new to show.
         search?.get("whats-new") ?? null,
-        // ?notify-user=grower: Settings & help › Notifications as that phone's owner, who is not an
+        // ?notify-user=grower: Settings › Notifications as that phone's owner, who is not an
         // administrator.
         search?.get("notify-user") ?? null,
       );
@@ -130,6 +136,7 @@ export class ControllerStore {
   };
   getSnapshot = () => this.snapshot;
   private publish() {
+    setClockTimeZone(this.timeZone);
     const rooms = discoverRooms(this.states);
     const room = rooms.find((r) => r.id === this.roomId) || emptyRoom;
     this.snapshot = {
@@ -557,13 +564,13 @@ export class ControllerStore {
       if (mutation) this.writing = false;
     }
   };
-  /** Throws unless every id is a sensor of the selected room or one of its registered runs. A
-   * promise only when it has to read the room's run records first. */
+  /** Throws unless every id is the selected room's (allowedHistoryIds) or a sensor of one of its
+   * registered runs. A promise only when it has to read the room's run records first. */
   private checkRunSensors(entityIds: string[]): Promise<void> | void {
     const generation = this.generation,
       roomId = this.roomId;
     if (!roomId) throw new Error("Select an available room.");
-    const allowed = new Set(this.snapshot.room.entities.map((entity) => entity.entity_id));
+    const allowed = allowedHistoryIds(this.snapshot.room, this.states);
     const check = () => {
       const registered = this.runDocuments.get(roomId);
       if (registered?.generation === generation)
@@ -662,16 +669,7 @@ export class ControllerStore {
   history = async (entityIds: string[], hours: number, signal?: AbortSignal) => {
     if (!Number.isFinite(hours) || hours <= 0 || hours > 720)
       throw new Error("History range must be between 0 and 720 hours.");
-    // The room's own entities, the probes its zones' readings combine, and the tank probes its
-    // descriptor maps for display.
-    const mapped = descriptor(this.states, this.snapshot.room.room)?.attributes;
-    const allowed = new Set([
-      ...this.snapshot.room.entities.map((e) => e.entity_id),
-      ...roomProbeIds(this.snapshot.room.zones, this.states),
-      ...[mapped?.tank_ec_sensor, mapped?.tank_ph_sensor].filter(
-        (id): id is string => typeof id === "string" && !!id,
-      ),
-    ]);
+    const allowed = allowedHistoryIds(this.snapshot.room, this.states);
     if (entityIds.some((id) => !allowed.has(id)))
       throw new Error("History is limited to entities in the selected room.");
     if (this.demo) return demoHistory(this.states, entityIds, hours);
@@ -697,24 +695,7 @@ export class ControllerStore {
   /** The selected room's grow-day, once: over Home Assistant's websocket inside Home Assistant,
    * over REST standalone. Live updates extend it from there (day-timeline.ts appendLive). */
   timeline = async (request: TimelineRequest) => {
-    const room = this.snapshot.room;
-    const mapped = descriptor(this.states, room.room)?.attributes;
-    const allowed = new Set([
-      ...room.entities.map((entity) => entity.entity_id),
-      ...room.zones.flatMap((zone) => (zone.valveEntity ? [zone.valveEntity] : [])),
-      // The tank and pump its descriptor maps, charted on Equipment › Tank & feed.
-      ...Object.values(TANK_KEYS).flatMap((key) => {
-        const id = mapped?.[key];
-        return typeof id === "string" && id ? [id] : [];
-      }),
-      // The main line and the lights: History › Timeline's equipment lanes (Settings › Display).
-      ...(["mainline", "light_entity"] as const).flatMap((key) => {
-        const id = mapped?.[key];
-        return typeof id === "string" && id ? [id] : [];
-      }),
-      // Every sensor the zone page's history explorer offers: probes, climate, feed and tank.
-      ...explorerSensors(room, this.states).map((sensor) => sensor.entityId),
-    ]);
+    const allowed = allowedHistoryIds(this.snapshot.room, this.states);
     const ids = [...request.entityIds, ...request.attributeIds];
     if (!ids.length || ids.some((id) => !allowed.has(id)))
       throw new Error("History is limited to entities in the selected room.");
@@ -735,7 +716,7 @@ export class ControllerStore {
    * its websocket inside Home Assistant; standalone, its recorded history over REST, which reaches
    * back only as far as the recorder keeps it. */
   waterRecord = async (request: WaterRecordRequest): Promise<WaterRecord> => {
-    const allowed = new Set(this.snapshot.room.entities.map((entity) => entity.entity_id));
+    const allowed = allowedHistoryIds(this.snapshot.room, this.states);
     if (!request.entityIds.length || request.entityIds.some((id) => !allowed.has(id)))
       throw new Error("Water records are limited to the selected room's sensors.");
     if (!(request.end > request.start))
@@ -748,12 +729,29 @@ export class ControllerStore {
       ? { source: "statistics", samples: await liveStatistics(this.live, request) }
       : {
           source: "history",
-          samples: historySamples(await this.client.timeline({ ...request, attributeIds: [] })),
+          samples: inLitres(
+            historySamples(await this.client.timeline({ ...request, attributeIds: [] })),
+            this.states,
+          ),
         };
     if (generation !== this.generation)
       throw new Error("Room or connection changed; water request cancelled.");
     return result;
   };
+}
+/** Recorded water counters in litres, by the unit each entity reports now (history carries none);
+ * a counter in a unit that cannot be converted is dropped, never shown as litres. */
+export function inLitres(
+  samples: Record<string, CounterSample[]>,
+  states: States,
+): Record<string, CounterSample[]> {
+  return Object.fromEntries(
+    Object.entries(samples).map(([id, list]) => {
+      if (!/_daily_water_/.test(id)) return [id, list];
+      const factor = waterLitres({ ...states[id], state: "1" });
+      return [id, factor === null ? [] : list.map((s) => ({ ...s, value: s.value * factor }))];
+    }),
+  );
 }
 function message(error: unknown): string {
   return error instanceof Error ? error.message : "Home Assistant request failed.";

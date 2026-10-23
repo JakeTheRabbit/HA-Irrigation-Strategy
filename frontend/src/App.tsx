@@ -35,9 +35,11 @@ import {
   routeHash,
   sameRoute,
   sectionOf,
+  zoneOnPage,
   type Page,
   type Route,
 } from "@/lib/routes";
+import { featureLabel, featureTargets, useHashFeature } from "@/lib/feature-focus";
 import { AppHeader, StaleBanner } from "@/components/app-header";
 import { UiTip } from "@/components/info-tip";
 import { PageTabs, pageLabel, SECTION_LABELS } from "@/components/page-tabs";
@@ -162,12 +164,87 @@ export default function App() {
   }, []);
   const zoneName =
     page === "zone"
-      ? (controller.room.zones.find((zone) => zone.id === route.zone) ?? controller.room.zones[0])
-          ?.name
+      ? (zoneOnPage(controller.room.zones, route.zone ?? null)?.name ??
+        (controller.room.zones.length ? `Zone ${route.zone} not in this room` : undefined))
       : undefined;
   useEffect(() => {
     document.title = `${zoneName ?? pageLabel(page)} · ${controller.room.room.name} · Crop Steering`;
   }, [page, zoneName, controller.room.room.name]);
+  // A `?feature=` link opens its page at the feature's control, once the control is on screen.
+  // Keyboard focus moves to the control and a screen reader hears which feature it is.
+  const roomRef = useRef(controller.room);
+  roomRef.current = controller.room;
+  const feature = useHashFeature();
+  const [announce, setAnnounce] = useState("");
+  useEffect(() => {
+    document
+      .querySelectorAll("[data-feature-focus]")
+      .forEach((element) => element.removeAttribute("data-feature-focus"));
+    const id = feature;
+    if (!id) return;
+    let landed: HTMLElement | null = null;
+    // True once the control has keyboard focus; until then the page may still be loading it, or
+    // have it disabled while it loads.
+    const land = () => {
+      if (!landed?.isConnected) {
+        const { room, zones } = roomRef.current;
+        landed =
+          featureTargets(id, room.prefix, zones.map((zone) => zone.id))
+            .map((item) => document.getElementById(item))
+            .find((element) => element?.getClientRects().length) ?? null;
+        if (!landed) return false;
+        const target = landed;
+        // A control inside a folded group (Setup's limits) is shown by opening the group.
+        let fold = target.closest("details");
+        while (fold) {
+          fold.open = true;
+          fold = fold.parentElement?.closest("details") ?? null;
+        }
+        target.setAttribute("data-feature-focus", id);
+        if (!target.matches("a[href], button, input, select, textarea, [tabindex]"))
+          target.setAttribute("tabindex", "-1");
+        setAnnounce(`Opened at ${featureLabel(id) ?? id}`);
+        requestAnimationFrame(() => centre(target));
+      }
+      landed.focus({ preventScroll: true });
+      return document.activeElement === landed;
+    };
+    // The window, not scrollIntoView: a control inside a panel that clips its overflow does not
+    // scroll the page.
+    const centre = (target: HTMLElement) => {
+      const box = target.getBoundingClientRect();
+      window.scrollTo({ top: window.scrollY + box.top - (window.innerHeight - box.height) / 2 });
+    };
+    // The control can arrive later: the room's states, or a page's own data, still loading. The
+    // grower's own click, key or wheel ends the wait, so focus is never taken back from them.
+    const observer = new MutationObserver(() => land() && observer.disconnect());
+    if (!land())
+      observer.observe(document.body, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ["disabled"],
+      });
+    // Content above a landed control can still be loading (the AI instructions, say) and push it
+    // out of view, so it is kept in the middle of the window while the page grows.
+    const resize = new ResizeObserver(() => {
+      if (landed?.isConnected && document.activeElement === landed) centre(landed);
+    });
+    resize.observe(document.body);
+    const timer = setTimeout(() => stop(), 10_000);
+    const stop = () => {
+      observer.disconnect();
+      resize.disconnect();
+      clearTimeout(timer);
+      window.removeEventListener("pointerdown", stop, true);
+      window.removeEventListener("keydown", stop, true);
+      window.removeEventListener("wheel", stop, true);
+    };
+    window.addEventListener("pointerdown", stop, true);
+    window.addEventListener("keydown", stop, true);
+    window.addEventListener("wheel", stop, true);
+    return stop;
+  }, [route, feature]);
   async function refresh() {
     setRefreshing(true);
     setRefreshError("");
@@ -264,7 +341,6 @@ export default function App() {
         controller={controller}
         allRooms={page === "all-zones"}
         currentZone={page === "zone" ? (route.zone ?? controller.room.zones[0]?.id ?? null) : null}
-        openAll={() => navigate("all-zones")}
         openRoom={openRoom}
         openZone={(room, zone) =>
           room === controller.roomId ? navigate("zone", zone) : openRoomPage(room, "zone", zone)
@@ -502,6 +578,9 @@ export default function App() {
           </button>
         ))}
       </nav>
+      <p id="feature-announce" className="sr-only" role="status">
+        {announce}
+      </p>
       <WhatsNewOnUpdate controller={controller} />
       <Tour navigate={navigate} />
       <Dialog

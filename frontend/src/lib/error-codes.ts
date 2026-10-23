@@ -1,4 +1,4 @@
-// The error codes shown on Settings & help › Help. docs/error-codes.json is the one list: the
+// The error codes shown on Settings › Help. docs/error-codes.json is the one list: the
 // controller app and the integration print these codes, and docs/ERROR_CODES.md is written from the
 // same file.
 import catalog from "../../../docs/error-codes.json";

@@ -1,4 +1,5 @@
 import type { EntityState } from "./types";
+import { unreadableState } from "./utils";
 
 /** A controller that has not reported for this long is not running: the integration's own limit
  * (the engine-offline repair and a zone's "Controller not reporting"). A shot holds the
@@ -17,6 +18,8 @@ export interface Heartbeat {
   /** When the controller last reported, or said it was stopping (epoch ms); null when unknown. */
   at: number | null;
   attributes: Record<string, unknown>;
+  /** The controller runs, but its last pass of this room ended in an error (CS-212): the error. */
+  error?: string;
 }
 
 const CONTROLLER_TIME =
@@ -46,9 +49,12 @@ export function readHeartbeat(entity: EntityState | undefined, now: number): Hea
       attributes,
     };
   const at = Number.isFinite(updated) ? updated : parseControllerTime(attributes.last_beat);
-  if (at === null || ["unknown", "unavailable"].includes(entity.state))
+  if (at === null || unreadableState(entity.state))
     return { health: "unreadable", at: null, attributes };
-  return { health: now - at > HEARTBEAT_STALE_MS ? "stale" : "fresh", at, attributes };
+  const health = now - at > HEARTBEAT_STALE_MS ? "stale" : "fresh";
+  if (entity.state === "error")
+    return { health, at, attributes, error: String(attributes.loop_error || "unknown error") };
+  return { health, at, attributes };
 }
 
 export function ageText(ms: number): string {

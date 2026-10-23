@@ -1,4 +1,4 @@
-/* Settings & help › Notifications: a checkbox per phone and kind of alert. A table on a laptop, with
+/* Settings › Notifications: a checkbox per phone and kind of alert. A table on a laptop, with
    the phone column held while it scrolls sideways; a card per phone on a phone. */
 .notify-notice {
   margin: 0 0 16px;
@@ -194,7 +194,7 @@
   color: var(--popover-foreground);
   box-shadow: 0 10px 30px rgb(0 0 0 / 18%);
   font-size: var(--text-sm);
-  line-height: 1.45;
+  line-height: 1.5;
 }
 .notify-kind-name {
   display: block;
@@ -225,7 +225,7 @@
   color: var(--primary-strong);
   font-family: inherit;
   font-size: var(--text-xs);
-  font-weight: 650;
+  font-weight: 600;
 }
 .notify-kind-codes a {
   text-decoration: underline;

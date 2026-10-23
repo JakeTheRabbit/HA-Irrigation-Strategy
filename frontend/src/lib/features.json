@@ -405,18 +405,6 @@
       "settings": [
         {
           "domain": "number",
-          "key": "p2_ec_high_threshold",
-          "scope": "room",
-          "default": 1.2
-        },
-        {
-          "domain": "number",
-          "key": "p2_ec_low_threshold",
-          "scope": "room",
-          "default": 0.8
-        },
-        {
-          "domain": "number",
           "key": "ec_min_interval",
           "scope": "room+zone",
           "default": 10.0
@@ -449,12 +437,6 @@
         },
         {
           "domain": "number",
-          "key": "ec_target_veg_p3",
-          "scope": "room",
-          "default": 3.0
-        },
-        {
-          "domain": "number",
           "key": "ec_target_gen_p0",
           "scope": "room+zone",
           "default": 4.0
@@ -470,12 +452,6 @@
           "key": "ec_target_gen_p2",
           "scope": "room+zone",
           "default": 6.0
-        },
-        {
-          "domain": "number",
-          "key": "ec_target_gen_p3",
-          "scope": "room",
-          "default": 4.5
         }
       ],
       "alsoOn": "plan/targets"
@@ -1290,12 +1266,32 @@
     {
       "domain": "select",
       "key": "irrigation_phase",
-      "why": "Status, written by the controller."
+      "why": "Retired, hidden; nothing reads it. Kept for old automations and scripts (CS-614). Deprecated, removal planned for a future major release (CS-613). Use the zone set-phase select."
+    },
+    {
+      "domain": "number",
+      "key": "p2_ec_high_threshold",
+      "why": "Retired, hidden; nothing reads it. Kept for old automations and scripts (CS-614)."
+    },
+    {
+      "domain": "number",
+      "key": "p2_ec_low_threshold",
+      "why": "Retired, hidden; nothing reads it. Kept for old automations and scripts (CS-614)."
+    },
+    {
+      "domain": "number",
+      "key": "ec_target_veg_p3",
+      "why": "Retired, hidden; nothing reads it. Kept for old automations and scripts (CS-614)."
+    },
+    {
+      "domain": "number",
+      "key": "ec_target_gen_p3",
+      "why": "Retired, hidden; nothing reads it. Kept for old automations and scripts (CS-614)."
     },
     {
       "domain": "select",
       "key": "recipe_stage",
-      "why": "Applies a recipe row to many setpoints: only through the recipe library on Plan > Schedule."
+      "why": "Deprecated, removal planned for a future major release. Applies a recipe row to many setpoints; nothing in the dashboard uses it."
     },
     {
       "domain": "select",

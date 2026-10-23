@@ -263,7 +263,7 @@ def test_a_plug_in_watts_gives_the_verdicts_it_always_did(rig, monkeypatch, rows
 
 # ---------------------------------------------------------------- no device read skips the table
 ALLOWED = {
-    "ha_get": {"_device", "_fused_id", "_detect_zones"},  # the last two only ask whether the entity exists
+    "ha_get": {"_device", "_fused_id"},  # the last one only asks whether the entity exists
     "ha_history": {"_device_history"},
 }
 

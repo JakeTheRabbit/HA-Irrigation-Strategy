@@ -194,8 +194,9 @@ def test_aborted_shot_records_only_delivered_volume_in_weekly_total(rig, monkeyp
         return 2, ("abort", _room.enable_flag)
     monkeypatch.setattr(c, "_wait_shot", partial_wait)
     c._execute_shot(room, 1, 10, 10)
-    assert room.state[1]["daily_vol"] == pytest.approx(2)
-    assert c._water_usage(room, 1, FixedDateTime.now())[0] == 2
+    # 3 of 10 s: the valve's 1 s ON read-back, then the 2 s wait
+    assert room.state[1]["daily_vol"] == pytest.approx(3)
+    assert c._water_usage(room, 1, FixedDateTime.now())[0] == 3
     assert any("counts the water of the shot up to the stop" in data.get("message", "") for _, _, data in fake.calls)
 
 

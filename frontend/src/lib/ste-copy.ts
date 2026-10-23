@@ -100,9 +100,8 @@ export const SETTING_COPY: Record<string, SteCopy> = {
     "tooltip": "The pore EC target in P2 for a zone in generative steering mode. It changes the size of maintenance shots, and the controller gives dilution shots above 1.2 times this target. With EC stacking on, it also moves the re-water point."
   },
   "ec_target_gen_p3": {
-    "guidance": "The default is 4.5 mS/cm. Change it only to change the EC ratio that the dashboard shows in P3.",
-    "impact": "Increase: The EC ratio sensor shows a lower ratio in P3. Decrease: The EC ratio sensor shows a higher ratio in P3. The shots do not change.",
-    "tooltip": "The pore EC target in P3 for generative steering mode. The integration shows it in the EC ratio sensor during P3. The controller does not read it."
+    "guidance": "Do not use it. The integration keeps it hidden only so that an automation or a script that uses it still loads, and Repairs names each one that does (CS-614).",
+    "tooltip": "A retired pore EC target for P3 in generative steering mode. Nothing reads it, and the controller does not steer EC in P3."
   },
   "ec_target_veg_p0": {
     "guidance": "The default is 3.0 mS/cm. If the controller cannot read a value, it uses 4 mS/cm. The controller uses values from 0.5 mS/cm to 9 mS/cm, and it sends a CS-401 alert for a value outside this range. The multiple comes from the substrate type of the room, and the generic type uses 2.5. The controller reads the zone value first, so the zone value overrides the room value for that zone only.",
@@ -120,9 +119,8 @@ export const SETTING_COPY: Record<string, SteCopy> = {
     "tooltip": "The pore EC target in P2 for a zone in vegetative steering mode. It changes the size of maintenance shots, and the controller gives dilution shots above 1.2 times this target. With EC stacking on, it also moves the re-water point."
   },
   "ec_target_veg_p3": {
-    "guidance": "The default is 3.0 mS/cm. Change it only to change the EC ratio that the dashboard shows in P3.",
-    "impact": "Increase: The EC ratio sensor shows a lower ratio in P3. Decrease: The EC ratio sensor shows a higher ratio in P3. The shots do not change.",
-    "tooltip": "The pore EC target in P3 for vegetative steering mode. The integration shows it in the EC ratio sensor during P3. The controller does not read it."
+    "guidance": "Do not use it. The integration keeps it hidden only so that an automation or a script that uses it still loads, and Repairs names each one that does (CS-614).",
+    "tooltip": "A retired pore EC target for P3 in vegetative steering mode. Nothing reads it, and the controller does not steer EC in P3."
   },
   "enabled": {
     "caution": "CAUTION: Do not leave a zone with plants off. The zone gets no water, not even a rescue shot.",
@@ -178,9 +176,10 @@ export const SETTING_COPY: Record<string, SteCopy> = {
     "tooltip": "The lowest feed pH at which the controller starts shots. While the feed pH is below this value, all shots in the room wait. It operates only when the controller app has a feed pH sensor."
   },
   "irrigation_phase": {
-    "guidance": "Do not use this select to move a zone. Use the Set phase select of the zone.",
-    "impact": "P0, P1, P2 or P3: the `current_phase` sensor shows the selected phase when the controller publishes no phase. The EC ratio sensor uses the selected phase to find its EC target. A change sends the event `crop_steering_phase_transition` for automations.",
-    "tooltip": "A manual phase marker for the room. The controller does not read it, and a change does not move a zone."
+    "caution": "DEPRECATED. The integration will remove this select in a future major release. The first time you choose a value, a notice appears in Repairs.",
+    "guidance": "Do not use this select to move a zone. Use the Set phase select of the zone. The integration keeps it hidden only so that an automation or a script that uses it still loads, and Repairs names each one that does (CS-614).",
+    "impact": "P0, P1, P2 or P3: a change sends the event `crop_steering_phase_transition` for automations. Nothing else reads the select.",
+    "tooltip": "A retired manual phase marker for the room. The controller does not read it, and a change does not move a zone."
   },
   "main_line_lead_time": {
     "caution": "CAUTION: Do not set a long lead time for a pump that must not run against a closed valve. During this time, the pump runs while the zone valve is closed.",
@@ -215,7 +214,7 @@ export const SETTING_COPY: Record<string, SteCopy> = {
   },
   "maximum_ec": {
     "caution": "CAUTION: Do not set the maximum EC at or below the feed EC. At or above this level, a zone with a feed EC that is not lower gets no shots, and the plants can dry out.",
-    "guidance": "The default is 9.0 mS/cm. The controller uses values from 3 mS/cm to 15 mS/cm. Set it above the EC targets of all phases. Examine the feed EC before a change. A flush works only when the feed EC is lower than the pore EC. With no feed EC sensor and no recipe feed EC, the controller uses 3.0 mS/cm as the feed EC. The high-EC flush needs VWC more than 2 points below field capacity. The controller reads the zone value first, so the zone value overrides the room value for that zone only.",
+    "guidance": "The default is 9.0 mS/cm. The controller uses values from 3 mS/cm to 15 mS/cm. Set it above the EC targets of all phases. Examine the feed EC before a change. A flush works only when the feed EC is lower than the pore EC. With no feed EC sensor and no recipe feed EC, the feed EC is unknown: the controller gives no flush and does not hold the zone for high EC, and it sends a CS-907 alert. The high-EC flush needs VWC more than 2 points below field capacity. The controller reads the zone value first, so the zone value overrides the room value for that zone only.",
     "impact": "Increase: Pore EC can rise higher before the controller flushes, so EC can stack more. Decrease: Flushes start at a lower pore EC, with more water and more runoff. In P2, a rescue flush starts 1 mS/cm below this value. These flushes can go past the daily water limit.",
     "tooltip": "The highest pore EC that the controller accepts in a zone. At or above this level, the controller gives a flush in any phase when the feed EC is lower than the pore EC. When the feed EC is not lower, or the zone does not drain, the zone gets no shot of any type."
   },
@@ -231,7 +230,7 @@ export const SETTING_COPY: Record<string, SteCopy> = {
     "tooltip": "Adds the next step of each zone to the vitals report that the controller sends. The dashboard shows the same step as `Next:`."
   },
   "p0_additional_dryback": {
-    "guidance": "A new room starts at 3%, and a room updated in place starts at 0 (off). The controller uses values from 0% to 40%. P0 also ends at the maximum wait time, or when VWC falls to the re-water point. Examine the time of the first shot on the day chart for two grow-days after a change.",
+    "guidance": "A new room starts at 3%, and a room updated in place starts at 0 (off). The controller uses values from 0% to 40%. P0 also ends at the maximum wait time, or when VWC falls to the rescue floor. Examine the time of the first shot on the day chart for two grow-days after a change.",
     "impact": "Increase: The first shot comes later, and the morning dryback is deeper, which steers generative. Decrease: The ramp starts sooner after lights-on.",
     "tooltip": "The dryback after lights-on before the first shot, as a percentage of the highest VWC since lights-on. At 3% and a highest VWC of 60%, P0 ends at 58.2% VWC. At 0, P0 uses the dryback target of the steering mode."
   },
@@ -241,7 +240,7 @@ export const SETTING_COPY: Record<string, SteCopy> = {
     "tooltip": "An old setting that stays for older rooms and recipes. The controller does not read it. The P0 dryback comes from the P0 extra dryback of each zone."
   },
   "p0_maximum_wait_time": {
-    "guidance": "The default is 120 min for a new room. If the controller cannot read a value, it uses 45 min as the wait. The controller uses values from 5 min to 240 min, and it sends a CS-401 alert for a value outside this range. P0 also ends when VWC falls to the re-water point, or when the zone completes its P0 dryback. Examine the time of the first shot on the day chart after a change. The controller reads the zone value first, so the zone value overrides the room value for that zone only.",
+    "guidance": "The default is 120 min for a new room. If the controller cannot read a value, it uses 45 min as the wait. The controller uses values from 5 min to 240 min, and it sends a CS-401 alert for a value outside this range. P0 also ends when VWC falls to the rescue floor, or when the zone completes its P0 dryback. Examine the time of the first shot on the day chart after a change. The controller reads the zone value first, so the zone value overrides the room value for that zone only.",
     "impact": "Increase: The first shot can come later, so the morning dryback can be deeper, which steers generative. Decrease: The ramp starts sooner after lights-on, and the morning dryback is smaller.",
     "tooltip": "The longest time that the morning dryback (P0) lasts after lights-on. At this time, the zone goes to P1, also when the dryback is not complete."
   },
@@ -287,14 +286,12 @@ export const SETTING_COPY: Record<string, SteCopy> = {
     "tooltip": "The minimum time between ramp shots. A ramp shot or an extra P1 shot starts only when this time has passed since the last shot."
   },
   "p2_ec_high_threshold": {
-    "guidance": "Keep the default of 1.2. To move the re-water point with pore EC, use the EC stacking switch. In P2, the controller gives dilution shots above 1.2 times the P2 EC target, and does not use this setting.",
-    "impact": "Increase: The adjusted P2 threshold sensor shows a higher value at a higher EC ratio. Decrease: The sensor shows a higher value at a lower EC ratio. The shots do not change.",
-    "tooltip": "A ratio of pore EC to the EC target. The integration uses it only for the adjusted P2 threshold sensor. The controller does not read it."
+    "guidance": "Do not use it. The integration keeps it hidden only so that an automation or a script that uses it still loads, and Repairs names each one that does (CS-614). To move the re-water point with pore EC, use the EC stacking switch.",
+    "tooltip": "A retired ratio of pore EC to the EC target. Nothing reads it. In P2, the controller gives dilution shots above 1.2 times the P2 EC target, or above the zone dilute ratio."
   },
   "p2_ec_low_threshold": {
-    "guidance": "Keep the default of 0.8. To move the re-water point with pore EC, use the EC stacking switch.",
-    "impact": "Increase: The adjusted P2 threshold sensor shows a lower value at a higher EC ratio. Decrease: The sensor shows a lower value at a lower EC ratio. The shots do not change.",
-    "tooltip": "A ratio of pore EC to the EC target. The integration uses it only for the adjusted P2 threshold sensor. The controller does not read it."
+    "guidance": "Do not use it. The integration keeps it hidden only so that an automation or a script that uses it still loads, and Repairs names each one that does (CS-614). To move the re-water point with pore EC, use the EC stacking switch.",
+    "tooltip": "A retired ratio of pore EC to the EC target. Nothing reads it."
   },
   "p2_shot_size": {
     "caution": "CAUTION: Do not set a large maintenance shot. EC flushes use 1.5 times this size or more, and a large shot can flood the substrate.",
@@ -348,7 +345,7 @@ export const SETTING_COPY: Record<string, SteCopy> = {
     "tooltip": "The time that the pump runs before the main-line valve opens. With no main-line valve, the zone valve opens after this time. The controller uses it only when the room has a pump."
   },
   "recipe_stage": {
-    "caution": "CAUTION: Examine the values of a stage before you select it. The controller uses the new setpoints for all zones at its next pass.",
+    "caution": "DEPRECATED. Nothing in the dashboard uses this select, and the integration will remove it in a future major release. The first time you choose a value, a notice appears in Repairs. CAUTION: Examine the values of a stage before you select it. The controller uses the new setpoints for all zones at its next pass.",
     "guidance": "Examine the setpoints of the stage on the recipe page before you select it. After you select a stage, examine the setpoints of each zone.",
     "impact": "Each option writes its own set of setpoints from the recipe. The integration keeps each value inside the limits of its number. If the VWC setpoints of the stage put the levels of a zone out of order, the integration writes nothing. It then shows an error. Auto setpoints and the setpoints judge of the AI assistant can change the values after that.",
     "tooltip": "Selects a stage of the room recipe: Veg, Transition, Bulk, Ripen or Custom. When you select a stage, the integration writes the setpoints of that stage into the numbers of the room and of each zone."
@@ -367,7 +364,7 @@ export const SETTING_COPY: Record<string, SteCopy> = {
   },
   "steering_mode": {
     "guidance": "The default is Vegetative. Set the steering mode of each zone. Before you change it, examine the dryback targets and EC targets of the new mode. After the change, examine the next dryback of the zone.",
-    "impact": "Vegetative: the zone uses the vegetative dryback target and the vegetative EC targets. Generative: the zone uses the generative dryback target and the generative EC targets. The controller reads the select of each zone, and uses the growth stage when it cannot read it. The integration uses the select of the room for the EC ratio sensor and for a zone with no select of its own.",
+    "impact": "Vegetative: the zone uses the vegetative dryback target and the vegetative EC targets. Generative: the zone uses the generative dryback target and the generative EC targets. The controller reads the select of each zone, and uses the growth stage of the room when it cannot read it. The dashboard shows the EC targets in the same order. The controller does not read the select of the room. The integration uses it only for the EC ratio sensor.",
     "tooltip": "Selects vegetative or generative steering. Each zone has its own steering mode, and the room has one more steering mode."
   },
   "substrate": {

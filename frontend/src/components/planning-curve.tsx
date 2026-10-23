@@ -6,6 +6,7 @@ import { UiTip } from "@/components/info-tip";
 import { CheckChip, GaugeRow, QualityChip, StatusLine } from "@/components/hmi";
 import { gauge, probeGaps, valueAt, PROBE_GAP_VWC } from "@/lib/hmi";
 import { referenceDryback } from "@/lib/day-chart";
+import type { PublishedDryback } from "@/lib/published";
 import {
   buildPlanningCurve,
   dryRates,
@@ -23,6 +24,7 @@ import {
   type RecordedPoint,
   type RecordedReading,
 } from "@/lib/planning-curve";
+import { ecTargetBand, type EcRatios } from "@/lib/ec-band";
 import { settingWords } from "@/lib/setting-words";
 
 export interface PlanningCurveProps {
@@ -51,8 +53,12 @@ export interface PlanningCurveProps {
   phase?: string | null;
   /** The pore EC band of the growth stage, when there is one. */
   ecBand?: [number, number] | null;
+  /** Without one, the band around the EC target: the controller's pore-EC ratios (lib/ec-band). */
+  ecRatios?: EcRatios | null;
   /** The stage's reference overnight dryback, in VWC points, when there is one. */
   drybackPoints?: [number, number] | null;
+  /** The zone's dryback and peak as the controller publishes them (published.ts). */
+  dryback?: PublishedDryback;
 }
 const trim = (value: number | null | undefined, digits = 1) =>
   typeof value === "number" && Number.isFinite(value) ? String(Number(value.toFixed(digits))) : "—";
@@ -96,7 +102,9 @@ export function PlanningCurve({
   zoneName,
   phase,
   ecBand,
+  ecRatios = null,
   drybackPoints,
+  dryback,
 }: PlanningCurveProps) {
   const limits =
     bounds ??
@@ -333,12 +341,12 @@ export function PlanningCurve({
       : nowHour === null
         ? null
         : (plan.phases.find((item) => nowHour >= item.start && nowHour < item.end)?.id ?? null);
-  const todayPeak = vwcRecorded.today.length
-    ? Math.max(...vwcRecorded.today.map((point) => point.value))
-    : null;
   const p1Done = nowHour !== null && nowHour >= p1.end;
   const ecTarget =
     phaseNow && phaseNow !== "P3" ? parameters[`ec_target_${phaseNow.toLowerCase()}`] : NaN;
+  // The day timeline's band: the stage's, else the controller's around the target. With neither,
+  // the gauge shows the distance to the target and judges nothing out of band.
+  const poreBand = ecBand ?? ecTargetBand(ecRatios, ecTarget);
   const gauges = hasRecorded
     ? [
         {
@@ -356,7 +364,8 @@ export function PlanningCurve({
           id: "peak",
           model: gauge({
             label: "Peak today",
-            value: todayPeak,
+            value: dryback?.peak ?? null,
+            quality: dryback?.reason ?? undefined,
             target: parameters.p1_target_vwc,
             unit: "%",
             tolerance: 3,
@@ -367,14 +376,14 @@ export function PlanningCurve({
           id: "dryback",
           model: gauge({
             label: "Dryback so far",
-            value: todayPeak && nowVwc ? ((todayPeak - nowVwc.value) / todayPeak) * 100 : null,
+            value: dryback?.percent ?? null,
             target: parameters.dryback_target,
-            reference: referenceDryback(drybackPoints, todayPeak),
+            reference: referenceDryback(drybackPoints, dryback?.peak),
             unit: "%",
             points: "%",
             tolerance: 3,
             underIsNormal: true,
-            quality: inGap ? "probe gap" : undefined,
+            quality: dryback?.reason ?? undefined,
           }),
         },
         {
@@ -382,9 +391,9 @@ export function PlanningCurve({
           model: gauge({
             label: "Pore EC",
             value: nowEc?.value ?? null,
-            band: ecBand ?? null,
-            target: ecBand ? null : ecTarget,
-            tolerance: Number.isFinite(ecTarget) ? ecTarget * 0.15 : 0,
+            band: poreBand,
+            target: poreBand ? null : ecTarget,
+            tolerance: poreBand ? 0 : Infinity,
             unit: "",
             digits: 2,
             points: "mS/cm",

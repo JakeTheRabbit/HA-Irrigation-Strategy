@@ -1367,7 +1367,10 @@ def _plan_holds(c, room):
     return "; ".join(holds) or "none"
 
 
-def _band(lo, hi, unit):
+def _band(band, unit):
+    lo, hi, unread = band
+    if unread:
+        return f"can't be read ({unread})"
     if lo > 0 and hi > 0:
         return f"{lo:g} to {hi:g}{unit}"
     return f"at least {lo:g}{unit}" if lo > 0 else f"at most {hi:g}{unit}" if hi > 0 else "none set"
@@ -1376,16 +1379,13 @@ def _band(lo, hi, unit):
 def feed_facts(c, room, now):
     """What the Feed task is shown: the feed's EC and pH against their bands, and each zone's latest pore EC against
     its maintenance target."""
-    num = c._num
-    feed, lo, hi = (c._read_feed_ec(room), num(f"number.crop_steering_{room.prefix}irrigation_ec_min", 0),
-                    num(f"number.crop_steering_{room.prefix}irrigation_ec_max", 0))
+    feed = c._read_feed_ec(room)
     facts = {"feed_ec": "not reading" if feed is None else f"{feed:.2f} mS/cm",
-             "feed_ec_band": _band(lo, hi, " mS/cm")}
+             "feed_ec_band": _band(c._feed_band(room, "ec"), " mS/cm")}
     if room.feed_ph_sensor:
         ph = c._read_feed_ph(room)
         facts["feed_ph"] = "not reading" if ph is None else f"{ph:.2f}"
-        facts["feed_ph_band"] = _band(num(f"number.crop_steering_{room.prefix}irrigation_ph_min", 0),
-                                      num(f"number.crop_steering_{room.prefix}irrigation_ph_max", 0), "")
+        facts["feed_ph_band"] = _band(c._feed_band(room, "ph"), "")
     params, zones = room.__dict__.get("_jev_params") or {}, {}
     for zone in room.zones:
         h = room.__dict__.get("_jev_hist", {}).get(zone)

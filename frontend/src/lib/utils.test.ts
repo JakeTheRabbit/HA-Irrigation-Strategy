@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { dayWord, errorText } from "./utils";
+import { dayWord, errorText, trimNumber, unreadableState } from "./utils";
+import { numeric, readable } from "./model";
+import { FEATURES, valueOf } from "./features";
 
 describe("errorText", () => {
   it("shows the REST response body from an inherited Home Assistant session", () => {
@@ -70,5 +72,29 @@ describe("dayWord", () => {
     expect(dayWord(at, now)).toBe(
       new Date(at).toLocaleDateString([], { weekday: "short", day: "numeric", month: "short" }),
     );
+  });
+});
+
+describe("unreadableState", () => {
+  it("is the integration's one test: missing, blank, unknown, unavailable or none, any case", () => {
+    for (const state of [undefined, null, "", "  ", "unknown", "unavailable", "none", "None", "UNAVAILABLE"])
+      expect(unreadableState(state), String(state)).toBe(true);
+    for (const state of ["0", "on", "off", "42.5", "Vegetative"])
+      expect(unreadableState(state), state).toBe(false);
+  });
+  it("is what every page asks, so one entity is never live on one page and missing on another", () => {
+    const none = { entity_id: "sensor.x", state: "none", attributes: {} };
+    expect(readable(none)).toBe(false);
+    expect(numeric(none)).toBeNull();
+    const control = FEATURES.flatMap((f) => f.settings).find((c) => c.domain === "select")!;
+    expect(valueOf(control, { ...none, entity_id: "select.x" })).toBeNull();
+  });
+});
+
+describe("trimNumber", () => {
+  it("keeps at most the digits asked for, without trailing zeros", () => {
+    expect(trimNumber(1.5)).toBe("1.5");
+    expect(trimNumber(2)).toBe("2");
+    expect(trimNumber(3.14159, 3)).toBe("3.142");
   });
 });
