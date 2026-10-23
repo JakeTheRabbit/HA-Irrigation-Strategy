@@ -1546,7 +1546,7 @@ try {
         );
         await lp.screenshot({ path: out + "workspace-stale-banner-390.png", fullPage: true });
         await band.getByRole("button", { name: "Probes", exact: true }).click();
-        await visible(lp.getByRole("heading", { name: "Probes", exact: true }));
+        await visible(lp.getByRole("heading", { name: "Probes & offsets", exact: true }));
         await visible(band);
         await lp.setViewportSize({ width: 1440, height: 1000 });
       } finally {
