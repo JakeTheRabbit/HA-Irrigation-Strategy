@@ -665,6 +665,9 @@ def _observe(name, capsys, tmp_path):
         mp.setattr(controller, "SETTINGS_WAIT_PASSES", 0)
         mp.setattr(controller, "WATER_SIZING", ())
         mp.setattr(controller, "_GATE", controller._AuthGate())
+        # The heartbeat carries the controller's version. The golden was recorded under 3.17.0, and a
+        # release changing that one field is not a change in what the controller does.
+        mp.setattr(controller, "CONTROLLER_VERSION", "3.17.0")
         clock = _Clock()
         mp.setattr(controller.time, "sleep", clock.sleep)
         mp.setattr(controller.time, "monotonic", clock.monotonic)
