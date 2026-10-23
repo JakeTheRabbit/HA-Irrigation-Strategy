@@ -1,7 +1,8 @@
 import type { SentenceToken } from "@/components/primitives/sentence";
 import { formatEc, formatTemp, formatVolume, getDisplayUnits } from "./display-units";
-import type { NotifyRecipient } from "./notify";
-import type { AlertRule, AlertRuleListItem, AlertSource, TimerWindow } from "./parity-types";
+import type { NotifyKind, NotifyRecipient } from "./notify";
+import { callV2 } from "./parity-api";
+import type { AlertRule, AlertRuleList, AlertRuleListItem, AlertSource, TimerWindow } from "./parity-types";
 import { clock, dayKey, dayLabel } from "./time";
 
 /** Your own alert rules (T1, backend alert_rules.py): what a rule can watch, the builder's sentence,
@@ -12,8 +13,8 @@ export interface RuleContext {
   /** The rule's room, as the room tree names it. */
   room: string;
   zones: number[];
-  /** Names of the phones that get the Sensors kind in this room: rule pushes go out as it. Null
-   * when the phone list could not be read. */
+  /** Names of the phones ticked for the rule's routing kind in this room: its pushes go out as it.
+   * Null when the phone list could not be read. */
   phones: string[] | null;
   stocks: { id: string; name: string }[];
   probes: { id: string; name: string }[];
@@ -35,12 +36,14 @@ export const RULE_SOURCES: {
   { id: "feed.ph", label: (r) => `${r} feed pH`, unit: "pH" },
   { id: "feed.ec", label: (r) => `${r} feed EC`, unit: "mS/cm" },
   { id: "tank.level", label: (r) => `${r} feed tank level`, unit: "%" },
-  { id: "stock.litres", label: (r, _z, n) => `${r} ${n} stock`, unit: "L", needs: "tank_id" },
-  { id: "stock.pct", label: (r, _z, n) => `${r} ${n} stock level`, unit: "%", needs: "tank_id" },
+  { id: "stock.litres", label: (r, _z, n) => `${inRoom(r, n)} stock`, unit: "L", needs: "tank_id" },
+  { id: "stock.pct", label: (r, _z, n) => `${inRoom(r, n)} stock level`, unit: "%", needs: "tank_id" },
   { id: "controller.heartbeat", label: (r) => `${r} controller heartbeat age`, unit: "s" },
-  { id: "probe.silence_s", label: (r, _z, n) => `${r} ${n} silence`, unit: "s", needs: "entity_id" },
+  { id: "probe.silence_s", label: (r, _z, n) => `${inRoom(r, n)} silence`, unit: "s", needs: "entity_id" },
 ];
 const sourceOf = (id: AlertSource) => RULE_SOURCES.find((s) => s.id === id) ?? RULE_SOURCES[0];
+/** A tank's or probe's name after its room, unless Home Assistant's name already starts with it. */
+const inRoom = (room: string, name = "") => (name.toLowerCase().startsWith(`${room.toLowerCase()} `) ? name : `${room} ${name}`);
 
 /** A new rule's threshold for each source, in its stored unit. */
 const FIRST_THRESHOLD: Record<AlertSource, { op: AlertRule["op"]; threshold: number }> = {
@@ -123,7 +126,7 @@ const breaching = (rule: Pick<AlertRule, "op" | "threshold">, value: number) =>
 const DAY = 86_400_000;
 
 /** A rule's line in Your rules: firing, fired today, last fired, never, or off (and whether it
- * would fire now). Times on Home Assistant's clock. */
+ * would fire now); held while its room is muted. Times on Home Assistant's clock. */
 export function ruleStatus(item: AlertRuleListItem, now: number, tz: string): { text: string; tone: "bad" | "warn" | "muted" } {
   const when = (ms: number) => {
     if (dayKey(ms, tz) === dayKey(now, tz)) return clock(ms, tz);
@@ -138,10 +141,17 @@ export function ruleStatus(item: AlertRuleListItem, now: number, tz: string): { 
       return { text: `Off · would fire now (${formatRuleValue(item.source, item.current_value)})`, tone: "warn" };
     return { text: "Off", tone: "muted" };
   }
+  const held = item.state === "muted" ? "Held: room muted · " : "";
   const fired = item.last_fired ? Date.parse(item.last_fired) : NaN;
-  if (!Number.isFinite(fired)) return { text: "Never fired", tone: "muted" };
-  if (dayKey(fired, tz) === dayKey(now, tz)) return { text: `Fired ${clock(fired, tz)} today`, tone: "warn" };
-  return { text: `Last fired ${when(fired)}`, tone: "muted" };
+  if (!Number.isFinite(fired)) return { text: `${held}Never fired`, tone: "muted" };
+  if (dayKey(fired, tz) === dayKey(now, tz)) return { text: `${held}Fired ${clock(fired, tz)} today`, tone: "warn" };
+  return { text: `${held}Last fired ${when(fired)}`, tone: "muted" };
+}
+
+/** A rule binary sensor's line on an integration before 3.18: only "off" is quiet. */
+export function legacyRuleStatus(state: string): { text: string; tone: "bad" | "muted" } {
+  if (state === "on") return { text: "Firing now", tone: "bad" };
+  return { text: state === "off" ? "Quiet" : "Not reporting", tone: "muted" };
 }
 
 /** What a rule watches, in the builder's words. */
@@ -185,12 +195,16 @@ export function notReporting(item: AlertRuleListItem, ctx: Pick<RuleContext, "ro
   return item.current_value === null ? `${sourceLabel(item, ctx)} isn't reporting. This rule can't fire until it does.` : null;
 }
 
-/** The phones ticked for the Sensors kind that cover the room (`prefix`): rule pushes go out as it. */
-export function sensorsPhones(recipients: readonly NotifyRecipient[], prefix: string): { service: string; name: string }[] {
+/** The phones ticked for a rule's routing kind (Sensors unless the rule says otherwise) that cover
+ * the room (`prefix`): its pushes go out as that kind. */
+export function sensorsPhones(recipients: readonly NotifyRecipient[], prefix: string, kind = "sensors"): { service: string; name: string }[] {
   return recipients
-    .filter((r) => r.kinds.includes("sensors") && (!r.rooms.length || r.rooms.includes(prefix)))
+    .filter((r) => r.kinds.includes(kind) && (!r.rooms.length || r.rooms.includes(prefix)))
     .map((r) => ({ service: r.service, name: r.name }));
 }
+
+/** A routing kind as the Notifications page names it. */
+export const kindName = (kinds: readonly NotifyKind[], id: string) => kinds.find((k) => k.id === id)?.name ?? id;
 
 const and = (names: string[]) => (names.length < 2 ? (names[0] ?? "") : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`);
 
@@ -300,8 +314,8 @@ export function ruleTokens(draft: AlertRule, set: (next: AlertRule) => void, ctx
 
 /** What a test push did, phone by phone: "Delivered to Ben's phone ✓ · Night phone: not delivered —
  * held for the phone's digest or quiet hours." */
-export function deliveryLine(rows: { service: string | null; ok: boolean; error: string | null }[], names: Record<string, string>): string {
-  if (!rows.length) return "No phone got it: none is ticked for Sensors alerts.";
+export function deliveryLine(rows: { service: string | null; ok: boolean; error: string | null }[], names: Record<string, string>, kind: string): string {
+  if (!rows.length) return `No phone got it: none is ticked for ${kind}.`;
   const name = (service: string) => names[service] ?? service;
   const ok = rows.filter((r) => r.ok && r.service).map((r) => name(r.service!));
   const parts = ok.length ? [`Delivered to ${and(ok)} ✓`] : [];
@@ -329,6 +343,23 @@ export function ruleBody(rule: AlertRule): Record<string, unknown> {
   if (rule.entity_id) out.entity_id = rule.entity_id;
   if (rule.tank_id) out.tank_id = rule.tank_id;
   return out;
+}
+
+/** What a replay's readings depend on: a preview drawn for another source or room is not this one's. */
+export const replayKey = (rule: AlertRule) => `${rule.room_id}|${sourceKey(rule)}`;
+
+/** Undo for a delete that came back with no Journal event: the rule saved again as a new rule, only
+ * while the rules are as the delete left them (`revision`), then read back from the list. */
+export async function putBackDeleted(controller: Parameters<typeof callV2>[0], rule: AlertRule, revision: number): Promise<void> {
+  const listed = await callV2<AlertRuleList>(controller, "alert_rule_list", {});
+  if (listed.kind !== "ok") throw new Error("The rule list could not be read. Nothing was changed.");
+  if (listed.data.revision !== revision) throw new Error("The rules changed since the delete. Nothing was changed: put it back from History.");
+  const { id: _id, ...body } = ruleBody(rule);
+  const out = await callV2(controller, "alert_rule_set", { expected_revision: revision, rule: body });
+  if (out.kind !== "ok") throw new Error(out.kind === "error" ? `${out.message} Nothing was changed.` : "This needs Crop Steering 3.18 or newer.");
+  const back = await callV2<AlertRuleList>(controller, "alert_rule_list", {});
+  if (back.kind !== "ok" || !back.data.rules.some((r) => sameRule(r, rule)))
+    throw new Error("The controller did not confirm the rule is back. Reload and check it before trying again.");
 }
 
 /** Whether the listed rule holds what was saved (the read-back of a save or a switch). */

@@ -345,6 +345,40 @@
   .ar-row-text {
     grid-column: 1 / -1;
   }
+  /* 44 px touch targets: the threshold line's band and the On switch (its track drawn inside). */
+  .ar-threshold {
+    height: 44px;
+    margin-top: -22px;
+  }
+  .ar-threshold::before {
+    top: 21px;
+  }
+  .ar-threshold span {
+    bottom: 26px;
+  }
+  .ar-switch {
+    height: 44px;
+    background: transparent;
+  }
+  .ar-switch::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 10px;
+    height: 24px;
+    border-radius: 12px;
+    background: var(--muted);
+  }
+  .ar-switch[aria-checked="true"] {
+    background: transparent;
+  }
+  .ar-switch[aria-checked="true"]::before {
+    background: var(--primary);
+  }
+  .ar-switch span {
+    top: 13px;
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   .ar-switch span {

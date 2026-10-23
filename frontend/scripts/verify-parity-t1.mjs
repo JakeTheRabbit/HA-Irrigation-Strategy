@@ -17,8 +17,10 @@
  * - 3.18: Edit the Off Part B rule, save → "Saved (off). Written and read back HH:MM."; editing
  *   again hides that receipt, putting the written value back shows it;
  * - 3.18: the On switch applies at once with Undo; Undo puts it back, read back;
- * - 3.17: the builder shows "Needs integration 3.18" (Your own alert rules) and the list says Home
- *   Assistant has no rule sensors yet.
+ * - 3.18 phone: the On switch and the threshold line are 44 px touch targets; the line is a vertical
+ *   slider;
+ * - 3.17: "Needs integration 3.18" (Your own alert rules) in the builder on desktop and under Your
+ *   rules on phone, and the list says Home Assistant has no rule sensors yet.
  * Also writes full-page light and dark screenshots of each run beside the harness's own. */
 import assert from "node:assert/strict";
 import { runParity } from "./parity-harness.mjs";
@@ -50,12 +52,13 @@ await runParity({
     };
 
     if (backend === "3.17") {
-      if (!phone) {
-        const note = main.locator('[data-needs-integration="Your own alert rules"]');
-        await note.waitFor();
-        assert.match(await note.innerText(), /Needs integration 3\.18/, `${label}: note`);
-        region("needs integration note");
-      }
+      // On phone the builder is not reachable, so the note sits under Your rules.
+      const note = main.locator('[data-needs-integration="Your own alert rules"]');
+      await note.waitFor();
+      assert.equal(await note.count(), 1, `${label}: one note`);
+      assert.match(await note.innerText(), /Needs integration 3\.18/, `${label}: note`);
+      if (phone) assert.equal(await main.locator('.ar-list [data-needs-integration="Your own alert rules"]').count(), 1, `${label}: note under Your rules`);
+      region("needs integration note");
       await main.getByText("No alert rules in Home Assistant yet.").waitFor();
       region("legacy rule sensors");
       await shoot("full");
@@ -79,6 +82,10 @@ await runParity({
       `${label}: not reporting`,
     );
     assert.equal(await status(4), "Off · would fire now (5.4 L)", `${label}: off would fire`);
+    if (phone) {
+      const box = await rows.first().getByRole("switch").boundingBox();
+      assert.ok(box && box.height >= 44 && box.width >= 44, `${label}: switch 44 px (${box?.width}x${box?.height})`);
+    }
     region("your rules");
     if (!phone) await shoot("full");
 
@@ -116,6 +123,11 @@ await runParity({
     await page.waitForFunction(() => document.querySelector('[role="slider"][aria-label="Threshold"]')?.getAttribute("aria-valuenow") === "40.1");
     // The sentence's number follows the line.
     await page.waitForFunction(() => document.querySelector('input[aria-label="Threshold"]')?.value === "40.1");
+    assert.equal(await line.getAttribute("aria-orientation"), "vertical");
+    if (phone) {
+      const box = await line.boundingBox();
+      assert.ok(box && box.height >= 44, `${label}: threshold line 44 px (${box?.height})`);
+    }
     region("threshold line");
     if (phone) await shoot("builder");
 

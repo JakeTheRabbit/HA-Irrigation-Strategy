@@ -12,6 +12,10 @@ import {
   ruleContext,
   ruleStatus,
   ruleTokens,
+  kindName,
+  legacyRuleStatus,
+  putBackDeleted,
+  replayKey,
   saveReceipt,
   sensorsPhones,
   type RuleContext,
@@ -166,13 +170,14 @@ describe("deliveryLine", () => {
           { service: "notify.b", ok: false, error: "held for the phone's digest or quiet hours" },
         ],
         names,
+        "Sensors and drift",
       ),
     ).toBe("Delivered to Ben's phone ✓ · Night phone: not delivered — held for the phone's digest or quiet hours.");
-    expect(deliveryLine([{ service: null, ok: false, error: "Notifications are not set up" }], names)).toBe(
+    expect(deliveryLine([{ service: null, ok: false, error: "Notifications are not set up" }], names, "Sensors and drift")).toBe(
       "Not delivered — Notifications are not set up.",
     );
-    expect(deliveryLine([{ service: "notify.zz", ok: true, error: null }], names)).toBe("Delivered to notify.zz ✓.");
-    expect(deliveryLine([], names)).toBe("No phone got it: none is ticked for Sensors alerts.");
+    expect(deliveryLine([{ service: "notify.zz", ok: true, error: null }], names, "Sensors and drift")).toBe("Delivered to notify.zz ✓.");
+    expect(deliveryLine([], names, "Sensors and drift")).toBe("No phone got it: none is ticked for Sensors and drift.");
   });
 });
 
@@ -196,7 +201,7 @@ describe("review round 1", () => {
     const other = ruleContext(probe, here, { room: "Room B", phones: ["Phone 1"], stocks: [{ id: "part_b", name: "Part B" }], nameOf: names });
     expect(other).toEqual({ room: "Room B", zones: [], phones: ["Phone 1"], stocks: [{ id: "part_b", name: "Part B" }], probes: [{ id: "sensor.b_back_ec", name: "Room B zone 1 back EC" }] });
     const silent = notReporting({ ...item({}), ...probe, current_value: null }, other);
-    expect(silent).toBe("Room B Room B zone 1 back EC silence isn't reporting. This rule can't fire until it does.");
+    expect(silent).toBe("Room B zone 1 back EC silence isn't reporting. This rule can't fire until it does.");
     const stock = { ...base, room_id: "room:b_", source: "stock.litres" as const, zones: [], tank_id: "part_b" };
     expect(notReporting({ ...item({}), ...stock, current_value: null }, ruleContext(stock, here, { room: "Room B", phones: [], stocks: [{ id: "part_b", name: "Part B" }], nameOf: names })))
       .toBe("Room B Part B stock isn't reporting. This rule can't fire until it does.");
@@ -243,5 +248,82 @@ describe("the demo's alert rules", () => {
     expect(low.series.length).toBeGreaterThan(100);
     expect(low.sentence).not.toBe(high.sentence);
     expect(high.count).toBeGreaterThan(0);
+  });
+});
+
+describe("review round 2", () => {
+  afterEach(() => resetDemoAlertRules());
+  const recipients = [
+    { service: "notify.a", name: "Ben's phone", user_id: null, kinds: ["sensors"], rooms: [], urgent_high_priority: false },
+    { service: "notify.b", name: "Night phone", user_id: null, kinds: ["emergency"], rooms: [], urgent_high_priority: true },
+  ];
+
+  test("phones follow the rule's routing kind, and the kind is named by the catalog", () => {
+    expect(sensorsPhones(recipients, "f2_", "emergency")).toEqual([{ service: "notify.b", name: "Night phone" }]);
+    expect(sensorsPhones(recipients, "f2_", "sensors").map((p) => p.name)).toEqual(["Ben's phone"]);
+    const kinds = [{ id: "emergency", name: "Emergencies", detail: "", codes: [], events: [] }];
+    expect(kindName(kinds, "emergency")).toBe("Emergencies");
+    expect(kindName(kinds, "dosing")).toBe("dosing");
+    expect(deliveryLine([], {}, "Emergencies")).toBe("No phone got it: none is ticked for Emergencies.");
+  });
+
+  test("a legacy rule sensor that reads nothing is not called quiet", () => {
+    expect(legacyRuleStatus("on")).toEqual({ text: "Firing now", tone: "bad" });
+    expect(legacyRuleStatus("off")).toEqual({ text: "Quiet", tone: "muted" });
+    expect(legacyRuleStatus("unavailable")).toEqual({ text: "Not reporting", tone: "muted" });
+    expect(legacyRuleStatus("unknown")).toEqual({ text: "Not reporting", tone: "muted" });
+  });
+
+  test("a preview is drawn only for the source and room it answered", () => {
+    const k = replayKey(base);
+    expect(replayKey({ ...base, threshold: 50, op: "above", min_duration_s: 60 })).toBe(k);
+    expect(replayKey({ ...base, source: "zone.ec" })).not.toBe(k);
+    expect(replayKey({ ...base, zones: [2] })).not.toBe(k);
+    expect(replayKey({ ...base, room_id: "room:b_" })).not.toBe(k);
+  });
+
+  test("a named probe or tank that already carries the room name is not prefixed twice", () => {
+    const probe = item({ source: "probe.silence_s", zones: [], entity_id: "sensor.x", current_value: null });
+    expect(notReporting(probe, { ...ctx, probes: [{ id: "sensor.x", name: "F2 zone 1 back EC" }] })).toBe(
+      "F2 zone 1 back EC silence isn't reporting. This rule can't fire until it does.",
+    );
+    expect(notReporting(probe, { ...ctx, probes: [{ id: "sensor.x", name: "F2back EC" }] })).toBe(
+      "F2 F2back EC silence isn't reporting. This rule can't fire until it does.",
+    );
+  });
+
+  test("an active rule held by its room's mute says so", () => {
+    expect(ruleStatus(item({ state: "muted" }), NOW, TZ)).toEqual({ text: "Held: room muted · Never fired", tone: "muted" });
+    expect(ruleStatus(item({ state: "muted", last_fired: at("2026-10-23T11:31:00+13:00") }), NOW, TZ)).toEqual({
+      text: "Held: room muted · Fired 11:31 today",
+      tone: "warn",
+    });
+  });
+
+  const demo = { operator: <T,>(action: string, data?: Record<string, unknown>) => parityDemo(action as "alert_rule_list", data ?? {}, NOW, "3.18") as Promise<T> };
+  const list = async () => ((await parityDemo("alert_rule_list", {}, NOW, "3.18")) as { data: { rules: AlertRuleListItem[]; revision: number } }).data;
+
+  test("a delete with no event to undo is put back as a new rule, read back", async () => {
+    const before = await list();
+    const gone = before.rules[4];
+    await parityDemo("alert_rule_delete", { id: gone.id, expected_revision: before.revision }, NOW, "3.18");
+    const after = await list();
+    expect(after.rules).toHaveLength(4);
+    await putBackDeleted(demo, gone, after.revision);
+    const back = await list();
+    expect(back.rules).toHaveLength(5);
+    expect(back.rules.some((r) => r.id !== gone.id && r.source === gone.source && r.threshold === gone.threshold)).toBe(true);
+  });
+
+  test("putting back a delete refuses when the rules changed since", async () => {
+    const before = await list();
+    const gone = before.rules[4];
+    await parityDemo("alert_rule_delete", { id: gone.id, expected_revision: before.revision }, NOW, "3.18");
+    const after = await list();
+    await parityDemo("alert_rule_delete", { id: after.rules[0].id, expected_revision: after.revision }, NOW, "3.18");
+    await expect(putBackDeleted(demo, gone, after.revision)).rejects.toThrow(
+      "The rules changed since the delete. Nothing was changed: put it back from History.",
+    );
+    expect((await list()).rules).toHaveLength(3);
   });
 });

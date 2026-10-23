@@ -8,8 +8,12 @@ import {
   deliveryLine,
   displayScale,
   formatRuleValue,
+  kindName,
+  legacyRuleStatus,
   newRule,
   notReporting,
+  putBackDeleted,
+  replayKey,
   ruleBody,
   ruleStatus,
   ruleContext,
@@ -75,7 +79,7 @@ export function AlertRules({ controller, onDirtyChange }: PageProps) {
     void load();
   }, [load]);
 
-  // Who rule pushes reach (the Sensors kind): unknown (null) until notify_get answers, and when it fails.
+  // Who a rule's pushes reach (its routing kind, Sensors unless set otherwise): unknown (null) until notify_get answers, and when it fails.
   const [notify, setNotify] = useState<NotifyDocument | null>(null);
   const [notifyFailed, setNotifyFailed] = useState(false);
   useEffect(() => {
@@ -116,12 +120,12 @@ export function AlertRules({ controller, onDirtyChange }: PageProps) {
   );
   const roomName = (id: string) => rooms.find((r) => r.id === id)?.name ?? (id === roomId ? room.room.name : id.replace(/^room:/, "") || "Room");
   const prefixOf = (id: string) => id.replace(/^room:/, "");
-  const phonesFor = (id: string) => (notify ? sensorsPhones(notify.config.recipients, prefixOf(id)) : null);
-  const ctxFor = (rule: Pick<AlertRule, "room_id" | "entity_id">): RuleContext =>
+  const phonesFor = (id: string, routing: string) => (notify ? sensorsPhones(notify.config.recipients, prefixOf(id), routing) : null);
+  const ctxFor = (rule: Pick<AlertRule, "room_id" | "entity_id" | "routing">): RuleContext =>
     ruleContext(
       rule,
       { roomId, zones: room.zones.map((z) => z.id), probes },
-      { room: roomName(rule.room_id), phones: phonesFor(rule.room_id)?.map((p) => p.name) ?? null, stocks: stocksByRoom[rule.room_id] ?? [], nameOf },
+      { room: roomName(rule.room_id), phones: phonesFor(rule.room_id, rule.routing)?.map((p) => p.name) ?? null, stocks: stocksByRoom[rule.room_id] ?? [], nameOf },
     );
 
   // The rule the builder holds: `?rule=<id>`, else a new one for the room the tree picked.
@@ -156,17 +160,21 @@ export function AlertRules({ controller, onDirtyChange }: PageProps) {
   const shownNote = note && (!note.rule || sameRule(note.rule, draft)) ? note : null;
   const [busy, setBusy] = useState<string | null>(null);
 
-  // Yesterday as the draft would have seen it, 250 ms after the last edit.
-  const [preview, setPreview] = useState<{ data: AlertPreview | null; error: string | null } | null>(null);
+  // Yesterday as the draft would have seen it, 250 ms after the last edit. A preview read for another
+  // source or room is not drawn (its readings are on another scale).
+  const [preview, setPreview] = useState<{ key: string; data: AlertPreview | null; error: string | null } | null>(null);
   const body = JSON.stringify(ruleBody(draft));
+  const shownPreview = preview?.key === replayKey(draft) ? preview : null;
   useEffect(() => {
     if (list.state !== "ready") return;
     let current = true;
+    const rule = JSON.parse(body) as AlertRule;
+    const key = replayKey(rule);
     const timer = setTimeout(() => {
-      void callV2<AlertPreview>(controller, "alert_rule_preview", { rule: JSON.parse(body), hours: 24 }).then((out) => {
+      void callV2<AlertPreview>(controller, "alert_rule_preview", { rule, hours: 24 }).then((out) => {
         if (!current) return;
-        if (out.kind === "ok") setPreview({ data: out.data, error: null });
-        else setPreview((p) => ({ data: p?.data ?? null, error: message(out) }));
+        if (out.kind === "ok") setPreview({ key, data: out.data, error: null });
+        else setPreview((p) => ({ key, data: p?.key === key ? p.data : null, error: message(out) }));
       });
     }, 250);
     return () => {
@@ -177,7 +185,8 @@ export function AlertRules({ controller, onDirtyChange }: PageProps) {
 
   // The test push and its delivery, phone by phone.
   const [delivery, setDelivery] = useState<string | null>(null);
-  const phones = phonesFor(draft.room_id);
+  const phones = phonesFor(draft.room_id, draft.routing);
+  const kind = kindName(notify?.kinds ?? [], draft.routing);
   const names = Object.fromEntries((notify?.config.recipients ?? []).map((r) => [r.service, r.name]));
   const sendTest = async () => {
     setBusy("test");
@@ -186,14 +195,14 @@ export function AlertRules({ controller, onDirtyChange }: PageProps) {
     setBusy(null);
     // A phone that did not get it is an `unavailable` answer that still carries every row.
     const rows = out.kind === "ok" ? out.data.delivery : out.kind === "error" ? (out.data as { delivery?: AlertPreview["delivery"] } | undefined)?.delivery : undefined;
-    setDelivery(rows ? deliveryLine(rows, names) : `Not sent: ${message(out)}`);
+    setDelivery(rows ? deliveryLine(rows, names, kind) : `Not sent: ${message(out)}`);
   };
 
   /** The list read again, and the rule `id` in it (null when gone), or the read's failure. */
   const readBack = async (id: string) => {
     const out = await load();
     if (out.kind !== "ok") return { ok: false as const, error: message(out) };
-    return { ok: true as const, rule: out.data.rules.find((r) => r.id === id) ?? null };
+    return { ok: true as const, rule: out.data.rules.find((r) => r.id === id) ?? null, revision: out.data.revision };
   };
   const undoEvents = (eventIds: string[], what: string) => async () => {
     try {
@@ -274,7 +283,20 @@ export function AlertRules({ controller, onDirtyChange }: PageProps) {
       return;
     }
     setRuleParam(phone ? null : "new");
-    after(out.eventIds, `Deleted: ${item.summary_sentence}`, "Rule");
+    if (out.eventIds.length) after(out.eventIds, `Deleted: ${item.summary_sentence}`, "Rule");
+    else
+      // No Journal event to put back: Undo saves the rule again, only while the rules are as the delete left them.
+      offerUndo({
+        message: `Deleted: ${item.summary_sentence}`,
+        undo: async () => {
+          try {
+            await putBackDeleted(controller, item, back.revision);
+          } finally {
+            await load();
+          }
+          toast.success(`Rule put back as a new rule. Written and read back ${clock(Date.now(), tz)}.`);
+        },
+      });
   };
 
   const edit = (item: AlertRuleListItem) => {
@@ -329,8 +351,8 @@ export function AlertRules({ controller, onDirtyChange }: PageProps) {
             <Sentence parts={ruleTokens(draft, setDraft, ctx)} phone={phone} ariaLabel="Rule" />
             <RuleReplay
               draft={draft}
-              preview={preview?.data ?? null}
-              error={list.state === "error" ? `The rules could not be read, so yesterday can't be replayed: ${list.error}` : (preview?.error ?? null)}
+              preview={shownPreview?.data ?? null}
+              error={list.state === "error" ? `The rules could not be read, so yesterday can't be replayed: ${list.error}` : (shownPreview?.error ?? null)}
               label={sourceLabel(draft, ctx)}
               lights={lights(draft.room_id)}
               tz={tz}
@@ -353,7 +375,7 @@ export function AlertRules({ controller, onDirtyChange }: PageProps) {
             </div>
             {phones && !phones.length && (
               <p className="ar-muted">
-                No phone gets Sensors alerts in this room yet: tick it on <a href="#/settings/notifications">Notifications</a>.
+                No phone is ticked for {kind} in this room yet: tick it on <a href="#/settings/notifications">Notifications</a>.
               </p>
             )}
             {notifyFailed && (
@@ -392,7 +414,11 @@ export function AlertRules({ controller, onDirtyChange }: PageProps) {
             )}
           </div>
           {list.state === "missing" ? (
-            <LegacyRules controller={controller} />
+            <>
+              {/* On phone the builder is not reachable: say here why there is no New rule. */}
+              {phone && <NeedsIntegration feature="Your own alert rules" />}
+              <LegacyRules controller={controller} />
+            </>
           ) : list.state === "loading" ? (
             <p className="ar-muted">Reading the rules…</p>
           ) : list.state === "error" ? (
@@ -446,14 +472,17 @@ function LegacyRules({ controller }: { controller: Controller }) {
   if (!rules.length) return <p className="ar-muted">No alert rules in Home Assistant yet.</p>;
   return (
     <ul className="ar-rows">
-      {rules.map((s) => (
-        <li key={s.entity_id} className="ar-row" data-rule={s.entity_id}>
-          <div className="ar-row-text">
-            <span className="ar-sentence">{typeof s.attributes.friendly_name === "string" ? s.attributes.friendly_name : s.entity_id}</span>
-          </div>
-          <span className={`ar-status is-${s.state === "on" ? "bad" : "muted"}`}>{s.state === "on" ? "Firing now" : "Quiet"}</span>
-        </li>
-      ))}
+      {rules.map((s) => {
+        const status = legacyRuleStatus(s.state);
+        return (
+          <li key={s.entity_id} className="ar-row" data-rule={s.entity_id}>
+            <div className="ar-row-text">
+              <span className="ar-sentence">{typeof s.attributes.friendly_name === "string" ? s.attributes.friendly_name : s.entity_id}</span>
+            </div>
+            <span className={`ar-status is-${status.tone}`}>{status.text}</span>
+          </li>
+        );
+      })}
     </ul>
   );
 }
@@ -587,6 +616,7 @@ function RuleReplay({
             role="slider"
             tabIndex={0}
             aria-label="Threshold"
+            aria-orientation="vertical"
             aria-valuemin={scale.min}
             aria-valuemax={scale.max}
             aria-valuenow={threshold}
