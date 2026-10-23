@@ -38,7 +38,7 @@ report with you, one line at a time, asking you before each save:
 
 **Order:** update the integration first, restart Home Assistant, then update the controller app.
 
-A tour of the new pages, with pictures, is in the [changelog](../CHANGELOG.md#unreleased).
+A tour of the new pages, with pictures, is in the [changelog](../CHANGELOG.md#3180---2026-10-24).
 
 3.18 is a big upgrade. The update keeps every zone watering and dosing by the same settings (with one new
 fail-closed hold, see [Upgrading to 3.18](UPGRADING-TO-PARITY.md#what-stays-the-same)), carries your

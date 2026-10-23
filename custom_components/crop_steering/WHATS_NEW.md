@@ -19,12 +19,13 @@ for the people who build the system:
 `tests/test_whats_new.py` checks the shape and the plain words, and that the newest section is the
 version being released.
 
-## Unreleased
+## 3.18.0 - 2026-10-24
 
-- This is a big upgrade: almost every page is new. Your zones keep watering and dosing exactly as before.
-- Your settings were carried across where that was safe. The Upgrade report lists what was carried and what needs you.
-- Find it in Settings, System status, or on the card in Home Assistant's Repairs.
+- This is a massive upgrade: almost every page is new. Your zones keep watering and dosing exactly as before.
+- New: timer programs, presets, alert rules, a History section, feed and pump calibration, and pump sharing.
+- The Upgrade report in Settings, System status, lists what was carried across and what needs you.
 - Ask your AI assistant to work through the report with you, using the upgrading guide in the documentation.
+- Bug fixes and improvements.
 
 ## 3.17.0 - 2026-10-21
 
