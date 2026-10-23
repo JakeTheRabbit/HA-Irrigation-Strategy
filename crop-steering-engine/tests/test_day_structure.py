@@ -142,7 +142,7 @@ def test_22_sep_no_watchdog_at_lights_on_after_the_night():
     assert result[0] == "P0" and result[2] is False and "WATCHDOG" not in result[4]
     # still no watchdog later in P0, however long since the last shot
     later = decide(S(phase="P0", vwc=30, ec=5, minutes_since_shot=13 * 60, dryback_pct=2, phase_minutes=20),
-                   P(p2_threshold=25))
+                   P(p2_threshold=25, p3_emergency_floor=25))
     assert later[2] is False and "WATCHDOG" not in later[4]
 
 

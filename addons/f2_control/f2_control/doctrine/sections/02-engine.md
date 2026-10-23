@@ -3,7 +3,7 @@ Dryback points and relative dryback are different units: relative = (peak - VWC)
 - Lights-off forces any phase other than P3 to P3; nothing strands mid-cycle overnight.
 - P3 returns to P0 on the lights-on edge, or on the first tick of a new grow-day if the edge was missed.
 - A zone still in P1 or P2 when a new grow-day begins resets to P0 with fresh counters and budget.
-- P0 ends on VWC at or below re-water, the drop since lights-on at p0_additional_dryback when positive (otherwise dryback_target), or its maximum wait. A positive additional setting replaces the target; it is not summed.
+- P0 ends on VWC at or below the rescue floor (p3_emergency_floor), the drop since lights-on at p0_additional_dryback when positive (otherwise dryback_target), or its maximum wait. Under the re-water threshold alone it keeps waiting. A positive additional setting replaces the target; it is not summed.
 - P1 ends on maximum shots, a trusted below-target stall after minimum shots and the interval, the extra-shot cap at target, budget spent at target, or the settled-rise test after an extra shot. The needed rise is p1_rise_pts or 30% of learned expected gain, whichever is greater. A stalled day re-waters below its achieved reading.
 - P1 has no time-based exit and is not held open by high pore EC: a gate-blocked ramp waits in P1 and resumes.
 - Predictive P3: in the last 3 h before lights-off (after 10 min uptime, VWC at or above the rescue floor), P2 hands over early when the points still needed to reach dryback_target from the day's peak, at the measured drying rate (0.1 points/h if unknown), would take at least the hours left until lights-on (and no more than 12 h).

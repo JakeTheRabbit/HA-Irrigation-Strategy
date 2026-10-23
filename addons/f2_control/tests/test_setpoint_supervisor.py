@@ -134,10 +134,10 @@ def _day(trace, d=0):
     return rows, shots
 
 
-def test_with_todays_live_setpoints_the_real_engine_skips_p0_and_burns_the_ramp_into_runoff():
+def test_with_todays_live_setpoints_the_real_engine_burns_the_ramp_into_runoff():
     rows, shots = _day(et.run(Z1, LIVE_Z1, 31.5, 5.2, 3.0, demand=DEMAND)[0])
     ramp = [s for _h, s, ph in shots if ph in ("P0", "P1")]
-    assert shots[0][0] < 10.1  # first shot the minute the lights come on
+    assert shots[0][0] >= 11.0  # P0 waits its 60 min under the threshold (#195); it used to fire at lights-on
     assert len(ramp) >= 7 and max(ramp) >= 5.0  # escalating shots chasing a 40% target the probe cannot read
     assert sum(s for _h, s, _p in shots) > 35.0  # % of substrate volume in a day
 

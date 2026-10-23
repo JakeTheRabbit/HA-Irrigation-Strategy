@@ -292,7 +292,7 @@ def test_the_overnight_threshold_sits_under_where_the_dryback_target_ends_so_p0_
                          uptime_min=600.0)
         return decide(s, p)[0]
 
-    assert p0_tick(62.2) == "P1"  # skipped, as it was
+    assert p0_tick(62.2) == "P0"  # skipped once; now only the 50 rescue floor ends P0 at once (#195)
     assert p0_tick(night["p2_vwc_threshold"]) == "P0"  # P0 runs: its additional dryback first
 
 
