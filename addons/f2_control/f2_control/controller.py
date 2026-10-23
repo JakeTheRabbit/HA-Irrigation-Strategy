@@ -4305,8 +4305,10 @@ class Controller:
         Help & tools lists the same catalog). The key, and so the notification id, never changes
         with the wording: an update replaces an old notification instead of adding a second one.
         True once Home Assistant has it; False while it is inside its quiet period (`quiet`: for a
-        condition re-checked every loop) or could not be created. Each raise Home Assistant took is
-        journaled (alert.raised), with `entity_id`: the sensor or switch it is about, when it is about one."""
+        condition re-checked every loop) or could not be created. The first raise of an episode Home Assistant
+        took is journaled (alert.raised), with `entity_id`: the sensor or switch it is about, when it is about one;
+        a standing alert's repeats are not (a new code, a raise after it cleared, or one after over
+        ALERT_EPISODE_GAP_S is a new episode, as for the push)."""
         if room is not None and zone is not None and zone in getattr(room, "state", {}):
             day_summary.alert(room.state[zone], code)  # the code, for the zone's grow-day summary
         if quiet and not self._alert_due(key, code):
@@ -4330,6 +4332,9 @@ class Controller:
             notification_id=f"f2_{key}",
         ):
             return False
+        last = self._alerted.get(key)
+        new_episode = (last is None or self._alert_codes.get(key) != code
+                       or (now - last).total_seconds() > ALERT_EPISODE_GAP_S)
         push = self._push_due(key, code, now)
         self._alerted[key] = now
         self._alert_codes[key] = code
@@ -4338,7 +4343,8 @@ class Controller:
         data = {"key": key, "title": title}
         if entity_id:
             data["entity_id"] = entity_id
-        self._journal(prefix, "alert.raised", zone=zone, code=code, data=data)
+        if new_episode:
+            self._journal(prefix, "alert.raised", zone=zone, code=code, data=data)
         if push and self._muted(room, code):
             log("ALERT push held:", key, "its room is muted in Crop Steering")
             push = False

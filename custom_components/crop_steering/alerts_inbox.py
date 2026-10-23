@@ -9,7 +9,9 @@ Assistant keeps notifications in memory only, so after a restart an alert stays 
 dropped) until its notification is seen again and then dismissed; a new alert.raised for a key
 forgets it was seen, so the fresh raise stays open until its notification shows. Inbox publishes
 the fold for every loaded room on each stored alert.* event and every 5 min (journal_api wires
-it). The sensor's state is the count; `alerts` lists them, newest first.
+it). The sensor's state is the count; `alerts` lists them, newest first. After a room's first full
+read, each fold reads from its oldest open raise or LOOKBACK back, whichever is earlier
+(window_start); an alert.* stored with a time before that start makes the next fold read it all again.
 
 Nothing here touches irrigation: it only reads the journal and sets a state.
 """
@@ -18,7 +20,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from .const import DOMAIN
 
@@ -27,6 +29,9 @@ _LOGGER = logging.getLogger(__name__)
 KINDS = ["alert.raised", "alert.cleared", "alert.acknowledged"]
 EVERY = timedelta(minutes=5)
 SINCE_EVER = "1970-01-01T00:00:00+00:00"
+LOOKBACK = timedelta(
+    days=7
+)  # a fold always reads at least this far back (late outbox flushes)
 INBOX = "_alerts_inbox"
 
 
@@ -49,15 +54,8 @@ def open_alerts(
     {rule id: the entity its source reads}. A raise repeated while the alert is open keeps the
     first.
     """
-    raised: dict[tuple, dict] = {}
-    for event in events:
-        identity = _identity(event)
-        if event.get("kind") == "alert.raised":
-            raised.setdefault(identity, event)
-        elif event.get("kind") in ("alert.cleared", "alert.acknowledged"):
-            raised.pop(identity, None)
     out = []
-    for event in raised.values():
+    for event in _open_raises(events).values():
         data = event.get("data") or {}
         rule_id = data.get("rule_id")
         controller = (event.get("source") or {}).get("actor") != "system"
@@ -77,6 +75,40 @@ def open_alerts(
             alert["rule_id"] = rule_id
         out.append({**alert, "acknowledged": False})
     return sorted(out, key=lambda a: a["ts"] or "", reverse=True)
+
+
+def _open_raises(events: list[dict]) -> dict[tuple, dict]:
+    """{identity: the first raise} of the alerts `events` leaves open, notifications aside."""
+    raised: dict[tuple, dict] = {}
+    for event in events:
+        identity = _identity(event)
+        if event.get("kind") == "alert.raised":
+            raised.setdefault(identity, event)
+        elif event.get("kind") in ("alert.cleared", "alert.acknowledged"):
+            raised.pop(identity, None)
+    return raised
+
+
+def _when(ts) -> datetime | None:
+    try:
+        parsed = datetime.fromisoformat(str(ts).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo is not None else None
+
+
+def window_start(events: list[dict], now: datetime) -> datetime:
+    """Where the next fold of these events (the whole window the last one read) may start: the oldest
+    raise still open, a gone one too (its notification can show again with no new raise), or LOOKBACK
+    before `now`, whichever is earlier. A raise whose time cannot be read: from the start.
+    """
+    start = now - LOOKBACK
+    for event in _open_raises(events).values():
+        when = _when(event.get("ts"))
+        if when is None:
+            return datetime.fromisoformat(SINCE_EVER)
+        start = min(start, when)
+    return start
 
 
 def sensor_id(room_id: str) -> str:
@@ -112,17 +144,23 @@ def rule_entities(hass, room_id) -> dict:
     return out
 
 
-async def read_open(hass, hub, room_id) -> list[dict]:
-    """The room's open alerts now, from its whole alert.* history."""
+async def read_events(hub, room_id, since=SINCE_EVER) -> list[dict]:
+    """The room's alert.* events from `since`, oldest first."""
     events, cursor = [], None
     while True:
-        page = await hub.query(
-            room_id=room_id, since=SINCE_EVER, kinds=KINDS, cursor=cursor
-        )
+        page = await hub.query(room_id=room_id, since=since, kinds=KINDS, cursor=cursor)
         events += page["events"]
         cursor = page["cursor"]
         if cursor is None:
             break
+    return events
+
+
+async def read_open(hass, hub, room_id, events=None) -> list[dict]:
+    """The room's open alerts now, from its whole alert.* history (or from `events`, a window of it
+    that starts no later than window_start of the last fold)."""
+    if events is None:
+        events = await read_events(hub, room_id)
     inbox = hass.data.get(DOMAIN, {}).get(INBOX)
     gone = inbox.gone() if inbox is not None else set()
     return open_alerts(events, gone, rule_entities(hass, room_id))
@@ -152,6 +190,12 @@ class Inbox:
         self._seen: set[str] = set()  # f2_* notifications seen live since the start
         self._no_getter = False
         self._down: set[str] = set()  # rooms whose journal read failed (warned once)
+        self._since: dict[str, datetime] = (
+            {}
+        )  # room -> where its next fold starts (none: all)
+        self._late: set[str] = (
+            set()
+        )  # rooms sent an alert.* from before that start: read all
 
     def gone(self) -> set[str]:
         """The f2_* notifications seen live since the start that are no longer shown. Nothing is
@@ -180,8 +224,14 @@ class Inbox:
         async with self._lock:
             if room_id not in self.rooms:
                 return
+            from homeassistant.util import dt as dt_util
+
+            since = self._since.pop(room_id, None)
             try:
-                alerts = await read_open(self.hass, self.hub, room_id)
+                events = await read_events(
+                    self.hub, room_id, since.isoformat() if since else SINCE_EVER
+                )
+                alerts = await read_open(self.hass, self.hub, room_id, events)
             except Exception as error:  # the journal is down: say so, never raise
                 if room_id not in self._down:
                     self._down.add(room_id)
@@ -193,6 +243,9 @@ class Inbox:
             self._down.discard(room_id)
             if room_id not in self.rooms:  # the room left while it was read
                 return
+            if room_id not in self._late:
+                self._since[room_id] = window_start(events, dt_util.utcnow())
+            self._late.discard(room_id)
             self.hass.states.async_set(
                 sensor_id(room_id),
                 str(len(alerts)),
@@ -224,7 +277,12 @@ class Inbox:
             if str(body.get("kind", "")).startswith("alert.") and (
                 body.get("room_id") in self.rooms
             ):
-                self.hass.async_create_task(self.publish(body["room_id"]))
+                room_id = body["room_id"]
+                since, when = self._since.get(room_id), _when(body.get("ts"))
+                if since is None or when is None or when < since:
+                    self._since.pop(room_id, None)  # the next fold reads it all
+                    self._late.add(room_id)
+                self.hass.async_create_task(self.publish(room_id))
 
         unlisten = self.hass.bus.async_listen(EVENT_JOURNAL, stored)
         try:

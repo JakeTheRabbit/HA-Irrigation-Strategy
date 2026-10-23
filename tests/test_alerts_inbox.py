@@ -1,7 +1,14 @@
 """The alerts inbox (alerts_inbox.open_alerts): which raised alerts are still open, folded from the
 room's alert.* journal events and the notifications seen live that are now gone. PURE."""
 
-from custom_components.crop_steering.alerts_inbox import open_alerts
+from datetime import datetime, timedelta, timezone
+
+from custom_components.crop_steering.alerts_inbox import (
+    LOOKBACK,
+    SINCE_EVER,
+    open_alerts,
+    window_start,
+)
 
 TANK = "sensor.crop_steering_f2_tank_level"
 
@@ -128,3 +135,26 @@ def test_an_alert_whose_notification_is_gone_leaves_the_inbox():
     # A rule alert is the integration's own (actor system): never closed by a notification.
     rule = _ev("alert.raised", "E1", "07:00", rule_id="R1", key="stale_z2")
     assert [a["event_id"] for a in open_alerts([rule], {"f2_stale_z2"})] == ["E1"]
+
+
+NOW = datetime(2026, 10, 22, 12, 0, tzinfo=timezone.utc)
+
+
+def test_the_next_fold_starts_at_the_oldest_open_raise_or_the_lookback():
+    """P1 M2: the 5-min fold reads from the oldest alert still open (a gone one too: the controller shows its
+    notification again, with no new raise), or LOOKBACK before now when that is earlier.
+    """
+    old = _ev("alert.raised", "O1", "07:00", actor="engine", key="k")
+    old["ts"] = "2026-08-01T07:00:00+12:00"
+    assert window_start([old, _controller()], NOW) == datetime.fromisoformat(old["ts"])
+    cleared = _ev("alert.cleared", "X1", "07:30", actor="engine", key="k")
+    assert window_start([old, cleared, _controller()], NOW) == NOW - LOOKBACK
+    assert window_start([], NOW) == NOW - LOOKBACK
+    assert LOOKBACK >= timedelta(days=1)
+
+
+def test_an_open_raise_with_no_time_reads_everything():
+    """Fail closed: a raise whose time cannot be read keeps the whole history in the fold."""
+    bad = _controller()
+    bad["ts"] = "not a time"
+    assert window_start([bad], NOW) == datetime.fromisoformat(SINCE_EVER)

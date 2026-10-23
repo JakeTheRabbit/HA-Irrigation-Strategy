@@ -288,3 +288,65 @@ async def test_the_last_room_unloading_takes_the_inbox_away(hass):
     hass.bus.async_fire("crop_steering_event", {"room_id": ROOM, "kind": "alert.raised"})
     await hass.async_block_till_done()
     assert hass.states.get(INBOX) is None
+
+
+async def test_the_5_min_fold_reads_from_the_oldest_open_alert_and_takes_a_late_one(
+    hass, hass_admin_user, freezer, monkeypatch
+):
+    """P1 M2: after the first full read, the fold starts at the oldest open raise (or LOOKBACK back), so a
+    standing alert stays open while its old history is not re-read; an alert.* stored with a time before that
+    start (a late outbox flush) makes the next fold read everything again."""
+    from datetime import datetime
+
+    from homeassistant.util import dt as dt_util
+
+    from custom_components.crop_steering.alerts_inbox import LOOKBACK, SINCE_EVER
+
+    freezer.move_to(
+        "2026-12-01T00:00:00+00:00"
+    )  # RAISED (Oct 22) is older than LOOKBACK
+    await _install(hass)
+    await hass.async_block_till_done()
+    inbox = hass.data[DOMAIN]["_alerts_inbox"]
+    query, sinces = inbox.hub.query, []
+
+    async def spy(**kw):
+        sinces.append(kw["since"])
+        return await query(**kw)
+
+    monkeypatch.setattr(inbox.hub, "query", spy)
+    persistent_notification.async_create(hass, "Probe stale", "Zone 2", "f2_stale_z2")
+    await _controller_alert(hass, hass_admin_user)
+    await _tick(hass, freezer, 5 * 60 + 1)
+    await _tick(hass, freezer, 5 * 60 + 1)
+    assert sinces[0] == SINCE_EVER
+    assert datetime.fromisoformat(sinces[-1]) == datetime.fromisoformat(RAISED["ts"])
+    assert hass.states.get(INBOX).state == "1"
+
+    clear = {
+        **RAISED,
+        "id": "01JDDDDDDDDDDDDDDDDDDDDDDD",
+        "kind": "alert.cleared",
+        "ts": "2026-10-23T07:00:00+00:00",
+        "code": None,
+        "data": {"key": "stale_z2"},
+    }
+    await _call(hass, hass_admin_user, "journal_append", room_id=ROOM, events=[clear])
+    await hass.async_block_till_done()
+    assert hass.states.get(INBOX).state == "0"
+    await _tick(hass, freezer, 5 * 60 + 1)
+    start = datetime.fromisoformat(sinces[-1])
+    assert start > datetime.fromisoformat(RAISED["ts"])  # nothing open: LOOKBACK back
+    assert 0 <= (dt_util.utcnow() - LOOKBACK - start).total_seconds() <= 5 * 60 + 5  # set by the last fold
+
+    late = {
+        **RAISED,
+        "id": "01JEEEEEEEEEEEEEEEEEEEEEEE",
+        "ts": "2026-11-01T07:00:00+00:00",
+        "data": {"key": "late_z2", "title": "Zone 2 late"},
+    }
+    await _call(hass, hass_admin_user, "journal_append", room_id=ROOM, events=[late])
+    await hass.async_block_till_done()
+    assert [a["event_id"] for a in hass.states.get(INBOX).attributes["alerts"]] == [
+        late["id"]
+    ]

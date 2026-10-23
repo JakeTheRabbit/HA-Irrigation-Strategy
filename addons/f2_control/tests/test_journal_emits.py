@@ -460,3 +460,29 @@ def test_old_state_file_without_outbox_still_loads(rig):
     assert os.path.dirname(c.journal.path) == os.path.dirname(c._state_path)
     assert c.journal.pending() == []
     c.loop_once(NOW)  # nothing to flush: nothing sent
+
+
+def test_a_standing_alert_journals_its_first_raise_only_and_a_raise_after_it_clears(rig):  # P1 M2
+    c, fake, _clock = rig
+    room, key = c.rooms[0], "wd_default_z1"
+    pushes = []
+    c._push = lambda *a: pushes.append(a[0])
+
+    def creates():
+        return [d for dom, svc, d in fake.calls if (dom, svc) == ("persistent_notification", "create")]
+
+    assert c._alert(key, "CS-207", "dry", "msg", room=room, zone=1)
+    for _ in range(3):  # standing: the card (and its push cadence) comes back every 30 min, as before
+        c._alerted[key] -= timedelta(minutes=31)
+        assert c._alert(key, "CS-207", "dry", "msg", room=room, zone=1)
+    assert len(creates()) == 4 and pushes  # the push cadence is _push_due's, untouched
+    assert len(_events(c, "alert.raised")) == 1
+    c._alerted[key] -= timedelta(minutes=6)
+    assert c._alert(key, "CS-206", "wet", "msg", room=room, zone=1)  # another diagnosis: a new episode
+    assert [e["code"] for e in _events(c, "alert.raised")] == ["CS-207", "CS-206"]
+    c._dismiss(key)
+    assert c._alert(key, "CS-206", "wet", "msg", room=room, zone=1)  # back after it cleared
+    assert [e["code"] for e in _events(c, "alert.raised")] == ["CS-207", "CS-206", "CS-206"]
+    c._alerted[key] -= timedelta(seconds=controller.ALERT_EPISODE_GAP_S + 1)
+    assert c._alert(key, "CS-206", "wet", "msg", room=room, zone=1)  # not raised for over an hour: a new episode
+    assert len(_events(c, "alert.raised")) == 4

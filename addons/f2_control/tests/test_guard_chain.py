@@ -712,8 +712,26 @@ def _without_guard(journal):
     return out
 
 
+def _first_raises(journal):
+    """The recorded journal as the controller journals it since P1 M2: a standing alert's repeated raise (same key and
+    code, no alert.cleared of the key between) is no longer journaled; its card and push are unchanged."""
+    out, open_ = [], {}
+    for e in journal:
+        key = (e.get("data") or {}).get("key")
+        if e["kind"] == "alert.raised" and key:
+            if open_.get(key) == e["code"]:
+                continue
+            open_[key] = e["code"]
+        elif e["kind"] == "alert.cleared":
+            open_.pop(key, None)
+        out.append(e)
+    return out
+
+
 def _held_named(new, old):
-    """The pre-open and sized holds name their guard and code; everything else in the journal is as recorded."""
+    """The pre-open and sized holds name their guard and code; everything else in the journal is as recorded, less a
+    standing alert's repeated raises (_first_raises)."""
+    old = _first_raises(old)
     assert len(new) == len(old)
     stripped = _without_guard(new)
     for n, o, full in zip(stripped, old, new):
