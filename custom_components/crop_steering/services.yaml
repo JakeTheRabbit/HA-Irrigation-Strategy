@@ -2,14 +2,14 @@ apply_recipe:
   name: Apply recipe stage
   description: >-
     Writes the setpoints of one recipe stage into the VWC, dryback, EC and shot size numbers. The
-    integration applies the stage in every room and every zone. Changes live setpoints that the
+    integration applies the stage in every zone of one room. Changes live setpoints that the
     controller reads. The integration keeps each value inside the limits of its number. When the
     stage puts the moisture setpoints of a zone in the wrong order, the integration writes nothing.
     The kill switch still controls the shots. When a signed-in user calls it, that user must be a
     Home Assistant administrator. An automation can call it without this check. Use it when the room
-    moves to a different growth stage. Leave the stage empty to apply the active stage again.
-    CAUTION: Examine the values of the stage before you apply it. The new setpoints change the water
-    that each zone gets in every room.
+    moves to a different growth stage. Leave the stage empty to apply the active stage again. With
+    several rooms, give the room. CAUTION: Examine the values of the stage before you apply it. The
+    new setpoints change the water that each zone of the room gets.
   fields:
     stage:
       name: Recipe stage
@@ -25,16 +25,25 @@ apply_recipe:
             - "Bulk"
             - "Ripen"
             - "Custom"
+    room:
+      name: Room
+      description: >-
+        The slug of the room. Leave it empty when there is only one room. A different slug applies
+        the stage in a different room. With several rooms and no slug, the integration refuses the
+        call. Default: empty. Example: f1.
+      required: false
+      selector:
+        text:
 
 save_recipe:
   name: Save recipe table
   description: >-
-    Replaces the stored recipe table of every room. The table gives the setpoints for each recipe
+    Replaces the stored recipe table of one room. The table gives the setpoints for each recipe
     stage. Changes stored data only. No live setpoint changes until you apply a stage. When a
     signed-in user calls it, that user must be a Home Assistant administrator. An automation can
     call it without this check. The recipe editor of the dashboard calls it. Send the full table,
     because the call replaces the stored table. The integration stores the table without a check of
-    its values, so examine the values before you apply a stage.
+    its values, so examine the values before you apply a stage. With several rooms, give the room.
   fields:
     recipe:
       name: Recipe table
@@ -45,6 +54,15 @@ save_recipe:
       required: true
       selector:
         object:
+    room:
+      name: Room
+      description: >-
+        The slug of the room. Leave it empty when there is only one room. A different slug saves
+        the table of a different room. With several rooms and no slug, the integration refuses the
+        call. Default: empty. Example: f1.
+      required: false
+      selector:
+        text:
 
 set_manual_override:
   name: Set manual override
