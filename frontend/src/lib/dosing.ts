@@ -65,10 +65,16 @@ export interface DosingRequest {
   at: string | null;
   by: string | null;
 }
+/** The room's dosing limits the controller works to (the `profile` the integration publishes). */
+export interface DosingProfile {
+  min_flow_ml_s: number;
+  max_dose_s: number;
+}
 export interface DosingConfig {
   revision: number;
   pumps: DosingPump[];
   batch: DosingBatch;
+  profile: DosingProfile;
   request: DosingRequest | null;
   updated_at: string | null;
 }
@@ -250,9 +256,32 @@ export function parseConfig(value: unknown): DosingConfig | null {
     revision: count(raw.revision) ?? 0,
     pumps: pumps.slice(0, MAX_PUMPS),
     batch: parseBatch(raw.batch),
+    profile: parseProfile(raw.profile),
     request: parseRequest(raw.request),
     updated_at: text(raw.updated_at),
   };
+}
+/** What every room used before it could set its profile (`PROFILE` in dosing.py, `PROFILE` in the
+ * controller's dosing_runner.py). A value that is not a positive number takes its default, as the
+ * controller does. */
+export const PROFILE_DEFAULTS: DosingProfile = { min_flow_ml_s: 0.05, max_dose_s: 1200 };
+export function parseProfile(value: unknown): DosingProfile {
+  const raw = (value && typeof value === "object" ? value : {}) as Raw;
+  const limit = (key: keyof DosingProfile) => {
+    const number = raw[key];
+    return typeof number === "number" && Number.isFinite(number) && number > 0
+      ? number
+      : PROFILE_DEFAULTS[key];
+  };
+  return { min_flow_ml_s: limit("min_flow_ml_s"), max_dose_s: limit("max_dose_s") };
+}
+/** A pump's calibrated flow in mL/s: its flow entity's number in its own unit, converted as the
+ * controller does (mL/min, L/h); a unit it does not know is read as mL/s, as the controller does. */
+export function flowMlS(entity: EntityState | undefined): number | null {
+  const flow = numeric(entity);
+  if (flow === null) return null;
+  const unit = String(entity?.attributes?.unit_of_measurement ?? "").trim().toLowerCase();
+  return unit === "ml/min" ? flow / 60 : unit === "l/h" ? (flow * 1000) / 3600 : flow;
 }
 /** The integration's `dosing_config` sensor: its state is the revision. */
 export function readConfig(entity: EntityState | undefined): DosingConfig | null {
@@ -406,12 +435,12 @@ export function doseProgress(runtime: PumpRuntime | null, now: number): DoseProg
   return { target, elapsed, expected, share, ml: target * share, overdue: elapsed > expected };
 }
 /** When the controller switches a pump off that is still dosing: expected × 1.25 + 20 s. */
-/** The controller's limits (DOSING.md): the least flow it trusts, the longest dose it runs, and
- * the latest it lets one go before cutting the power. */
-export const MIN_FLOW_ML_S = 0.05;
-export const MAX_DOSE_S = 20 * 60;
-export const MAX_DEADLINE_S = MAX_DOSE_S + 60;
-export const doseDeadline = (expected: number) => Math.min(expected * 1.25 + 20, MAX_DEADLINE_S);
+/** The latest the controller lets a dose go before cutting the power, from the room's longest dose. */
+/** Whether a dose expected to take this long is longer than the room lets the controller run one. */
+export const exceedsDoseLimit = (expected: number, profile: DosingProfile) =>
+  expected > profile.max_dose_s;
+export const doseDeadline = (expected: number, maxDoseS: number) =>
+  Math.min(expected * 1.25 + 20, maxDoseS + 60);
 
 export interface PumpView {
   pump: DosingPump;
@@ -432,10 +461,11 @@ export function pumpView(
   reach: Reach,
   states: States,
   now: number,
+  profile: DosingProfile,
 ): PumpView {
   const runtime = status?.pumps[pump.id] ?? null;
   const flowEntity = states[pump.flow_entity];
-  const flow = flowEntity ? numeric(flowEntity) : (runtime?.flow_ml_s ?? null);
+  const flow = flowEntity ? flowMlS(flowEntity) : (runtime?.flow_ml_s ?? null);
   const view = (state: PumpState, reason: string | null = null): PumpView => ({
     pump,
     state,
@@ -462,7 +492,7 @@ export function pumpView(
   }
   if (deviceDosing(pump, states) === null)
     return view("unavailable", `${pump.dosing_entity} reports nothing.`);
-  if (!(flow !== null && flow >= MIN_FLOW_ML_S))
+  if (!(flow !== null && flow >= profile.min_flow_ml_s))
     return view(
       "uncalibrated",
       flow === null
@@ -611,7 +641,7 @@ export function recipeRows(config: DosingConfig, states: States): RecipeRow[] {
     const reading = line.ml_entity ? numeric(states[line.ml_entity]) : null;
     const unreadable = !!line.ml_entity && reading === null;
     const ml = unreadable ? 0 : Math.max(0, reading ?? line.ml);
-    const flow = pump ? numeric(states[pump.flow_entity]) : null;
+    const flow = pump ? flowMlS(states[pump.flow_entity]) : null;
     return {
       pump: line.pump,
       name: pump?.name ?? line.pump,
@@ -621,7 +651,7 @@ export function recipeRows(config: DosingConfig, states: States): RecipeRow[] {
       fromEntity: reading !== null,
       unreadable,
       flow,
-      seconds: ml > 0 && flow !== null && flow >= MIN_FLOW_ML_S ? ml / flow : null,
+      seconds: ml > 0 && flow !== null && flow >= config.profile.min_flow_ml_s ? ml / flow : null,
       skipped: !unreadable && ml <= 0,
       unknown: !pump,
     };

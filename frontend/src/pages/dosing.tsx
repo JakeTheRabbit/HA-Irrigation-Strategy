@@ -36,7 +36,7 @@ import {
   canEdit,
   controllerReach,
   doseDeadline,
-  MAX_DOSE_S,
+  exceedsDoseLimit,
   dosingConfigId,
   dosingError,
   dosingStatusId,
@@ -44,6 +44,7 @@ import {
   leftWords,
   pumpStock,
   pumpView,
+  parseConfig,
   readConfig,
   readStatus,
   recipeRows,
@@ -478,7 +479,7 @@ export function Dosing({
   const status = readStatus(states[dosingStatusId(prefix)]);
   const now = Date.now();
   const reach = controllerReach(states, prefix, status, now);
-  const views = (config?.pumps ?? []).map((pump) => pumpView(pump, status, reach, states, now));
+  const views = (config?.pumps ?? []).map((pump) => pumpView(pump, status, reach, states, now, config!.profile));
   const running = views.some((view) => view.state === "dosing");
   const batchRunning = !!status && status.batch.step !== "idle";
   useTicker(running || batchRunning);
@@ -517,6 +518,7 @@ export function Dosing({
   // The dose form.
   const ml = amount.trim() === "" ? Number.NaN : Number(amount);
   const max = view?.pump.max_ml ?? 0;
+  const profile = (config ?? parseConfig({})!).profile;
   const validMl = Number.isFinite(ml) && ml > 0 && ml <= max;
   const expected = view && validMl && view.flow && view.flow > 0 ? ml / view.flow : null;
   const doseBlock = !view
@@ -537,8 +539,8 @@ export function Dosing({
                   ? view.reason
                   : !validMl
                     ? `Enter more than 0 and at most ${mL(max)} mL.`
-                    : expected !== null && expected > MAX_DOSE_S
-                      ? `That dose would take ${seconds(expected)}: the controller refuses a dose longer than 20 minutes.`
+                    : expected !== null && exceedsDoseLimit(expected, profile)
+                      ? `That dose would take ${seconds(expected)}: the controller refuses a dose longer than ${seconds(profile.max_dose_s)} in this room.`
                       : null;
   const reviewDose = () => {
     if (!view || !validMl) return;
@@ -556,7 +558,7 @@ export function Dosing({
         {
           label: "How it stops",
           value: expected
-            ? `by itself: the pump times the dose. Still running after ${seconds(doseDeadline(expected))}, its power is switched off.`
+            ? `by itself: the pump times the dose. Still running after ${seconds(doseDeadline(expected, profile.max_dose_s))}, its power is switched off.`
             : "by itself: the pump times the dose.",
         },
       ],
