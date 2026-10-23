@@ -74,7 +74,7 @@ const WORDS: Record<string, SettingWords> = {
     label: "Extra dryback",
     short: "Extra dryback",
     tag: "dries",
-    help: "The ramp starts once moisture is this far below the highest reading since lights-on. 0 is off: P0 waits for the P3 dryback target.",
+    help: "The ramp starts once moisture is this far below the highest reading since lights-on. 0 is off: P0 waits for the whole dryback target, so in practice for the latest first shot.",
   },
   p1_target_vwc: {
     label: "Peak VWC target",
@@ -254,7 +254,7 @@ const EC_STAGES =
 const DETAILS: Record<string, SettingDetail> = {
   p0_maximum_wait_time: {
     what: "How long after lights-on the first shot can wait: the plants start drinking before the day’s watering does.",
-    when: "P0 ends and the ramp starts at the first of: this long after lights-on; moisture at or below the rescue floor; moisture down by the additional dryback (or, while that is 0, the P3 dryback target) from its highest reading since lights-on. The ramp’s first shot then fires straight away, unless moisture is still at the peak VWC target.",
+    when: "P0 ends and the ramp starts at the first of: this long after lights-on; moisture at or below the rescue floor; moisture down by the additional dryback (or, while that is 0, the whole dryback target, which in practice the latest first shot reaches first) from its highest reading since lights-on. The ramp’s first shot then fires straight away, unless moisture is still at the peak VWC target.",
     practice:
       "The first shot commonly comes 30 minutes to 2 hours after lights-on. The extra fall before it, the additional dryback, is commonly 1 to 5% and is planned, not a missed shot.",
   },
