@@ -729,11 +729,13 @@ try {
         // Every other room here models an integration from before the power switches.
         const others = (await judges.locator("thead th.ai-room-col").count()) - 1;
         assert.equal(await judges.locator("td", { hasText: "No switch" }).count(), 9 * others);
+        // One editor: the judges table. A Capabilities link lands on the judge row of its power.
         assert.equal(
           await page.locator('[id^="config-ai_power_"]').count(),
-          0,
+          await judges.locator('tr[id^="config-ai_power_"]').count(),
           "the powers have one editor on the page",
         );
+        assert.equal(await judges.locator('tr[id^="config-ai_power_"]').count(), 8, "a landing row per power");
         assert.equal(
           await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
           true,
