@@ -13,17 +13,24 @@ the change by it (changes.py). A claim names one write: that write consumes it, 
 takes it back (`crop_steering_setpoint_claim_cancel`) when its write did not land. A write it has not
 named is the operator's when a signed-in person made it, and Home Assistant's own (an automation or a
 script) otherwise.
+
+Switches and selects (toggle()): a zone's enable switch, the room's kill switch, and the growth stage,
+P2 mode and watering-by selects journal target.changed with who moved them, from the state change
+itself: a signed-in person is manual with their user id, the controller app (a system user) the
+engine, and nothing else the system. Only the journal: the log keeps numbers. A write a caller
+journals itself (`quiet`) is not journaled again.
 """
 
 from __future__ import annotations
 
 import asyncio
+import re
 import time
 from copy import deepcopy
 
 from .const import DOMAIN
 from .journal_api import note
-from .room import room_prefix
+from .room import default_gate, room_gate, room_prefix
 
 MAX_CHANGES = 2000
 CLAIM_EVENT = f"{DOMAIN}_setpoint_write"
@@ -40,12 +47,16 @@ ACTORS = {
     "brain": "ai",
     "safety": "safety",
 }
+# A zone's switch or select journaled by toggle(): its name after the room prefix -> its key.
+ZONE_TOGGLES = re.compile(r"zone_(\d+)_(enabled|p2_mode|irrigation_mode)")
+UNREAD = ("unknown", "unavailable")
 
 
 class SetpointLog:
     def __init__(self, hass, entry, store=None):
         self.hass, self.entry = hass, entry
-        self.room_id = "room:" + room_prefix(entry)
+        self.prefix = room_prefix(entry)
+        self.room_id = "room:" + self.prefix
         self._store = store
         self._lock = asyncio.Lock()
         # entity_id -> (value, who, monotonic seconds, expires or None, reason or None, expected or None,
@@ -199,6 +210,67 @@ class SetpointLog:
         )
         return who, expires
 
+    def _toggle_key(self, entity_id):
+        """-> (key, zone or None) of a switch or select toggle() journals, else None."""
+        domain, _, name = entity_id.partition(".")
+        own = f"{DOMAIN}_{self.prefix}"
+        if domain in ("switch", "select") and name.startswith(own):
+            rest = name[len(own) :]
+            zone = ZONE_TOGGLES.fullmatch(rest)
+            if zone is not None and (domain == "switch") == (zone[2] == "enabled"):
+                return zone[2], int(zone[1])
+            if domain == "select" and rest == "growth_stage":
+                return "growth_stage", None
+        if domain in ("switch", "input_boolean") and entity_id in (
+            default_gate(self.prefix),
+            room_gate(self.hass, self.prefix),
+        ):
+            return "engine_enabled", None
+        return None
+
+    def toggle(self, entity_id, old_state, new_state, context):
+        """A state change of one of the room's journaled switches and selects -> what journal_toggle()
+        records, or None. Synchronous, so a caller's `quiet` context is still marked."""
+        if old_state is None or new_state is None or old_state.state == new_state.state:
+            return None
+        if new_state.state in UNREAD or getattr(context, "id", None) in self.quiet:
+            return None
+        found = self._toggle_key(entity_id)
+        if found is None:
+            return None
+        # A pick from a value that read nothing has no old value to put back.
+        old = None if old_state.state in UNREAD else old_state.state
+        return {
+            "entity_id": entity_id,
+            "key": found[0],
+            "zone": found[1],
+            "old": old,
+            "new": new_state.state,
+        }
+
+    async def journal_toggle(self, change, context):
+        """target.changed for a toggle(): a signed-in person is manual, with their user id."""
+        user_id = getattr(context, "user_id", None)
+        user = await self.hass.auth.async_get_user(user_id) if user_id else None
+        person = user is not None and not user.system_generated
+        zone = change["zone"]
+        note(
+            self.hass,
+            self.room_id,
+            "target.changed",
+            zone=zone,
+            actor="manual" if person else "engine" if user is not None else "system",
+            user_id=user_id if person else None,
+            data={
+                "key": change["key"],
+                "scope": "room" if zone is None else f"zone:{zone}",
+                "layer": "base",
+                "old": change["old"],
+                "new": change["new"],
+                "entity_id": change["entity_id"],
+            },
+        )
+
     def response(self):
         return {
             "schema_version": 1,
@@ -215,6 +287,7 @@ def log_for(hass, entry_id):
 
 async def async_setup_setpoint_log(hass, entry):
     import voluptuous as vol
+    from homeassistant.const import EVENT_STATE_CHANGED
     from homeassistant.core import SupportsResponse, callback
     from homeassistant.exceptions import HomeAssistantError
 
@@ -235,6 +308,20 @@ async def async_setup_setpoint_log(hass, entry):
 
     entry.async_on_unload(hass.bus.async_listen(CLAIM_EVENT, claimed))
     entry.async_on_unload(hass.bus.async_listen(CANCEL_EVENT, cancelled))
+
+    @callback
+    def changed(event):
+        data = event.data
+        change = log.toggle(
+            data["entity_id"],
+            data.get("old_state"),
+            data.get("new_state"),
+            event.context,
+        )
+        if change is not None:
+            hass.async_create_task(log.journal_toggle(change, event.context))
+
+    entry.async_on_unload(hass.bus.async_listen(EVENT_STATE_CHANGED, changed))
 
     async def handle(call):
         # Reading only: anyone who may look at the room may read who changed what.

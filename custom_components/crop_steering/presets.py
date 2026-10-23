@@ -65,6 +65,8 @@ SECTIONS = {
 }
 SCOPES = {"targets": ("targets",), "timers": ("timers",), "all": tuple(SECTIONS)}
 SELECTS = ("p2_mode",)
+# A switch is read and written as "on" / "off" (history_revert of a zone or kill switch, setpoint_log).
+SWITCHES = ("switch.", "input_boolean.")
 # What a timer program is without where it is stored.
 _STORED = ("id", "created_at", "updated_at", "deleted_at")
 # A copy never takes a zone or a room out of its timer programs (review ruling): when the source has
@@ -216,7 +218,7 @@ def _state(hass, entity_id):
     state = hass.states.get(entity_id)
     if state is None or state.state in ("unknown", "unavailable"):
         return None
-    if entity_id.startswith("select."):
+    if entity_id.startswith(("select.", *SWITCHES)):
         return state.state
     try:
         value = float(state.state)
@@ -348,6 +350,12 @@ async def _write_all(hass, writes, pending, errors, context):
             try:
                 if entity_id.startswith("select."):
                     domain, service, data = "select", "select_option", {"option": value}
+                elif entity_id.startswith(SWITCHES) and value in ("on", "off"):
+                    domain, service, data = (
+                        entity_id.split(".", 1)[0],
+                        f"turn_{value}",
+                        {},
+                    )
                 else:
                     domain, service, data = "number", "set_value", {"value": value}
                 await hass.services.async_call(

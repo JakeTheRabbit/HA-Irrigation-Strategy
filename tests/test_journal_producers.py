@@ -43,7 +43,7 @@ class MemoryStore:
         self.saved = value
 
 
-def log_rig(operator=True):
+def log_rig(operator=True, prefix="f2_"):
     user = SimpleNamespace(system_generated=False)
 
     async def get_user(user_id):
@@ -51,7 +51,7 @@ def log_rig(operator=True):
 
     hass = ha_stubs.FakeHass()
     hass.auth = SimpleNamespace(async_get_user=get_user)
-    entry = ha_stubs.FakeEntry(data={"room_prefix": "f2_"}, entry_id="e")
+    entry = ha_stubs.FakeEntry(data={"room_prefix": prefix}, entry_id="e")
     log = SetpointLog(hass, entry, MemoryStore())
     asyncio.run(log.async_init())
     return log
@@ -158,6 +158,141 @@ def test_a_journal_that_is_down_never_stops_a_setpoint_write(monkeypatch):
     record(log, 50.0, 52.0)
     assert [row["new"] for row in log.changes] == [52.0]
     assert log._store.saved == {"changes": log.changes}
+
+
+def _toggle(log, entity_id, old, new, context=None):
+    """A state change of `entity_id` from `old` to `new` (None: no state) through the log's
+    listener steps: the synchronous filter, then the journal write."""
+    change = log.toggle(
+        entity_id,
+        old if old is None else ha_stubs.FakeState(old),
+        new if new is None else ha_stubs.FakeState(new),
+        context,
+    )
+    if change is not None:
+        asyncio.run(log.journal_toggle(change, context))
+    return change
+
+
+@pytest.mark.parametrize(
+    "entity_id,old,new,key,zone",
+    [
+        ("switch.crop_steering_f2_zone_2_enabled", "on", "off", "enabled", 2),
+        ("switch.crop_steering_f2_engine_enabled", "on", "off", "engine_enabled", None),
+        ("select.crop_steering_f2_zone_1_p2_mode", "moisture", "timer", "p2_mode", 1),
+        (
+            "select.crop_steering_f2_zone_3_irrigation_mode",
+            "steering",
+            "timer",
+            "irrigation_mode",
+            3,
+        ),
+        (
+            "select.crop_steering_f2_growth_stage",
+            "Vegetative",
+            "Flower",
+            "growth_stage",
+            None,
+        ),
+    ],
+)
+def test_a_person_switching_or_picking_is_journaled_with_their_user(
+    emitted, entity_id, old, new, key, zone
+):
+    log = log_rig()
+    _toggle(log, entity_id, old, new, SimpleNamespace(id="c1", user_id="u1"))
+    (event,) = emitted
+    assert (event.room_id, event.kind, event.zone, event.actor, event.user_id) == (
+        "room:f2_",
+        "target.changed",
+        zone,
+        "manual",
+        "u1",
+    )
+    assert event.data == {
+        "key": key,
+        "scope": "room" if zone is None else f"zone:{zone}",
+        "layer": "base",
+        "old": old,
+        "new": new,
+        "entity_id": entity_id,
+    }
+    assert log.changes == []  # the setpoint log keeps numbers only
+
+
+def test_a_switch_with_no_person_is_the_system_and_the_controllers_is_the_engine(
+    emitted,
+):
+    log = log_rig(operator=False)
+    _toggle(log, "switch.crop_steering_f2_zone_1_enabled", "on", "off")
+    log.hass.auth = SimpleNamespace(
+        async_get_user=lambda uid: _done(SimpleNamespace(system_generated=True))
+    )
+    _toggle(
+        log,
+        "switch.crop_steering_f2_engine_enabled",
+        "on",
+        "off",
+        SimpleNamespace(id="c2", user_id="supervisor"),
+    )
+    assert [(e.actor, e.user_id) for e in emitted] == [
+        ("system", None),
+        ("engine", None),
+    ]
+
+
+def test_the_default_rooms_legacy_kill_switch_is_its_engine_switch(emitted):
+    log = log_rig(prefix="")
+    _toggle(log, "input_boolean.f2_control_enabled", "on", "off")
+    # Another room's zone switch is not the default room's.
+    _toggle(log, "switch.crop_steering_f2_zone_1_enabled", "on", "off")
+    (event,) = emitted
+    assert (event.room_id, event.data["key"], event.zone) == (
+        "room:",
+        "engine_enabled",
+        None,
+    )
+
+
+@pytest.mark.parametrize(
+    "entity_id,old,new",
+    [
+        # Not one of the journaled entities.
+        ("switch.crop_steering_f2_zone_1_manual_override", "off", "on"),
+        ("select.crop_steering_f2_zone_1_set_phase", "Keep", "P2"),
+        ("switch.crop_steering_f2_zone_1_irrigation_mode", "on", "off"),
+        ("select.crop_steering_f2_zone_1_enabled", "on", "off"),
+        ("switch.crop_steering_g1_zone_1_enabled", "on", "off"),
+        # Only its attributes moved, it was just added, it went away or it reads nothing.
+        ("select.crop_steering_f2_growth_stage", "Flower", "Flower"),
+        ("switch.crop_steering_f2_zone_1_enabled", None, "on"),
+        ("switch.crop_steering_f2_zone_1_enabled", "on", None),
+        ("switch.crop_steering_f2_zone_1_enabled", "on", "unavailable"),
+        ("select.crop_steering_f2_zone_1_irrigation_mode", "timer", "unknown"),
+    ],
+)
+def test_other_entities_and_non_changes_journal_nothing(emitted, entity_id, old, new):
+    log = log_rig()
+    assert _toggle(log, entity_id, old, new) is None
+    assert emitted == []
+
+
+def test_a_pick_from_an_unreadable_value_has_no_old_so_it_cannot_be_put_back(emitted):
+    log = log_rig()
+    _toggle(log, "select.crop_steering_f2_zone_1_irrigation_mode", "unknown", "timer")
+    (event,) = emitted
+    assert (event.data["old"], event.data["new"]) == (None, "timer")
+
+
+def test_a_write_a_caller_journals_itself_is_not_journaled_twice(emitted):
+    log = log_rig()
+    log.quiet.add("c1")
+    context = SimpleNamespace(id="c1", user_id="u1")
+    assert (
+        _toggle(log, "select.crop_steering_f2_zone_1_p2_mode", "a", "b", context)
+        is None
+    )
+    assert emitted == []
 
 
 def test_the_plan_journals_saved_armed_activated_disarmed_and_expired(
