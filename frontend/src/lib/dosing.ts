@@ -3,7 +3,7 @@ import { parseControllerTime, readHeartbeat } from "./controller-health";
 import { numeric } from "./model";
 import type { SetupCandidate } from "./operator-types";
 import { formatVolume } from "./display-units";
-import { OVER_PCT, MINIMUM_PCT, tankLevelId } from "./reservoir";
+import { OVER_PCT, MINIMUM_PCT, reservoirView, tankLevelId } from "./reservoir";
 import { batchesLeft, type StockDocument } from "./stock";
 import type { EntityState, States } from "./types";
 
@@ -1267,14 +1267,37 @@ export function nextBatch(
 }
 
 /** How fast the tank's level falls, % per hour, since its last rise (a fill): the newest run of the
- * recorded level that only goes down. Null with under an hour of it, or a level that is not falling. */
+ * recorded level that only goes down, from the last reading at its peak. Null with under an hour of
+ * it, or a level that is not falling. */
 export function levelFall(points: readonly { time: number; value: number }[]): number | null {
   if (points.length < 2) return null;
   let start = points.length - 1;
   while (start > 0 && points[start - 1].value >= points[start].value) start--;
+  // A tank that sat full is not falling yet: the run starts where it last left its peak.
+  while (start < points.length - 1 && points[start + 1].value === points[start].value) start++;
   const first = points[start],
     last = points[points.length - 1];
   const hours = (last.time - first.time) / 3_600_000;
   if (hours < 1 || !(first.value > last.value)) return null;
   return (first.value - last.value) / hours;
+}
+
+/** The level the next batch is made at, and the reading that says when: the refill reminder on its
+ * own level entity (`batch.level_entity`, dosing_runner), else the minimum on the controller's tank
+ * level (`sensor.crop_steering_<prefix>tank_level`). The time is worked out from the same entity as
+ * the mark. */
+export function batchLevel(
+  states: States,
+  prefix: string,
+): { atPct: number; entityId: string; pct: number | null } {
+  const batch = record(record(states[dosingConfigId(prefix)]?.attributes).batch);
+  const remind = count(batch.remind_pct);
+  const own = entityId(batch.level_entity);
+  if (remind !== null && remind > 0 && own) {
+    const entity = states[own];
+    const pct = readable(entity) ? count(entity!.state) : null;
+    return { atPct: remind, entityId: own, pct };
+  }
+  const guard = reservoirView(states, prefix);
+  return { atPct: guard.minimum, entityId: tankLevelId(prefix), pct: guard.level };
 }

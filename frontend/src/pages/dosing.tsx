@@ -35,6 +35,7 @@ import { TankStatus } from "@/components/tank-status";
 import {
   PUMP_STATES,
   STOCK_STATES,
+  batchLevel,
   batchSteps,
   batchTime,
   blankPump,
@@ -79,7 +80,6 @@ import { formatEc, formatVolume, useDisplayUnits } from "@/lib/display-units";
 import { descriptor, numeric } from "@/lib/model";
 import { RELEASE_PCT, reservoirView, type ReservoirView } from "@/lib/reservoir";
 import type { StockDocument } from "@/lib/stock";
-import { tankTelemetry } from "@/lib/tank-telemetry";
 import { clock, dayKey, dayLabel } from "@/lib/time";
 import type { Controller, States } from "@/lib/types";
 import { errorText } from "@/lib/utils";
@@ -340,9 +340,9 @@ function Mark({ item, children }: { item: { label: string; ok: boolean }; childr
   return (
     <p className="plumb-mark" data-protection={item.ok ? "armed" : "off"}>
       {item.ok ? (
-        <Check size={15} aria-label="Armed" />
+        <Check size={15} role="img" aria-label="Armed" />
       ) : (
-        <X size={15} aria-label="Not armed" />
+        <X size={15} role="img" aria-label="Not armed" />
       )}
       <span>{item.label}</span>
       {children}
@@ -395,15 +395,16 @@ function BandGauge({
 }
 
 const MIX_TITLE = { "off target": "Mix check failed", "not read": "Mix check could not read the tank" };
+const PROBE_NAMES = { ec: "EC", ph: "pH" } as const;
 
 /** The last batch's mix check, in place beside the tank, when it did not pass: both readings on
  * their bands, why, and a hold to make a batch that fills, mixes and checks again. Making a batch is
  * the only way on: no service releases a failed check. */
-function MixCheckCard({
+export function MixCheckCard({
   mix,
   states,
   prefix,
-  calibratedAt,
+  calibration,
   now,
   tz,
   block,
@@ -413,7 +414,8 @@ function MixCheckCard({
   mix: MixCheck;
   states: States;
   prefix: string;
-  calibratedAt: number | null;
+  /** When each feed probe was last calibrated (engine_config `feed_calibration`), null when never. */
+  calibration: { ec: number | null; ph: number | null };
   now: number;
   tz: string;
   block: string | null;
@@ -438,9 +440,26 @@ function MixCheckCard({
     outside(mix.ec, ec) && `Want EC ${range(ec, ecText)}; it read ${ecText(mix.ec!)}.`,
     outside(mix.ph, ph) && `Want pH ${range(ph, PH)}; it read ${PH(mix.ph!)}.`,
   ].filter(Boolean);
+  // What the controller could not read, in its own words; an off-band reading is said above, in
+  // display units.
+  const unread =
+    mix.verdict === "off target"
+      ? null
+      : (mix.why ?? "")
+          .split("; ")
+          .filter((part) => part && !/ outside the feed /.test(part))
+          .join("; ") || null;
+  // The probe behind each failure: one off its band, or one that read nothing.
+  const probes = (["ec", "ph"] as const).filter((quantity) => {
+    const value = mix[quantity];
+    return value === null ? mix.verdict !== "off target" : outside(value, quantity === "ec" ? ec : ph);
+  });
   const checked = Date.parse(mix.checked_at ?? mix.gave_up_at ?? "");
   const title = mix.gave_up_at ? "Mix check not done" : MIX_TITLE[mix.verdict as keyof typeof MIX_TITLE];
-  const days = calibratedAt === null ? null : Math.floor((now - calibratedAt) / 86_400_000);
+  const ago = (ms: number) => {
+    const days = Math.floor((now - ms) / 86_400_000);
+    return days === 0 ? "today" : `${days} ${days === 1 ? "day" : "days"} ago`;
+  };
   return (
     <section className="plumb-mix" aria-labelledby={id} data-mix-check={mix.gave_up_at ? "not done" : mix.verdict}>
       <h3 id={id}>
@@ -450,11 +469,16 @@ function MixCheckCard({
       <BandGauge name="EC" value={mix.ec} low={ec.low} high={ec.high} text={ecText} />
       <BandGauge name="pH" value={mix.ph} low={ph.low} high={ph.high} text={PH} />
       <p className="plumb-mix-why">
-        {wanted.length
-          ? wanted.join(" ")
-          : mix.why
-            ? `The controller could not judge the tank: ${mix.why}.`
-            : "The controller could not judge the tank."}{" "}
+        {[
+          ...wanted,
+          unread
+            ? `The controller could not judge the tank: ${unread}.`
+            : wanted.length
+              ? null
+              : "The controller could not judge the tank.",
+        ]
+          .filter(Boolean)
+          .join(" ")}{" "}
         The shots continue. The controller refuses a batch an automation asks for until a batch made
         by hand passes this check.
       </p>
@@ -471,17 +495,21 @@ function MixCheckCard({
           {error}
         </p>
       )}
-      <p className="plumb-mix-cal">
-        {days === null ? (
-          <a href="#/equipment/feed-calibration">Calibrate the feed EC probe</a>
-        ) : (
-          <>
-            Feed EC probe calibrated{" "}
-            {days === 0 ? "today" : `${days} ${days === 1 ? "day" : "days"} ago`} ·{" "}
-            <a href="#/equipment/feed-calibration">calibrate</a>
-          </>
-        )}
-      </p>
+      {probes.map((quantity) => {
+        const ms = calibration[quantity];
+        return (
+          <p className="plumb-mix-cal" key={quantity} data-mix-probe={quantity}>
+            {ms === null ? (
+              <a href="#/equipment/feed-calibration">Calibrate the feed {PROBE_NAMES[quantity]} probe</a>
+            ) : (
+              <>
+                Feed {PROBE_NAMES[quantity]} probe calibrated {ago(ms)} ·{" "}
+                <a href="#/equipment/feed-calibration">calibrate</a>
+              </>
+            )}
+          </p>
+        );
+      })}
     </section>
   );
 }
@@ -991,7 +1019,6 @@ export function Dosing({
 
   // The plumbing's facts.
   const guard = reservoirView(states, prefix);
-  const tank = tankTelemetry(states, room.room, now);
   const armed = config
     ? protections(
         { schema_version: 1, room_id: controller.roomId, config, candidates: [], error: null },
@@ -1001,30 +1028,34 @@ export function Dosing({
   const armedCount = armed.filter((item) => item.ok).length;
   const fillValve = config?.batch.fill_valve ? states[config.batch.fill_valve] : undefined;
   const engine = descriptor(states, room.room)?.attributes ?? {};
-  const calibration = (engine.feed_calibration as { ec?: { calibrated_at?: string } } | undefined)?.ec
-    ?.calibrated_at;
-  const calibratedAt = Date.parse(calibration ?? "");
+  const calibratedAt = (quantity: "ec" | "ph") => {
+    const record = (engine.feed_calibration as Record<string, { calibrated_at?: string }> | undefined)?.[
+      quantity
+    ];
+    const ms = Date.parse(record?.calibrated_at ?? "");
+    return Number.isFinite(ms) ? ms : null;
+  };
   const mix = status?.mix ?? null;
   const failed = !!mix && !batchRunning && (mix.verdict === "off target" || mix.verdict === "not read" || !!mix.gave_up_at);
   const feedNow = doc?.feed_now ?? null;
   const inUse = doc ? recipeInUse(doc) : { name: null, lines: [] };
   const started = Date.parse(status?.batch.started_at ?? "");
-  // The next batch: made when the tank reaches its refill reminder, else its minimum.
-  const rawBatch = states[dosingConfigId(prefix)]?.attributes.batch as { remind_pct?: unknown } | undefined;
-  const remind = Number(rawBatch?.remind_pct);
-  const atPct = remind > 0 ? remind : guard.minimum;
-  const recorded = useRecordedLevel(controller, config ? tank.level.entityId : null);
+  // The next batch: made when the tank reaches its refill reminder, else its minimum, timed from the
+  // level that mark is on.
+  const level = batchLevel(states, prefix);
+  const atPct = level.atPct;
+  const recorded = useRecordedLevel(controller, config ? level.entityId : null);
   // The recorded level, then the level it reads now: a level that has held since its last change
   // still counts the time it held.
   const fall = levelFall([
     ...recorded,
-    ...(tank.level.value !== null ? [{ time: now, value: tank.level.value }] : []),
+    ...(level.pct !== null ? [{ time: now, value: level.pct }] : []),
   ]);
   const next =
     doc && config
       ? nextBatch({ ...doc, config: { ...doc.config, ...config } }, stock, now, {
           states,
-          levelPct: tank.level.value,
+          levelPct: level.pct,
           litresPerPct: guard.litresPerPct,
           pctPerHour: fall,
           atPct,
@@ -1145,6 +1176,12 @@ export function Dosing({
             </section>
           </div>
         )}
+        {/* No pumps to draw: the last batch is still said. */}
+        {config && !views.length && status && (
+          <p className="plumb-batch-line" data-batch-line>
+            {batchLine}
+          </p>
+        )}
         <div className="plumb-main">
           {config && (
             <div className="plumb-fill" data-fill-valve>
@@ -1164,7 +1201,7 @@ export function Dosing({
             <TankStatus controller={controller} onConfigure={configure} />
             <GuardMark
               guard={guard}
-              item={armed[2] ?? { label: `Minimum ${guard.minimum}%`, ok: guard.state !== "unmapped" }}
+              item={armed[2] ?? { label: `Minimum ${guard.minimum}%`, ok: guard.level !== null }}
               onConfigure={configure}
             />
             {armed[3] && <Mark item={armed[3]} />}
@@ -1174,7 +1211,7 @@ export function Dosing({
               mix={mix}
               states={states}
               prefix={prefix}
-              calibratedAt={Number.isFinite(calibratedAt) ? calibratedAt : null}
+              calibration={{ ec: calibratedAt("ec"), ph: calibratedAt("ph") }}
               now={now}
               tz={tz}
               block={batchBlock ?? (canAct ? null : "The controller cannot take a request now.")}
@@ -1206,7 +1243,7 @@ export function Dosing({
             <NextBatchCard
               next={next}
               atPct={atPct}
-              levelKnown={tank.level.value !== null}
+              levelKnown={level.pct !== null}
               now={now}
               tz={tz}
               navigate={navigate}

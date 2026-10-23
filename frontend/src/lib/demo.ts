@@ -1499,10 +1499,14 @@ function demoTank(
   ];
   const iso = (time: number) => new Date(time).toISOString();
   const before = model.fills.filter((fill) => fill <= from).at(-1);
+  const level = [from, ...model.draws.map((run) => run.stop), ...model.fills, to]
+    .filter((time, index) => !index || (time > from && time <= to))
+    .map((time) => ({ state: String(model.level(time)), time }));
   return {
-    [mapped(TANK_KEYS.level)]: [from, ...model.draws.map((run) => run.stop), ...model.fills, to]
-      .filter((time, index) => !index || (time > from && time <= to))
-      .map((time) => ({ state: String(model.level(time)), time })),
+    [mapped(TANK_KEYS.level)]: level,
+    // The controller's own reading of it records the same level (Feed & dosing times the next
+    // batch from it).
+    [`sensor.crop_steering_${String(config.attributes.prefix ?? "")}tank_level`]: level,
     [mapped(TANK_KEYS.pump)]: switched(model.runs),
     [mapped(TANK_KEYS.filling)]: switched(
       model.fills.map((fill) => ({ start: fill - FILL_MS, stop: fill })),
@@ -1644,7 +1648,10 @@ export function demoDay(states: States, request: TimelineRequest, now = Date.now
     }
     put(`sensor.crop_steering_${prefix}current_decision`, decision);
     // The batch tank, for the tank chart, when it is asked for.
-    if (Object.values(TANK_KEYS).some((key) => wanted.has(String(config.attributes[key]))))
+    if (
+      Object.values(TANK_KEYS).some((key) => wanted.has(String(config.attributes[key]))) ||
+      wanted.has(`sensor.crop_steering_${prefix}tank_level`)
+    )
       for (const [id, list] of Object.entries(demoTank(states, config, request.start, end, now)))
         put(id, list);
   }

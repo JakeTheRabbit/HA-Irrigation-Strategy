@@ -4,6 +4,8 @@ import {
   batchSteps,
   batchTime,
   canEdit,
+  batchLevel,
+  levelFall,
   nextBatch,
   protections,
   controllerReach,
@@ -1069,5 +1071,51 @@ describe("Feed & dosing: the plumbing view's facts", () => {
     expect(calm.at).toBeNull();
     expect(calm.litres).toBeNull();
     expect(calm.steps.map((step) => step.name)).toEqual(["premix", "dose", "postmix"]);
+  });
+
+  it("batchLevel reads the controller's tank level against its minimum when only that is mapped", () => {
+    // No water_level_sensor in the room: the controller's level, built from the distance sensor.
+    const level = batchLevel(armed, "");
+    expect(level).toEqual({ atPct: 8, entityId: "sensor.crop_steering_tank_level", pct: 64 });
+  });
+  it("batchLevel reads the refill reminder on its own level entity", () => {
+    const states: States = {
+      ...armed,
+      [dosingConfigId("")]: entity(dosingConfigId(""), "1", {
+        batch: { level_entity: "sensor.batch_tank", remind_pct: 30 },
+      }),
+      "sensor.batch_tank": entity("sensor.batch_tank", "41.5", { unit_of_measurement: "%" }),
+    };
+    expect(batchLevel(states, "")).toEqual({ atPct: 30, entityId: "sensor.batch_tank", pct: 41.5 });
+  });
+  it("batchLevel has no reading when the controller's level reads nothing", () => {
+    const states: States = {
+      [dosingConfigId("")]: entity(dosingConfigId(""), "1", { batch: { remind_pct: 0 } }),
+      "sensor.crop_steering_tank_level": entity("sensor.crop_steering_tank_level", "unavailable", {
+        minimum_pct: 10,
+      }),
+    };
+    expect(batchLevel(states, "")).toEqual({ atPct: 10, entityId: "sensor.crop_steering_tank_level", pct: null });
+  });
+  it("levelFall starts the fall where the level last left its peak, not while it sat full", () => {
+    const h = 3_600_000;
+    // Full for 5 h, then 10 % in the hour after: 10 %/h, not 10 % over 6 h.
+    expect(
+      levelFall([
+        { time: 0, value: 100 },
+        { time: 5 * h, value: 100 },
+        { time: 6 * h, value: 95 },
+        { time: 7 * h, value: 90 },
+      ]),
+    ).toBe(5);
+    // A pause inside the fall still counts.
+    expect(
+      levelFall([
+        { time: 0, value: 100 },
+        { time: 1 * h, value: 90 },
+        { time: 3 * h, value: 90 },
+        { time: 4 * h, value: 80 },
+      ]),
+    ).toBe(5);
   });
 });

@@ -1,5 +1,4 @@
 import type { PillTone } from "@/components/mini-visuals";
-import { BATCH_STEPS, STEP_LABELS, resultTone, resultWords, type DosingStatus } from "./dosing";
 import type { States } from "./types";
 
 /** The tank level the controller reads from the level mapped in Rooms and setup, with its minimum and
@@ -104,28 +103,4 @@ export function reservoirView(states: States, prefix: string): ReservoirView {
       ? `Watering is held at ${minimum} % and starts again at ${RELEASE_PCT} %. The litres each 1 % holds are learned from the shots; until then no shot waits ahead of the minimum.`
       : `Watering is held at ${minimum} % and starts again at ${RELEASE_PCT} %. A shot that would take the tank to its minimum waits, and a refill is asked for one round of shots ahead.`,
   );
-}
-
-/** The batch on the tank: the step running now, else how the last one ended. Null with no batch
- * dosing reported. */
-export function batchLine(status: DosingStatus | null): { label: string; tone: PillTone } | null {
-  if (!status) return null;
-  const batch = status.batch;
-  if (batch.step !== "idle") {
-    const index = BATCH_STEPS.indexOf(batch.step);
-    return {
-      label: `Batch running: ${STEP_LABELS[batch.step]} (step ${index + 1} of ${BATCH_STEPS.length})`,
-      tone: "water",
-    };
-  }
-  if (!batch.result) return { label: "No batch made yet", tone: "neutral" };
-  const ended = batch.ended_at ? new Date(batch.ended_at) : null;
-  const when =
-    ended && Number.isFinite(ended.getTime())
-      ? ` · ${ended.toLocaleString([], { dateStyle: "short", timeStyle: "short" })}`
-      : "";
-  return {
-    label: `Last batch: ${resultWords(batch.result)}${when}`,
-    tone: resultTone(batch.result),
-  };
 }

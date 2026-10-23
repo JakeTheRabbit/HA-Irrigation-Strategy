@@ -612,6 +612,11 @@
 .plumb-tank > .panel {
   margin-bottom: 0;
 }
+/* The tank card sits under the pumps: a tighter inset, still one on every side, keeps it on a
+   laptop's first screen with room to spare (verify-tank-status). */
+.plumb-tank .tank-layout {
+  padding: 12px;
+}
 .plumb-guard {
   display: grid;
   gap: 4px;
