@@ -9,9 +9,12 @@ import {
   primeLabel,
   pumpMotion,
   rateSentence,
+  runGone,
   runState,
   wearNote,
 } from "./pump-calibration";
+import { PumpDemo } from "./pump-demo";
+import type { States } from "./types";
 
 const DAY = 86_400_000;
 const NOW = Date.UTC(2026, 9, 22, 12);
@@ -106,21 +109,46 @@ describe("canStartRun", () => {
 });
 
 describe("prime and run wording", () => {
-  test("the pump reads as running only once the prime was accepted", () => {
-    expect(pumpMotion("Part B", { priming: true, primeOk: undefined, waiting: false })).toEqual({ active: false, text: "Part B" });
-    expect(pumpMotion("Part B", { priming: true, primeOk: false, waiting: false })).toEqual({ active: false, text: "Part B" });
-    expect(pumpMotion("Part B", { priming: true, primeOk: true, waiting: false })).toEqual({ active: true, text: "Part B is running" });
+  test("a prime is only asked for: the drawing never runs without the controller's word", () => {
+    expect(pumpMotion("Part B", { priming: true, primeOk: undefined, waiting: false })).toBe("Part B");
+    expect(pumpMotion("Part B", { priming: true, primeOk: false, waiting: false })).toBe("Part B");
+    expect(pumpMotion("Part B", { priming: true, primeOk: true, waiting: false })).toBe("Asked Part B to prime");
   });
   test("a run waiting for its report is worded as asked for", () => {
-    expect(pumpMotion("Part B", { priming: false, primeOk: undefined, waiting: true })).toEqual({
-      active: false,
-      text: "Asked Part B to run 30 s",
-    });
+    expect(pumpMotion("Part B", { priming: false, primeOk: undefined, waiting: true })).toBe("Asked Part B to run 30 s");
   });
-  test("the prime button claims priming only once accepted, and drops it on refusal", () => {
-    expect(primeLabel(false, undefined)).toBe("Hold to prime");
-    expect(primeLabel(true, undefined)).toBe("Asking to prime… let go to stop");
-    expect(primeLabel(true, true)).toBe("Priming… let go to stop");
-    expect(primeLabel(true, false)).toBe("Hold to prime");
+  test("the prime button says the prime was asked for, and drops it on refusal", () => {
+    expect(primeLabel("Part B", false, undefined)).toBe("Hold to prime");
+    expect(primeLabel("Part B", true, undefined)).toBe("Asking to prime… let go to stop");
+    expect(primeLabel("Part B", true, true)).toBe("Asked Part B to prime… let go to stop");
+    expect(primeLabel("Part B", true, false)).toBe("Hold to prime");
+  });
+});
+
+describe("runGone", () => {
+  test("a read after the run opened that no longer shows its session ends the run", () => {
+    expect(runGone("s1", null, true)).toBe(true);
+    expect(runGone("s1", { session_id: "s2" }, true)).toBe(true);
+    expect(runGone("s1", { session_id: "s1" }, true)).toBe(false);
+  });
+  test("a read from before the run opened, or no run, proves nothing", () => {
+    expect(runGone("s1", null, false)).toBe(false);
+    expect(runGone(null, null, true)).toBe(false);
+  });
+});
+
+describe("demo pump_stop", () => {
+  const pumps = [{ id: "part_b", name: "Part B", flow_entity: "number.part_b_flow" }];
+  const states = {
+    "sensor.crop_steering_dosing_config": { entity_id: "sensor.crop_steering_dosing_config", state: "ok", attributes: { pumps } },
+  } as unknown as States;
+  const doc = () => ({ room_id: "room:", config: { pumps: structuredClone(pumps) } }) as never;
+  test("a stop before the controller takes the run closes the session, as the backend does", () => {
+    const demo = new PumpDemo(() => states, () => {});
+    demo.call("pump_calibrate", { room_id: "room:", pump: "part_b", seconds: 30 });
+    expect(demo.decorate(doc()).config?.pumps[0].calibration_session?.session_id).toMatch(/^demo-pump-cal-/);
+    const stop = demo.call("pump_stop", { room_id: "room:", pump: "part_b" }) as { data: { replaced: unknown } };
+    expect(stop.data.replaced).toMatchObject({ action: "calibrate", pump: "part_b" });
+    expect(demo.decorate(doc()).config?.pumps[0].calibration_session).toBeUndefined();
   });
 });

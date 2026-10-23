@@ -6,8 +6,8 @@ import type { States } from "./types";
 
 /** The demo integration's pump prime and calibration (dosing_api.py `pump_*`), in memory: a prime
  * is a request a stop ends; a calibration run is reported 3 s after it is asked for (demo time, on
- * the timer so a pinned clock does not stall it), or when stopped (0 s if stopped within 1.5 s,
- * before the controller took it); a commit stores the flow and
+ * the timer so a pinned clock does not stall it), or when stopped; a stop within 1.5 s, before the
+ * controller took it, closes the session instead (no report comes); a commit stores the flow and
  * sets the pump's flow number. Each pump's newest calibration is the flow its flow number holds. */
 
 /** The catalogue as dosing_get serves it (dosing.py PUMP_CATALOG). */
@@ -134,12 +134,18 @@ export class PumpDemo {
         return envelope({ request_id: id("prime"), outcome: "requested", blockers: [] });
       }
       case "pump_stop": {
-        const session = this.sessions.get(`${room}|${pump}`);
+        const key = `${room}|${pump}`;
+        const session = this.sessions.get(key);
         if (session && session.ran_s === null) {
           clearTimeout(session.timer);
           const elapsed = performance.now() - session.started;
-          session.ran_s = elapsed < PICKUP_MS ? 0 : round(Math.min(1, elapsed / RUN_MS) * session.seconds, 1);
-          session.result = elapsed < PICKUP_MS ? "stopped before the controller started it" : "stopped";
+          // Not taken yet: the stop replaces the request and the session closes (dosing_api.py _replaced).
+          if (elapsed < PICKUP_MS) {
+            this.sessions.delete(key);
+            return envelope({ request_id: id("stop"), replaced: { id: session.request_id, action: "calibrate", pump } });
+          }
+          session.ran_s = round(Math.min(1, elapsed / RUN_MS) * session.seconds, 1);
+          session.result = "stopped";
         }
         return envelope({ request_id: id("stop"), replaced: null });
       }

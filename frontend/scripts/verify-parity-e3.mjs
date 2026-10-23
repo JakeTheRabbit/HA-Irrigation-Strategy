@@ -10,8 +10,9 @@
  * - step 2: the precheck says nothing stops a prime (its time outside the live list); a 2 s mouse hold on "Hold to prime" records
  *   pump_prime {room_id, pump: part_b, seconds: 30} then pump_stop {room_id, pump: part_b}, and
  *   "Line is full, next" goes on;
- * - step 3: "Stop the run" right after holding "Run 30 s" gets a 0 s report, "The run did not
- *   run: … Hold Run again." and the Run button back; holding it again records pump_calibrate {seconds: 30}, shows "Waiting for the
+ * - step 3: "Stop the run" right after holding "Run 30 s" closes the session before the controller
+ *   takes it (as dosing_api.py does): "The run was cancelled before the controller started it. Hold
+ *   Run again.", Back enabled and the Run button back; holding it again records pump_calibrate {seconds: 30}, shows "Waiting for the
  *   controller to report the run…" with the drawing saying "Asked Part B to run 30 s" (1440), then step 4 when the run is reported;
  * - step 4: 150 mL → "150 mL in 30 s = 300 mL/min"; "Next: review and save";
  * - step 5: "Save 300 mL/min" commits {session_id, measured_ml: 150} and shows "Written and read
@@ -89,11 +90,12 @@ await runParity({
     region("prime");
     await page.getByRole("button", { name: "Line is full, next" }).click();
 
-    // Step 3: a run stopped before the controller takes it reports 0 s, and Run comes back.
+    // Step 3: a run stopped before the controller takes it is closed, not reported; Run comes back.
     await hold(page, page.getByRole("button", { name: /^Run 30 s/ }), 1900);
     await page.getByRole("button", { name: "Stop the run" }).click();
-    await page.getByText("The run did not run: stopped before the controller started it. Hold Run again.").waitFor();
+    await page.getByText("The run was cancelled before the controller started it. Hold Run again.").waitFor();
     await page.getByRole("button", { name: /^Run 30 s/ }).waitFor();
+    assert.ok(await page.getByRole("button", { name: "Back" }).isEnabled(), `${label}: Back after a cancelled run`);
     region("run stopped before it started");
     // Hold Run 30 s past its 1.5 s confirm; the drawing says it was asked for, not that it runs.
     await hold(page, page.getByRole("button", { name: /^Run 30 s/ }), 1900);
@@ -102,7 +104,7 @@ await runParity({
     region("run");
     await page.getByRole("heading", { name: "How much did it pull?" }).waitFor({ timeout: 15_000 });
     const runs = (await calls(page)).filter((c) => c.action === "pump_calibrate");
-    assert.equal(runs.length, 2, `${label}: run again after a 0 s run`);
+    assert.equal(runs.length, 2, `${label}: run again after a cancelled run`);
     const run = runs[1];
     assert.deepEqual(run?.data, { room_id: "room:", pump: "part_b", seconds: 30, api: 2 }, `${label}: calibrate data`);
 

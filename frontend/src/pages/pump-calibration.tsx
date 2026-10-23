@@ -31,6 +31,7 @@ import {
   pumpHistory,
   pumpMotion,
   rateSentence,
+  runGone,
   runState,
   wearNote,
   type CalibrationPump,
@@ -53,7 +54,8 @@ const TITLES = [
 const PRECHECK_MS = 10_000;
 const DOSING_POLL_MS = 2_000;
 type Blockers = PumpPrecheck["blockers"];
-type Load = { state: "loading" } | { state: "missing" } | { state: "error"; message: string } | { state: "ready"; doc: PumpDosingDocument };
+/** `seq` numbers each dosing_get in the order it was sent, so a run is judged only on reads sent after it opened. */
+type Load = { state: "loading" } | { state: "missing" } | { state: "error"; message: string } | { state: "ready"; doc: PumpDosingDocument; seq: number };
 /** The flow number's own value, mL/s, as the integration writes it (4 decimals). */
 const mlS = (mlMin: number) => Math.round((mlMin / 60) * 10_000) / 10_000;
 const writable = (entityId: string) => /^(number|input_number)\./.test(entityId);
@@ -70,9 +72,15 @@ export function PumpCalibration({ controller, navigate, onDirtyChange }: PagePro
   const [pumpId, setPumpId] = useState<string | null>(null);
   const [step, setStep] = useState(1);
   const [precheck, setPrecheck] = useState<{ result: PumpPrecheck; at: number } | null>(null);
+  const [precheckError, setPrecheckError] = useState<string | null>(null);
+  /** The last dosing_get failed while an older answer is still shown. */
+  const [readError, setReadError] = useState<{ message: string; at: number } | null>(null);
   const [priming, setPriming] = useState(false);
   const [prime, setPrime] = useState<{ ok: boolean; heldS: number | null; message: string | null; blockers: Blockers } | null>(null);
-  const [run, setRun] = useState<{ sessionId: string | null; message: string | null; blockers: Blockers; stopping: boolean } | null>(null);
+  /** `from`: the seq of the last dosing_get sent before the run opened. */
+  const [run, setRun] = useState<{ sessionId: string | null; message: string | null; blockers: Blockers; stopping: boolean; from: number } | null>(
+    null,
+  );
   const [measured, setMeasured] = useState("");
   const [saved, setSaved] = useState<{ result: PumpCalibrationResult; receipt: ApplyReceipt; before: number | null } | null>(null);
   /** When the current hold began, and how long the last one lasted (s). */
@@ -80,13 +88,20 @@ export function PumpCalibration({ controller, navigate, onDirtyChange }: PagePro
   const lastHeld = useRef<number | null>(null);
   const latest = useRef(controller);
   latest.current = controller;
+  const readSeq = useRef(0);
 
   const read = useCallback(async () => {
+    const seq = ++readSeq.current;
     const outcome = await callV2<PumpDosingDocument>(latest.current, "dosing_get", { room_id: roomId });
     if (outcome.kind === "missing") setLoad({ state: "missing" });
-    else if (outcome.kind === "error") setLoad((old) => (old.state === "ready" ? old : { state: "error", message: outcome.message }));
-    else if (!outcome.data.catalog) setLoad({ state: "missing" });
-    else setLoad({ state: "ready", doc: outcome.data });
+    else if (outcome.kind === "error") {
+      setReadError({ message: outcome.message, at: Date.now() });
+      setLoad((old) => (old.state === "ready" ? old : { state: "error", message: outcome.message }));
+    } else if (!outcome.data.catalog) setLoad({ state: "missing" });
+    else {
+      setReadError(null);
+      setLoad({ state: "ready", doc: outcome.data, seq });
+    }
     return outcome;
   }, [roomId]);
   useEffect(() => {
@@ -133,8 +148,16 @@ export function PumpCalibration({ controller, navigate, onDirtyChange }: PagePro
       if (heldFrom.current !== null) return;
       const outcome = await callV2<PumpPrecheck>(latest.current, "pump_precheck", { room_id: roomId, pump: pump.id });
       if (!live) return;
-      if (outcome.kind === "ok") setPrecheck({ result: outcome.data, at: Date.now() });
-      else if (outcome.kind === "missing") setLoad({ state: "missing" });
+      if (outcome.kind === "ok") {
+        setPrecheck({ result: outcome.data, at: Date.now() });
+        setPrecheckError(null);
+      } else if (outcome.kind === "missing") setLoad({ state: "missing" });
+      // A failed check leaves the blockers unknown: the button waits for a check that succeeds. Not
+      // while held, as disabling the button mid-hold would stop the prime.
+      else if (heldFrom.current === null) {
+        setPrecheck(null);
+        setPrecheckError(outcome.message);
+      }
     };
     void check();
     const timer = setInterval(() => void check(), PRECHECK_MS);
@@ -150,6 +173,21 @@ export function PumpCalibration({ controller, navigate, onDirtyChange }: PagePro
     const timer = setInterval(() => void read(), DOSING_POLL_MS);
     return () => clearInterval(timer);
   }, [waiting, read]);
+  // A read sent after the run opened that no longer shows its session: the backend closed it (a stop
+  // before the controller took the run, a replacing request, or expiry), so no report will come.
+  const loadSeq = load.state === "ready" ? load.seq : 0;
+  useEffect(() => {
+    if (!run || !runGone(run.sessionId, session, loadSeq > run.from)) return;
+    setRun({
+      sessionId: null,
+      message: run.stopping
+        ? "The run was cancelled before the controller started it. Hold Run again."
+        : "The run ended before the controller reported it: it expired or another request replaced it. Hold Run again.",
+      blockers: [],
+      stopping: false,
+      from: run.from,
+    });
+  }, [run, session, loadSeq]);
   // A run that ran moves on to the measurement.
   useEffect(() => {
     if (step === 3 && ran && ranS !== null && ranS > 0) setStep(4);
@@ -186,10 +224,10 @@ export function PumpCalibration({ controller, navigate, onDirtyChange }: PagePro
 
   const startRun = async () => {
     if (!pump) return;
-    setRun({ sessionId: null, message: null, blockers: [], stopping: false });
+    setRun({ sessionId: null, message: null, blockers: [], stopping: false, from: readSeq.current });
     const outcome = await callV2<PumpCalibrateStart>(latest.current, "pump_calibrate", { room_id: roomId, pump: pump.id, seconds: RUN_SECONDS });
     if (outcome.kind === "ok" && outcome.data.session_id) {
-      setRun({ sessionId: outcome.data.session_id, message: null, blockers: [], stopping: false });
+      setRun({ sessionId: outcome.data.session_id, message: null, blockers: [], stopping: false, from: readSeq.current });
       void read();
       return;
     }
@@ -199,6 +237,7 @@ export function PumpCalibration({ controller, navigate, onDirtyChange }: PagePro
       message: outcome.kind === "error" && !blockers.length ? outcome.message : null,
       blockers,
       stopping: false,
+      from: readSeq.current,
     });
   };
   const stopRun = async () => {
@@ -263,6 +302,7 @@ export function PumpCalibration({ controller, navigate, onDirtyChange }: PagePro
     setMeasured("");
     setSaved(null);
     setPrecheck(null);
+    setPrecheckError(null);
   };
 
   const room = controller.room.room.name;
@@ -318,7 +358,14 @@ export function PumpCalibration({ controller, navigate, onDirtyChange }: PagePro
     saved?.receipt.ok ? `read back ${clock(saved.receipt.at, tz)}` : "write + read back",
   ];
   const primeBlockers = precheck?.result.blockers ?? [];
-  const primeDisabled = admin ?? (primeBlockers.length ? primeBlockers.map((b) => b.message).join(". ") : undefined);
+  // Until a precheck succeeds, what could stop the pump is unknown: no prime.
+  const primeDisabled =
+    admin ??
+    (!precheck
+      ? (precheckError ?? "Checking what could stop the pump")
+      : primeBlockers.length
+        ? primeBlockers.map((b) => b.message).join(". ")
+        : undefined);
   const far = rate !== null ? offBy(rate, nominal ?? previous) : null;
   const farText =
     far !== null && Math.abs(far) > FAR_OFF_PCT
@@ -419,7 +466,14 @@ export function PumpCalibration({ controller, navigate, onDirtyChange }: PagePro
               </p>
               <ul className="pump-cal-checks" aria-label="Before priming" aria-live="polite">
                 {!precheck ? (
-                  <li>Checking what could stop the pump…</li>
+                  precheckError ? (
+                    <li className="is-bad">
+                      <X aria-hidden />
+                      Could not check what could stop the pump: {precheckError}. Trying again every {PRECHECK_MS / 1000} s.
+                    </li>
+                  ) : (
+                    <li>Checking what could stop the pump…</li>
+                  )
                 ) : primeBlockers.length ? (
                   primeBlockers.map((b) => (
                     <li key={b.code} className="is-bad">
@@ -439,7 +493,7 @@ export function PumpCalibration({ controller, navigate, onDirtyChange }: PagePro
               {hold && (
                 <HoldButton
                   mode="while-held"
-                  label={primeLabel(priming, prime?.ok)}
+                  label={primeLabel(pump.name, priming, prime?.ok)}
                   srLabel={`Runs ${pump.name} only while held, at most ${PRIME_SECONDS} s.`}
                   maxSeconds={PRIME_SECONDS}
                   disabledReason={primeDisabled}
@@ -477,6 +531,11 @@ export function PumpCalibration({ controller, navigate, onDirtyChange }: PagePro
                 {waiting ? (
                   <>
                     <span>Waiting for the controller to report the run…</span>
+                    {readError && (
+                      <span className="is-bad">
+                        Reading the run failed at {clock(readError.at, tz)}: {readError.message}. Still trying.
+                      </span>
+                    )}
                     <Button variant="outline" size="sm" disabled={run?.stopping} onClick={() => void stopRun()}>
                       {run?.stopping ? "Stopping…" : "Stop the run"}
                     </Button>
@@ -618,7 +677,7 @@ function WearSpark({ history, name }: { history: { at: number; mlMin: number }[]
   );
 }
 
-/** The pump drawn beside its stock bottle; it turns only while an accepted prime runs. */
+/** The pump drawn beside its stock bottle, idle: the controller reports nothing that says it turns. */
 function PumpVisual({
   pump,
   motion,
@@ -626,7 +685,7 @@ function PumpVisual({
   states,
 }: {
   pump: CalibrationPump;
-  motion: { active: boolean; text: string };
+  motion: string;
   prefix: string;
   states: PageProps["controller"]["states"];
 }) {
@@ -635,9 +694,9 @@ function PumpVisual({
     <aside className="pump-cal-visual" aria-label={`${pump.name} pump`}>
       <div className="pump-cal-rig">
         {tank && <StockBottle tank={tank} state={stockState(tank)} label={`${tank.name} stock`} />}
-        <PeristalticPump state={motion.active ? "dosing" : "idle"} label={motion.active ? `${pump.name} running` : `${pump.name} idle`} />
+        <PeristalticPump state="idle" label={`${pump.name} idle`} />
       </div>
-      <p>{motion.text}</p>
+      <p>{motion}</p>
     </aside>
   );
 }
