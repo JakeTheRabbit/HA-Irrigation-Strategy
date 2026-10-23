@@ -344,6 +344,38 @@ export function groupByDay(entries: ChangeEntry[], tz: string, now: number): { k
   return [...days.values()];
 }
 
+/** The backend judges only the learner's and the AI judge's changes (changes.py WRITERS). */
+const JUDGED = new Set(["learner", "ai"]);
+/** "What happened next": the backend's judgement, or why there is none. */
+export function nextText(entry: ChangeEntry): string {
+  if (entry.outcome) return entry.outcome;
+  if (!JUDGED.has(entry.actor)) return "Only learner and AI judge changes are judged afterwards.";
+  return "Not judged yet.";
+}
+
+/** The setting's value now, in words, when it has moved since the change; else null. */
+export function liveValue(entry: ChangeEntry, states: States, words: ChangeWords): string | null {
+  const entity = entry.entityId ? states[entry.entityId] : undefined;
+  const value = entity && entity.state.trim() !== "" ? Number(entity.state) : NaN;
+  if (!entity || !entry.key || typeof entry.newValue !== "number" || !Number.isFinite(value)) return null;
+  const step = Number(entity.attributes?.step);
+  return sameValue(entity.state, entry.newValue, Number.isFinite(step) ? step : undefined) ? null : words.value(entry.key, value, entry.roomId);
+}
+
+const WEEK_MS = 7 * 86_400_000;
+/** The week before what is shown: up to `since`, or up to the oldest row shown when the read was
+ * cut short at the newest rows. */
+export function olderRange(shown: ChangeEntry[], since: number, truncated: boolean): { since: number; until: number } {
+  const oldest = shown.reduce((min, e) => Math.min(min, e.at), Infinity);
+  return { since: since - WEEK_MS, until: truncated && Number.isFinite(oldest) ? oldest : since };
+}
+
+/** Older rows appended to the shown ones, each once, newest first. */
+export function mergeEntries(shown: ChangeEntry[], older: ChangeEntry[]): ChangeEntry[] {
+  const ids = new Set(shown.map((e) => e.id));
+  return [...shown, ...older.filter((e) => !ids.has(e.id))].sort((a, b) => b.at - a.at);
+}
+
 /** How many entries each value of a field has. */
 export function countBy<K extends "actor" | "kind">(entries: ChangeEntry[], field: K): Map<string, number> {
   const out = new Map<string, number>();

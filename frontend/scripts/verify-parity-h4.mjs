@@ -14,6 +14,8 @@
  * - choosing an entry fills the SELECTED CHANGE panel (its label, Why, What happened next);
  * - "Revert to 3.5%" puts it back: the receipt reads "Written and read back HH:MM" and a toast
  *   with Undo appears; Undo writes the value back ("Previous value written back");
+ * - on a phone the selected row shows the panel's Revert button only, not its own;
+ * - "Show the 7 days before" appends the older week (the change 9 days back appears);
  * - #/history/changes?actor=ai opens with AI judge pressed and only AI judge entries;
  * - on #/plan/targets the clock button of a [data-setting-row] opens its popover (only the clock
  *   button is asserted).
@@ -91,10 +93,17 @@ await runParity({
     assert.match(await panel.locator(".changes-panel-title").innerText(), /^Maintenance shot size$/, `${label}: panel title`);
     assert.match(await panel.locator("[data-why]").innerText(), /^Pore EC is over its band/, `${label}: why`);
     assert.ok((await panel.locator("[data-next]").innerText()).length > 0, `${label}: what happened next`);
+    // Each fact once: a phone's selected row drops its own Revert button for the panel's.
+    assert.equal(
+      await page.locator(`[data-change="${id}"] > [data-revert]`).count(),
+      width > 720 ? 1 : 0,
+      `${label}: one Revert button for the selected row`,
+    );
     region("selected change");
 
     // Revert to 3.5%: receipt, then a toast with Undo.
-    const revert = width > 720 ? panel.getByRole("button", { name: "Revert to 3.5%" }) : row.locator("[data-revert]");
+    // The panel carries the put-back (on a phone it opens under the row, which drops its own button).
+    const revert = panel.getByRole("button", { name: "Revert to 3.5%" });
     await revert.click();
     const receipt = panel.locator("[data-receipt]");
     await receipt.waitFor();
@@ -105,6 +114,12 @@ await runParity({
     await toast.getByRole("button", { name: "Undo" }).click();
     await panel.getByText(new RegExp(`Previous value written back ${HHMM}`)).waitFor();
     region("undo");
+
+    // The 7 days before: only that week is read, and its rows are appended to those shown.
+    const shownBefore = await page.locator("[data-change]").count();
+    await page.locator("[data-load-older]").click();
+    await page.waitForFunction((n) => document.querySelectorAll("[data-change]").length > n, shownBefore);
+    region("older week appended");
 
     // The address opens filtered.
     const url = new URL(page.url());
@@ -134,4 +149,4 @@ await runParity({
     await page.locator(`[data-selected-change="${id}"]`).waitFor({ timeout: 20_000 });
   },
 });
-console.log("PASS: H4 changes (scope, counts, Learner chip + actor=, kind chips, selected change, Revert to 3.5% receipt + toast + Undo, ?actor=ai, setting clock popover; 3.17 from the setting log)");
+console.log("PASS: H4 changes (scope, counts, Learner chip + actor=, kind chips, selected change, Revert to 3.5% receipt + toast + Undo, one Revert per selected row, older week appended, ?actor=ai, setting clock popover; 3.17 from the setting log)");

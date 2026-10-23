@@ -13,10 +13,15 @@ import {
   countBy,
   fromSetpointLog,
   groupByDay,
+  liveValue,
+  mergeEntries,
+  nextText,
+  olderRange,
   revertChange,
   toEntries,
   undoRevert,
   type ChangeEntry,
+  type ChangeWords,
   type ChangesQuery,
   type SetpointLogRow,
 } from "@/lib/changes";
@@ -75,7 +80,15 @@ export function Changes({ controller }: PageProps) {
   const [feed, setFeed] = useState<Feed>({ state: "loading", entries: [] });
   const [tick, setTick] = useState(0);
   const reload = useCallback(() => setTick((n) => n + 1), []);
+  // Each whole read bumps the generation, so an older week read before it is dropped. `extended`
+  // is the `since` an older week moved the address to: its rows are already appended.
+  const generation = useRef(0);
+  const extended = useRef<number | null>(null);
   useEffect(() => {
+    const appended = extended.current === since;
+    extended.current = null;
+    if (appended) return;
+    generation.current += 1;
     let current = true;
     setFeed((previous) => ({ state: "loading", entries: previous.entries, backend: "backend" in previous ? previous.backend : undefined }));
     void loadChanges(controller, { since, until, scope }, wordsRef.current).then((next) => {
@@ -136,13 +149,27 @@ export function Changes({ controller }: PageProps) {
     }
   };
 
-  // Scrolling to the end of the list reads the 7 days before it, while a week still adds some.
+  // Scrolling to the end of the list reads the 7 days before it, while a week still adds some. Only
+  // that week is read, and its rows are appended.
   const sentinel = useRef<HTMLDivElement>(null);
   const auto = useRef({ before: -1, on: true });
-  const older = useCallback(() => {
-    auto.current.before = entries.length;
-    update({ since: new Date(since - WEEK).toISOString() });
-  }, [entries.length, since, update]);
+  const readOlder = useRef(() => {});
+  readOlder.current = () => {
+    if (feed.state !== "ready") return;
+    const shown = feed;
+    const range = olderRange(shown.entries, since, shown.truncated);
+    const asked = generation.current;
+    auto.current.before = shown.entries.length;
+    setFeed({ state: "loading", backend: shown.backend, entries: shown.entries });
+    void loadChanges(latest.current, { ...range, scope }, wordsRef.current).then((next) => {
+      if (asked !== generation.current) return;
+      if (next.state !== "ready") return setFeed({ ...next, entries: shown.entries });
+      setFeed({ ...next, entries: mergeEntries(shown.entries, next.entries), truncated: shown.truncated || next.truncated });
+      extended.current = range.since;
+      update({ since: new Date(range.since).toISOString() });
+    });
+  };
+  const older = useCallback(() => readOlder.current(), []);
   useEffect(() => {
     if (feed.state === "ready" && auto.current.before >= 0)
       auto.current = { before: -1, on: feed.entries.length > auto.current.before };
@@ -169,6 +196,7 @@ export function Changes({ controller }: PageProps) {
   const panel = (entry: ChangeEntry | null) => (
     <SelectedChange
       controller={controller}
+      words={words}
       entry={entry}
       revert={entry && revert?.id === entry.id ? revert.state : { phase: "idle" }}
       onRevert={putBack}
@@ -266,7 +294,7 @@ export function Changes({ controller }: PageProps) {
                 No changes in this period.
               </p>
             )}
-            {groupByDay(shown, controller.timeZone, opened).map((day) => (
+            {groupByDay(shown, controller.timeZone, Date.now()).map((day) => (
               <section key={day.key} className="changes-day" aria-label={day.title}>
                 <h2 className="changes-day-title">{day.title}</h2>
                 <ol className="changes-list">
@@ -296,8 +324,12 @@ export function Changes({ controller }: PageProps) {
                           )}
                         </span>
                       </button>
-                      <RevertButton entry={entry} state={revert?.id === entry.id ? revert.state : undefined} onRevert={putBack} />
-                      {narrow && entry.id === selected?.id && panel(entry)}
+                      {narrow && entry.id === selected?.id ? (
+                        // On a phone the panel opens under the row and carries the put-back.
+                        panel(entry)
+                      ) : (
+                        <RevertButton entry={entry} state={revert?.id === entry.id ? revert.state : undefined} onRevert={putBack} />
+                      )}
                     </li>
                   ))}
                 </ol>
@@ -364,7 +396,8 @@ function Diff({ entry }: { entry: ChangeEntry }) {
       {entry.before && (
         <>
           <s>{entry.before}</s>
-          <span aria-label="to"> → </span>
+          <span aria-hidden="true"> → </span>
+          <span className="sr-only"> to </span>
         </>
       )}
       <b>{entry.after}</b>
@@ -400,6 +433,7 @@ function RevertButton({
  * and putting it back. */
 function SelectedChange({
   controller,
+  words,
   entry,
   revert,
   onRevert,
@@ -407,6 +441,7 @@ function SelectedChange({
   onReload,
 }: {
   controller: Controller;
+  words: ChangeWords;
   entry: ChangeEntry | null;
   revert: ApplyState;
   onRevert(entry: ChangeEntry): void;
@@ -440,11 +475,11 @@ function SelectedChange({
       <p className="muted">
         {entry.scope} · {KIND_LABEL[entry.kind]}
       </p>
-      <WasNow controller={controller} entry={entry} />
+      <WasNow controller={controller} entry={entry} words={words} />
       <h4 className="changes-kicker">Why</h4>
       <p data-why>{entry.reason ?? "No reason was recorded with this change."}</p>
       <h4 className="changes-kicker">What happened next</h4>
-      <p data-next>{entry.outcome ?? "Nothing was measured after this change."}</p>
+      <p data-next>{nextText(entry)}</p>
       <div className="changes-panel-foot">
         <RevertStatus entry={entry} state={revert} timeZone={tz} onUndo={onUndo} onReload={onReload} />
         {entry.revertible ? (
@@ -462,7 +497,7 @@ function SelectedChange({
 }
 
 /** Was and now on the setting's own range, where the setting has one. */
-function WasNow({ controller, entry }: { controller: Controller; entry: ChangeEntry }) {
+function WasNow({ controller, entry, words }: { controller: Controller; entry: ChangeEntry; words: ChangeWords }) {
   const attributes = entry.entityId ? controller.states[entry.entityId]?.attributes : undefined;
   const min = Number(attributes?.min);
   const max = Number(attributes?.max);
@@ -471,6 +506,8 @@ function WasNow({ controller, entry }: { controller: Controller; entry: ChangeEn
   const bar =
     typeof was === "number" && typeof now === "number" && Number.isFinite(min) && Number.isFinite(max) && max > min;
   if (!entry.before && !entry.after && !entry.limits) return null;
+  // "Now" is the change's value only while the setting still holds it.
+  const live = liveValue(entry, controller.states, words);
   const at = (value: number) => `${Math.min(100, Math.max(0, ((value - min) / (max - min)) * 100))}%`;
   return (
     <div className="changes-wasnow">
@@ -492,7 +529,12 @@ function WasNow({ controller, entry }: { controller: Controller; entry: ChangeEn
         )}
         {entry.after && (
           <span className="changes-now">
-            Now <b>{entry.after}</b>
+            {live ? "Set to" : "Now"} <b>{entry.after}</b>
+          </span>
+        )}
+        {live && (
+          <span data-live>
+            Now <b>{live}</b>
           </span>
         )}
         {entry.limits && <span className="muted changes-limits">{entry.limits}</span>}

@@ -7,10 +7,15 @@ import {
   fromSetpointLog,
   revertChange,
   groupByDay,
+  liveValue,
+  mergeEntries,
+  nextText,
+  olderRange,
   toEntries,
   type ChangeWords,
 } from "./changes";
 import { setDisplayUnits } from "./display-units";
+import { parityDemo } from "./parity-demo";
 import type { HistoryChange } from "./parity-types";
 import type { States } from "./types";
 
@@ -180,5 +185,48 @@ describe("changes", () => {
     const utc = groupByDay(entries, "UTC", now);
     expect(utc.map((d) => d.title)).toEqual(["Today · Thu 22 Oct", "Yesterday · Wed 21 Oct", "Mon 19 Oct"]);
     expect(utc.map((d) => d.entries.map((e) => e.id))).toEqual([["a"], ["b", "c"], ["d"]]);
+  });
+
+  it("what happened next says which changes are judged at all", () => {
+    const [learner, manual, judged] = toEntries(
+      [
+        change({ id: "a", actor: "learner", ts: "2026-10-22T13:00:00Z" }),
+        change({ id: "b", actor: "manual", ts: "2026-10-22T12:00:00Z" }),
+        change({ id: "c", actor: "ai", outcome: "Dryback came back into its band.", ts: "2026-10-22T11:00:00Z" }),
+      ],
+      words,
+    );
+    expect(nextText(learner)).toBe("Not judged yet.");
+    expect(nextText(manual)).toBe("Only learner and AI judge changes are judged afterwards.");
+    expect(nextText(judged)).toBe("Dryback came back into its band.");
+  });
+
+  it("the setting's live value shows only when it has moved since the change", () => {
+    const [entry] = toEntries([change({})], words);
+    expect(liveValue(entry, states, words)).toBe(null);
+    const moved = { ...states, "number.crop_steering_zone_2_p2_shot_size": state(5.2, "%") } as unknown as States;
+    expect(liveValue(entry, moved, words)).toBe("5.2%");
+    const gone = { ...states, "number.crop_steering_zone_2_p2_shot_size": { ...state(0, "%"), state: "unavailable" } } as unknown as States;
+    expect(liveValue(entry, gone, words)).toBe(null);
+  });
+
+  it("older weeks read only the week before what is shown, and append", () => {
+    const since = Date.parse("2026-10-16T00:00:00Z");
+    const week = 7 * 86_400_000;
+    const shown = toEntries([change({ id: "a", ts: "2026-10-20T00:00:00Z" }), change({ id: "b", ts: "2026-10-18T00:00:00Z" })], words);
+    expect(olderRange(shown, since, false)).toEqual({ since: since - week, until: since });
+    // A truncated read stops short of `since`: read on from the oldest row shown.
+    expect(olderRange(shown, since, true)).toEqual({ since: since - week, until: Date.parse("2026-10-18T00:00:00Z") });
+    const older = toEntries([change({ id: "b", ts: "2026-10-18T00:00:00Z" }), change({ id: "c", ts: "2026-10-10T00:00:00Z" })], words);
+    expect(mergeEntries(shown, older).map((e) => e.id)).toEqual(["a", "b", "c"]);
+  });
+
+  it("the demo's Journal fixture rows can't be put back: only the demo's own writes can", async () => {
+    const now = Date.parse("2026-10-22T14:00:00Z");
+    const answer = (await parityDemo("history_changes", { since: new Date(now - 7 * 86_400_000).toISOString() }, now, "3.18")) as {
+      data: { changes: HistoryChange[] };
+    };
+    expect(answer.data.changes.length).toBeGreaterThan(0);
+    expect(answer.data.changes.filter((c) => c.revertible)).toEqual([]);
   });
 });

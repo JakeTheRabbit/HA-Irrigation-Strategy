@@ -167,7 +167,9 @@ function allChanges(data: Record<string, unknown>, rooms: string[], now: number,
         reason: (e.data.reason as string) ?? null,
         outcome: e.source.actor === "learner" ? "Too soon to judge — check after the next lights-on." : null,
         limits: e.source.actor === "learner" ? { writer: "learner", min: 50, max: 65, step_scope: "zone" } : null,
-        revertible: e.kind !== "calibration.committed",
+        // The demo writes nothing for its Journal fixture, so putting one back would claim a write
+        // that never happened: only the demo's own writes this session (above) can be put back.
+        revertible: false,
         user_id: e.source.user_id ?? null, user_name: e.source.actor === "manual" ? "Ben" : null,
       })),
     ].sort((a, b) => Date.parse(b.ts) - Date.parse(a.ts));
