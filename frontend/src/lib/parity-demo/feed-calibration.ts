@@ -78,17 +78,16 @@ export class FeedCalibrationDemo {
     private now: () => number = Date.now,
   ) {}
 
-  /** Every session this demo opened, ended ones included: a step on one that ended is EXPIRED. */
-  private opened = new Set<string>();
   /** Whether this Journal event is one of the demo's calibration commits. */
   owns(eventId: string) {
     return this.events.has(eventId);
   }
-  /** Whether the call is this demo's: a start or revert naming a feed probe, a step on a session it
-   * opened. Anything else falls through to Task 3's plain answers. */
+  /** Whether the call is this demo's: a start or revert naming a feed probe, or any step on a session.
+   * A session it does not hold (ended, or opened before a reload, as sessions end on an integration
+   * restart) is EXPIRED, never Task 3's plain answer. */
   handles(action: string, data: Record<string, unknown>) {
     if (action === "calibration_start" || action === "calibration_revert") return typeof data.probe === "string" && data.probe in PROBES;
-    return this.opened.has(String(data.session_id));
+    return typeof data.session_id === "string";
   }
 
   call(action: string, data: Record<string, unknown>): unknown {
@@ -172,7 +171,6 @@ export class FeedCalibrationDemo {
       sim: { from: raw, to: READS[kind][0], since: now },
     };
     this.sessions.set(session.id, session);
-    this.opened.add(session.id);
     this.tick();
     return ok(
       {

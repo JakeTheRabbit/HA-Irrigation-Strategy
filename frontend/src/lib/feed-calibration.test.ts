@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { createDemo } from "./demo";
 import { OperatorDemo } from "./operator-demo";
 import { demoParityStatus } from "./parity-demo/status";
-import { callV2 } from "./parity-api";
+import { callV2, type V2Outcome } from "./parity-api";
 import type { States } from "./types";
 import { revertEvents } from "./undo";
 import {
@@ -10,6 +10,8 @@ import {
   dueLine,
   dueState,
   forcedLine,
+  appliedRecord,
+  confirmStored,
   isApplied,
   looksSteady,
   proofLine,
@@ -133,7 +135,7 @@ describe("forcedLine", () => {
 });
 
 describe("refusalView", () => {
-  it("expired session restarts from buffer 1", () => {
+  it("an expired session reads as expired, with the start-again words", () => {
     const v = refusalView({ kind: "error", code: "invalid", message: "Calibration session expired. Start again." });
     expect(v).toEqual({
       kind: "expired",
@@ -210,8 +212,63 @@ describe("proofLine and isApplied", () => {
     expect(proofLine(states, "", "feed_ph", 4, result, 2)?.text).toBe("Now reads 4.00 in pH 4.00 buffer");
     states["sensor.crop_steering_feed_ph_corrected"].state = "4.2";
     expect(proofLine(states, "", "feed_ph", 4, result, 2)).toEqual({ text: "Now reads 4.20 in pH 4.00 buffer", ok: false });
-    expect(isApplied({ records: [{ id: "r1", probe: "feed_ph", applied: true }] }, "r1")).toBe(true);
-    expect(isApplied({ records: [{ id: "r1", probe: "feed_ph", applied: false }] }, "r1")).toBe(false);
+    const sensors = { feed_ph: "sensor.tank_ph", feed_ec: null };
+    expect(isApplied({ sensors, records: [{ id: "r1", probe: "feed_ph", applied: true, entity_id: "sensor.tank_ph" }] }, "r1")).toBe(true);
+    expect(isApplied({ sensors, records: [{ id: "r1", probe: "feed_ph", applied: false, entity_id: "sensor.tank_ph" }] }, "r1")).toBe(false);
+  });
+  it("a calibration of a sensor the room no longer maps is not in force (calibration.py applied())", () => {
+    const records = [
+      { id: "r2", probe: "feed_ph", applied: true, entity_id: "sensor.old_ph" },
+      { id: "r1", probe: "feed_ph", applied: false, entity_id: "sensor.tank_ph" },
+    ];
+    const remapped = { sensors: { feed_ph: "sensor.tank_ph", feed_ec: null }, records };
+    expect(isApplied(remapped, "r2")).toBe(false);
+    expect(appliedRecord(remapped, "feed_ph")).toBeNull();
+    const same = { sensors: { feed_ph: "sensor.old_ph", feed_ec: null }, records };
+    expect(isApplied(same, "r2")).toBe(true);
+    expect(appliedRecord(same, "feed_ph")?.id).toBe("r2");
+  });
+});
+
+describe("confirmStored", () => {
+  const stored = {
+    session_id: "s1",
+    expires_at: "2026-10-23T02:30:00Z",
+    step: 3,
+    room_id: "room:",
+    probe: "feed_ph",
+    kind: "ph",
+    solutions: [7, 4],
+    raw_entity_id: "sensor.demo_tank_ph",
+    temperature_entity_id: null,
+    dosing_paused: true,
+    points: [7.04, null],
+  } as StoredSession;
+  const ok = (expires_at: string): V2Outcome<{ expires_at: string }> => ({
+    kind: "ok",
+    data: { expires_at },
+    revision: null,
+    readback: { status: "unverified", at: null },
+    eventIds: [],
+  });
+  it("holds the stored session only while the integration still has it, with the integration's end time", () => {
+    expect(confirmStored(stored, ok("2026-10-23T02:41:00Z"))).toEqual({
+      held: { ...stored, expires_at: "2026-10-23T02:41:00Z" },
+      clear: false,
+    });
+  });
+  it("ended on the integration (restart, undo, another device): forgets it", () => {
+    expect(confirmStored(stored, { kind: "error", code: "invalid", message: "Calibration session expired. Start again." })).toEqual({
+      held: null,
+      clear: true,
+    });
+    expect(confirmStored(stored, { kind: "missing" })).toEqual({ held: null, clear: true });
+  });
+  it("unconfirmed (no answer): claims nothing but keeps it to ask again", () => {
+    expect(confirmStored(stored, { kind: "error", code: "unavailable", message: "Home Assistant did not answer" })).toEqual({
+      held: null,
+      clear: false,
+    });
   });
 });
 
@@ -290,6 +347,18 @@ describe("the demo integration", () => {
     expect(isApplied((await read()).data, commit.data.record_id)).toBe(false);
     // Undoing twice is refused: the calibration in force is no longer this one.
     await expect(revertEvents(controller, commit.eventIds)).rejects.toThrow(/changed/);
+  });
+  it("a stored session the integration does not hold (after a restart) is expired, never confirmed", async () => {
+    let states = createDemo(Date.now());
+    const demo = new OperatorDemo(
+      () => states,
+      (next) => (states = next),
+    );
+    const controller = { operator: <T,>(action: string, data: Record<string, unknown> = {}) => demo.call<T>(action as never, data) };
+    for (const action of ["calibration_status", "calibration_capture", "calibration_commit", "calibration_abandon"]) {
+      const outcome = await callV2(controller, action as never, { session_id: "feed-cal-before-restart", point: 0 });
+      expect(outcome.kind === "error" && refusalView(outcome).kind).toBe("expired");
+    }
   });
   it("abandon ends the session; a later step finds it expired", async () => {
     let states = createDemo(Date.now());

@@ -197,9 +197,32 @@ export function dueLine(dueAt: number, now: number, tz: string): { text: string;
   return { text: left <= 0 ? "Due today" : `Due in ${left} ${left === 1 ? "day" : "days"}`, overdue: false };
 }
 
-/** Whether calibration_get holds record `recordId` as the one applied. */
-export function isApplied(doc: { records?: { id: string; probe?: string; applied?: boolean }[] } | null | undefined, recordId: string): boolean {
-  return !!doc?.records?.some((r) => r.id === recordId && r.applied === true);
+type AppliedDoc = {
+  sensors?: Partial<Record<FeedProbe, string | null>>;
+  records?: { id: string; probe?: string; applied?: boolean; entity_id?: string | null }[];
+};
+/** calibration.py `applied()`: applied, and of the sensor the room's setup names now (a calibration of
+ * a probe since remapped is not applied to the new one). */
+const inForce = (doc: AppliedDoc, r: NonNullable<AppliedDoc["records"]>[number]) =>
+  r.applied === true && !!r.probe && r.entity_id === doc.sensors?.[r.probe as FeedProbe];
+/** The probe's calibration in force, or null. */
+export function appliedRecord<D extends AppliedDoc>(doc: D | null | undefined, probe: FeedProbe): NonNullable<D["records"]>[number] | null {
+  return doc?.records?.find((r) => r.probe === probe && inForce(doc, r)) ?? null;
+}
+/** Whether calibration_get holds record `recordId` as the one in force. */
+export function isApplied(doc: AppliedDoc | null | undefined, recordId: string): boolean {
+  return !!doc?.records?.some((r) => r.id === recordId && inForce(doc, r));
+}
+
+/** A stored session checked with calibration_status: held (with the integration's end time) only while
+ * the integration still has it. Ended there (EXPIRED: a restart, an Undo or a commit elsewhere) or no
+ * guided calibration: forget it. No answer: claim nothing, keep it to ask again. */
+export function confirmStored(
+  stored: StoredSession,
+  outcome: V2Outcome<{ expires_at: string }>,
+): { held: StoredSession | null; clear: boolean } {
+  if (outcome.kind === "ok") return { held: { ...stored, expires_at: outcome.data.expires_at }, clear: false };
+  return { held: null, clear: outcome.kind === "missing" || refusalView(outcome).kind === "expired" };
 }
 
 /** A reading or buffer in the probe's unit: pH as "4.00 pH"-less digits, EC in the display unit. */

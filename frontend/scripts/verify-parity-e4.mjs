@@ -16,13 +16,17 @@
  *   buffer 2 the same ("Captured 4.09"); the result reads "Probe reads 0.04 pH high. Response 98.3% —
  *   healthy." with Pass marked; Apply calibration gives "Written and read back 14:1x" and the proof
  *   "Now reads 4.00 in pH 4.00 buffer ✓"; Undo writes the previous calibration back.
- * - The Room A pH card reads "last calibrated <date>" and "Overdue since <date>", as the demo's
+ * - The Room A pH card reads "last checked <date>" and "Overdue since <date>", as the demo's
  *   calibration_due sensor says (calibration.py due(): the newest record that did not fail).
  * - Desktop, after Undo: "Calibrate the other probe", Start, then Back abandons the session (no Resume
  *   card, footer "Step 1 of 5" with no pause); Start again, 31 min later the status poll finds it
  *   expired: "Your last calibration session expired" and the footer no longer says dosing is paused.
+ *   Start again, then reload (the demo integration restarts, as an HA restart ends sessions): the
+ *   stored session is checked with calibration_status, found expired, not offered, no pause claimed.
  * - Phone: ✕ goes back to Feed & dosing; ✕ mid-session abandons it (back on the page: step 1, no
- *   Resume card, no "dosing paused").
+ *   Resume card, no "dosing paused"). Then a failed check: buffer 2 captured before the probe moved
+ *   (clock paused) grades Fail; "Record the failed check" brings back step 1 with the integration's own
+ *   "recorded but not applied" words, Start calibration enabled and no pause claimed.
  * - 3.17: the v1 two-point check form ("Feed probe calibration") under one Needs integration note.
  * - Both: Equipment › Probes & offsets shows the link "Feed pH and EC probes: Calibrate →".
  * Only requests to the page's own origin are made (the harness fails any other). */
@@ -73,7 +77,7 @@ await runParity({
     );
     assert.equal(await cards.first().getAttribute("aria-checked"), "true");
     const phCard = await cards.first().innerText();
-    assert.match(phCard, /last calibrated \d{1,2} \w{3}/, `${label}: pH card last calibrated`);
+    assert.match(phCard, /last checked \d{1,2} \w{3}/, `${label}: pH card last checked`);
     assert.match(phCard, /Overdue since \d{1,2} \w{3}/, `${label}: pH card overdue as calibration_due`);
     region("choose probe");
     region("probe due as calibration_due");
@@ -173,6 +177,26 @@ await runParity({
       assert.equal(await page.locator(".feed-cal-phonebar p").innerText(), "Equipment · step 1 of 5", `${label}: no pause after close`);
       assert.equal(await main.locator(".feed-cal-resume").count(), 0, `${label}: no resume after close`);
       region("phone close abandons");
+
+      // A failed check: buffer 2 captured while the probe still reads buffer 1 (the clock paused, so
+      // it has not moved yet) grades Fail. Recording it shows the integration's words on step 1.
+      await foot.getByRole("button", { name: "Start calibration" }).click();
+      await settle("7.00", "7.04");
+      await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 50);
+      await foot.getByRole("button", { name: "Next: rinse, into 4.00" }).click();
+      const second = foot.locator(".feed-cal-next");
+      assert.equal(await second.innerText(), "Capture 4.00 point", `${label}: buffer 2 capture before the probe moves`);
+      await second.click();
+      await main.locator(".feed-cal-status").getByText(/^Captured /).waitFor();
+      await foot.getByRole("button", { name: "Next: see the result" }).click();
+      assert.equal(await main.locator('.feed-cal-grades li[aria-current="true"]').innerText(), "Fail");
+      await main.getByRole("button", { name: "Record the failed check" }).click();
+      await main.locator(".feed-cal-bad").getByText(/It is recorded but not applied/).waitFor();
+      assert.equal(await page.locator(".feed-cal-phonebar p").innerText(), "Equipment · step 1 of 5", `${label}: step 1 after fail`);
+      assert.ok(await foot.getByRole("button", { name: "Start calibration" }).isEnabled(), `${label}: start again after fail`);
+      region("failed check recorded");
+      // axe and the screenshot wait on timers.
+      await page.clock.resume();
     } else {
       // Back from buffer 1 abandons the session.
       await main.getByRole("button", { name: "Calibrate the other probe" }).click();
@@ -190,6 +214,19 @@ await runParity({
       await main.getByText("Your last calibration session expired. Start again from buffer 1.", { exact: true }).waitFor();
       assert.equal(await foot.locator(".feed-cal-count").innerText(), "Step 2 of 5", `${label}: no pause after expiry`);
       region("expiry releases the pause");
+      // A session the integration no longer holds (the reload restarts the demo integration, as an
+      // HA restart ends every session) is not offered and no pause is claimed, though this browser
+      // stored it.
+      await main.getByRole("button", { name: "Start again" }).click();
+      await foot.locator(".feed-cal-count").getByText(/^Step 2 of 5 · dosing for Room A paused$/).waitFor();
+      assert.ok(await page.evaluate(() => !!sessionStorage.getItem("crop-steering.cal-session")), `${label}: session stored`);
+      await page.reload();
+      await main.locator("[data-feed-probe]").first().waitFor();
+      await page.clock.runFor(6_000);
+      assert.equal(await main.locator(".feed-cal-resume").count(), 0, `${label}: no resume for a session the integration lost`);
+      assert.equal(await foot.locator(".feed-cal-count").innerText(), "Step 1 of 5", `${label}: no pause claimed after restart`);
+      assert.ok(await page.evaluate(() => !sessionStorage.getItem("crop-steering.cal-session")), `${label}: lost session forgotten`);
+      region("lost session not offered");
     }
   },
 });
