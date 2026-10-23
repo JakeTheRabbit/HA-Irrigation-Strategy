@@ -6,7 +6,8 @@ import type { States } from "./types";
 
 /** The demo integration's pump prime and calibration (dosing_api.py `pump_*`), in memory: a prime
  * is a request a stop ends; a calibration run is reported 3 s after it is asked for (demo time, on
- * the timer so a pinned clock does not stall it), or when stopped; a commit stores the flow and
+ * the timer so a pinned clock does not stall it), or when stopped (0 s if stopped within 1.5 s,
+ * before the controller took it); a commit stores the flow and
  * sets the pump's flow number. Each pump's newest calibration is the flow its flow number holds. */
 
 /** The catalogue as dosing_get serves it (dosing.py PUMP_CATALOG). */
@@ -30,6 +31,8 @@ const SEEDS: Record<string, { model: PumpModel; solution: SolutionType; days: nu
   cleaner: { model: { catalog_id: "other", dial: null }, solution: "additive", days: [] },
 };
 const RUN_MS = 3000;
+/** A run stopped this soon after it was asked for never started: the controller reports 0 s. */
+const PICKUP_MS = 1500;
 const DAY = 86_400_000;
 const round = (value: number, digits: number) => Math.round(value * 10 ** digits) / 10 ** digits;
 const iso = (ms: number) => new Date(ms).toISOString();
@@ -134,8 +137,9 @@ export class PumpDemo {
         const session = this.sessions.get(`${room}|${pump}`);
         if (session && session.ran_s === null) {
           clearTimeout(session.timer);
-          session.ran_s = round(Math.min(1, (performance.now() - session.started) / RUN_MS) * session.seconds, 1);
-          session.result = "stopped";
+          const elapsed = performance.now() - session.started;
+          session.ran_s = elapsed < PICKUP_MS ? 0 : round(Math.min(1, elapsed / RUN_MS) * session.seconds, 1);
+          session.result = elapsed < PICKUP_MS ? "stopped before the controller started it" : "stopped";
         }
         return envelope({ request_id: id("stop"), replaced: null });
       }

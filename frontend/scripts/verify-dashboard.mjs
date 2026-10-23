@@ -277,7 +277,7 @@ try {
     ["equipment/probes", "Probes"],
     ["equipment/stock", "Stock tanks"],
     ["equipment/dosing", "Dosing"],
-    ["equipment/pump-calibration", "Pump calibration"],
+    ["equipment/pump-calibration", "Prime & calibrate a pump"],
     ["equipment/feed-calibration", "Feed pH/EC calibration"],
     ["equipment/setup", "Rooms and setup"],
     ["settings", "Settings"],

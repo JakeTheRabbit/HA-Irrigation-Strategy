@@ -2,9 +2,12 @@ import { describe, expect, test, vi } from "vitest";
 import { holdController } from "@/components/primitives/hold-button";
 import {
   calibrationDue,
+  canStartRun,
   estimateRate,
   nominalOf,
   primeActions,
+  primeLabel,
+  pumpMotion,
   rateSentence,
   runState,
   wearNote,
@@ -89,5 +92,35 @@ describe("helpers", () => {
     expect(estimateRate(100, 29)).toBe(206.9);
     expect(estimateRate(0, 30)).toBeNull();
     expect(estimateRate(150, 0)).toBeNull();
+  });
+});
+
+describe("canStartRun", () => {
+  test("offers Run when there is no run, or the last one ran 0 s", () => {
+    expect(canStartRun(null, null)).toBe(true);
+    expect(canStartRun("s1", null)).toBe(false);
+    expect(canStartRun("s1", { ran_s: null })).toBe(false);
+    expect(canStartRun("s1", { ran_s: 0 })).toBe(true);
+    expect(canStartRun("s1", { ran_s: 30 })).toBe(false);
+  });
+});
+
+describe("prime and run wording", () => {
+  test("the pump reads as running only once the prime was accepted", () => {
+    expect(pumpMotion("Part B", { priming: true, primeOk: undefined, waiting: false })).toEqual({ active: false, text: "Part B" });
+    expect(pumpMotion("Part B", { priming: true, primeOk: false, waiting: false })).toEqual({ active: false, text: "Part B" });
+    expect(pumpMotion("Part B", { priming: true, primeOk: true, waiting: false })).toEqual({ active: true, text: "Part B is running" });
+  });
+  test("a run waiting for its report is worded as asked for", () => {
+    expect(pumpMotion("Part B", { priming: false, primeOk: undefined, waiting: true })).toEqual({
+      active: false,
+      text: "Asked Part B to run 30 s",
+    });
+  });
+  test("the prime button claims priming only once accepted, and drops it on refusal", () => {
+    expect(primeLabel(false, undefined)).toBe("Hold to prime");
+    expect(primeLabel(true, undefined)).toBe("Asking to prime… let go to stop");
+    expect(primeLabel(true, true)).toBe("Priming… let go to stop");
+    expect(primeLabel(true, false)).toBe("Hold to prime");
   });
 });

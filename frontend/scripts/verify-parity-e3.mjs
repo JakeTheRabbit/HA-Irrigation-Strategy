@@ -6,12 +6,13 @@
  *
  * Interactions asserted, at 1440 and 390 on both backends:
  * - 3.18: the pump cards, Part B 69 days since its calibration and due; picking Part B gives
- *   "Next: prime Part B";
- * - step 2: the precheck says nothing stops a prime; a 2 s mouse hold on "Hold to prime" records
+ *   "Next: prime Part B"; arrow keys move the pick and focus; Next moves focus to the step heading;
+ * - step 2: the precheck says nothing stops a prime (its time outside the live list); a 2 s mouse hold on "Hold to prime" records
  *   pump_prime {room_id, pump: part_b, seconds: 30} then pump_stop {room_id, pump: part_b}, and
  *   "Line is full, next" goes on;
- * - step 3: holding "Run 30 s" records pump_calibrate {seconds: 30}, shows "Waiting for the
- *   controller to report the run…", then step 4 when the run is reported;
+ * - step 3: "Stop the run" right after holding "Run 30 s" gets a 0 s report, "The run did not
+ *   run: … Hold Run again." and the Run button back; holding it again records pump_calibrate {seconds: 30}, shows "Waiting for the
+ *   controller to report the run…" with the drawing saying "Asked Part B to run 30 s" (1440), then step 4 when the run is reported;
  * - step 4: 150 mL → "150 mL in 30 s = 300 mL/min"; "Next: review and save";
  * - step 5: "Save 300 mL/min" commits {session_id, measured_ml: 150} and shows "Written and read
  *   back HH:MM", the rate sentence and the wear note;
@@ -59,13 +60,21 @@ await runParity({
     assert.match(await partB.innerText(), /69 days ago · due, every 60 days/, `${label}: Part B due`);
     await partB.click();
     assert.equal(await partB.getAttribute("aria-checked"), "true", `${label}: Part B picked`);
+    // Arrow keys move the pick (one tab stop for the group).
+    await page.keyboard.press("ArrowRight");
+    assert.equal(await page.getByRole("radio", { name: /Part A/ }).getAttribute("aria-checked"), "true", `${label}: arrow picks Part A`);
+    await page.keyboard.press("ArrowLeft");
+    assert.equal(await partB.getAttribute("aria-checked"), "true", `${label}: arrow back to Part B`);
+    assert.ok(await partB.evaluate((el) => el === document.activeElement), `${label}: focus follows the pick`);
     const nextB = page.getByRole("button", { name: "Next: prime Part B" });
     await nextB.waitFor();
     region("pump cards");
     await nextB.click();
+    assert.equal(await page.evaluate(() => document.activeElement?.textContent), "Prime the line", `${label}: focus on the new step`);
 
     // Step 2: hold to prime for 2 s.
-    await page.getByText(/^Nothing stops a prime now · checked/).waitFor();
+    await page.getByText("Nothing stops a prime now", { exact: true }).waitFor();
+    await page.getByText(new RegExp(`^Checked ${HHMM}$`)).waitFor();
     const before = (await calls(page)).length;
     await hold(page, page.getByRole("button", { name: /Hold to prime/ }), 2000);
     await page.getByText(/^You held it [\d.]+ s\./).waitFor();
@@ -80,12 +89,21 @@ await runParity({
     region("prime");
     await page.getByRole("button", { name: "Line is full, next" }).click();
 
-    // Step 3: hold Run 30 s past its 1.5 s confirm.
+    // Step 3: a run stopped before the controller takes it reports 0 s, and Run comes back.
+    await hold(page, page.getByRole("button", { name: /^Run 30 s/ }), 1900);
+    await page.getByRole("button", { name: "Stop the run" }).click();
+    await page.getByText("The run did not run: stopped before the controller started it. Hold Run again.").waitFor();
+    await page.getByRole("button", { name: /^Run 30 s/ }).waitFor();
+    region("run stopped before it started");
+    // Hold Run 30 s past its 1.5 s confirm; the drawing says it was asked for, not that it runs.
     await hold(page, page.getByRole("button", { name: /^Run 30 s/ }), 1900);
     await page.getByText("Waiting for the controller to report the run…").waitFor();
+    if (width > 720) assert.equal(await page.locator(".pump-cal-visual p").innerText(), "Asked Part B to run 30 s", `${label}: run asked for`);
     region("run");
     await page.getByRole("heading", { name: "How much did it pull?" }).waitFor({ timeout: 15_000 });
-    const run = (await calls(page)).find((c) => c.action === "pump_calibrate");
+    const runs = (await calls(page)).filter((c) => c.action === "pump_calibrate");
+    assert.equal(runs.length, 2, `${label}: run again after a 0 s run`);
+    const run = runs[1];
     assert.deepEqual(run?.data, { room_id: "room:", pump: "part_b", seconds: 30, api: 2 }, `${label}: calibrate data`);
 
     // Step 4: 150 mL.

@@ -19,6 +19,7 @@ import {
   RUN_SECONDS,
   SOLUTION_LABELS,
   calibrationDue,
+  canStartRun,
   estimateRate,
   headWords,
   lastCalibration,
@@ -26,7 +27,9 @@ import {
   offBy,
   parseMl,
   primeActions,
+  primeLabel,
   pumpHistory,
+  pumpMotion,
   rateSentence,
   runState,
   wearNote,
@@ -106,6 +109,14 @@ export function PumpCalibration({ controller, navigate, onDirtyChange }: PagePro
   const admin = controller.admin === false ? "Only a Home Assistant administrator can prime or calibrate a pump." : undefined;
 
   useWakeLock(step >= 2 && step <= 4);
+  // A step change moves focus to the new step's heading, so it is announced (not on first render).
+  const stepHeading = useRef<HTMLHeadingElement>(null);
+  const shownStep = useRef(step);
+  useEffect(() => {
+    if (shownStep.current === step) return;
+    shownStep.current = step;
+    stepHeading.current?.focus();
+  }, [step]);
   // Leaving with a run open or a measurement typed asks first (the app's unsaved-changes guard).
   const dirty = !saved && (!!run?.sessionId || measured.trim() !== "");
   useEffect(() => {
@@ -334,12 +345,25 @@ export function PumpCalibration({ controller, navigate, onDirtyChange }: PagePro
       </section>
       <section className="pump-cal-body panel" aria-labelledby={`pump-cal-step-${step}`}>
         <div className="pump-cal-main">
-          <h2 id={`pump-cal-step-${step}`} className="pump-cal-step-title">
+          <h2 id={`pump-cal-step-${step}`} ref={stepHeading} tabIndex={-1} className="pump-cal-step-title">
             {TITLES[step - 1]}
           </h2>
           {step === 1 && (
             <>
-              <div className="pump-cal-pumps" role="radiogroup" aria-label="Pump">
+              <div
+                className="pump-cal-pumps"
+                role="radiogroup"
+                aria-label="Pump"
+                onKeyDown={(e) => {
+                  // Arrow keys move the pick between pumps (one tab stop for the group).
+                  const delta = e.key === "ArrowDown" || e.key === "ArrowRight" ? 1 : e.key === "ArrowUp" || e.key === "ArrowLeft" ? -1 : 0;
+                  if (!delta) return;
+                  e.preventDefault();
+                  const index = (pumps.findIndex((p) => p.id === pump.id) + delta + pumps.length) % pumps.length;
+                  setPumpId(pumps[index].id);
+                  e.currentTarget.querySelectorAll<HTMLButtonElement>('[role="radio"]')[index]?.focus();
+                }}
+              >
                 {pumps.map((p, i) => {
                   const lastOf = lastCalibration(p);
                   const due = calibrationDue(lastOf?.at ?? null, CALIBRATE_EVERY_DAYS, now);
@@ -350,6 +374,7 @@ export function PumpCalibration({ controller, navigate, onDirtyChange }: PagePro
                       type="button"
                       role="radio"
                       aria-checked={on}
+                      tabIndex={on ? 0 : -1}
                       className="pump-cal-card"
                       data-due={due.due ? "" : undefined}
                       onClick={() => setPumpId(p.id)}
@@ -405,14 +430,16 @@ export function PumpCalibration({ controller, navigate, onDirtyChange }: PagePro
                 ) : (
                   <li className="is-ok">
                     <Check aria-hidden />
-                    Nothing stops a prime now · checked {clock(precheck.at, tz)}
+                    Nothing stops a prime now
                   </li>
                 )}
               </ul>
+              {/* Outside the live list, so the time does not re-announce every check. */}
+              {precheck && <p className="pump-cal-hint">Checked {clock(precheck.at, tz)}</p>}
               {hold && (
                 <HoldButton
                   mode="while-held"
-                  label={priming ? "Priming… let go to stop" : "Hold to prime"}
+                  label={primeLabel(priming, prime?.ok)}
                   srLabel={`Runs ${pump.name} only while held, at most ${PRIME_SECONDS} s.`}
                   maxSeconds={PRIME_SECONDS}
                   disabledReason={primeDisabled}
@@ -436,7 +463,7 @@ export function PumpCalibration({ controller, navigate, onDirtyChange }: PagePro
           {step === 3 && (
             <>
               <p>Put the suction line in a measuring jug with at least 250 mL.</p>
-              {!run?.sessionId && (
+              {canStartRun(run?.sessionId, ours) && (
                 <HoldButton
                   mode="hold-to-confirm"
                   label={`Run ${RUN_SECONDS} s`}
@@ -508,7 +535,14 @@ export function PumpCalibration({ controller, navigate, onDirtyChange }: PagePro
             </>
           )}
         </div>
-        {!narrow && <PumpVisual pump={pump} active={priming || waiting} prefix={roomId.replace(/^room:/, "")} states={controller.states} />}
+        {!narrow && (
+          <PumpVisual
+            pump={pump}
+            motion={pumpMotion(pump.name, { priming, primeOk: prime?.ok, waiting })}
+            prefix={roomId.replace(/^room:/, "")}
+            states={controller.states}
+          />
+        )}
       </section>
       <footer className="pump-cal-foot panel">
         <Button variant="outline" disabled={backOff} onClick={() => setStep((s) => Math.max(1, s - 1))}>
@@ -584,15 +618,15 @@ function WearSpark({ history, name }: { history: { at: number; mlMin: number }[]
   );
 }
 
-/** The pump drawn beside its stock bottle; it turns while it primes or runs. */
+/** The pump drawn beside its stock bottle; it turns only while an accepted prime runs. */
 function PumpVisual({
   pump,
-  active,
+  motion,
   prefix,
   states,
 }: {
   pump: CalibrationPump;
-  active: boolean;
+  motion: { active: boolean; text: string };
   prefix: string;
   states: PageProps["controller"]["states"];
 }) {
@@ -601,9 +635,9 @@ function PumpVisual({
     <aside className="pump-cal-visual" aria-label={`${pump.name} pump`}>
       <div className="pump-cal-rig">
         {tank && <StockBottle tank={tank} state={stockState(tank)} label={`${tank.name} stock`} />}
-        <PeristalticPump state={active ? "dosing" : "idle"} label={active ? `${pump.name} running` : `${pump.name} idle`} />
+        <PeristalticPump state={motion.active ? "dosing" : "idle"} label={motion.active ? `${pump.name} running` : `${pump.name} idle`} />
       </div>
-      <p>{active ? `${pump.name} is running` : pump.name}</p>
+      <p>{motion.text}</p>
     </aside>
   );
 }

@@ -93,6 +93,28 @@ export function wearNote(history: { at: number; mlMin: number }[], tz = "UTC"): 
 export function runState(session: { ran_s?: number | null } | null): "waiting" | "ran" {
   return typeof session?.ran_s === "number" ? "ran" : "waiting";
 }
+/** Whether Run is offered: no run asked for yet, or the last one was reported at 0 s (stopped
+ * before the controller started it). A new run replaces the old session (the backend's pump_open
+ * closes it). */
+export function canStartRun(sessionId: string | null | undefined, session: { ran_s?: number | null } | null): boolean {
+  return !sessionId || (typeof session?.ran_s === "number" && session.ran_s <= 0);
+}
+
+/** What the pump drawing claims: running only once the controller accepted the prime; a
+ * calibration run is only asked for until the controller reports it. */
+export function pumpMotion(
+  name: string,
+  { priming, primeOk, waiting }: { priming: boolean; primeOk: boolean | undefined; waiting: boolean },
+): { active: boolean; text: string } {
+  if (priming && primeOk === true) return { active: true, text: `${name} is running` };
+  if (waiting) return { active: false, text: `Asked ${name} to run ${RUN_SECONDS} s` };
+  return { active: false, text: name };
+}
+/** The prime button's words: priming only once accepted; a refusal drops back to the plain label. */
+export function primeLabel(priming: boolean, primeOk: boolean | undefined): string {
+  if (!priming || primeOk === false) return "Hold to prime";
+  return primeOk ? "Priming… let go to stop" : "Asking to prime… let go to stop";
+}
 
 /** What holding the prime button sends: a 30 s prime on press, a stop on release. The stop goes
  * however the hold ends (HoldButton's while-held mode calls `onStop` exactly once). */
