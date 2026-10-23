@@ -7,7 +7,10 @@ import { demoId } from "./journal";
  * calibration_get's `probe_user_offsets`. Like the integration: bounds, a preview that writes nothing,
  * a revision check, each write journalled (an event id Undo puts back, refused once the offset has
  * moved on), and the zone's value re-fused from its probes with the offsets (the median; the mean for
- * two). The demo keeps its own revision for offsets; the feed calibration history keeps its own. */
+ * two). Unlike the integration, the demo keeps its own revision for offsets and the feed calibration
+ * history keeps its own (CalibrationDemo): the integration has one revision for the whole calibration
+ * document, so there a feed calibration check also makes an offset preview stale. The demo never shows
+ * that case; the stale-revision path is exercised by an offset write instead. */
 
 const OFFSET_LIMIT = 20;
 const CURVE_ON_PERCENT = "This probe already converts to moisture. A curve only applies to raw readings.";

@@ -87,6 +87,15 @@ describe("readOffsets", () => {
     });
     expect(readOffsets({ revision: 1 })).toBeNull();
   });
+  it("reads a malformed stored offset as unknown, never 0; an entry without one holds none", () => {
+    expect(
+      readOffsets({ probe_user_offsets: { "sensor.a": { offset: "bad", curve: null }, "sensor.b": { offset: null }, "sensor.c": { curve: null } } }),
+    ).toEqual({
+      "sensor.a": { offset: null, curve: null },
+      "sensor.b": { offset: null, curve: null },
+      "sensor.c": { offset: 0, curve: null },
+    });
+  });
   it("treats the offsets as unknown when the integration cannot read its store, and says why", () => {
     const message =
       "The stored probe offsets could not be read; they have not been overwritten and the probes read without them: bad";
@@ -106,7 +115,12 @@ describe("applyOffset", () => {
   it("receipt line uses fused_before and fused_after", async () => {
     const controller = fakeController(3);
     const receipt = await applyOffset(controller, request);
-    expect(receipt).toMatchObject({ ok: true, summary: "F1 Zone 1 value 63.8% → 65.3%", eventIds: ["01JEVENT"] });
+    // Read back: the stored offset. The zone's value is the integration's own figure, and says so.
+    expect(receipt).toMatchObject({
+      ok: true,
+      summary: "Zone 1 Back offset — → +3.0 · F1 Zone 1 value 63.8% → 65.3% (integration's figure)",
+      eventIds: ["01JEVENT"],
+    });
     // The write names exactly the offset reviewed and the revision the preview gave; never client or proposal_token.
     expect(controller.calls[0]).toEqual([
       "probe_offset_set",
@@ -117,6 +131,11 @@ describe("applyOffset", () => {
   it("claims nothing when the store does not read the offset back", async () => {
     const receipt = await applyOffset(fakeController(1.5), request);
     expect(receipt).toMatchObject({ ok: false, unconfirmed: true, summary: "" });
+  });
+  it("claims nothing when the store reads back a malformed offset, even for a write of 0", async () => {
+    const controller = fakeController("bad" as unknown as number, { offset: 0 });
+    const receipt = await applyOffset(controller, { ...request, offset: 0 });
+    expect(receipt).toMatchObject({ ok: false, unconfirmed: true });
   });
   it("names the offset when the zone has no value to show", async () => {
     const receipt = await applyOffset(fakeController(3, { fused_before: null, fused_after: null }), { ...request, before: 0 });
@@ -161,7 +180,10 @@ describe("the demo's probe offsets (3.18)", () => {
     const { fused_before: before, fused_after: after, revision } = preview.data;
     expect(after! - before!).toBeCloseTo(1.5);
     const receipt = await applyOffset(controller, { ...request, roomId: "room:", entityId: probe, revision, room: "Room A" });
-    expect(receipt).toMatchObject({ ok: true, summary: `Room A Zone 1 value ${before!.toFixed(1)}% → ${after!.toFixed(1)}%` });
+    expect(receipt).toMatchObject({
+      ok: true,
+      summary: `Zone 1 Back offset — → +3.0 · Room A Zone 1 value ${before!.toFixed(1)}% → ${after!.toFixed(1)}% (integration's figure)`,
+    });
     expect(Number(states["sensor.crop_steering_vwc_zone_1"].state)).toBeCloseTo(after!, 1);
     // The preview's revision has moved on.
     expect(await applyOffset(controller, { ...request, roomId: "room:", entityId: probe, revision, room: "Room A" })).toMatchObject({

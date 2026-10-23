@@ -59,7 +59,8 @@ const pct = (value: number | null) => (value === null ? "—" : `${value.toFixed
 const digits = (state: string | undefined) => (state?.split(".")[1] ?? "").length;
 
 /** The rooms' stored probe offsets (calibration_get): `missing` on an integration older than 3.18,
- * which keeps none; a room whose store cannot be read has none to show. */
+ * which keeps none; a room whose store cannot be read has none to show. `loaded` once the read lands:
+ * until then nothing says whether matching is possible. */
 function useOffsets(controller: Controller, roomIds: string[]) {
   const [read, setRead] = useState<{
     key: string;
@@ -102,7 +103,8 @@ function useOffsets(controller: Controller, roomIds: string[]) {
     rooms: Record<string, Record<string, ProbeOffset> | null>;
     blocked: Record<string, string | null>;
   } = { missing: false, rooms: {}, blocked: {} };
-  return { ...(read && read.key === key ? read : fallback), reload: () => setTick((n) => n + 1) };
+  const loaded = read !== null && read.key === key;
+  return { ...(loaded ? read : fallback), loaded, reload: () => setTick((n) => n + 1) };
 }
 
 /** The rooms' zones as Probes & offsets draws them: each moisture probe on a row, pore EC beside it. */
@@ -232,7 +234,7 @@ export function Probes({
       )}
       <div className="probes-layout">
         <section className="panel probes-board" aria-label="Probes by room">
-          {offsets.missing && (
+          {offsets.loaded && offsets.missing && (
             <div className="probes-missing" data-match-handheld-missing>
               <span>Match handheld</span>
               <NeedsIntegration feature="Matching a probe to a handheld meter" compact />
@@ -266,7 +268,7 @@ export function Probes({
                     controller={controller}
                     group={group}
                     offsets={offsets.missing ? null : (offsets.rooms[group.view.room.id] ?? null)}
-                    v2={!offsets.missing}
+                    v2={offsets.loaded && !offsets.missing}
                     blocked={offsets.missing ? null : (offsets.blocked[group.view.room.id] ?? null)}
                     history={history}
                     now={now}
@@ -297,8 +299,8 @@ export function Probes({
                 <span>
                   {`${room} ${zone} ${row.side} reads ${pct(row.vwc.value)}`}
                   {row.vwc.health === "out-of-range"
-                    ? ", which no probe can read: it is likely not seated, or sits in the drip. Move it, and it rejoins the zone value once it reads in range."
-                    : ", far from the zone’s other probes: probably right under a dripper. Move it, and it rejoins the zone value once it reads like the others."}
+                    ? ", outside what a probe can read. Check how it sits against the steps below; it rejoins the zone value once it reads in range."
+                    : ", far from the zone’s other probes. Check how it sits against the steps below; it rejoins the zone value once it reads like the others."}
                 </span>
               </p>
             ))}
@@ -433,7 +435,8 @@ function RoomRows({
               : `1 probe${stuck ? " · stuck" : ""}`;
         const editing = rows.find((row) => row.vwc.id === open);
         return rows.map((row, index) => {
-          const offset = offsets ? (offsets[row.vwc.id]?.offset ?? 0) : null;
+          // No entry: no offset. A stored value the panel cannot read stays unknown.
+          const offset = offsets ? (row.vwc.id in offsets ? offsets[row.vwc.id].offset : 0) : null;
           const raw = moisturePct(row.vwc.value, row.vwc.unit);
           const temp = index === 0 ? rootZoneSensor(controller.states, view.room, zone.id) : null;
           const tempState = temp ? controller.states[temp] : undefined;
@@ -456,6 +459,7 @@ function RoomRows({
                 variant="outline"
                 size="sm"
                 aria-expanded={open === row.vwc.id}
+                aria-controls={`probe-offset-${row.vwc.id}`}
                 aria-label={`Match handheld: ${zone.name} ${row.side}`}
                 onClick={() => onOpen(open === row.vwc.id ? null : row.vwc.id)}
                 data-match-handheld={row.vwc.id}
@@ -520,7 +524,7 @@ function RoomRows({
                 <td data-label="">{action}</td>
               </tr>
               {editing === row && (
-                <tr className="probe-offset-row">
+                <tr className="probe-offset-row" id={`probe-offset-${row.vwc.id}`}>
                   <td colSpan={7}>
                     <MatchHandheld
                       controller={controller}

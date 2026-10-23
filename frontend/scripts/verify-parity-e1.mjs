@@ -10,7 +10,7 @@
  *   and back of each zone;
  * - 3.18: every Offset reads "0.0"; Match handheld on Room A Zone 1 Back → type the probe's
  *   reading + 3 → "+3.0" → "Apply +3.0 offset to Zone 1 Back" (through the phone's review sheet) → a
- *   receipt "Written and read back HH:MM" with "Room A Zone 1 value a% → b%" → its Offset reads "+3.0"
+ *   receipt "Written and read back HH:MM" with "Zone 1 Back offset 0.0 → +3.0 · Room A Zone 1 value a% → b% (integration's figure)" → its Offset reads "+3.0"
  *   → Undo → "Previous values written back HH:MM" and "0.0" again;
  * - "Check placement" in the editor focuses the "Where to put a probe" card;
  * - the substrate curve card says why no curve applies (3.18) or "Needs integration 3.18" (3.17);
@@ -79,8 +79,12 @@ await runParity({
     const row = page.locator(`tr[data-probe="${PROBE}"]`);
     const raw = Number.parseFloat(await row.locator(".probes-vwc").innerText());
     // Its accessible name holds the visible words (WCAG 2.5.3).
-    await row.getByRole("button", { name: "Match handheld: Zone 1 Back", exact: true }).click();
+    const match = row.getByRole("button", { name: "Match handheld: Zone 1 Back", exact: true });
+    await match.click();
     const editor = page.locator(`[data-offset-editor="${PROBE}"]`);
+    // The toggle names the row it opens.
+    const controls = await match.getAttribute("aria-controls");
+    assert.equal(await page.locator(`[id="${controls}"] [data-offset-editor="${PROBE}"]`).count(), 1, `${label}: aria-controls ${controls}`);
     await editor.getByRole("textbox", { name: "Handheld reading, same spot, %" }).fill((raw + 3).toFixed(1));
     assert.equal((await editor.locator("[data-offset-preview]").innerText()).trim(), "+3.0", `${label}: offset preview`);
     assert.match(await editor.innerText(), /Raw value kept · logged in History › Changes/, `${label}: raw kept`);
@@ -99,7 +103,8 @@ await runParity({
     await receipt.waitFor();
     const text = await receipt.innerText();
     assert.match(text, new RegExp(`Written and read back ${HHMM}`), `${label}: receipt ${text}`);
-    assert.match(text, /Room A Zone 1 value \d+\.\d% → \d+\.\d%/, `${label}: receipt line ${text}`);
+    // The offset is what was read back; the zone value is the integration's own figure.
+    assert.match(text, /Zone 1 Back offset 0\.0 → \+3\.0 · Room A Zone 1 value \d+\.\d% → \d+\.\d% \(integration's figure\)/, `${label}: receipt line ${text}`);
     await page.waitForFunction((id) => document.querySelector(`[data-offset="${id}"]`)?.textContent?.trim() === "+3.0", PROBE);
     region("receipt");
 

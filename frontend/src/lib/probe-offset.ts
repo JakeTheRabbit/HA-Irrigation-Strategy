@@ -47,9 +47,14 @@ export function signedPoints(value: number): string {
 const pct = (value: number) => `${value.toFixed(1)}%`;
 
 export interface ProbeOffset {
-  offset: number;
+  /** VWC points; null when the stored value is not a number the panel can read. */
+  offset: number | null;
   curve: string | null;
 }
+/** A stored entry's offset: none (0) when the entry names none, as the integration reads it; null when
+ * it is not a finite number, never an invented 0. */
+const storedOffset = (value: unknown) =>
+  value === undefined ? 0 : typeof value === "number" && Number.isFinite(value) ? value : null;
 /** Each probe's stored offset (absent: none), from calibration_get; null from an integration that keeps
  * none (older than 3.18), or one that cannot read its store (`offsets_error`): the probes then read
  * without the offsets it still lists. */
@@ -61,7 +66,7 @@ export function readOffsets(document: unknown): Record<string, ProbeOffset> | nu
   return Object.fromEntries(
     Object.entries(section as Record<string, { offset?: unknown; curve?: unknown }>).map(([id, entry]) => [
       id,
-      { offset: Number(entry?.offset) || 0, curve: typeof entry?.curve === "string" ? entry.curve : null },
+      { offset: storedOffset(entry?.offset), curve: typeof entry?.curve === "string" ? entry.curve : null },
     ]),
   );
 }
@@ -104,8 +109,8 @@ export function previewOffset(
 }
 
 /** Writes exactly the reviewed offset, then reads the calibration store back. "Written and read back"
- * only when the store holds that offset; the receipt line is the zone's value from the write's own
- * `fused_before`/`fused_after`. */
+ * only when the store holds that offset; the receipt names that offset, then the zone's value from the
+ * write's own `fused_before`/`fused_after`, marked as the integration's figure (it is not read back). */
 export async function applyOffset(
   controller: Pick<Controller, "operator">,
   request: {
@@ -131,23 +136,16 @@ export async function applyOffset(
   if (written.kind !== "ok") return written;
   const back = await callV2<unknown>(controller, "calibration_get", { room_id: request.roomId });
   const stored = back.kind === "ok" ? readOffsets(back.data) : null;
-  const holds = stored ? (stored[request.entityId]?.offset ?? 0) : null;
+  const holds = stored ? (request.entityId in stored ? stored[request.entityId].offset : 0) : null;
   const { fused_before: before, fused_after: after, offset } = written.data;
-  const row =
-    before !== null && after !== null
-      ? { id: request.entityId, label: `${request.room} ${request.zone} value`, before: pct(before), after: pct(after) }
-      : {
-          id: request.entityId,
-          label: `${request.probe} offset`,
-          before: request.before == null ? "—" : signedPoints(request.before),
-          after: signedPoints(offset),
-        };
+  const was = request.before == null ? "—" : signedPoints(request.before);
   if (holds === null || Math.abs(holds - offset) > 1e-9)
     return {
       at: now(),
       ok: false,
       unconfirmed: true,
-      failed: [{ id: row.id, holds: row.before }],
+      // The review row's before: the zone's value where it showed one, else the offset.
+      failed: [{ id: request.entityId, holds: before !== null && after !== null ? pct(before) : was }],
       summary: "",
       eventIds: written.eventIds,
     };
@@ -155,7 +153,12 @@ export async function applyOffset(
     at: now(),
     ok: true,
     failed: [],
-    summary: `${row.label} ${row.before} → ${row.after}`,
+    // Read back: the offset. The zone's value is the write's own answer, so it is named as such.
+    summary:
+      `${request.probe} offset ${was} → ${signedPoints(offset)}` +
+      (before !== null && after !== null
+        ? ` · ${request.room} ${request.zone} value ${pct(before)} → ${pct(after)} (integration's figure)`
+        : ""),
     eventIds: written.eventIds,
     ...(written.eventIds.length ? {} : { undoUnavailable: true }),
   };
