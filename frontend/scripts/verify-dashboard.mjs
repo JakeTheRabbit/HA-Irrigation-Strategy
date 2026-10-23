@@ -245,7 +245,7 @@ try {
       ["plan", "plan/watering", "Timeline"],
       ["history", "history/explorer", "Explorer"],
       ["history/timeline", "history/explorer", "Explorer"],
-      ["equipment/feed", "equipment/dosing", "Dosing"],
+      ["equipment/feed", "equipment/dosing", "Feed & dosing · Room A"],
       ["equipment", "equipment/probes", "Probes & offsets"],
     ];
     for (const [old, now, heading] of moved) {
@@ -283,7 +283,7 @@ try {
     ["history/changes", "Changes"],
     ["equipment/probes", "Probes & offsets"],
     ["equipment/stock", "Stock tanks · Room A"],
-    ["equipment/dosing", "Dosing"],
+    ["equipment/dosing", "Feed & dosing · Room A"],
     ["equipment/pump-calibration", "Pump calibration"],
     ["equipment/feed-calibration", "Feed pH/EC calibration"],
     ["equipment/setup", "Rooms and setup"],
@@ -309,7 +309,10 @@ try {
       await expectVisible(page.getByRole("heading", { name: heading, exact: true, level: 1 }));
       // A heading carries a sentence only for a behaviour someone could get wrong. Probes & offsets
       // carries its counts instead (mockup 13), checked with the probes below.
-      if (!route.startsWith("plan/") && !["all-zones", "settings/features", "equipment/probes"].includes(route))
+      if (
+        !route.startsWith("plan/") &&
+        !["all-zones", "settings/features", "equipment/probes", "equipment/dosing"].includes(route)
+      )
         assert.equal(
           await page.locator(".page-heading > div > p").count(),
           0,
@@ -1502,9 +1505,12 @@ try {
   await check(
     "dosing: each room's pumps, a dose and a batch through their reviews, and stop; only requests are sent",
     async () => {
-      // Room A's four pumps and Room B's six, one of them not calibrated yet.
-      const cards = page.locator("[data-dosing-pump]");
-      const strip = page.locator("[data-stock-strip]");
+      // Room A's four pumps and Room B's six, one of them not calibrated yet, on the plumbing.
+      const cards = page.locator("[data-plumbing] [data-dosing-pump]");
+      const linked = () =>
+        page
+          .locator("[data-plumbing] [data-pump-stock]")
+          .evaluateAll((nodes) => nodes.map((node) => node.getAttribute("data-pump-stock")));
       const stockOf = (id) => page.locator(`[data-dosing-pump="${id}"] [data-pump-stock]`);
       await go("equipment/dosing");
       await expectVisible(cards.first());
@@ -1524,13 +1530,14 @@ try {
       assert.deepEqual(await pillTones('[data-dosing-pump="finisher"] .pill'), [
         ["Not calibrated", "warn"],
       ]);
-      assert.deepEqual(await strip.locator("[data-stock-gauge] strong").allInnerTexts(), [
-        "Veg base",
-        "Line cleaner",
-        "Silica",
-        "Finisher",
-        "Part A",
-        "Part B",
+      // Each pump drawn with the stock tank it is linked to, in pump order.
+      assert.deepEqual(await linked(), [
+        "veg_base",
+        "cleaner",
+        "silica",
+        "finisher",
+        "part_a",
+        "part_b",
       ]);
       // Part A, passed by in the recipe and dosed by hand: its tank lasts doses at its last one.
       assert.equal(
@@ -1546,26 +1553,20 @@ try {
         await go("equipment/dosing");
         await expectVisible(cards.first());
       });
-      // A fresh Room A: each card shows the stock tank its pump is linked to, Part B's drawn to
-      // scale with its litres and the batches its recipe amount leaves, and the stock strip every
-      // linked tank in pump order.
+      // A fresh Room A: each pump shows the stock tank it is linked to, Part B's drawn to scale with
+      // its litres and the batches its recipe amount leaves, every linked tank in pump order.
       await go("equipment/dosing");
       await expectVisible(cards.first());
       assert.equal(await stockOf("part_b").getAttribute("data-pump-stock"), "part_b");
       assert.equal(
         await stockOf("part_b").locator(".dosing-stock-litres").innerText(),
-        "5.4 L of 20 L",
+        "5.4 / 20.0 L",
       );
       assert.equal(
         await stockOf("part_b").locator(".dosing-stock-left").innerText(),
         "about 3 batches left",
       );
-      assert.deepEqual(await strip.locator("[data-stock-gauge] strong").allInnerTexts(), [
-        "Silica",
-        "Part B",
-        "Part A",
-        "Line cleaner",
-      ]);
+      assert.deepEqual(await linked(), ["silica", "part_b", "part_a", "cleaner"]);
       // A dose of Part B, through its review: its card doses, then the history has it.
       await page.locator('[data-dosing-pump="part_b"] .dosing-pump-select').click();
       await page.getByLabel("Quantity (mL)", { exact: true }).fill("60");
@@ -1598,13 +1599,9 @@ try {
         await page.locator('[data-dosing-pump="part_b"]').getAttribute("data-state"),
         "idle",
       );
-      // What it dosed came off Part B's stock tank: 5.4 L less 60 mL, on its card and in the strip.
+      // What it dosed came off Part B's stock tank: 5.4 L less 60 mL, on its bottle.
       await expectVisible(
-        stockOf("part_b").locator(".dosing-stock-litres", { hasText: "5.3 L of 20 L" }),
-      );
-      assert.equal(
-        await strip.locator('[data-stock-gauge="part_b"] .dosing-stock-litres').innerText(),
-        "5.3 L of 20 L",
+        stockOf("part_b").locator(".dosing-stock-litres", { hasText: "5.3 / 20.0 L" }),
       );
       // A batch, through its review: its steps walk, and stop ends it where it is.
       await page.getByRole("button", { name: "Make a batch", exact: true }).click();
@@ -1620,8 +1617,8 @@ try {
       await stop.getByRole("button", { name: "Send stop", exact: true }).click();
       await stop.waitFor({ state: "hidden" });
       await expectVisible(
-        page.locator("[data-batch-summary]", {
-          hasText: /^Last batch stopped \S.* \(stop requested during [a-z ]+\)$/,
+        page.locator("[data-batch-line]", {
+          hasText: /^No batch running · last batch stopped \S.* \(stop requested during [a-z ]+\)$/,
         }),
       );
       assert.equal((await pillTones('tr[data-history-kind="batch"] .pill'))[0][1], "warn");
@@ -1796,9 +1793,9 @@ try {
       });
       const part_b = live.locator('[data-dosing-pump="part_b"]');
       await expectVisible(part_b);
-      // No pump is linked to a stock tank here: the cards say so, and there is no stock strip.
+      // No pump is linked to a stock tank here: the drawing says so, with no bottle.
       assert.equal(await part_b.locator("[data-pump-stock]").innerText(), "No stock tank linked");
-      assert.equal(await live.locator("[data-stock-strip]").count(), 0);
+      assert.equal(await live.locator("[data-plumbing] .stock-bottle").count(), 0);
       // A pump whose dosing sensor is unavailable: greyed out, a question mark on its head.
       const veg_base = live.locator('[data-dosing-pump="veg_base"]');
       assert.equal(await veg_base.getAttribute("data-state"), "unavailable");
@@ -1828,12 +1825,12 @@ try {
           { action: "stop", room_id: "room:" },
         ],
       );
-      // Besides reads (dosing_get, and What's new on opening), those three requests are all it sent:
-      // no pump, valve or number was written.
+      // Besides reads (dosing_get, stock_get for the next batch, and What's new on opening), those
+      // three requests are all it sent: no pump, valve or number was written.
       assert.deepEqual(
         posts
           .map((post) => post.path)
-          .filter((path) => !/\/crop_steering\/(dosing_get|whats_new_get)$/.test(path)),
+          .filter((path) => !/\/crop_steering\/(dosing_get|stock_get|whats_new_get)$/.test(path)),
         Array(3).fill("/api/services/crop_steering/dosing_request"),
         "the page wrote nothing but its dosing requests",
       );
@@ -1845,50 +1842,46 @@ try {
     },
   );
   await check(
-    "dosing: each room's stock strip, light and dark, on a phone, and its way to Stock tanks",
+    "dosing: each room's stock bottles on the plumbing, light and dark, and on a phone",
     async () => {
-      const strip = page.locator("[data-stock-strip]");
-      const gauges = strip.locator("[data-stock-gauge]");
+      const gauges = page.locator("[data-plumbing] [data-pump-stock]:has(.stock-bottle)");
       for (const [room, count] of [
         ["f2", 4],
         ["room_b", 6],
       ]) {
         await go("equipment/dosing", room);
-        await expectVisible(strip);
-        assert.equal(await gauges.count(), count, `${room}: a gauge per linked tank`);
-        // Each labelled with its level, its litres and what it has left, its low mark drawn.
+        await expectVisible(gauges.first());
+        assert.equal(await gauges.count(), count, `${room}: a bottle per linked tank`);
+        // Each labelled with its litres and what it has left, its low mark drawn.
         for (const text of await gauges.allInnerTexts())
           assert.match(
             text,
-            /\n\d+%\n[\d.]+ L of [\d.]+ L(\n(about \d+|less than one) (batch|batches|dose|doses) left)?/,
+            /^[\d.]+ \/ [\d.]+ L(\n(low|very low))?(\n(about \d+|less than one) (batch|batches|dose|doses) left)?$/,
           );
         assert.equal(await gauges.locator(".sb-low").count(), count);
       }
       await inBothThemes("dosing, Room B", async () => {
         await go("equipment/dosing", "room_b");
-        await expectVisible(strip);
+        await expectVisible(gauges.first());
       });
       await go("equipment/dosing");
-      await expectVisible(strip);
+      await expectVisible(gauges.first());
       await page.screenshot({ path: path.join(out, "dashboard-dosing-light.png"), fullPage: true });
       await page.evaluate(() => localStorage.setItem("irrigation-theme", "dark"));
       await page.reload({ waitUntil: "networkidle" });
-      await expectVisible(strip);
+      await expectVisible(gauges.first());
       await page.screenshot({ path: path.join(out, "dashboard-dosing-dark.png"), fullPage: true });
       await page.evaluate(() => localStorage.setItem("irrigation-theme", "light"));
-      // A phone: both rooms fit, the strip two tanks to a row.
+      // A phone: both rooms fit, the pumps two to a row.
       await page.setViewportSize({ width: 390, height: 844 });
       for (const room of ["room_b", "f2"]) {
         await go("equipment/dosing", room);
-        await expectVisible(strip);
+        await expectVisible(gauges.first());
         await noOverflow();
       }
       await axe("dosing on a phone");
       await page.screenshot({ path: path.join(out, "mobile-dosing.png"), fullPage: true });
       await page.setViewportSize({ width: 1440, height: 1000 });
-      await strip.getByRole("button", { name: /^Stock tanks/ }).click();
-      await expectVisible(page.getByRole("heading", { name: /^Stock tanks · Room [AB]$/ }));
-      assert.match(page.url(), /#\/equipment\/stock$/);
     },
   );
   await check("setup: every mapping says whether it is mapped; the checks are pills", async () => {

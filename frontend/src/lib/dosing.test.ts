@@ -4,6 +4,12 @@ import {
   batchSteps,
   batchTime,
   canEdit,
+  batchLevel,
+  levelFall,
+  levelFallUnknown,
+  mixChecked,
+  nextBatch,
+  protections,
   controllerReach,
   deviceDosing,
   doseDeadline,
@@ -32,6 +38,7 @@ import {
   stockSensorId,
   stockState,
   stockTanks,
+  type DosingBatch,
   type DosingDocument,
   type DosingRequestResult,
   type DosingStatus,
@@ -865,6 +872,25 @@ describe("the demo's dosing services and controller", () => {
     expect(demo.states["switch.demo_tank_fill_valve"].state).toBe("off");
     expect(status.history[0]).toMatchObject({ kind: "batch", result: /^stopped/ });
   });
+  it("keeps the last mix check through a stopped batch and plans a new one when a batch finishes", () => {
+    const demo = start();
+    expect(demo.status().mix).toMatchObject({ verdict: "off target" });
+    demo.request({ action: "batch" });
+    vi.advanceTimersByTime(3_000);
+    // The controller replaces the check only when a batch finishes (dosing_runner._plan_mix).
+    expect(demo.status().mix).toMatchObject({ verdict: "off target" });
+    demo.request({ action: "stop" });
+    vi.advanceTimersByTime(1_000);
+    expect(demo.status().batch.result).toMatch(/^stopped/);
+    expect(demo.status().mix).toMatchObject({ verdict: "off target" });
+    demo.request({ action: "batch" });
+    vi.advanceTimersByTime(46_000);
+    const status = demo.status();
+    expect(status.batch.result).toBe("finished");
+    // Room A's feed probes have bands: a check is due 5 min after the batch, not judged yet.
+    expect(status.mix).toMatchObject({ batch: status.batch.started_at, verdict: null });
+    expect(Date.parse(status.mix!.due!)).toBe(Date.parse(status.batch.ended_at!) + 5 * 60_000);
+  });
   it("saves a setup against its revision, and refuses a stale one", () => {
     const demo = start();
     const doc = demo.get();
@@ -913,5 +939,325 @@ describe("the demo's dosing services and controller", () => {
       ["part_a", "part_a"],
       ["cleaner", "cleaner"],
     ]);
+  });
+});
+
+describe("Feed & dosing: the plumbing view's facts", () => {
+  const batch: DosingBatch = {
+    fill_valve: "switch.fill",
+    full_entity: null,
+    full_state: "on",
+    fill_timeout_min: 12,
+    mix_pump: "switch.mix",
+    mix_valves: [],
+    mix_power_sensor: "sensor.mix_power",
+    mix_min_w: 200,
+    premix_min: 4,
+    postmix_min: 5,
+    close_entities: [],
+    hold_entity: null,
+    filled_at_entity: null,
+    recipe: [
+      { pump: "part_a", ml: 744, ml_entity: null },
+      { pump: "part_b", ml: 744, ml_entity: null },
+    ],
+  };
+  const pump = (id: string, name: string, stock: string) => ({
+    id,
+    name,
+    volume_entity: `number.${id}_volume`,
+    start_entity: `button.${id}_start`,
+    dosing_entity: `binary_sensor.${id}_dosing`,
+    dosing_prefix: "Dosing",
+    power_entity: `switch.${id}_power`,
+    flow_entity: `number.${id}_flow`,
+    max_ml: 2000,
+    restore_volume: true,
+    stock_tank: stock,
+  });
+  const doc = (over: Partial<DosingBatch> = {}): DosingDocument => ({
+    schema_version: 1,
+    room_id: "room:",
+    config: {
+      revision: 1,
+      pumps: [pump("part_a", "Part A", "a"), pump("part_b", "Part B", "b")],
+      batch: { ...batch, ...over },
+      request: null,
+      updated_at: null,
+    },
+    candidates: [],
+    error: null,
+  });
+  const armed: States = {
+    "binary_sensor.part_a_dosing": entity("binary_sensor.part_a_dosing", "off"),
+    "binary_sensor.part_b_dosing": entity("binary_sensor.part_b_dosing", "off"),
+    "switch.part_a_power": entity("switch.part_a_power", "off"),
+    "switch.part_b_power": entity("switch.part_b_power", "off"),
+    "number.part_a_flow": entity("number.part_a_flow", "5"),
+    "number.part_b_flow": entity("number.part_b_flow", "5"),
+    "switch.mix": entity("switch.mix", "on"),
+    "sensor.mix_power": entity("sensor.mix_power", "420", { unit_of_measurement: "W" }),
+    "sensor.crop_steering_tank_level": entity("sensor.crop_steering_tank_level", "64", {
+      minimum_pct: 8,
+      litres_per_pct: 4.5,
+    }),
+  };
+
+  it("protections counts armed of total", () => {
+    expect(protections(doc(), armed)).toEqual([
+      { label: "Read-back on every dose", ok: true },
+      { label: "Overfill cut 102%", ok: true },
+      { label: "Minimum 8%", ok: true },
+      { label: "Mix pump on · 0.42 kW", ok: true },
+      { label: "Timeout 12 min", ok: true },
+    ]);
+    // No tank level mapped, no power read-back for the mix pump, no fill valve: 1 of 5 armed.
+    const bare = { ...armed };
+    delete bare["sensor.crop_steering_tank_level"];
+    const list = protections(doc({ fill_valve: null, mix_power_sensor: null, mix_min_w: 0 }), bare);
+    expect(list.filter((item) => item.ok).length).toBe(1);
+    expect(list.map((item) => item.label)).toEqual([
+      "Read-back on every dose",
+      "Overfill cut 102%",
+      "Minimum 8%",
+      "Mix pump on",
+      "Timeout 12 min",
+    ]);
+    // A pump whose dosing state reads nothing: its doses are not read back.
+    expect(
+      protections(doc(), {
+        ...armed,
+        "binary_sensor.part_b_dosing": entity("binary_sensor.part_b_dosing", "unavailable"),
+      })[0],
+    ).toEqual({ label: "Read-back on every dose", ok: false });
+    // The controller reads each dose back on the pump's power switch: one that reads nothing is not
+    // read back either.
+    expect(
+      protections(doc(), {
+        ...armed,
+        "switch.part_a_power": entity("switch.part_a_power", "unavailable"),
+      })[0],
+    ).toEqual({ label: "Read-back on every dose", ok: false });
+    // The mix pump's power is read back only while its power sensor reads.
+    expect(
+      protections(doc(), {
+        ...armed,
+        "sensor.mix_power": entity("sensor.mix_power", "unavailable"),
+      })[3],
+    ).toEqual({ label: "Mix pump on", ok: false });
+  });
+
+  it("mixChecked: a mapped feed probe with a band, or a band that can't be read (_mix_bands)", () => {
+    const band = (key: string, value: string) => {
+      const id = `number.crop_steering_irrigation_${key}`;
+      return { [id]: entity(id, value) };
+    };
+    const ec = { feed_ec_sensor: "sensor.tank_ec" };
+    const banded = { ...band("ec_min", "2.3"), ...band("ec_max", "3.5") };
+    expect(mixChecked(banded, "", ec)).toBe(true);
+    // No feed probe mapped: nothing to check, whatever the bands.
+    expect(mixChecked(banded, "", {})).toBe(false);
+    // A probe whose band is 0 to 0, or that the room does not have: no bound, no check.
+    expect(mixChecked({ ...band("ec_min", "0"), ...band("ec_max", "0") }, "", ec)).toBe(false);
+    expect(mixChecked({}, "", ec)).toBe(false);
+    // Only the pH band is set, and only the EC probe is mapped: no check.
+    expect(mixChecked(band("ph_max", "6.2"), "", ec)).toBe(false);
+    // A band that can't be read: the controller plans the check and waits for it.
+    expect(mixChecked(band("ec_max", "unavailable"), "", ec)).toBe(true);
+  });
+
+  it("nextBatch warns when stock after batch is below low line", () => {
+    const tank = (id: string, name: string, level: number, low: number) => ({
+      id,
+      name,
+      capacity_l: 20,
+      level_l: level,
+      dose_ml: 744,
+      dose_entity: null,
+      low_l: low,
+      refilled_at: null,
+      updated_at: "",
+    });
+    const stock = {
+      schema_version: 1 as const,
+      room_id: "room:",
+      revision: 1,
+      tanks: [tank("a", "Part A", 12.9, 4), tank("b", "Part B", 5.4, 5)],
+      last_batch: null,
+      history: [],
+      fill_entity: null,
+      doses: { a: 744, b: 744 },
+      low: [],
+      max_tanks: 12,
+      error: null,
+    };
+    const next = nextBatch(doc(), stock, NOW, {
+      states: armed,
+      levelPct: 64,
+      litresPerPct: 4.5,
+      pctPerHour: 2,
+      atPct: 20,
+      checks: true,
+    });
+    // 44 % to go at 2 % an hour: 22 h from now. 80 % of the tank at 4.5 L per 1 %.
+    expect(next.at).toBe(NOW + 22 * 3_600_000);
+    expect(next.litres).toBe(360);
+    expect(next.doses).toEqual([
+      { name: "Part A", ml: 744 },
+      { name: "Part B", ml: 744 },
+    ]);
+    // 1488 mL at 5 mL/s: 297.6 s, about 5 min of dosing.
+    expect(next.steps).toEqual([
+      { name: "premix", min: 4 },
+      { name: "dose", min: 5 },
+      { name: "postmix", min: 5 },
+      { name: "check", min: 5 },
+    ]);
+    expect(next.stockWarning).toBe("Part B after this batch: 4.7 L, 6 batches left");
+    // Above its low line after the batch: no warning. A level that is not falling: no time.
+    const plenty = { ...stock, tanks: [tank("a", "Part A", 12.9, 4), tank("b", "Part B", 9, 5)] };
+    const calm = nextBatch(doc(), plenty, NOW, {
+      states: armed,
+      levelPct: 64,
+      litresPerPct: null,
+      pctPerHour: null,
+      atPct: 20,
+      checks: false,
+    });
+    expect(calm.stockWarning).toBeNull();
+    expect(calm.at).toBeNull();
+    expect(calm.litres).toBeNull();
+    expect(calm.steps.map((step) => step.name)).toEqual(["premix", "dose", "postmix"]);
+  });
+
+  it("batchLevel reads the controller's tank level against its minimum when only that is mapped", () => {
+    // No water_level_sensor in the room: the controller's level, built from the distance sensor.
+    const level = batchLevel(armed, "");
+    expect(level).toEqual({ atPct: 8, entityId: "sensor.crop_steering_tank_level", pct: 64 });
+  });
+  it("batchLevel reads the refill reminder on its own level entity", () => {
+    const states: States = {
+      ...armed,
+      [dosingConfigId("")]: entity(dosingConfigId(""), "1", {
+        batch: { level_entity: "sensor.batch_tank", remind_pct: 30 },
+      }),
+      "sensor.batch_tank": entity("sensor.batch_tank", "41.5", { unit_of_measurement: "%" }),
+    };
+    expect(batchLevel(states, "")).toEqual({ atPct: 30, entityId: "sensor.batch_tank", pct: 41.5 });
+  });
+  it("batchLevel has no reading when the controller's level reads nothing", () => {
+    const states: States = {
+      [dosingConfigId("")]: entity(dosingConfigId(""), "1", { batch: { remind_pct: 0 } }),
+      "sensor.crop_steering_tank_level": entity("sensor.crop_steering_tank_level", "unavailable", {
+        minimum_pct: 10,
+      }),
+    };
+    expect(batchLevel(states, "")).toEqual({
+      atPct: 10,
+      entityId: "sensor.crop_steering_tank_level",
+      pct: null,
+    });
+  });
+  it("levelFall starts the fall where the level last left its peak, not while it sat full", () => {
+    const h = 3_600_000;
+    // Full for 5 h, then 10 % in the 2 h after: 5 %/h, not 10 % over 7 h.
+    expect(
+      levelFall([
+        { time: 0, value: 100 },
+        { time: 5 * h, value: 100 },
+        { time: 6 * h, value: 95 },
+        { time: 7 * h, value: 90 },
+      ]),
+    ).toBe(5);
+    // A pause inside the fall still counts.
+    expect(
+      levelFall([
+        { time: 0, value: 100 },
+        { time: 1 * h, value: 90 },
+        { time: 3 * h, value: 90 },
+        { time: 4 * h, value: 80 },
+      ]),
+    ).toBe(5);
+    // A level sensor's jitter is no rise: the fall runs on through it.
+    expect(
+      levelFall([
+        { time: 0, value: 100 },
+        { time: 1 * h, value: 96 },
+        { time: 1.5 * h, value: 96.3 },
+        { time: 2 * h, value: 92 },
+        { time: 3 * h, value: 88 },
+      ]),
+    ).toBe(4);
+    // A fill is a rise: the fall starts after it.
+    expect(
+      levelFall([
+        { time: 0, value: 50 },
+        { time: 1 * h, value: 40 },
+        { time: 1.1 * h, value: 100 },
+        { time: 3.1 * h, value: 90 },
+      ]),
+    ).toBe(5);
+  });
+});
+
+describe("Feed & dosing: what the mix check covered and why the next batch has no time", () => {
+  it("keeps a probe that was not in the check apart from one that read nothing", () => {
+    const status = (mix: Record<string, unknown>) =>
+      readStatus(entity("sensor.crop_steering_dosing", "idle", { mix }))!.mix!;
+    // A pH-only room: _judge_mix sets only the keys of the probes it checks.
+    const phOnly = status({
+      verdict: "not read",
+      ph: null,
+      why: "its pH probe (sensor.ph) is not readable",
+    });
+    expect(phOnly.probes).toEqual(["ph"]);
+    expect(phOnly.ph).toBeNull();
+    expect(status({ verdict: "off target", ec: 3.7, ph: 5.8 }).probes).toEqual(["ec", "ph"]);
+    // A check given up on read no probe.
+    expect(
+      status({ gave_up_at: "2026-10-23T10:00:00Z", why: "the dosing setup could not be read" })
+        .probes,
+    ).toEqual([]);
+  });
+
+  it("says why no time is known, and 'not falling' only after an hour of level that does not fall", () => {
+    const h = 3_600_000;
+    const flat = [
+      { time: 0, value: 60 },
+      { time: 2 * h, value: 60 },
+    ];
+    expect(levelFallUnknown(false, "loaded", flat)).toBe("Not known: no tank level is read");
+    expect(levelFallUnknown(true, "loading", [])).toBe(
+      "Not known yet: the recorded tank level is still loading",
+    );
+    expect(levelFallUnknown(true, "failed", [])).toBe(
+      "Not known: the recorded tank level could not be loaded",
+    );
+    expect(
+      levelFallUnknown(true, "loaded", [
+        { time: 0, value: 60 },
+        { time: 0.5 * h, value: 60 },
+      ]),
+    ).toBe("Not known yet: less than an hour of tank level is recorded");
+    expect(levelFallUnknown(true, "loaded", flat)).toBe(
+      "Not known yet: the tank level is not falling",
+    );
+    // Falling, but for less than an hour so far.
+    expect(
+      levelFallUnknown(true, "loaded", [
+        { time: 0, value: 60 },
+        { time: 2 * h, value: 60 },
+        { time: 2.5 * h, value: 58 },
+      ]),
+    ).toBe("Not known yet: the tank has been falling for less than an hour");
+    // ...still falling through a jitter of the level sensor.
+    expect(
+      levelFallUnknown(true, "loaded", [
+        { time: 0, value: 60 },
+        { time: 2 * h, value: 60 },
+        { time: 2.5 * h, value: 58 },
+        { time: 2.6 * h, value: 58.3 },
+      ]),
+    ).toBe("Not known yet: the tank has been falling for less than an hour");
   });
 });

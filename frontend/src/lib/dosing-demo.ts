@@ -3,6 +3,8 @@ import {
   STEP_LABELS,
   dosingConfigId,
   dosingStatusId,
+  MIX_SETTLE_MIN,
+  mixChecked,
   parseConfig,
   readConfig,
   readStatus,
@@ -15,6 +17,8 @@ import {
   type DosingRequest,
   type DosingRequestResult,
   type DosingStatus,
+  type FeedNow,
+  type FeedSetup,
   type PumpRuntime,
 } from "./dosing";
 import { numeric } from "./model";
@@ -52,6 +56,33 @@ const CANDIDATE_DOMAINS = [
   "input_boolean",
   "input_datetime",
 ];
+
+/** Room A's feed recipes by flower week (dosing.py clean_feed): Bloom is the batch's own recipe, in
+ * use this week (the dosing_config sensor's `feed`). Room B has no feed schedule. */
+function demoFeed(prefix: string, config: DosingConfig, feedNow: unknown): FeedSetup | null {
+  if (prefix) return null;
+  const now = feedNow as FeedNow | undefined;
+  const line = (pump: string, ml: number) => ({ pump, ml, ml_entity: null });
+  return {
+    recipes: [
+      {
+        id: "stretch",
+        name: "Stretch",
+        doses: [line("silica", 300), line("part_b", 1200), line("part_a", 1200)],
+        ec: 2.0,
+      },
+      { id: "bloom", name: "Bloom", doses: structuredClone(config.batch.recipe), ec: 2.4 },
+      { id: "ripen", name: "Ripen", doses: [line("part_b", 2000), line("part_a", 600)], ec: 1.8 },
+      { id: "flush", name: "Flush", doses: [], ec: null },
+    ],
+    schedule: {
+      start: now?.start ?? null,
+      weeks: ["stretch", "stretch", ...Array(6).fill("bloom"), "ripen", "ripen", "ripen", "flush"],
+    },
+    stage: null,
+    held_until: null,
+  };
+}
 
 interface Dose {
   pump: DosingPump;
@@ -180,11 +211,14 @@ export class DosingDemo {
           ? { device_class: entity.attributes.device_class }
           : {}),
       }));
+    const prefix = roomId.startsWith("room:") ? roomId.slice(5) : "";
+    const feedNow = this.getStates()[dosingConfigId(prefix)]?.attributes.feed;
     // The demo's user is an administrator.
     return structuredClone({
       schema_version: 1,
       room_id: roomId,
-      config,
+      config: { ...config, feed: demoFeed(prefix, config, feedNow) },
+      feed_now: (feedNow as FeedNow | undefined) ?? null,
       candidates,
       can_edit: true,
       error,
@@ -381,6 +415,7 @@ export class DosingDemo {
         handled: status.handled,
         handled_result: status.handled_result,
         history: structuredClone(status.history),
+        mix: structuredClone(status.mix ?? null),
         updated_at: status.updated_at,
       },
       last_changed: old?.state === status.state ? old.last_changed : tx.stamp,
@@ -711,5 +746,23 @@ export class DosingDemo {
     };
     this.remember(room, "batch", batch, batch.doses, result, tx.stamp);
     room.batch = null;
+    // Only a finished batch replaces the last one's mix check (dosing_runner._plan_mix): due 5 min
+    // on, or none in a room that checks nothing. A stopped batch keeps it.
+    if (result.startsWith("finished")) {
+      const engine = tx.get(`sensor.crop_steering_${room.prefix}engine_config`)?.attributes ?? {};
+      room.status.mix = mixChecked(this.getStates(), room.prefix, engine)
+        ? {
+            batch: room.status.batch.started_at,
+            due: new Date(tx.now + MIX_SETTLE_MIN * 60_000).toISOString(),
+            verdict: null,
+            checked_at: null,
+            why: null,
+            gave_up_at: null,
+            ec: null,
+            ph: null,
+            probes: [],
+          }
+        : null;
+    }
   }
 }

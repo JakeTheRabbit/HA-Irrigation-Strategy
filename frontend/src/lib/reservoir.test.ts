@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createDemo } from "./demo";
-import { readStatus, dosingStatusId } from "./dosing";
-import { batchLine, reservoirView, tankLevelId } from "./reservoir";
+import { reservoirView, tankLevelId } from "./reservoir";
 import type { States } from "./types";
 
 const level = (state: string, attributes: Record<string, unknown> = {}): States => ({
@@ -49,30 +48,5 @@ describe("the reservoir minimum in words", () => {
     const states = createDemo(Date.parse("2026-09-28T04:00:00Z"));
     expect(reservoirView(states, "").state).toBe("ok");
     expect(reservoirView(states, "room_b_").state).toBe("unmapped");
-  });
-});
-
-describe("the batch on the tank", () => {
-  it("is absent with no batch dosing reported", () => {
-    expect(batchLine(null)).toBeNull();
-  });
-  it("names the step running now and how far through the batch it is", () => {
-    const status = readStatus({
-      entity_id: dosingStatusId(""),
-      state: "batch",
-      attributes: { batch: { step: "fill", steps: [] } },
-    })!;
-    expect(batchLine(status)).toEqual({
-      label: "Batch running: Fill the tank (step 3 of 8)",
-      tone: "water",
-    });
-  });
-  it("says how the last batch ended", () => {
-    const status = readStatus({
-      entity_id: dosingStatusId(""),
-      state: "idle",
-      attributes: { batch: { step: "idle", result: "stopped by hand", steps: [] } },
-    })!;
-    expect(batchLine(status)).toMatchObject({ label: "Last batch: Stopped by hand", tone: "warn" });
   });
 });
