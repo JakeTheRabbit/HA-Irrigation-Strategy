@@ -1,5 +1,6 @@
 import { dosingConfigId, dosingStatusId, readConfig, readStatus, stockSensorId } from "./dosing";
 import type { OperatorAction } from "./operator-types";
+import { recordDemoEvent } from "./parity-demo/journal";
 import {
   batchesLeft,
   draftErrors,
@@ -268,6 +269,7 @@ export class StockDemo {
       const tank = doc.tanks.find((t) => t.id === data.id);
       if (!tank) throw new Error(`There is no stock tank ${String(data.id)}.`);
       const level = data.level_l;
+      const before = tank.level_l;
       if (level === undefined || level === null) {
         tank.level_l = tank.capacity_l;
         tank.refilled_at = now;
@@ -275,6 +277,12 @@ export class StockDemo {
         tank.level_l = level;
       } else throw new Error("The level must be between 0 L and the tank's capacity.");
       tank.updated_at = now;
+      recordDemoEvent(doc.room_id, "stock.refilled", {
+        tank: tank.id,
+        level_l: tank.level_l,
+        old_level_l: before,
+        full: level === undefined || level === null,
+      });
     } else if (action === "stock_record_batch") {
       const draw: Record<string, number> = {};
       for (const tank of doc.tanks) {

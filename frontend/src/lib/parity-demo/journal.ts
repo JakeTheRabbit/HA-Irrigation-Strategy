@@ -158,12 +158,36 @@ function roomDay(roomId: string, on: number, today: boolean): CsEvent[] {
 
 const tsMs = (e: CsEvent) => Date.parse(e.ts);
 
+/** What the demo's own services journalled this session (its stock refills), as the integration's
+ * would. */
+const recorded: CsEvent[] = [];
+export function recordDemoEvent(roomId: string, kind: string, data: Record<string, unknown>, at = Date.now()) {
+  recorded.push({
+    v: 1,
+    // The time, then a count: events recorded in the same millisecond (a pinned clock) keep their order.
+    id: demoId(at, "").slice(0, 10) + String(recorded.length).padStart(16, "0"),
+    ts: new Date(at).toISOString(),
+    room_id: roomId,
+    zone: null,
+    kind,
+    outcome: "ok",
+    code: null,
+    source: { actor: "manual", detail: null, program_id: null, user_id: "demo-user" },
+    correlation: {},
+    data,
+  });
+}
+
 /** Yesterday's and today's demo events for one room, ordered and numbered. */
 export function demoJournal(roomId: string, now: number): CsEvent[] {
   const room = ROOMS[roomId];
   if (!room) return [];
   const today = lightsOnBefore(now, room.lightsOn);
-  const events = [...roomDay(roomId, today - 86_400_000, false), ...roomDay(roomId, today, true)].sort(
+  const events = [
+    ...roomDay(roomId, today - 86_400_000, false),
+    ...roomDay(roomId, today, true),
+    ...recorded.filter((e) => e.room_id === roomId).map((e) => ({ ...e })),
+  ].sort(
     (a, b) => tsMs(a) - tsMs(b) || a.id.localeCompare(b.id),
   );
   events.forEach((e, i) => (e.seq = i + 1));

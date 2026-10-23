@@ -1,5 +1,7 @@
 import { dayKey } from "./time";
+import type { CsEvent } from "./parity-types";
 import type { Controller } from "./types";
+import { sameValue } from "./utils";
 
 /** A room's stock tanks, as the integration's stock services return them (stock_api.py). */
 export interface StockTank {
@@ -187,9 +189,92 @@ export function weeklyUse(
   return weeks;
 }
 
-/** Undo a refill: saves the tanks again from `current`, the refilled tank back at `priorLevel`, at
- * `current`'s revision, so a change since refuses. Refuses itself when the tank no longer reads the
- * refilled level, and when the answer does not read `priorLevel` back. */
+/** Weeks for Used per week: the last `shown`. A full history (`kept` rows) may have lost the start of
+ * its oldest week, so that week is left out, unless it is this week. */
+export function weeksShown(
+  history: readonly Pick<StockBatch, "at" | "draw_ml">[],
+  tz: string,
+  kept: number,
+  shown: number,
+  now = Date.now(),
+) {
+  const weeks = weeklyUse(history, tz, now);
+  return (history.length >= kept && weeks.length > 1 ? weeks.slice(1) : weeks).slice(-shown);
+}
+
+/** One logged refill to capacity. */
+export interface RefillRow {
+  key: string;
+  tank: string;
+  /** The tank's place on the page, for its colour. */
+  hue: number;
+  at: number;
+  /** Litres added, when the level before is known. */
+  added: number | null;
+  to: number;
+}
+const near = (a: unknown, b: unknown) =>
+  typeof a === "number" && typeof b === "number" && Math.abs(a - b) <= 1e-6;
+/** Refills to capacity, newest first. From the Journal's `stock.refilled` events on 3.18: a set level
+ * (`full: false`) is not a refill, and a refill whose next event on that tank puts its level before
+ * back (an Undo) is left out. On an older integration (`events` null), each tank's last refill, the
+ * only one it keeps, unless `undone` holds it as `<tank id>@<refilled_at>`. */
+export function refillRows(
+  tanks: readonly StockTank[],
+  events: readonly CsEvent[] | null,
+  undone: ReadonlySet<string> = new Set(),
+): RefillRow[] {
+  const index = new Map(tanks.map((tank, i) => [tank.id, i]));
+  const sorted = [...(events ?? [])].sort(
+    (a, b) => Date.parse(a.ts) - Date.parse(b.ts) || (a.seq ?? 0) - (b.seq ?? 0),
+  );
+  const rows: RefillRow[] = events
+    ? sorted.flatMap((event, n) => {
+        const { tank, level_l, old_level_l, full } = event.data as Record<string, unknown>;
+        const i = index.get(String(tank));
+        if (i === undefined || full !== true || typeof level_l !== "number") return [];
+        const next = sorted.slice(n + 1).find((e) => e.data.tank === tank)?.data;
+        if (
+          next &&
+          next.full === false &&
+          near(next.old_level_l, level_l) &&
+          near(next.level_l, old_level_l)
+        )
+          return [];
+        return [
+          {
+            key: event.id,
+            tank: tanks[i].name,
+            hue: i,
+            at: Date.parse(event.ts),
+            added:
+              typeof old_level_l === "number"
+                ? Math.round((level_l - old_level_l) * 1e4) / 1e4
+                : null,
+            to: level_l,
+          },
+        ];
+      })
+    : tanks.flatMap((tank, i) =>
+        tank.refilled_at && !undone.has(`${tank.id}@${tank.refilled_at}`)
+          ? [
+              {
+                key: tank.id,
+                tank: tank.name,
+                hue: i,
+                at: Date.parse(tank.refilled_at),
+                added: null,
+                to: tank.capacity_l,
+              },
+            ]
+          : [],
+      );
+  return rows.filter((row) => Number.isFinite(row.at)).sort((a, b) => b.at - a.at);
+}
+
+/** Undo a refill: the refilled tank back at `priorLevel` through stock_refill (so the Journal records
+ * the put-back), at `current`'s revision, so a change since refuses. Refuses itself when the tank no
+ * longer reads the refilled level, and when the answer does not read `priorLevel` back. */
 export async function undoRefill(
   controller: Pick<Controller, "operator">,
   current: StockDocument,
@@ -199,16 +284,15 @@ export async function undoRefill(
 ): Promise<StockDocument> {
   const tank = current.tanks.find((t) => t.id === tankId);
   const name = tank?.name ?? "The tank";
-  if (!tank || Math.abs(tank.level_l - refilledTo) > 1e-6)
+  if (!tank || !sameValue(String(tank.level_l), refilledTo))
     throw new Error(`${name} has changed since the refill. Nothing was put back.`);
-  const doc = await controller.operator<StockDocument>("stock_save", {
+  const doc = await controller.operator<StockDocument>("stock_refill", {
     expected_revision: current.revision,
-    tanks: current.tanks.map(({ refilled_at: _r, updated_at: _u, level_l: _l, ...rest }) =>
-      rest.id === tankId ? { ...rest, level_l: priorLevel } : rest,
-    ),
+    id: tankId,
+    level_l: priorLevel,
   });
   const back = doc.tanks.find((t) => t.id === tankId);
-  if (!back || Math.abs(back.level_l - priorLevel) > 1e-6)
+  if (!back || !sameValue(String(back.level_l), priorLevel))
     throw new Error(
       `The controller did not confirm ${name} at its previous level. Reload and check it.`,
     );

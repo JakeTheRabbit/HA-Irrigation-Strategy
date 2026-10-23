@@ -25,7 +25,13 @@ import {
 } from "@/components/ui/dialog";
 import { Empty, Heading, number, type Page } from "@/components/dashboard";
 import { UiTip } from "@/components/info-tip";
-import { StockBottle, bottleSize, bottleTop } from "@/components/stock-bottle";
+import {
+  MIN_BOTTLE,
+  StockBottle,
+  bottleSize,
+  bottleTop,
+  percentTop,
+} from "@/components/stock-bottle";
 import {
   dosingConfigId,
   dosingStatusId,
@@ -46,10 +52,12 @@ import {
   batchEveryDays,
   draftErrors,
   nextToRunOut,
+  refillRows,
   stockOutlook,
   stockShare,
   undoRefill,
   weeklyUse,
+  weeksShown,
   type StockBatch,
   type StockDocument,
   type StockTank,
@@ -59,7 +67,7 @@ import { clock, dayLabel, shortDate } from "@/lib/time";
 import type { Controller } from "@/lib/types";
 import { LITRES_PER_US_GALLON } from "@/lib/units";
 import { offerUndo } from "@/lib/undo";
-import { errorText } from "@/lib/utils";
+import { errorText, sameValue } from "@/lib/utils";
 import "./stock.css";
 
 const SOURCES: Record<StockBatch["source"], string> = {
@@ -175,11 +183,7 @@ function TankCard({
           aria-hidden="true"
           style={{
             // In the liquid; just above it while too little shows to hold the number.
-            top: `${
-              share < 25
-                ? bottleTop(tank.level_l, tank.capacity_l, scale) - 7
-                : bottleTop(tank.level_l / 2, tank.capacity_l, scale)
-            }%`,
+            top: `${percentTop(tank.level_l, tank.capacity_l, tank.low_l, scale)}%`,
           }}
         >
           {share}%
@@ -273,10 +277,7 @@ function TankCard({
 
 /** Litres drawn per week, a bar per tank; this week's so far faded. */
 function UsedPerWeek({ doc, tz }: { doc: StockDocument; tz: string }) {
-  let weeks = weeklyUse(doc.history, tz);
-  // A full history may have lost the start of its oldest week: that week is left out.
-  if (doc.history.length >= HISTORY_KEPT) weeks = weeks.slice(1);
-  weeks = weeks.slice(-WEEKS_SHOWN);
+  const weeks = weeksShown(doc.history, tz, HISTORY_KEPT, WEEKS_SHOWN);
   const gal = getDisplayUnits().volume === "gal";
   const unit = gal ? "gal" : "L";
   const shown = (litres: number) => (gal ? litres / LITRES_PER_US_GALLON : litres);
@@ -368,53 +369,17 @@ const weeklyWords = (weeks: ReturnType<typeof weeklyUse>, tanks: StockTank[]) =>
     )
     .join("; ")}`;
 
-/** One logged refill: from the Journal on 3.18; on an older integration, each tank's last refill to
- * capacity (the only one it keeps, without the level before). */
-interface RefillRow {
-  key: string;
-  tank: string;
-  hue: number;
-  at: number;
-  /** Litres added, when the level before is known. */
-  added: number | null;
-  to: number;
-}
-function refillRows(doc: StockDocument, events: CsEvent[] | null): RefillRow[] {
-  const index = new Map(doc.tanks.map((tank, i) => [tank.id, i]));
-  const rows: RefillRow[] = events
-    ? events.flatMap((event) => {
-        const { tank, level_l, old_level_l } = event.data as Record<string, unknown>;
-        const i = index.get(String(tank));
-        if (i === undefined || typeof level_l !== "number") return [];
-        return [
-          {
-            key: event.id,
-            tank: doc.tanks[i].name,
-            hue: i,
-            at: Date.parse(event.ts),
-            added: typeof old_level_l === "number" ? level_l - old_level_l : null,
-            to: level_l,
-          },
-        ];
-      })
-    : doc.tanks.flatMap((tank, i) =>
-        tank.refilled_at
-          ? [
-              {
-                key: tank.id,
-                tank: tank.name,
-                hue: i,
-                at: Date.parse(tank.refilled_at),
-                added: null,
-                to: tank.capacity_l,
-              },
-            ]
-          : [],
-      );
-  return rows.filter((row) => Number.isFinite(row.at)).sort((a, b) => b.at - a.at);
-}
-
-function Refills({ controller, doc }: { controller: Controller; doc: StockDocument }) {
+/** Refills to capacity: from the Journal on 3.18; on an older integration, each tank's last one (the
+ * only one it keeps), less those Undo took back this visit (`undone`, see refillRows). */
+function Refills({
+  controller,
+  doc,
+  undone,
+}: {
+  controller: Controller;
+  doc: StockDocument;
+  undone: ReadonlySet<string>;
+}) {
   const tz = controller.timeZone;
   const journal = useParity<{ events: CsEvent[] }>(
     controller,
@@ -429,9 +394,9 @@ function Refills({ controller, doc }: { controller: Controller; doc: StockDocume
   );
   const rows =
     journal.state === "ready"
-      ? refillRows(doc, journal.data?.events ?? [])
+      ? refillRows(doc.tanks, journal.data?.events ?? [])
       : journal.state === "missing"
-        ? refillRows(doc, null)
+        ? refillRows(doc.tanks, null, undone)
         : [];
   return (
     <section
@@ -453,9 +418,7 @@ function Refills({ controller, doc }: { controller: Controller; doc: StockDocume
                 </span>
                 <span className="stock-refill-date">{shortDate(row.at, tz)}</span>
                 <span className="stock-refill-amount">
-                  {row.added !== null && row.added >= 0
-                    ? `+${volume(Math.round(row.added * 1e4) / 1e4)}, `
-                    : ""}
+                  {row.added !== null && row.added >= 0 ? `+${volume(row.added)}, ` : ""}
                   to {volume(row.to)}
                 </span>
               </li>
@@ -631,6 +594,9 @@ export function StockTanks({
   const [busy, setBusy] = useState(false);
   const [editing, setEditing] = useState<StockTankDraft[] | null>(null);
   const [confirmBatch, setConfirmBatch] = useState(false);
+  // Refills Undo took back this visit, as "<tank id>@<refilled_at>": an older integration keeps the
+  // refill time through the put-back, so Refills leaves these out itself.
+  const [undone, setUndone] = useState<ReadonlySet<string>>(new Set());
   // The newest document, for an Undo pressed after later changes.
   const latest = useRef<StockDocument | null>(null);
   latest.current = doc;
@@ -674,7 +640,7 @@ export function StockTanks({
     const after = await act("stock_refill", { id: tank.id });
     if (!after) return;
     const read = after.tanks.find((t) => t.id === tank.id);
-    if (!read || read.level_l !== tank.capacity_l) {
+    if (!read || !sameValue(String(read.level_l), tank.capacity_l)) {
       toast.error(
         `The controller did not confirm ${tank.name} at ${volume(tank.capacity_l)}. Reload and check it.`,
       );
@@ -687,6 +653,7 @@ export function StockTanks({
         setBusy(true);
         try {
           setDoc(await undoRefill(controller, latest.current, tank.id, read.level_l, before));
+          setUndone((done) => new Set(done).add(`${tank.id}@${read.refilled_at}`));
           toast.success(`${tank.name} put back to ${volume(before)}.`);
         } finally {
           setBusy(false);
@@ -768,7 +735,9 @@ export function StockTanks({
       {doc && !!doc.tanks.length && (
         <>
           <p className="stock-rhythm" data-stock-rhythm>
-            Drawn to scale
+            {doc.tanks.some((tank) => Math.cbrt(tank.capacity_l / largest) < MIN_BOTTLE)
+              ? "Drawn to scale, the smallest tanks a little larger"
+              : "Drawn to scale"}
             {every
               ? ` · one batch every ${number(every, 1)} ${number(every, 1) === "1" ? "day" : "days"} at current use`
               : ""}
@@ -795,7 +764,7 @@ export function StockTanks({
           <div className="stock-lower">
             <UsedPerWeek doc={doc} tz={tz} />
             <div className="stock-side">
-              <Refills controller={controller} doc={doc} />
+              <Refills controller={controller} doc={doc} undone={undone} />
               <p className="stock-source" data-stock-source>
                 {doc.fill_entity ? (
                   <>

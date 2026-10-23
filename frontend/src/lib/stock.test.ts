@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { StockBottle, bottleTop } from "@/components/stock-bottle";
+import { StockBottle, bottleTop, percentTop } from "@/components/stock-bottle";
 import {
   batchEveryDays,
   batchesLeft,
@@ -9,8 +9,10 @@ import {
   nextToRunOut,
   stockShare,
   stockOutlook,
+  refillRows,
   undoRefill,
   weeklyUse,
+  weeksShown,
   type StockBatch,
   type StockDocument,
   type StockTank,
@@ -18,6 +20,8 @@ import {
 } from "./stock";
 import { createDemo } from "./demo";
 import { StockDemo } from "./stock-demo";
+import { journalQuery } from "./parity-demo/journal";
+import type { CsEvent } from "./parity-types";
 
 const draft = (change: Partial<StockTankDraft> = {}): StockTankDraft => ({
   name: "Part B",
@@ -291,40 +295,14 @@ describe("refill undo (E5)", () => {
       },
     };
   };
-  it("refill undo on 3.17 saves the prior level with the revision", async () => {
+  it("refill undo puts the prior level back through stock_refill, so the Journal records it", async () => {
     const { calls, controller } = fake(() => ({
       revision: 8,
       tanks: [tanks[0], { ...tanks[1], level_l: 5.4 }],
     }));
     const doc = await undoRefill(controller, after, "part_b", 20, 5.4);
     expect(doc.revision).toBe(8);
-    expect(calls).toEqual([
-      [
-        "stock_save",
-        {
-          expected_revision: 7,
-          tanks: [
-            {
-              id: "part_a",
-              name: "Part A",
-              capacity_l: 20,
-              dose_ml: 744,
-              dose_entity: null,
-              low_l: 6,
-            },
-            {
-              id: "part_b",
-              name: "Part B",
-              capacity_l: 20,
-              dose_ml: 744,
-              dose_entity: "number.dose_b",
-              low_l: 6,
-              level_l: 5.4,
-            },
-          ],
-        },
-      ],
-    ]);
+    expect(calls).toEqual([["stock_refill", { expected_revision: 7, id: "part_b", level_l: 5.4 }]]);
     expect(JSON.stringify(calls)).not.toMatch(/client|proposal_token/);
   });
 
@@ -366,5 +344,118 @@ describe("stock bottle to scale (E5)", () => {
     ).toBe("translate(20 60) scale(0.6) translate(-20 -60)");
     // The low mark at 1.5 of 5 L, on the full-size drawing: y = 60 - 0.3 × 42 = 47.4 of 62.
     expect(bottleTop(1.5, 5, 1)).toBeCloseTo((47.4 / 62) * 100, 6);
+  });
+});
+
+describe("refills, weeks and the bottle label (E5 review 1)", () => {
+  const tank = (id: string, name: string, refilled_at: string | null = null): StockTank => ({
+    id,
+    name,
+    capacity_l: 20,
+    level_l: 10,
+    dose_ml: 0,
+    dose_entity: null,
+    low_l: 4,
+    refilled_at,
+    updated_at: "u",
+  });
+  const tanks = [tank("part_b", "Part B", "2026-10-20T09:00:00Z"), tank("cleaner", "Line cleaner")];
+  const refilled = (id: string, ts: string, data: Record<string, unknown>) =>
+    ({ id, ts, kind: "stock.refilled", data }) as unknown as CsEvent;
+  it("lists only refills to capacity, never a level someone set", () => {
+    const rows = refillRows(tanks, [
+      refilled("a", "2026-10-21T09:00:00Z", {
+        tank: "cleaner",
+        level_l: 0.8,
+        old_level_l: 1.1,
+        full: false,
+      }),
+      refilled("b", "2026-10-21T10:00:00Z", {
+        tank: "part_b",
+        level_l: 20,
+        old_level_l: 3.4,
+        full: true,
+      }),
+    ]);
+    expect(rows.map((r) => [r.key, r.tank, r.added, r.to])).toEqual([["b", "Part B", 16.6, 20]]);
+  });
+  it("leaves out a refill that was put back, on 3.18 by its put-back and on 3.17 by the undone list", () => {
+    const events = [
+      refilled("b", "2026-10-21T10:00:00Z", {
+        tank: "part_b",
+        level_l: 20,
+        old_level_l: 5.4,
+        full: true,
+      }),
+      refilled("c", "2026-10-21T10:00:20Z", {
+        tank: "part_b",
+        level_l: 5.4,
+        old_level_l: 20,
+        full: false,
+      }),
+      refilled("d", "2026-10-21T11:00:00Z", {
+        tank: "part_b",
+        level_l: 20,
+        old_level_l: 5.4,
+        full: true,
+      }),
+    ];
+    expect(refillRows(tanks, events).map((r) => r.key)).toEqual(["d"]);
+    expect(refillRows(tanks, null).map((r) => r.key)).toEqual(["part_b"]);
+    expect(refillRows(tanks, null, new Set(["part_b@2026-10-20T09:00:00Z"]))).toEqual([]);
+  });
+  it("journals each demo refill, a set level as not full", () => {
+    const stock = new StockDemo(() => ({}));
+    const room = "room:";
+    let doc = stock.call("stock_get", { room_id: room });
+    const since = new Date(Date.now() - 60_000).toISOString();
+    doc = stock.call("stock_refill", {
+      room_id: room,
+      expected_revision: doc.revision,
+      id: "part_b",
+    });
+    stock.call("stock_refill", {
+      room_id: room,
+      expected_revision: doc.revision,
+      id: "cleaner",
+      level_l: 0.8,
+    });
+    // The module's Journal also holds the refills of the tests above, in the same demo room.
+    const page = journalQuery({ room_id: room, since, kinds: ["stock.refilled"] }, Date.now());
+    expect(page.events.map((e) => e.data)).toEqual(
+      expect.arrayContaining([
+        { tank: "part_b", level_l: 20, old_level_l: 5.4, full: true },
+        { tank: "cleaner", level_l: 0.8, old_level_l: 3.9, full: false },
+      ]),
+    );
+    expect(page.events.every((e) => e.source.actor === "manual")).toBe(true);
+  });
+  it("never drops this week from Used per week, even when the full history sits in it", () => {
+    const tz = "UTC";
+    const now = Date.parse("2026-10-23T12:00:00Z");
+    const history = Array.from({ length: 30 }, (_, i) => ({
+      at: new Date(now - i * 3_600_000).toISOString(),
+      draw_ml: { part_b: 100 },
+    }));
+    const weeks = weeksShown(history, tz, 30, 8, now);
+    expect(weeks.map((w) => [w.week, w.partial, w.byTank.part_b])).toEqual([
+      ["2026-10-19", true, 3],
+    ]);
+    const older = [...history, { at: "2026-10-08T12:00:00Z", draw_ml: { part_b: 50 } }];
+    // A full history spanning weeks loses its oldest (maybe cut short) week, never this one.
+    expect(weeksShown(older, tz, 30, 8, now).map((w) => w.week)).toEqual([
+      "2026-10-12",
+      "2026-10-19",
+    ]);
+  });
+  it("keeps the percent clear of the dashed low line", () => {
+    // Line cleaner at 0.8 of 5 L, low 1 L: the label goes above the low line, not on it.
+    const label = percentTop(0.8, 5, 1, 1);
+    const low = bottleTop(1, 5, 1);
+    expect(low - label).toBeGreaterThanOrEqual(8);
+    // 30% full with the low line at 15%: the middle of the liquid is the low line, so it moves.
+    expect(Math.abs(percentTop(6, 20, 3, 1) - bottleTop(3, 20, 1))).toBeGreaterThanOrEqual(8);
+    // A well-filled bottle keeps it in the middle of the liquid.
+    expect(percentTop(15, 20, 4, 1)).toBeCloseTo(bottleTop(7.5, 20, 1), 6);
   });
 });
