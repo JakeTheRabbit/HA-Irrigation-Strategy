@@ -244,8 +244,30 @@ node frontend/scripts/verify-workspace.mjs
 node frontend/scripts/verify-steering-visuals.mjs
 node frontend/scripts/verify-recipe-library.mjs
 node frontend/scripts/verify-tank-status.mjs
+node frontend/scripts/verify-calibration.mjs
 node frontend/scripts/verify-ha-shell.mjs
+node frontend/scripts/verify-navigation.mjs
+node frontend/scripts/verify-ai-instructions.mjs
+node frontend/scripts/verify-irrigation-workspace.mjs
 ```
+
+The Academy has its own browser suites. They need the compiled catalogue, the pinned lesson media (about 660 MB, checksum-verified) and a static server on port 8794; `BROWSER_CHANNEL=chrome` is needed because the lesson videos are H.264, which Playwright's bundled Chromium cannot decode (CI uses Chrome too):
+
+```sh
+python scripts/build_course.py
+python scripts/install_course_media.py
+python scripts/build_course.py --verify-media
+node frontend/node_modules/vite/bin/vite.js preview --outDir www --host 127.0.0.1 --port 8794 &
+export BROWSER_CHANNEL=chrome
+node tests/academy.browser.mjs
+node tests/academy-navigation.browser.mjs
+node tests/academy-video.browser.mjs
+node tests/academy-media.browser.mjs
+```
+
+`tests/academy-scene-sync.browser.mjs` is the one browser check CI does not run: it needs the private production masters (`ACADEMY_PRODUCTION`, see [ACADEMY.md](ACADEMY.md)).
+
+Some scripts also render the screenshots used in the README. By default those go to the untracked `output/playwright/readme/`, so running the tests leaves the tree clean. To refresh the committed `img/` files, set `UPDATE_README_IMAGES=1` when running a script, or run `node frontend/scripts/capture-readme.mjs` (see [SCREENSHOTS.md](SCREENSHOTS.md)).
 
 The browser scripts start loopback servers. Demo workflows reject API/external traffic; mocked-HA workflows intercept all API calls. The checks cover all eleven pages, desktop/mobile navigation, accessibility, drafts, partial failures, readback, room identity, stale probes, and legacy route compatibility. Screenshots and JSON results are written to `output/playwright/`. This frontend job also runs in GitHub CI. The Python packaging tests verify that the HA and add-on artifacts match and retain room/demo navigation.
 

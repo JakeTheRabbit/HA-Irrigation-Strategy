@@ -5,6 +5,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
 import AxeBuilder from "@axe-core/playwright";
+import { readmeImage } from "./readme-images.mjs";
 const out = fileURLToPath(new URL("../../output/playwright/", import.meta.url));
 await mkdir(out, { recursive: true });
 const html = await readFile(new URL("../../www/dashboard.html", import.meta.url));
@@ -130,7 +131,7 @@ try {
         window.scrollTo(0, 0);
       });
       await page.screenshot({
-        path: fileURLToPath(new URL("../../img/manual-setpoints.png", import.meta.url)),
+        path: readmeImage("manual-setpoints.png"),
       });
       await zoneTab(2).click();
       assert.equal(await otherFloor.inputValue(), other, "Zone 2 remains unchanged");
@@ -222,7 +223,7 @@ try {
     ]);
     await graph.scrollIntoViewIfNeeded();
     await graph.screenshot({
-      path: fileURLToPath(new URL("../../img/plan-graph.png", import.meta.url)),
+      path: readmeImage("plan-graph.png"),
     });
     // What the probes recorded over days, against the targets: on the zone's page, on request.
     await shot.evaluate(() => (location.hash = "#/zone/1"));
@@ -233,7 +234,7 @@ try {
     await history.locator('[aria-label^="History chart:"]').first().waitFor();
     await history.scrollIntoViewIfNeeded();
     await history.screenshot({
-      path: fileURLToPath(new URL("../../img/sensor-history.png", import.meta.url)),
+      path: readmeImage("sensor-history.png"),
     });
     await pinned.close();
   });
@@ -352,7 +353,7 @@ try {
     assert.match(await page.locator('.desktop-sidebar .room-tree-row[data-room="room:"]').innerText(), /Room off/);
     await page.evaluate(() => window.scrollTo(0, 0));
     await page.screenshot({
-      path: fileURLToPath(new URL("../../img/room-off.png", import.meta.url)),
+      path: readmeImage("room-off.png"),
       clip: { x: 0, y: 0, width: 1600, height: 760 },
     });
   });
@@ -532,7 +533,7 @@ try {
         window.scrollTo(0, 0);
       });
       await page.screenshot({
-        path: fileURLToPath(new URL("../../img/run-comparison.png", import.meta.url)),
+        path: readmeImage("run-comparison.png"),
         fullPage: true,
       });
       // Archived and restored in History › Grows; each room keeps its own records.

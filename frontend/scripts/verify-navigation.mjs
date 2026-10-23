@@ -1,7 +1,9 @@
-/** Demo-only navigation and landing regression checks. Set DASHBOARD_URL for a packaged build. */
+/** Demo-only navigation and landing regression checks. Serves the compiled www/dashboard.html itself; set DASHBOARD_URL to test another server. */
 import assert from "node:assert/strict";
 import { chromium } from "playwright";
-const entry = new URL(process.env.DASHBOARD_URL || "http://127.0.0.1:5270/");
+import { serveDashboard } from "./dashboard-server.mjs";
+const served = process.env.DASHBOARD_URL ? null : await serveDashboard();
+const entry = new URL(process.env.DASHBOARD_URL || `${served.origin}/`);
 entry.search = "?demo=1";
 entry.hash = "";
 const browser = await chromium.launch({
@@ -114,4 +116,5 @@ try {
   );
 } finally {
   await browser.close();
+  await served?.close();
 }

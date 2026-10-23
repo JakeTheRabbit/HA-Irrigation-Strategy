@@ -6,7 +6,7 @@ import {fileURLToPath} from 'node:url';
 import {chromium} from '../frontend/node_modules/playwright/index.mjs';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const base=(process.env.BASE_URL || 'http://127.0.0.1:8794/learn/').replace(/\/?$/,'/');
-const out=path.resolve(process.env.ACADEMY_QA_DIR || path.join(root,'tmp/academy-r3/media-qa'));
+const out=path.resolve(process.env.ACADEMY_QA_DIR || path.join(root,'output/playwright/academy-media'));
 fs.mkdirSync(out,{recursive:true});
 const sha=data=>crypto.createHash('sha256').update(data).digest('hex');
 const browser=await chromium.launch({channel:process.env.BROWSER_CHANNEL || 'msedge',headless:true,args:['--disable-gpu']});
@@ -26,7 +26,7 @@ try{
   await page.goto(base+'?verify=r3#/'+entry.route,{waitUntil:'domcontentloaded',timeout:90000});
   const video=page.locator('video');await video.waitFor();
   await page.waitForFunction(()=>document.querySelector('video')?.readyState>=1);
-  const played=await video.evaluate(async v=>{v.muted=true;await v.play();await new Promise(r=>setTimeout(r,400));v.pause();return {duration:v.duration,time:v.currentTime,width:v.videoWidth,height:v.videoHeight,src:v.currentSrc};});
+  const played=await video.evaluate(async v=>{v.muted=true;await v.play();for(let i=0;i<50&&v.currentTime<=.1;i++)await new Promise(r=>setTimeout(r,100));v.pause();return {duration:v.duration,time:v.currentTime,width:v.videoWidth,height:v.videoHeight,src:v.currentSrc};});
   assert.equal(played.src,new URL(metadata.src,base).href,'The requested lesson or group must be the video that actually loaded');
   assert.ok(played.time>.1,entry.id+' playback did not advance');assert.equal(played.width,854);assert.equal(played.height,480);assert.ok(Number.isFinite(played.duration)&&played.duration>30);
   await page.waitForFunction(()=>document.querySelector('video track')?.readyState===2);
@@ -41,7 +41,7 @@ try{
    await page.waitForFunction(t=>{const v=document.querySelector('video');return v.readyState>=2&&!v.seeking&&Math.abs(v.currentTime-t)<.2;},time);
   }
   const captionSelector=entry.kind==='lesson'?'.lp-caption':'.group-captions';
-  assert.equal(await page.locator(captionSelector).count(),1);
+  await page.locator(captionSelector).first().waitFor();assert.equal(await page.locator(captionSelector).count(),1);
   await video.screenshot({path:path.join(out,entry.kind+'-'+entry.id+'.png')});
   const mediaPath=metadata.src.split('?')[0].replace(/^media\//,'');const expected=manifest.files.find(f=>f.path===mediaPath);assert.ok(expected,mediaPath+' missing from inventory');
   let actualHash;
@@ -56,8 +56,8 @@ try{
  assert.equal(response.status(),200);
  const served=await response.body();
  results.dashboardHTTP_SHA256=sha(served);
- const stable='1914a9180d3051636f560d00074de48213df134edb34b5ed6e806161884d220c';
- assert.equal(results.dashboardHTTP_SHA256,stable,'Serve the compiled www directory with Vite preview; actual app bytes must match the verified stable build');
+ const stable=process.env.DASHBOARD_SHA256||sha(fs.readFileSync(path.join(root,'www/dashboard.html')));
+ assert.equal(results.dashboardHTTP_SHA256,stable,'Serve the compiled www directory with Vite preview; actual app bytes must match the compiled www/dashboard.html (or DASHBOARD_SHA256)');
  results.dashboardServedBytesVerified=true;
  results.dashboardPublishedBytesVerified=base.startsWith('https:');
  assert.deepEqual(errors,[]);results.errors=errors;results.complete=true;

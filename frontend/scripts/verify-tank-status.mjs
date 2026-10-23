@@ -4,12 +4,12 @@ import { createServer } from "node:http";
 import { readFile, mkdir, writeFile } from "node:fs/promises";
 import { chromium } from "playwright";
 import AxeBuilder from "@axe-core/playwright";
+import { readmeImage } from "./readme-images.mjs";
 const html = await readFile(new URL("../../www/dashboard.html", import.meta.url));
 const out = new URL("../../output/playwright/", import.meta.url);
 const file = (name) => new URL(name, out).pathname.replace(/^\/([A-Za-z]:)/, "$1");
 // The README's screenshots.
-const img = (name) =>
-  new URL(`../../img/${name}`, import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1");
+const img = readmeImage;
 await mkdir(out, { recursive: true });
 const server = createServer((req, res) => {
   res.writeHead(200, { "Content-Type": "text/html" });
