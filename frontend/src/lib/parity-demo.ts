@@ -1,6 +1,7 @@
 import { demoBackend, type DemoBackend } from "./demo";
 import { PARITY_ACTIONS, type ParityAction } from "./parity-api";
 import { DEMO_TIMER_PROGRAM_ID, demoId, demoJournal } from "./parity-demo/journal";
+import { demoSystemStatus } from "./parity-demo/system";
 import { demoTargetChanges } from "./parity-demo/targets";
 import type {
   AlertPreview,
@@ -9,7 +10,6 @@ import type {
   DashboardList,
   HistoryChange,
   SupplyDoc,
-  SystemStatus,
   TimelineBlock,
   TimelineGetData,
   TimelineSummary,
@@ -192,29 +192,6 @@ const preview = (now: number): AlertPreview => ({
   sentence: "It wouldn't have fired in the last 24 h. Lowest was 46%.",
 });
 
-const status = (now: number): SystemStatus => ({
-  controller: "running", addon_version: "3.18.0", ha_version: "2026.10.1",
-  ai: { model: "claude-haiku-4-5", calls_today: 42, daily_budget: 200, pct_used: 21 },
-  card_version: "3.18.0",
-  rooms: DEMO_ROOMS.map((room_id, index) => {
-    const entity = (n: number) => ({
-      entity_id: `sensor.crop_steering_${room_id.slice(5)}vwc_zone_${n}`, name: `Zone ${n} VWC`, kind: "probe_vwc" as const,
-      zone: n, last_seen: iso(now - 40_000), last_change: iso(now - 40_000), ok: !(index === 1 && n === 2),
-      uptime_7d_pct: index === 1 && n === 2 ? 92.85714285714286 : 100,
-    });
-    const probes = [1, 2, 3].map(entity);
-    return {
-      room_id, pct_online: index ? 66.66666666666667 : 100, alerts_open: 1,
-      entities: probes.map(({ entity_id, last_seen, ok }) => ({ entity_id, last_seen, ok })),
-      groups: [{ kind: "probe_vwc", entities: probes }],
-      heartbeat: {
-        last_beat: iso(now - 18_000), age_s: 18, controller: "running", interval_s: 60,
-        beats: Array.from({ length: 10 }, (_, i) => ({ at: iso(now - (10 - i) * 60_000), missed: false, readback_ms: null })),
-      },
-    };
-  }),
-});
-
 const DASHBOARDS: DashboardList = {
   dashboards: [],
   templates: [
@@ -269,7 +246,7 @@ const DEFAULTS: Record<Exclude<ParityAction, StatefulAction>, (data: Record<stri
   timer_skip: (d) => ({ skip: { zone: d.zone ?? null, at: d.at ?? null, until: typeof d.at === "string" ? iso(Date.parse(d.at) + 15 * 60_000) : null }, revision: 2 }),
   dashboard_create: (d) => ({ url_path: `crop-steering-${String(d.template ?? "facility_wall")}-1`, title: d.title ?? "Crop Steering" }),
   dashboard_list: () => structuredClone(DASHBOARDS),
-  system_status_get: (_d, now) => status(now),
+  system_status_get: (_d, now) => demoSystemStatus(now),
 };
 
 /** The demo's v2 integration: a lane handler whose `match` accepts the call, else Task 3's default.

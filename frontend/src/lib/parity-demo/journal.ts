@@ -110,7 +110,7 @@ function roomDay(roomId: string, on: number, today: boolean): CsEvent[] {
   if (roomId === "room:")
     add(on + 270 * MIN, "alert.raised", { key: "pore_ec_high", title: "Pore EC 6.6 is over the 4.5–6.0 band", entity_id: "sensor.crop_steering_ec_zone_2" }, { zone: 2, code: "CS-205", outcome: "partial" });
   else
-    add(on + 270 * MIN, "alert.raised", { key: "probe_silent", title: "Back sensor silent 3 h, left out of the reading" }, { zone: 2, code: "CS-406", outcome: "partial" });
+    add(on + 270 * MIN, "alert.raised", { key: "probe_silent", title: "Back sensor silent 3 h, left out of the reading" }, { zone: 2, code: "CS-102", outcome: "partial" });
   const paused = today ? room.paused : undefined;
   if (paused)
     add(on - paused.minutesBeforeOn * MIN, "config.changed", {

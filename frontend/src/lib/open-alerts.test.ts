@@ -74,6 +74,7 @@ describe("openAlerts", () => {
         code: "CS-301",
         title: "Zone 3 valve didn't open",
         ruleId: null,
+        entityId: null,
         at: Date.parse("2026-10-22T11:00:00+13:00"),
       },
       {
@@ -83,6 +84,7 @@ describe("openAlerts", () => {
         code: null,
         title: "Feed pH above 6.2",
         ruleId: "r1",
+        entityId: "sensor.feed_ph",
         at: Date.parse("2026-10-22T10:00:00+13:00"),
       },
     ]);
