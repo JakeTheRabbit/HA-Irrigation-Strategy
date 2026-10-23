@@ -1,9 +1,11 @@
 import type { ApplyReceipt, ReviewRow } from "@/components/review-apply";
 import { getDisplayUnits } from "./display-units";
+import type { SetupRoom } from "./operator-types";
 import type { V2Outcome } from "./parity-api";
 import type { CapacityPair, SupplyDoc, SupplyPreview } from "./parity-types";
 import { UndoError } from "./undo";
 import { LITRES_PER_US_GALLON } from "./units";
+import { errorText } from "./utils";
 
 /** Pump capacity and exclusive groups (Setup: pumps & valves). The verdicts come from the
  * integration's own `capacity_check`; the "what can run together" rows are display layout only. */
@@ -22,8 +24,13 @@ export function flowValue(lph: number, litreDigits: number): string {
   return getDisplayUnits().volume === "gal" ? (lph / LITRES_PER_US_GALLON).toFixed(litreDigits + 1) : lph.toFixed(litreDigits);
 }
 export const flowUnit = () => (getDisplayUnits().volume === "gal" ? "gal/h" : "L/h");
-/** How many decimals a stored number carries (never round past it). */
-export const digitsOf = (n: number) => (String(n).split(".")[1] ?? "").length;
+/** How many decimals a stored number carries (never round past it); float noise from a sum or a
+ * product (57.599999999999994) is not a digit. */
+export const digitsOf = (n: number) => (String(Number(n.toPrecision(12))).split(".")[1] ?? "").length;
+/** A flow at its own digits. */
+export const lphText = (n: number) => flowText(n, digitsOf(n));
+/** The same flow, give or take float noise (a gal/h value converted back to L/h). */
+const sameFlow = (a: number | null | undefined, b: number) => a != null && Math.abs(a - b) <= 1e-9 * Math.max(1, Math.abs(b));
 /** A typed flow in the display unit, back to L/h; null when it is not a flow above 0. */
 export function parseFlow(text: string): number | null {
   const t = text.trim().replace(",", ".");
@@ -52,7 +59,7 @@ export function supplyChecks(doc: SupplyDoc, demand?: Record<string, number>): C
   const c = doc.capacity_check;
   if (c.max_flow_lph == null) return [];
   const max = c.max_flow_lph;
-  const checks: Check[] = [{ ok: true, text: `Pump max flow ${flowText(max, 0)} is in range` }];
+  const checks: Check[] = [{ ok: true, text: `Pump max flow ${lphText(max)} is in range` }];
   // A pump that passes feeds its worst mix, so each zone alone; else each zone must share a pair
   // that fits.
   const key = (ref: CapacityPair["zones"][number]) => (typeof ref === "number" ? String(ref) : `${ref.room_id}/${ref.zone}`);
@@ -65,7 +72,7 @@ export function supplyChecks(doc: SupplyDoc, demand?: Record<string, number>): C
   // One zone at a time is never refused: a zone bigger than its pump still waters (CS-214 warns).
   if ((c.pumps ?? []).some((p) => !p.ok && p.max_concurrent_zones < 2))
     for (const [zone, need] of Object.entries(demand ?? {}))
-      if (need > max) checks.push({ ok: "warn", text: `Zone ${zone} alone needs ${flowText(need, digitsOf(need) ? 1 : 0)}, more than the pump's ${flowText(max, 0)}` });
+      if (need > max) checks.push({ ok: "warn", text: `Zone ${zone} alone needs ${lphText(need)}, more than the pump's ${lphText(max)}` });
   for (const p of c.pairs)
     if (p.pct_of_pump != null && p.pct_of_pump > 100)
       checks.push({ ok: "warn", text: `${zonesText(p.zones)} need ${pctText(p.pct_of_pump)}: shots queue, one after another` });
@@ -190,7 +197,7 @@ const isDripper = (r: ReviewRow) => r.id.startsWith("dripper:");
 
 /** Apply: supply_save first (pump and groups), then setup_save for the dripper flows. A refused or
  * unconfirmed supply save stops there; a dripper flow not written is named with what the controller
- * still holds. */
+ * still holds. Pump and group rows with no supply save (no pump mapped) are not written. */
 export async function applySupply(
   io: SupplyApplyIo,
   rows: ReviewRow[],
@@ -219,6 +226,7 @@ export async function applySupply(
       return { at: now, ok: false, unconfirmed: true, failed: rows.map((r) => ({ id: r.id, holds: r.before })), summary: "", eventIds: out.eventIds };
     eventIds = out.eventIds;
   }
+  const unsaved = io.saveSupply ? [] : pumpRows.map((r) => ({ id: r.id, holds: r.before, label: r.label }));
   const result: DripperResult = edits.length && io.saveDrippers ? await io.saveDrippers(edits) : { holds: {} };
   const failed: ApplyReceipt["failed"] = [];
   const notConfirmed: string[] = [];
@@ -226,13 +234,13 @@ export async function applySupply(
     const holds = result.holds[edit.zone];
     const label = rows.find((r) => r.id === edit.rowId)?.label ?? `Zone ${edit.zone} dripper flow`;
     if (holds == null) notConfirmed.push(edit.rowId);
-    else if (holds !== edit.after) failed.push({ id: edit.rowId, holds: flowText(holds, 1), label });
+    else if (!sameFlow(holds, edit.after)) failed.push({ id: edit.rowId, holds: flowText(holds, Math.max(1, digitsOf(holds))), label });
   }
-  const left = new Set([...failed.map((f) => f.id), ...notConfirmed]);
+  const left = new Set([...unsaved.map((f) => f.id), ...failed.map((f) => f.id), ...notConfirmed]);
   const receipt: ApplyReceipt = {
     at: now,
     ok: !left.size,
-    failed,
+    failed: [...unsaved, ...failed],
     ...(notConfirmed.length ? { notConfirmed } : {}),
     summary: rows
       .filter((r) => !left.has(r.id))
@@ -240,9 +248,10 @@ export async function applySupply(
       .join(" · "),
     eventIds,
   };
-  if (failed.length && !notConfirmed.length)
+  if ((unsaved.length || failed.length) && !notConfirmed.length)
     receipt.message = [
-      pumpRows.length ? "Pump settings were saved." : "",
+      pumpRows.length && !unsaved.length ? "Pump settings were saved." : "",
+      ...unsaved.map((f) => `${f.label} was not saved: this room has no pump mapped.`),
       ...failed.map((f) => `${f.label} was not: controller still holds ${f.holds}.`),
     ]
       .filter(Boolean)
@@ -270,8 +279,59 @@ export async function undoSupply(io: SupplyApplyIo, edits: DripperEdit[]): Promi
   if (!edits.length || !io.saveDrippers) return;
   const result = await io.saveDrippers(edits);
   for (const edit of edits) {
-    if (result.holds[edit.zone] !== edit.after)
+    if (!sameFlow(result.holds[edit.zone], edit.after))
       stop(result.reason ?? "The controller did not confirm the previous value. Reload and check it before trying again.");
     reverted++;
+  }
+}
+
+/** What Undo puts back: the pump and groups as they were before `revision` (null: no supply save),
+ * and the dripper edits run back. `partial`: that apply did not all take, so its receipt had no Undo. */
+export interface SupplyUndo {
+  pumps: SupplyDoc["irrigation_pumps"];
+  groups: SupplyDoc["zone_groups"];
+  revision: number | null;
+  edits: DripperEdit[];
+  partial: boolean;
+}
+/** The Undo after an apply. A Try again after a partial apply (the rows left over, no new pump
+ * change) carries the earlier one: its pump save and its dripper edits stay in this Undo. */
+export function nextUndo(prev: SupplyUndo | null, applied: SupplyUndo): SupplyUndo {
+  if (!prev?.partial || applied.revision !== null) return applied;
+  return { ...prev, edits: [...prev.edits, ...applied.edits], partial: applied.partial };
+}
+
+/** A write that may still have landed: nothing says what the controller holds. */
+const UNSURE = /timed out|did not confirm|unconfirmed|connection|closed/i;
+export interface DripperSetupIo {
+  read: () => Promise<SetupRoom | null>;
+  save: (payload: Record<string, unknown>) => Promise<SetupRoom>;
+}
+/** Dripper flows go through the room's setup: read fresh, refuse a value changed since, write,
+ * and read back what the controller holds. */
+export async function saveDripperFlows(io: DripperSetupIo, list: DripperEdit[]): Promise<DripperResult> {
+  const fresh = await io.read();
+  const holds = (r: SetupRoom | null) =>
+    Object.fromEntries(list.map((e) => [e.zone, r?.zones.find((z) => z.id === e.zone)?.dripper_flow_rate ?? null]));
+  if (!fresh) return { holds: holds(null) };
+  const now = holds(fresh);
+  if (list.some((e) => !sameFlow(now[e.zone], e.before))) return { holds: now, reason: "The dripper flow changed since you started editing." };
+  try {
+    const room = await io.save({
+      entry_id: fresh.entry_id,
+      expected_revision: fresh.revision,
+      room_name: fresh.room_name,
+      active: fresh.active,
+      zones: fresh.zones.map((z) => {
+        const e = list.find((x) => x.zone === z.id);
+        return e ? { ...z, dripper_flow_rate: e.after } : z;
+      }),
+      hardware: fresh.hardware,
+      ...(fresh.plumbing ? { plumbing: fresh.plumbing } : {}),
+    });
+    return { holds: holds(room) };
+  } catch (error) {
+    const reason = errorText(error);
+    return UNSURE.test(reason) ? { holds: holds(null), reason } : { holds: now, reason };
   }
 }

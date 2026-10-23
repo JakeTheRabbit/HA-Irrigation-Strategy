@@ -16,9 +16,12 @@ import {
   flowUnit,
   flowValue,
   forPump,
+  lphText,
+  nextUndo,
   overCapacityText,
   parseFlow,
   reviewChecks,
+  saveDripperFlows,
   togetherRows,
   togetherVerdict,
   undoSupply,
@@ -26,6 +29,7 @@ import {
   type DripperEdit,
   type DripperResult,
   type SupplyApplyIo,
+  type SupplyUndo,
 } from "@/lib/supply";
 import type { Controller } from "@/lib/types";
 import { errorText } from "@/lib/utils";
@@ -33,8 +37,6 @@ import "./supply-editor.css";
 
 const FEATURE = "Pump capacity and exclusive groups";
 const GROUPS = ["", "A", "B"];
-/** A write that may still have landed: nothing says what the controller holds. */
-const UNSURE = /timed out|did not confirm|unconfirmed|connection|closed/i;
 
 interface Draft {
   maxFlow: string | null;
@@ -46,7 +48,6 @@ const EMPTY: Draft = { maxFlow: null, concurrency: null, groups: {}, drippers: {
 type Load = { state: "loading" | "missing" | "error" | "ready"; doc: SupplyDoc | null; error: string | null };
 
 const pct = (n: number) => `${Math.round(n)}%`;
-const lph = (n: number) => flowText(n, digitsOf(n) > 1 ? 1 : 0);
 
 /** Setup: pumps & valves. The room's pump (max flow, zones at once), its zones' drippers and
  * exclusive groups, and what can run together; supply_save first, then setup_save for the dripper
@@ -61,7 +62,7 @@ export function SupplyEditor({ controller, onDirtyChange }: { controller: Contro
   const [refusal, setRefusal] = useState<{ text: string; suggest: number | null } | null>(null);
   // Why a dripper flow was not written, by zone; editing that zone's field clears it.
   const [dripperReason, setDripperReason] = useState<Record<string, string>>({});
-  const [last, setLast] = useState<{ pumps: SupplyDoc["irrigation_pumps"]; groups: SupplyDoc["zone_groups"]; revision: number | null; edits: DripperEdit[] } | null>(null);
+  const [last, setLast] = useState<SupplyUndo | null>(null);
 
   const readSetup = useCallback(async () => {
     try {
@@ -126,8 +127,8 @@ export function SupplyEditor({ controller, onDirtyChange }: { controller: Contro
     rows.push({
       id: "max_flow",
       label: "Pump max flow",
-      before: baseMax === null ? "not set" : lph(baseMax),
-      after: lph(maxLph),
+      before: baseMax === null ? "not set" : lphText(baseMax),
+      after: lphText(maxLph),
       undo: () => setDraft((d) => ({ ...d, maxFlow: null })),
     });
   if (draft.concurrency !== null && draft.concurrency !== baseConc)
@@ -204,35 +205,18 @@ export function SupplyEditor({ controller, onDirtyChange }: { controller: Contro
       ? { text: overCapacityText(ownRow.max_concurrent_zones, ownRow.suggest_max_concurrent), suggest: ownRow.suggest_max_concurrent }
       : null);
 
-  // Dripper flows go through the room's setup: read fresh, refuse a value changed since, write,
-  // and read back what the controller holds.
-  const saveDrippers = async (list: DripperEdit[]): Promise<DripperResult> => {
-    const fresh = await readSetup();
-    const holds = (r: SetupRoom | null) =>
-      Object.fromEntries(list.map((e) => [e.zone, r?.zones.find((z) => z.id === e.zone)?.dripper_flow_rate ?? null]));
-    if (!fresh) return { holds: holds(null) };
-    const now = holds(fresh);
-    if (list.some((e) => now[e.zone] !== e.before)) return { holds: now, reason: "The dripper flow changed since you started editing." };
-    try {
-      const room = await controller.operator<SetupRoom>("setup_save", {
-        entry_id: fresh.entry_id,
-        expected_revision: fresh.revision,
-        room_name: fresh.room_name,
-        active: fresh.active,
-        zones: fresh.zones.map((z) => {
-          const e = list.find((x) => x.zone === z.id);
-          return e ? { ...z, dripper_flow_rate: e.after } : z;
-        }),
-        hardware: fresh.hardware,
-        ...(fresh.plumbing ? { plumbing: fresh.plumbing } : {}),
-      });
-      setSetup(room);
-      return { holds: holds(room) };
-    } catch (error) {
-      const reason = errorText(error);
-      return UNSURE.test(reason) ? { holds: holds(null), reason } : { holds: now, reason };
-    }
-  };
+  const saveDrippers = (list: DripperEdit[]): Promise<DripperResult> =>
+    saveDripperFlows(
+      {
+        read: readSetup,
+        save: async (payload) => {
+          const saved = await controller.operator<SetupRoom>("setup_save", payload);
+          setSetup(saved);
+          return saved;
+        },
+      },
+      list,
+    );
   const saveSupplyWith = (section: ReturnType<typeof sectionOf>, revision: number) => async () => {
     const out = await callV2<SupplyDoc>(controller, "supply_save", { ...section, expected_revision: revision });
     if (out.kind === "ok") setLoad({ state: "ready", doc: out.data, error: null });
@@ -266,17 +250,21 @@ export function SupplyEditor({ controller, onDirtyChange }: { controller: Contro
       const kept = new Set([...receipt.failed.map((f) => f.id), ...(receipt.notConfirmed ?? [])]);
       if (receipt.unconfirmed || (receipt.message && !receipt.summary)) return receipt;
       setDraft((d) => ({
-        maxFlow: null,
-        concurrency: null,
-        groups: {},
+        maxFlow: kept.has("max_flow") ? d.maxFlow : null,
+        concurrency: kept.has("max_concurrent") ? d.concurrency : null,
+        groups: Object.fromEntries(Object.entries(d.groups).filter(([zone]) => kept.has(`group:${zone}`))),
         drippers: Object.fromEntries(Object.entries(d.drippers).filter(([zone]) => kept.has(`dripper:${zone}`))),
       }));
-      setLast({
-        pumps: before.irrigation_pumps,
-        groups: before.zone_groups,
-        revision: payload ? revision : null,
-        edits: edits.filter((e) => !kept.has(e.rowId)).map((e) => ({ ...e, before: e.after, after: e.before })),
-      });
+      // A partial apply shows no Undo: a Try again carries it into its own.
+      setLast((prev) =>
+        nextUndo(prev, {
+          pumps: before.irrigation_pumps,
+          groups: before.zone_groups,
+          revision: payload ? revision : null,
+          edits: edits.filter((e) => !kept.has(e.rowId)).map((e) => ({ ...e, before: e.after, after: e.before })),
+          partial: !receipt.ok,
+        }),
+      );
     }
     return receipt;
   };
@@ -296,6 +284,8 @@ export function SupplyEditor({ controller, onDirtyChange }: { controller: Contro
   };
   const discard = () => {
     setDraft(EMPTY);
+    // The rows left over are dropped: no Try again will carry a partial apply into an Undo.
+    setLast((l) => (l?.partial ? null : l));
     setRefusal(null);
     setDripperReason({});
   };
@@ -490,7 +480,7 @@ export function SupplyEditor({ controller, onDirtyChange }: { controller: Contro
                               </small>
                             )}
                           </td>
-                          <td className="supply-num">{lph(demand[String(z.id)])}</td>
+                          <td className="supply-num">{lphText(demand[String(z.id)])}</td>
                           <td>
                             {share === null ? (
                               <span className="muted">Set max flow</span>
@@ -511,6 +501,8 @@ export function SupplyEditor({ controller, onDirtyChange }: { controller: Contro
                                   key={g || "none"}
                                   type="button"
                                   aria-pressed={groupOf(z.id) === g}
+                                  disabled={!pumpEntity}
+                                  title={pumpEntity ? undefined : "Map Room pump first"}
                                   onClick={() => setDraft((d) => ({ ...d, groups: { ...d.groups, [z.id]: g } }))}
                                 >
                                   {g || "None"}

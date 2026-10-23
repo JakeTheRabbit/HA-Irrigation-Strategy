@@ -6,13 +6,18 @@ import { answerSupply, demoCapacityCheck, resetDemoSupply } from "./parity-demo/
 import { setDisplayUnits } from "./display-units";
 import type { V2Outcome } from "./parity-api";
 import type { SupplyDoc } from "./parity-types";
+import type { SetupRoom } from "./operator-types";
 import {
   applySupply,
   capacityRefusal,
   flowEdit,
+  digitsOf,
   flowText,
+  lphText,
+  nextUndo,
   parseFlow,
   reviewChecks,
+  saveDripperFlows,
   supplyChecks,
   togetherRows,
   togetherVerdict,
@@ -355,5 +360,75 @@ describe("the review panel", () => {
     expect(html).toContain("Pump settings were saved. Zone 3 dripper flow was not: controller still holds 3.0 L/h.");
     expect(html).toContain("Try again");
     expect(html).not.toContain("Written and read back");
+  });
+});
+
+describe("review round 2", () => {
+  test("no pump mapped: group rows are not claimed as written", async () => {
+    const rows = [row("group:2", "Zone 2 exclusive group", "None", "A"), row("dripper:3", "Zone 3 dripper flow", "3.0 L/h", "4.0 L/h")];
+    const receipt = await applySupply({ saveSupply: null, saveDrippers: async () => ({ holds: { 3: 4 } }) }, rows, EDITS, AT);
+    expect(receipt).toMatchObject({
+      ok: false,
+      failed: [{ id: "group:2", holds: "None", label: "Zone 2 exclusive group" }],
+      message: "Zone 2 exclusive group was not saved: this room has no pump mapped.",
+      summary: "Zone 3 dripper flow 3.0 L/h → 4.0 L/h",
+    });
+  });
+  test("flows keep their source digits", () => {
+    expect(digitsOf(57.599999999999994)).toBe(1);
+    expect(lphText(57.6)).toBe("57.6 L/h");
+    expect(lphText(912.5)).toBe("912.5 L/h");
+    expect(lphText(900)).toBe("900 L/h");
+    expect(supplyChecks(doc({ max_flow_lph: 912.5, pairs: [] }))[0]).toEqual({ ok: true, text: "Pump max flow 912.5 L/h is in range" });
+    const pump = { entity_id: "switch.f2_feed_pump", worst_case_lph: 1300.25, max_flow_lph: 900, max_concurrent_zones: 1, ok: false, suggest_max_concurrent: 1 };
+    expect(supplyChecks(doc({ ok: false, pumps: [pump], pairs: [] }), { "1": 1300.25 })).toContainEqual({
+      ok: "warn",
+      text: "Zone 1 alone needs 1300.25 L/h, more than the pump's 900 L/h",
+    });
+  });
+  test("a failed dripper flow shows what the controller holds at its own digits", async () => {
+    const receipt = await applySupply({ saveSupply: null, saveDrippers: async () => ({ holds: { 3: 2.25 }, reason: "x" }) }, ROWS.slice(1), EDITS, AT);
+    expect(receipt).toMatchObject({ failed: [{ id: "dripper:3", holds: "2.25 L/h" }] });
+  });
+  test("a dripper flow read back with float noise counts as written, and as put back", async () => {
+    const receipt = await applySupply({ saveSupply: null, saveDrippers: async () => ({ holds: { 3: 4.000000000001 } }) }, ROWS.slice(1), EDITS, AT);
+    expect(receipt).toMatchObject({ ok: true });
+    await expect(
+      undoSupply({ saveSupply: null, saveDrippers: async () => ({ holds: { 3: 2.9999999999999 } }) }, [{ zone: 3, before: 4, after: 3, rowId: "dripper:3" }]),
+    ).resolves.toBeUndefined();
+  });
+  test("a retry after a partial failure keeps the pump in Undo", () => {
+    const pumps = [{ entity_id: "switch.p", max_flow_lph: 1000, max_concurrent_zones: 1, flow_meter: null }];
+    const edit = { zone: 3, before: 4, after: 3, rowId: "dripper:3" };
+    const first = nextUndo(null, { pumps, groups: {}, revision: 5, edits: [], partial: true });
+    const retry = nextUndo(first, { pumps: [], groups: {}, revision: null, edits: [edit], partial: false });
+    expect(retry).toEqual({ pumps, groups: {}, revision: 5, edits: [edit], partial: false });
+    // A new pump change after a partial apply is its own Undo.
+    const again = { pumps: [], groups: {}, revision: 6, edits: [], partial: false };
+    expect(nextUndo(first, again)).toEqual(again);
+    // A whole apply's Undo is its own: the next apply does not reach back past it.
+    expect(nextUndo({ ...first, partial: false }, { pumps: [], groups: {}, revision: null, edits: [edit], partial: false })).toEqual({
+      pumps: [],
+      groups: {},
+      revision: null,
+      edits: [edit],
+      partial: false,
+    });
+  });
+  const room = (flow: number, revision = 7) =>
+    ({ entry_id: "e", revision, room_name: "F2", active: true, zones: [{ id: 3, dripper_flow_rate: flow }], hardware: {} }) as unknown as SetupRoom;
+  test("saveDripperFlows: fresh read, stale refusal, write and read back", async () => {
+    const sent: unknown[] = [];
+    const io = (fresh: SetupRoom | null, after: () => Promise<SetupRoom>) => ({
+      read: async () => fresh,
+      save: async (payload: unknown) => (sent.push(payload), after()),
+    });
+    expect(await saveDripperFlows(io(room(3.0000000000001), async () => room(4)), EDITS)).toEqual({ holds: { 3: 4 } });
+    expect(sent[0]).toMatchObject({ entry_id: "e", expected_revision: 7, zones: [{ id: 3, dripper_flow_rate: 4 }] });
+    expect(sent[0]).not.toHaveProperty("client");
+    expect(await saveDripperFlows(io(room(5), async () => room(4)), EDITS)).toEqual({ holds: { 3: 5 }, reason: "The dripper flow changed since you started editing." });
+    expect(await saveDripperFlows(io(null, async () => room(4)), EDITS)).toEqual({ holds: { 3: null } });
+    expect(await saveDripperFlows(io(room(3), async () => Promise.reject(new Error("timed out"))), EDITS)).toEqual({ holds: { 3: null }, reason: "timed out" });
+    expect(await saveDripperFlows(io(room(3), async () => Promise.reject(new Error("pump must read OFF"))), EDITS)).toEqual({ holds: { 3: 3 }, reason: "pump must read OFF" });
   });
 });
