@@ -498,6 +498,8 @@ try {
         .getByRole("link", { name: "Compare runs", exact: true })
         .click();
       await page.getByRole("heading", { name: "Compare runs", exact: true }).waitFor();
+      // The zone-level view is one tap down, under the room-wide comparison.
+      await page.locator('details[data-section="zone-detail"] > summary').click();
       await page.getByRole("button", { name: "Overlay", exact: true }).click();
       await page.getByRole("img", { name: /VWC and EC by age/ }).waitFor();
       await page
@@ -571,6 +573,8 @@ try {
       );
       await open("history/compare");
       await page.getByRole("heading", { name: "Compare runs", exact: true }).waitFor();
+      // The zone-level view is one tap down, under the room-wide comparison.
+      await page.locator('details[data-section="zone-detail"] > summary').click();
       await page.setViewportSize({ width: 390, height: 844 });
       await noOverflow();
       await axe("mobile run comparison");

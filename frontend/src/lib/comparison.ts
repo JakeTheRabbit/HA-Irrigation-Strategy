@@ -1,4 +1,9 @@
-import type { DailyReading, HistoryPoint, RunRecord } from "./comparison-types";
+import type { ComparedRun, DailyReading, HistoryPoint, RunRecord } from "./comparison-types";
+import { formatEc, formatVolume } from "./display-units";
+import { yieldFigures, type GrowDay, type Harvest, type HarvestsDocument } from "./grows";
+import type { Stage } from "./stage-arc";
+import { dayLabel, daysBetween } from "./time";
+export { daysBetween };
 const DAY = 86_400_000;
 const formatters = new Map<string, Intl.DateTimeFormat>();
 function formatter(zone: string) {
@@ -30,8 +35,6 @@ export function addDays(value: string, days: number): string {
   if (!validDate(value) || !Number.isInteger(days)) throw new Error("Invalid calendar date.");
   return new Date(Date.parse(value + "T00:00:00Z") + days * DAY).toISOString().slice(0, 10);
 }
-export const daysBetween = (start: string, end: string) =>
-  (Date.parse(end + "T00:00:00Z") - Date.parse(start + "T00:00:00Z")) / DAY;
 const midnightCache = new Map<string, number>();
 /** First instant of a local date: accommodates 23/25-hour days and midnight offset changes. */
 export function midnight(value: string, zone: string): number {
@@ -231,4 +234,184 @@ export function dailyStatistics(result: unknown, timeZone: string): Record<strin
       ),
     ]),
   );
+}
+
+/** The smallest gap each Compare runs chart speaks about: VWC points, dryback points, mS/cm and
+ * litres per plant a day. A smaller gap is noise between grows, so the chart says nothing. */
+export const CALLOUT_FLOOR = { vwc: 0.5, dryback: 0.5, pore_ec: 0.2, water: 0.02 } as const;
+export type CalloutMetric = keyof typeof CALLOUT_FLOOR;
+/** Fewer days than this in common is not a comparison. */
+const CALLOUT_MIN_DAYS = 3;
+
+/** "flower setting (stretch)" reads "stretch", "flower bulk" reads "bulk". */
+export const stageWord = (name: string) =>
+  /\(([^)]+)\)/.exec(name)?.[1] ?? name.replace(/^flower /i, "");
+/** Decimals of the readings themselves (at most 3): a gap is never shown finer than its source. */
+function sourceDigits(values: number[]) {
+  return Math.min(3, Math.max(0, ...values.map((v) => (String(v).split(".")[1] ?? "").length)));
+}
+const average = (values: number[]) => values.reduce((a, b) => a + b, 0) / values.length;
+
+/** One callout for a Compare runs chart: the biggest gap, stage by stage, between the reference run
+ * (this run, else the first) and each other run, over the grow days both have. Null when no gap
+ * reaches the metric's floor. The box is the days the gap was measured over. */
+export function runCallout(
+  metric: CalloutMetric,
+  runs: ComparedRun[],
+  stages: Stage[],
+): { text: string; box: { fromDay: number; toDay: number } } | null {
+  const reference = runs.find((r) => r.current) ?? runs[0];
+  if (!reference) return null;
+  const refDays = new Map((reference.days[metric] ?? []).map((d) => [d.day, d.value]));
+  let best: {
+    run: ComparedRun;
+    delta: number;
+    share: number | null;
+    from: number;
+    to: number;
+    days: number;
+    digits: number;
+  } | null = null;
+  for (const run of runs) {
+    if (run === reference) continue;
+    for (const stage of stages) {
+      const common = (run.days[metric] ?? []).filter(
+        (d) => d.day >= stage.first && d.day <= stage.last && refDays.has(d.day),
+      );
+      if (common.length < CALLOUT_MIN_DAYS) continue;
+      const theirs = common.map((d) => d.value),
+        ours = common.map((d) => refDays.get(d.day)!);
+      const delta = average(theirs) - average(ours),
+        base = average(ours);
+      if (Math.abs(delta) + 1e-9 < CALLOUT_FLOOR[metric]) continue;
+      if (best && Math.abs(delta) <= Math.abs(best.delta)) continue;
+      const days = common.map((d) => d.day);
+      best = {
+        run,
+        delta,
+        share: base > 0 ? Math.abs(delta) / base : null,
+        from: Math.min(...days),
+        to: Math.max(...days),
+        days: days.length,
+        digits: Math.max(
+          run.digits?.[metric] ?? sourceDigits(theirs),
+          reference.digits?.[metric] ?? sourceDigits(ours),
+        ),
+      };
+    }
+  }
+  if (!best) return null;
+  const { run, delta, share, from, to, days, digits } = best;
+  const ref = reference.current ? "this run" : reference.name;
+  const Ref = reference.current ? "This run" : reference.name;
+  // Run days, not stage names: no flip date is recorded, so a stage on run days would be a guess.
+  const span = days === to - from + 1 ? `on run days ${from}–${to}` : `on ${days} of run days ${from}–${to}`;
+  const size = Math.abs(delta).toFixed(digits);
+  const pts = size === "1" ? "pt" : "pts";
+  // The reference run's side of the gap, for the sentences it is the subject of.
+  const ourDelta = -delta;
+  const text =
+    metric === "vwc"
+      ? `${run.name} sat ${size} ${pts} ${delta > 0 ? "wetter" : "drier"} than ${ref} ${span}.`
+      : metric === "dryback"
+        ? `${Ref} dries back ${size} ${pts} ${ourDelta > 0 ? "more" : "less"} than ${run.name} ${span}.`
+        : metric === "pore_ec"
+          ? `${Ref} is ${formatEc(Math.abs(delta), digits)} ${ourDelta > 0 ? "higher" : "lower"} than ${run.name} ${span}.`
+          : `${run.name} gave ${formatVolume(Math.abs(delta), digits)}${
+              share === null ? "" : ` (${Math.round(share * 100)}%)`
+            } ${delta > 0 ? "more" : "less"} water a plant a day than ${ref} ${span}.`;
+  return { text, box: { fromDay: from, toDay: to } };
+}
+
+/** A run's whole-room daily values from the room's grow-day summaries (crop_steering.grow_days_get):
+ * each grow day's zones averaged, a missing reading left out (never zero). */
+export function comparedRun(run: RunRecord, growDays: GrowDay[], current: boolean): ComparedRun {
+  const pick: Record<CalloutMetric, (d: GrowDay) => number | null | undefined> = {
+    vwc: (d) => d.vwc?.mean,
+    dryback: (d) => d.p0?.drop_pts,
+    pore_ec: (d) => d.ec?.mean,
+    water: (d) => d.litres_per_plant,
+  };
+  const inRun = growDays.filter(
+    (d) => d.date >= run.start_date && (!run.end_date || d.date <= run.end_date),
+  );
+  const dates = [...new Set(inRun.map((d) => d.date))].sort();
+  const days: ComparedRun["days"] = {};
+  const digits: NonNullable<ComparedRun["digits"]> = {};
+  for (const metric of Object.keys(pick) as CalloutMetric[]) {
+    const out: { day: number; value: number }[] = [];
+    const raw: number[] = [];
+    for (const date of dates) {
+      const values = inRun
+        .filter((d) => d.date === date)
+        .map(pick[metric])
+        .filter((v): v is number => typeof v === "number" && Number.isFinite(v));
+      raw.push(...values);
+      if (values.length) out.push({ day: daysBetween(run.start_date, date) + 1, value: average(values) });
+    }
+    if (out.length) {
+      days[metric] = out;
+      digits[metric] = sourceDigits(raw);
+    }
+  }
+  return { id: run.id, name: run.name, current, days, digits };
+}
+
+/** A calendar date ("2026-08-10") as "Mon 10 Aug". */
+export const dateLabel = (date: string) => dayLabel(Date.parse(date + "T12:00:00Z"), "UTC");
+/** A weight in grams as kg, to the gram and no finer: 38400 reads "38.4 kg". */
+export const kgText = (grams: number) => `${Number((grams / 1000).toFixed(3))} kg`;
+/** A dry weight typed in kg, as grams: a decimal point or comma, to the gram. Null for anything
+ * else, including "1,234", which could be a thousands comma. */
+export function parseDryKg(text: string): number | null {
+  const t = text.trim();
+  if (!/^\d+([.,]\d{1,3})?$/.test(t) || /^\d{1,3},\d{3}$/.test(t)) return null;
+  return Math.round(Number(t.replace(",", ".")) * 1000);
+}
+
+/** What a run's card says it ended with: its harvest as recorded (dry weight in kg and g/m² only
+ * where entered), else that none is; a run in progress, its planned harvest date if the plan has one.
+ * `missing` asks for the Add harvest result button. */
+export function runResult(
+  run: RunRecord,
+  harvest: Harvest | undefined,
+  harvestDue: string | null,
+): { text: string; missing: boolean } {
+  if (!harvest && !run.end_date)
+    return {
+      text: harvestDue ? `Growing · harvest due ${dateLabel(harvestDue)}` : "Growing · no harvest date planned",
+      missing: false,
+    };
+  if (!harvest) return { text: "No harvest result recorded", missing: true };
+  const figures = yieldFigures(harvest, run, "room", null);
+  const parts = [
+    harvest.harvest_date
+      ? `Harvested ${dateLabel(harvest.harvest_date)}`
+      : run.end_date
+        ? `Ended ${dateLabel(run.end_date)}`
+        : "Harvested",
+  ];
+  if (figures.dryG !== null) parts.push(`${kgText(figures.dryG)} dry`);
+  if (figures.gramsPerM2 !== null) parts.push(`${Math.round(figures.gramsPerM2)} g/m²`);
+  return { text: parts.join(" · "), missing: false };
+}
+
+/** The harvest result Compare runs saves: the dry weight the grower entered and nothing else, so no
+ * harvest date is stored that was never entered or reviewed. */
+export function harvestResult(dryG: number): Harvest {
+  return {
+    harvest_date: null,
+    room: { dry_weight_g: dryG, wet_weight_g: null, plants_harvested: null, canopy_m2: null },
+    zones: {},
+    plants: [],
+    quality: null,
+    notes: null,
+    lab: { thc_pct: null, terpenes: {} },
+  };
+}
+/** An undo of a harvest result counts only when the harvests the service answered with no longer
+ * hold that run. */
+export function harvestCleared(answer: HarvestsDocument, runId: string): void {
+  if (answer.harvests[runId] != null)
+    throw new Error("The harvest result is still stored. Reload and check before trying again.");
 }

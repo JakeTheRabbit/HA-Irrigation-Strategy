@@ -130,6 +130,9 @@ export interface ReviewApplyProps {
   /** Writes back the previous values of an applied receipt (`revertEvents`, or a 3.17 re-write).
    * Without it the receipt offers no Undo. */
   undo?(receipt: ApplyReceipt): Promise<void>;
+  /** Who read the values back, under the receipt; "Controller confirmed every value" without.
+   * For a write the integration stores itself (run records, harvests), not the controller. */
+  confirmation?: string;
 }
 export type ApplyState =
   | { phase: "idle" }
@@ -440,7 +443,7 @@ export function ReviewApplyView(
           {result.summary && <span>{result.summary}</span>}
           {result.notCopied?.length ? <span className="review-apply-not-copied">{notCopiedText(result)}</span> : null}
           {result.undoUnavailable && historyNote}
-          <small>{`Controller confirmed every value${result.notCopied?.length ? " written" : ""}${result.by ? ` · by ${result.by}` : ""}`}</small>
+          <small>{`${props.confirmation ?? `Controller confirmed every value${result.notCopied?.length ? " written" : ""}`}${result.by ? ` · by ${result.by}` : ""}`}</small>
         </span>
         {props.undo ? (
           <Button

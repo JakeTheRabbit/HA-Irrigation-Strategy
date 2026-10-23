@@ -1194,6 +1194,8 @@ try {
     "compare runs: by grow week, the biggest differences, the overlay toggle, the detail one tap down",
     async () => {
       await go("history/compare");
+      // The zone-level week-by-week view is one tap down, under the room-wide comparison.
+      await page.locator('details[data-section="zone-detail"] > summary').click();
       // The run in progress against the latest ended one, chosen to start with.
       assert.match(
         await page.getByLabel("Current run").locator("option:checked").innerText(),

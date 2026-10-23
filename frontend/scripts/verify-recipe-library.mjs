@@ -221,6 +221,8 @@ try {
         window.location.hash = "#/compare";
       });
       await page.getByRole("heading", { name: "Compare runs", exact: true }).waitFor();
+      // The zone-level view is one tap down, under the room-wide comparison.
+      await page.locator('details[data-section="zone-detail"] > summary').click();
       // The full-resolution chart is the Overlay view, one toggle from the weekly comparison.
       await page.getByRole("button", { name: "Overlay", exact: true }).click();
       await page.waitForFunction(() =>

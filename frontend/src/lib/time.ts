@@ -117,3 +117,7 @@ export function dayLabel(ms: number, tz: string): string {
   }
   return f.format(ms);
 }
+
+/** Whole days from one calendar date ("2026-09-15") to another. */
+export const daysBetween = (start: string, end: string) =>
+  (Date.parse(end + "T00:00:00Z") - Date.parse(start + "T00:00:00Z")) / 86_400_000;
