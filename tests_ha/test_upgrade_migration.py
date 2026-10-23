@@ -371,6 +371,25 @@ async def test_a_fahrenheit_home_assistant_shows_the_room_in_fahrenheit(hass, ha
     assert "units.temperature" in _ids(report["carried"]) and "units.clock" in _ids(report["needs_you"])
 
 
+async def test_a_fahrenheit_room_whose_ledger_was_lost_still_lists_its_temperature_unit(hass, hass_storage):
+    """A start that stopped after the display store took °F but before the ledger was saved: the next run
+    writes nothing again and still lists it."""
+    from custom_components.crop_steering import migration
+    from homeassistant.util.unit_system import US_CUSTOMARY_SYSTEM
+
+    hass.config.units = US_CUSTOMARY_SYSTEM
+    entry, _seed, _stores = await _upgrade(hass, hass_storage, V3_17)
+    display = deepcopy(hass.data[DOMAIN]["_display"][entry.entry_id].document)
+    changes = len(await _migration_changes(hass, "room:flower_room_"))
+    hass.data[DOMAIN]["_migration"].document = migration.empty()
+    await migration.async_migrate_room(hass, entry, False)
+    await hass.async_block_till_done()
+    assert hass.data[DOMAIN]["_display"][entry.entry_id].document == display
+    assert "units.temperature" in _ids((await _report(hass, "room:flower_room_"))["carried"])
+    after = await _migration_changes(hass, "room:flower_room_")
+    assert "migration:display_units" not in [e["source"]["detail"] for e in after[changes:]]
+
+
 @pytest.mark.parametrize("name", [V3_11, V3_17])
 async def test_old_stores_are_byte_for_byte_what_they_were(hass, hass_storage, name):
     """H4: recipe, notify, dosing and calibration stores are read, never written."""

@@ -493,26 +493,31 @@ async def step_display_units(hass, entry, room) -> list[dict]:
                 "units",
             )
         )
-    if not imperial or "temp_unit" in manager.document["options"]:
+    if not imperial:
         return out
-    async with manager._lock:
-        old = deepcopy(manager.document)
-        new = {
-            "revision": old["revision"] + 1,
-            "options": {**old["options"], "temp_unit": "F"},
-        }
-        await manager._store.async_save(deepcopy(new))
-        manager.document = new
-    async_dispatcher_send(hass, f"{DISPLAY_SIGNAL}_{entry.entry_id}")
-    _journal(
-        hass,
-        entry,
-        "display_units",
-        "display",
-        "options",
-        old["options"],
-        new["options"],
-    )
+    # Already °F (a run that stopped before the ledger was saved, or the grower's own pick): listed,
+    # never written again.
+    if "temp_unit" not in manager.document["options"]:
+        async with manager._lock:
+            old = deepcopy(manager.document)
+            new = {
+                "revision": old["revision"] + 1,
+                "options": {**old["options"], "temp_unit": "F"},
+            }
+            await manager._store.async_save(deepcopy(new))
+            manager.document = new
+        async_dispatcher_send(hass, f"{DISPLAY_SIGNAL}_{entry.entry_id}")
+        _journal(
+            hass,
+            entry,
+            "display_units",
+            "display",
+            "options",
+            old["options"],
+            new["options"],
+        )
+    elif manager.document["options"]["temp_unit"] != "F":
+        return out
     out.append(
         row(
             "units.temperature",
