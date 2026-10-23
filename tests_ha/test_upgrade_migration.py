@@ -222,6 +222,37 @@ async def test_a_probe_less_room_keeps_the_3_0_feed_ec_3_17_0_assumed(hass, hass
     assert snap.feed_ec == 3.0
 
 
+async def test_the_kept_feed_ec_survives_every_later_start(hass, hass_storage, controller_for):
+    """The descriptor reads the kept value from the ledger, which loads after the sensor first writes: every
+    later start (the steps already done) republishes it, or a probe-less room loses its EC flushes."""
+    entry, seed, _stores = await _upgrade(hass, hass_storage, V3_17)
+    assert await hass.config_entries.async_reload(entry.entry_id)
+    await hass.async_block_till_done()
+    descriptor = hass.states.get("sensor.crop_steering_flower_room_engine_config").attributes
+    assert descriptor["legacy_feed_ec_fallback"] == 3.0
+    c, _fake, _clock = controller_for(seed["addon_options"], saved_state=deepcopy(seed["controller_saved"]))
+    room = next(r for r in c.rooms if r.prefix == "flower_room_")
+    snap, _params = c._snapshot(room, 1, AT[V3_17], True, False)
+    assert snap.feed_ec == 3.0
+
+
+async def test_a_ledger_that_failed_to_load_republishes_the_kept_feed_ec_once_it_loads(hass, hass_storage):
+    from custom_components.crop_steering import migration
+    from homeassistant.helpers.dispatcher import async_dispatcher_send
+
+    entry, _seed, _stores = await _upgrade(hass, hass_storage, V3_17)
+    ledger = hass.data[DOMAIN]["_migration"]
+    ledger.document, ledger.error = migration.empty(), "disk error"  # this start's load failed
+    async_dispatcher_send(hass, f"{migration.SIGNAL}_{entry.entry_id}")
+    await hass.async_block_till_done()
+    sensor = "sensor.crop_steering_flower_room_engine_config"
+    assert "legacy_feed_ec_fallback" not in hass.states.get(sensor).attributes
+    await migration.async_migrate_room(hass, entry, False)  # the room's next setup loads it again
+    await hass.async_block_till_done()
+    assert ledger.error is None
+    assert hass.states.get(sensor).attributes["legacy_feed_ec_fallback"] == 3.0
+
+
 async def test_a_room_with_a_feed_ec_probe_gets_no_kept_value(hass, hass_storage):
     await _upgrade(hass, hass_storage, V3_11)
     assert "legacy_feed_ec_fallback" not in hass.states.get("sensor.crop_steering_engine_config").attributes

@@ -136,6 +136,7 @@ class Ledger:
         self.error = None
 
     async def async_init(self):
+        self.error = None
         try:
             if self._store is None:
                 from homeassistant.helpers.storage import Store
@@ -810,13 +811,16 @@ async def async_setup_migration(hass) -> Ledger:
 async def async_migrate_room(hass, entry, fresh: bool) -> None:
     """The room's steps: now (its entities exist), and its last steps once Home Assistant has
     started. Never raises."""
+    from homeassistant.helpers.dispatcher import async_dispatcher_send
     from homeassistant.helpers.start import async_at_started
 
     try:
         ledger = await async_setup_migration(hass)
-        if ledger.error:
-            return
         async with ledger.lock:
+            if ledger.error:  # it failed to load at an earlier setup: try again
+                await ledger.async_init()
+            if ledger.error:
+                return
             room = ledger.room(entry.entry_id)
             if fresh:
                 for name, _step in (*SETUP_STEPS, *STARTED_STEPS):
@@ -826,6 +830,9 @@ async def async_migrate_room(hass, entry, fresh: bool) -> None:
                 await ledger.save()
                 return
             await _run(hass, ledger, entry, SETUP_STEPS)
+        # The room's descriptor first wrote before the ledger was loaded: publish the kept feed EC
+        # again at every start, not only the one that kept it.
+        async_dispatcher_send(hass, f"{SIGNAL}_{entry.entry_id}")
         raise_card(hass, entry)
     except Exception as error:  # noqa: BLE001 - never block setup on the upgrade
         _LOGGER.warning("Crop Steering upgrade did not run: %s", error)
