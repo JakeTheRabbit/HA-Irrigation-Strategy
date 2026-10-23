@@ -176,19 +176,26 @@ async def _pass(hass, controller_for, seed, saved_state, options, at):
         fused = hass.states.get(f"sensor.crop_steering_{prefix}vwc_zone_{zone}")
         hass.states.async_set(fused.entity_id, "30", fused.attributes)
     c, fake, _clock = controller_for(options, saved_state=deepcopy(saved_state))
+    # What decide() is handed for each zone at the start of the pass (feed EC included).
+    snaps = {(room.slug, z): c._snapshot(room, z, at, True, False) for room in c.rooms for z in room.state}
     fake.calls.clear()
     c.loop_once(at)
     rooms = {
         room.slug: {z: (st["phase"], st["shots"], round(st["daily_vol"], 6)) for z, st in room.state.items()}
         for room in c.rooms
     }
-    return switch_calls(fake), rooms
+    return switch_calls(fake), rooms, snaps
 
 
 @pytest.mark.parametrize("name", [V3_11, V3_17])
 async def test_upgrade_waters_as_before(hass, hass_storage, controller_for, monkeypatch, name):
     """One controller pass on the old install before the migration, and the same pass after it: the same
-    switches in the same order, and every zone in the same phase with the same shots and water."""
+    switches in the same order, and every zone in the same phase with the same shots and water. After it,
+    decide() is handed the feed EC 3.17.0 handed it (measured, else 3.0 for a room with no probe and no
+    recipe EC: v3.17.0 controller.py) and decides what it decides with that feed EC."""
+    from dataclasses import replace
+
+    import controller
     from custom_components.crop_steering import migration
 
     real = migration.async_migrate_room
@@ -203,9 +210,18 @@ async def test_upgrade_waters_as_before(hass, hass_storage, controller_for, monk
     await hass.async_block_till_done()
     assert (await _report(hass, "room:" + seed["data"].get("room_prefix", "flower_room_")))["carried"]
     after = await _pass(hass, controller_for, seed, saved, options, AT[name])
-    assert after == before
-    calls, _rooms = before
+    assert after[:2] == before[:2]
+    calls, _rooms, snaps = before
     assert ("turn_on", "switch.zone_1_valve") in calls and ("turn_on", "switch.zone_2_valve") in calls
+    for key, (snap, params) in after[2].items():
+        old, _ = snaps[key]
+        as_3_17 = old.feed_ec if old.feed_ec is not None else 3.0
+        assert snap.feed_ec == as_3_17, key
+        expected = controller.decide(replace(old, feed_ec=as_3_17), params)
+        decided = controller.decide(snap, params)
+        assert decided[:4] == expected[:4] and str(decided[4]) == str(expected[4]), key
+    if name == V3_17:  # the probe-less room: without the kept value decide() would be handed None
+        assert snaps[("flower_room", 1)][0].feed_ec is None and after[2][("flower_room", 1)][0].feed_ec == 3.0
 
 
 async def test_a_probe_less_room_keeps_the_3_0_feed_ec_3_17_0_assumed(hass, hass_storage, controller_for):
