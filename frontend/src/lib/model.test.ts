@@ -112,6 +112,34 @@ describe("room model", () => {
     expect(older.zones[0].status).toBe("Older integration status");
   });
   it("requires an actual room descriptor", () => expect(discoverRooms({})).toEqual([]));
+  it("reads the EC target family the way the controller does: zone mode, else growth stage, else generative", () => {
+    const states = fixture();
+    const room = discoverRooms(states)[0];
+    const num = (id: string, v: string) =>
+      (states[id] = entity(id, v, { min: 0, max: 10, step: 0.1 }));
+    states["sensor.crop_steering_zone_1_phase"] = entity("sensor.crop_steering_zone_1_phase", "P1");
+    num("number.crop_steering_ec_target_veg_p1", "1.5");
+    num("number.crop_steering_ec_target_gen_p1", "3.5");
+    // The room's steering_mode select is not what the controller reads.
+    states["select.crop_steering_steering_mode"] = entity(
+      "select.crop_steering_steering_mode",
+      "Generative",
+    );
+    states["select.crop_steering_growth_stage"] = entity(
+      "select.crop_steering_growth_stage",
+      "Vegetative",
+    );
+    expect(buildRoom(states, room).zones[0].ecTarget.value).toBe(1.5);
+    states["select.crop_steering_zone_1_steering_mode"] = entity(
+      "select.crop_steering_zone_1_steering_mode",
+      "Generative",
+    );
+    expect(buildRoom(states, room).zones[0].ecTarget.value).toBe(3.5);
+    states["select.crop_steering_zone_1_steering_mode"].state = "unavailable";
+    expect(buildRoom(states, room).zones[0].ecTarget.value).toBe(1.5);
+    delete states["select.crop_steering_growth_stage"];
+    expect(buildRoom(states, room).zones[0].ecTarget.value).toBe(3.5);
+  });
   it("selects phase-specific thresholds and leaves unresolved EC mode unknown", () => {
     const states = fixture();
     const room = discoverRooms(states)[0];

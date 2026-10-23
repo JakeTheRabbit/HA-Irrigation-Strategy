@@ -90,6 +90,7 @@ controller still reports a setup change (CS-201) and a hardware hold (CS-301, CS
 | [CS-609](#cs-609) | Second controller for room | Warning | Notification |
 | [CS-610](#cs-610) | Engine Enabled not kill switch | Warning | Repairs card |
 | [CS-611](#cs-611) | Settings above zone limit | Warning | Repairs card |
+| [CS-613](#cs-613) | Deprecated feature in use | Warning | Repairs card |
 | [CS-701](#cs-701) | No water at the zone | Warning | Notification |
 | [CS-702](#cs-702) | Unusual water for each plant | Information | Notification |
 | [CS-703](#cs-703) | Overnight probe fault suspected | Warning | Notification |
@@ -1381,6 +1382,26 @@ controller still reports a setup change (CS-201) and a hardware hold (CS-301, CS
 
 - If the zone size is wrong, correct it in Rooms and setup, and the limit changes with it.
 - If the size is correct, decrease the setting to its limit at the next change. The card clears when each setting is inside its limit.
+
+<a id="cs-613"></a>
+
+### CS-613: Deprecated feature in use
+
+*Warning · Repairs card*
+
+**What it means.** Something called a service or chose a select that the integration will remove. The Repairs card names it, says what to use instead and gives the release that removes it.
+
+**Effect on water.** Water continues. The service or the select works as before until it is removed.
+
+**Probable causes**
+
+- A person, an automation or a script called apply_recipe or save_recipe, or chose a value in the Recipe stage or Irrigation phase select.
+
+**What to do**
+
+- Open the card and read what it names and what to use instead.
+- Change the automation or script that makes the call. For a stage of the grow, set the targets of the room in the dashboard or use a grow plan. To move one zone to a phase, use its Set phase select.
+- The card does not come back until Home Assistant restarts.
 
 ## AI assistant (CS-7xx)
 

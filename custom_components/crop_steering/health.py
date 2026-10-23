@@ -35,6 +35,8 @@ ISSUE_IDS = (
     "stock_low",
     # Raised and cleared by bounds.py, when the room sets up and when a setting changes.
     "outside_zone_bounds",
+    # Raised by deprecations.py, once per Home Assistant run, as deprecated_<service or select>.
+    "deprecated_feature",
 )
 # The platforms whose entities the controller reads by exact id and has no other way to find.
 # Fused sensors are left out: the controller tolerates their legacy naming and an add-on option

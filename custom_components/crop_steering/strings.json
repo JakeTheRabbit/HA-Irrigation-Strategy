@@ -792,6 +792,10 @@
     }
   },
   "issues": {
+    "deprecated_feature": {
+      "title": "Crop Steering: {what} is deprecated (CS-613)",
+      "description": "{what} is deprecated. It still works, and nothing is changed for now. The integration will remove it in {removal}.\n\nWhat to use instead: {instead}\n\nThe call that raised this notice came from a person, an automation or a script. Change that caller before the removal. This notice does not come back until Home Assistant restarts.\n\nCode CS-613. What it means and what to do: Crop Steering → Help & tools → Error codes."
+    },
     "kill_switch_missing": {
       "title": "Crop Steering: Kill switch missing (CS-601)",
       "description": "The kill switch of this room is `{kill_switch}` ({source}). It does not exist in Home Assistant. The controller does not water any zone in this room.\n\nIf the room comes from an installation before the setup wizard, create the helper. Go to Settings → Devices & Services → Helpers → Create Helper → Toggle. Give the helper a name that makes the entity ID {kill_switch}. Do not create a helper for a room that the setup wizard made. That room stops on its own Engine Enabled switch.\n\nCAUTION: Keep the new helper off until the zone map is correct. When the helper is on, the controller can start shots.\n\nCode CS-601. What it means and what to do: Crop Steering → Help & tools → Error codes."

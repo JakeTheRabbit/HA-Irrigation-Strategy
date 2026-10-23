@@ -65,6 +65,10 @@ RESERVED = {
     "CS-609": ("feat/duplicate-controller-guard", "two controllers on one room"),
     "CS-610": ("fix/one-kill-switch-rule", "a room switch that does not stop water"),
     "CS-611": ("feat/caps-scale-with-zone", "a setting held above its zone's limit"),
+    "CS-613": (
+        "fix/deprecate-the-unused-recipe-system",
+        "a deprecated service or select in use",
+    ),
     "CS-708": ("feat/claude-haiku-brain", "the brain"),
     "CS-709": ("feat/claude-haiku-brain", "the brain"),
     "CS-710": ("feat/brain-channel", "the brain: water finding a channel"),

@@ -567,12 +567,13 @@ export function buildRoom(states: States, room: Room): RoomView {
     const target = targetKey
       ? resolve(states, room, "number", `${z}${targetKey}`, targetKey)
       : undefined;
-    const mode = resolve(states, room, "select", `${z}steering_mode`, "steering_mode");
-    const family = mode?.state.toLowerCase().startsWith("gen")
-      ? "gen"
-      : mode?.state.toLowerCase().startsWith("veg")
-        ? "veg"
-        : null;
+    // The controller's order (_veg): the zone's own steering mode, else the room's growth stage,
+    // else Generative. The room's steering_mode select is not read by the controller.
+    const mode = [
+      resolve(states, room, "select", `${z}steering_mode`),
+      resolve(states, room, "select", "growth_stage"),
+    ].find(readable);
+    const family = mode?.state.toLowerCase().startsWith("veg") ? "veg" : "gen";
     const p = /^P[012]$/.test(phase?.state || "") ? phase!.state.toLowerCase() : null;
     // The controller posts this status with a reason; the integration's fixed-threshold sensor
     // writes the same entity without one. While the controller is live, show the controller's.

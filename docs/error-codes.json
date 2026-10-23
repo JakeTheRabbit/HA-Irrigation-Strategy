@@ -1081,6 +1081,22 @@
       ]
     },
     {
+      "code": "CS-613",
+      "title": "Deprecated feature in use",
+      "source": "repairs",
+      "severity": "warning",
+      "meaning": "Something called a service or chose a select that the integration will remove. The Repairs card names it, says what to use instead and gives the release that removes it.",
+      "watering": "Water continues. The service or the select works as before until it is removed.",
+      "causes": [
+        "A person, an automation or a script called apply_recipe or save_recipe, or chose a value in the Recipe stage or Irrigation phase select."
+      ],
+      "fixes": [
+        "Open the card and read what it names and what to use instead.",
+        "Change the automation or script that makes the call. For a stage of the grow, set the targets of the room in the dashboard or use a grow plan. To move one zone to a phase, use its Set phase select.",
+        "The card does not come back until Home Assistant restarts."
+      ]
+    },
+    {
       "code": "CS-701",
       "title": "No water at the zone",
       "source": "notification",
