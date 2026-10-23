@@ -1266,7 +1266,7 @@
     {
       "domain": "select",
       "key": "irrigation_phase",
-      "why": "Deprecated, removal planned for a future major release (CS-613). Retired, hidden; nothing reads it. Kept for old automations and scripts (CS-614). Use the zone set-phase select."
+      "why": "Retired, hidden; nothing reads it. Kept for old automations and scripts (CS-614). Deprecated, removal planned for a future major release (CS-613). Use the zone set-phase select."
     },
     {
       "domain": "number",
