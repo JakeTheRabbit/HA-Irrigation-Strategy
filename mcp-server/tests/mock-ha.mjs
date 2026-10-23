@@ -243,7 +243,8 @@ export async function mockHa(t) {
   const where = (target) =>
     target.room_id + (target.zone ? "/" + target.zone : "");
   // presets.apply: {diff, missing, applied?}. `presetFault`: "sticky" = a write that does not
-  // take; "timer" = once written, a (re-)preview names a refused timer row in `missing`;
+  // take; "timer" = the source room has no timer programs: every (re-)preview names that row in
+  // `missing` (presets.NO_TIMER), and a write answers it as a refused applied row marked missing (BX);
   // "refuse" = the last row is refused (site_api._rows_refused: ok:false guard_refused, data kept).
   const writeValues = (wanted, to, preview) => {
     const out = { diff: [], missing: [] };
@@ -254,7 +255,7 @@ export async function mockHa(t) {
         if (!(key in own)) out.missing.push({ target, key });
         else if (own[key] !== value)
           out.diff.push({ target, key, old: own[key], new: value });
-      if (state.presetFault === "timer" && state.writes > 0)
+      if (state.presetFault === "timer")
         out.missing.push({
           target,
           key: "timers",
@@ -276,6 +277,9 @@ export async function mockHa(t) {
         error: null,
       };
     });
+    for (const row of out.missing)
+      if (row.reason)
+        out.applied.push({ target: row.target, key: row.key, readback: "refused", error: row.reason, missing: true });
     if (refused)
       throw Object.assign(
         refusal("guard_refused", `Not applied: ${refused.key}: out of bounds`),

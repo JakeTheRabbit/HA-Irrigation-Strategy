@@ -241,10 +241,11 @@ test("preset apply is verified by an empty re-preview diff, not a revision", asy
   error(await apply(client, sticky), /not verified|did not read back/);
 });
 
-test("a refused timer row blocks verification; a copy previews and applies the same way", async (t) => {
+test("a no-timer-program row is left out of verification and said; another missing row is refused", async (t) => {
   const ha = await mockHa(t),
     { client } = await stdio(t, ha, WRITES);
-  // Copy zone 1 of the default room to Room B's zone 1.
+  // Copy zone 1 of the default room, which has no timer programs, to Room B's zone 1.
+  ha.presetFault = "timer";
   const p = data(
     await call(client, "preview_copy_config", {
       room_id: ROOM,
@@ -261,13 +262,15 @@ test("a refused timer row blocks verification; a copy previews and applies the s
     sections: ["targets"],
     preview: true,
   });
-  // Once written, the re-preview has an empty diff but names a refused timer row in `missing`.
-  ha.presetFault = "timer";
-  const result = await apply(client, p);
-  error(result, /not verified/);
-  assert.match(result.content[0].text, /source room has no timer programs/);
+  // The re-preview has an empty diff and still names the timer row, which can never be written:
+  // verified without it, and the result says so.
+  const result = data(await apply(client, p));
+  assert.equal(result.verified, true);
+  assert.match(result.note, /timers \(source room has no timer programs\)/);
+  assert.match(result.note, /left as they are/);
   assert.equal(ha.numbers[ROOM + "/1"].p1_target_vwc, 66);
-  // A preview that already names a value HA cannot write is refused: it could never verify.
+  // A preview that names a value HA cannot write is refused: it could never verify.
+  delete ha.numbers[ROOM + "/1"].p2_shot_size;
   error(
     await call(client, "preview_copy_config", {
       room_id: ROOM,
@@ -275,7 +278,7 @@ test("a refused timer row blocks verification; a copy previews and applies the s
       zones: [1],
       sections: ["targets"],
     }),
-    /could never be verified/,
+    /cannot write p2_shot_size, so an apply could never be verified/,
   );
 });
 

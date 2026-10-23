@@ -188,9 +188,21 @@ function stored(row: JsonObject | undefined, payload: JsonObject) {
 function offsetRows(rows: { path: string }[] = []) {
   return rows.filter((row) => !/\.(at|by)$/.test(row.path));
 }
+// presets.NO_TIMER: a target's timer programs, left as they are because the source has none. Never
+// written, by design, so such a row stays in `missing` and can never block verification.
+const NO_TIMER = new Set([
+  "source zone has no timer program",
+  "source room has no timer programs",
+]);
+const noTimer = (row: { key: string; reason?: string }) =>
+  (row.key === "timer" || row.key === "timers") && NO_TIMER.has(row.reason ?? "");
+// The rows of `missing` that do block verification: everything but NO_TIMER.
+function blocking(answer: PresetAnswer) {
+  return answer.missing.filter((row) => !noTimer(row));
+}
 // What a preset or copy cannot write, with HA's reason (a refused timer row) where it gives one.
-function unwritable(answer: PresetAnswer) {
-  return answer.missing
+function unwritable(rows: PresetAnswer["missing"]) {
+  return rows
     .map((row) => `${row.key}${row.reason ? ` (${row.reason})` : ""}`)
     .join(", ");
 }
@@ -763,10 +775,10 @@ export class Workspace {
   ) {
     const id = "room:" + room.prefix;
     const preview = await this.dryRun(service, payload, id);
-    // Verification needs an empty `missing` (ledger, Task 22): one there now never clears.
-    if (preview.missing.length)
+    // Verification needs an empty `missing` (ledger, Task 22), NO_TIMER aside: one there now never clears.
+    if (blocking(preview).length)
       throw new SafeError(
-        `Home Assistant cannot write ${unwritable(preview)}, so an apply could never be verified. Narrow the zones or sections and preview again.`,
+        `Home Assistant cannot write ${unwritable(blocking(preview))}, so an apply could never be verified. Narrow the zones or sections and preview again.`,
       );
     return this.remember(
       this.proposal(
@@ -936,25 +948,32 @@ export class Workspace {
       throw new SafeError(
         `Unsupported Crop Steering ${service} answer. Inspect Home Assistant; do not automatically retry.`,
       );
-    const applied = written.data.applied ?? [];
+    // A NO_TIMER row is answered as a refused applied row marked `missing` (nothing was written).
+    const applied = (written.data.applied ?? []).filter((row) => row.missing !== true);
     const again = await this.dryRun(service, proposal.payload, id);
     const problems = [
       ...applied
         .filter((row) => row.readback !== "verified")
         .map((row) => `${row.key} read back ${row.readback}`),
       ...again.diff.map((row) => `${row.key} still differs`),
-      ...(again.missing.length ? [unwritable(again)] : []),
+      ...(blocking(again).length ? [unwritable(blocking(again))] : []),
     ];
     if (!applied.length || problems.length)
       throw new SafeError(
         `The write was submitted but is not verified: ${problems.join("; ") || "nothing was applied"}. Inspect Home Assistant; do not automatically retry.`,
       );
+    const kept = again.missing.filter(noTimer);
     return {
       applied: true,
       verified: true,
       kind: proposal.kind,
       room_id: id,
       rows: applied,
+      ...(kept.length
+        ? {
+            note: `Verified by an empty re-preview diff. Not written, and left as they are: ${unwritable(kept)}; these rows can never be written, so they are not part of the verification.`,
+          }
+        : {}),
     };
   }
   async apply(token: string, roomId: string | undefined, revision: number) {
