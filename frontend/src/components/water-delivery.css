@@ -24,8 +24,8 @@
 .wd-note,
 .wd-capacity small {
   color: var(--muted-foreground);
-  font-size: 12px;
-  line-height: 1.6;
+  font-size: var(--text-xs);
+  line-height: 1.5;
 }
 .wd-title p {
   margin: 0;
@@ -39,7 +39,7 @@
   background: var(--muted);
 }
 .wd-capacity dt {
-  font-size: 13px;
+  font-size: var(--text-sm);
   margin-bottom: 5px;
 }
 .wd-capacity dd {
@@ -52,7 +52,7 @@
   max-width: 65ch;
 }
 .wd-flow-line {
-  font-size: 13px;
+  font-size: var(--text-sm);
   padding-bottom: 0;
 }
 .wd-runtime {
@@ -87,7 +87,7 @@
 .wd-comparison h4,
 .wd-budget h4 {
   margin: 0 0 8px;
-  font-size: 13px;
+  font-size: var(--text-sm);
   font-weight: 500;
 }
 .wd-comparison strong {
@@ -96,7 +96,7 @@
   overflow-wrap: anywhere;
 }
 .wd-comparison span {
-  font-size: 13px;
+  font-size: var(--text-sm);
 }
 .wd-water > .wd-note,
 .wd-warning,
@@ -127,12 +127,12 @@
   border-top: 1px solid var(--border);
 }
 .wd-budget p {
-  font-size: 13px;
+  font-size: var(--text-sm);
   margin: 0 0 8px;
   max-width: 75ch;
 }
 .wd-budget .wd-note {
-  font-size: 12px;
+  font-size: var(--text-xs);
 }
 .wd-daily {
   margin-block: 20px;
@@ -199,7 +199,7 @@
 .wd-shots .wd-core-limit {
   display: block;
   color: var(--warning);
-  font-size: 12px;
+  font-size: var(--text-xs);
   line-height: 1.5;
   margin-block: 6px;
 }
@@ -243,7 +243,7 @@
   padding: 16px 20px;
   cursor: pointer;
   border-top: 1px solid var(--border);
-  font-size: 13px;
+  font-size: var(--text-sm);
   font-weight: 500;
 }
 .wd-details > summary:focus-visible,

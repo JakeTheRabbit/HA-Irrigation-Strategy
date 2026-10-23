@@ -1,204 +1,571 @@
+/* All rooms (all-zones.tsx): each room with its tank, its zones, and each zone's sensors. */
 .facility {
   display: grid;
-  gap: 24px;
+  gap: var(--space-5);
 }
 .facility .page-heading {
   margin-bottom: 0;
 }
-.facility-filter {
+.facility .panel {
+  margin-bottom: 0;
+}
+
+/* A problem, shown where it is: on the room, a zone or the tank. */
+.facility-flag {
   display: flex;
-  align-items: center;
-  gap: 10px;
-  color: var(--muted-foreground);
-  font-size: 13px;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 0;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--warning) 14%, var(--surface));
+  color: var(--foreground);
+  font-size: var(--text-sm);
+  line-height: 1.4;
 }
-.facility-filter select {
-  min-width: 140px;
+.facility-flag svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--warning);
 }
+.facility-flag[data-level="critical"] {
+  background: color-mix(in srgb, var(--destructive) 14%, var(--surface));
+}
+.facility-flag[data-level="critical"] svg {
+  color: var(--destructive);
+}
+
+/* The room: name, state and run on the left, its feed tank on the right. */
+/* The room in two columns: its run, climate and zones on the left, what supplies it on the right. */
 .facility-room {
   display: grid;
-  gap: 14px;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 320px);
+  align-items: start;
+  gap: var(--space-4) var(--space-5);
+  padding: var(--space-4) var(--space-5) var(--space-5);
   min-width: 0;
 }
-.facility-room-heading,
-.facility-room-heading > div {
+.facility-room[data-problem] {
+  border-color: var(--destructive);
+}
+.facility-room-top {
+  grid-column: 1;
+  min-width: 0;
+}
+.facility-supply {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+}
+.facility-zones {
+  grid-column: 1;
+}
+.facility-room-main {
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.facility-room-head {
   display: flex;
-  align-items: center;
-  gap: 12px;
   flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px var(--space-3);
 }
-.facility-room-heading {
-  justify-content: space-between;
+.facility-room-name {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--foreground);
+  cursor: pointer;
 }
-.facility-room-heading h2 {
-  font-size: 20px;
+.facility-room-name h2 {
+  margin: 0;
+  font-size: var(--text-xl);
   font-weight: 600;
 }
-.facility-room-status {
-  font-size: 13px;
-  color: var(--warning);
-  margin: 0;
+.facility-room-name:hover h2 {
+  color: var(--primary);
 }
-.facility-zone-grid {
+.facility-room-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--muted-foreground);
+}
+.facility-room-dot[data-tone="holding"] {
+  background: var(--success);
+}
+.facility-room-dot[data-tone="watering"] {
+  background: var(--primary);
+}
+.facility-room-dot[data-tone="stopped"],
+.facility-room-dot[data-tone="stale"] {
+  background: var(--destructive);
+}
+.facility-room-state {
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+}
+.facility-room-day {
+  margin-left: auto;
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+.facility-room-day strong {
+  font-weight: 600;
+}
+.facility-run {
+  position: relative;
+  height: 10px;
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--muted-foreground) 22%, transparent);
+}
+.facility-run-stage {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--primary) 22%, transparent);
+}
+.facility-run-done {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 5px;
+  background: var(--primary);
+}
+.facility-run-today {
+  position: absolute;
+  top: -5px;
+  bottom: -5px;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--foreground);
+}
+.facility-room-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-5);
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+.facility-room-facts div {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
-  gap: 16px;
+  gap: 2px;
+}
+.facility-room-facts dt {
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+}
+.facility-room-facts dd {
+  margin: 0;
+  font-size: var(--text-md);
+  font-weight: 500;
+}
+.facility-fact-lead dd strong {
+  font-size: var(--text-xl);
+  font-weight: 600;
+}
+
+/* The room's feed tank, beside the room. */
+.facility-tank {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--background);
+  color: var(--foreground);
+  text-align: left;
+  cursor: pointer;
+}
+.facility-tank:hover {
+  border-color: color-mix(in srgb, var(--foreground) 30%, var(--border));
+}
+.facility-tank[data-held] {
+  border-color: var(--destructive);
+}
+.facility-tank .feed-tank {
+  width: 52px;
+  flex: none;
+}
+.facility-tank-facts {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+.facility-tank-title {
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.facility-tank-level strong {
+  font-size: var(--text-lg);
+  font-weight: 600;
+}
+.facility-tank-readings {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px var(--space-3);
+}
+
+/* Zones: one card each, its slab, its state, what it drank, its readings and its sensors. */
+.facility-zones {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr));
+  gap: var(--space-3);
 }
 .facility-zone {
   position: relative;
-  padding: 20px;
+  display: grid;
+  align-content: start;
+  gap: var(--space-2);
   min-width: 0;
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--background);
 }
-/* The whole card opens the zone: one tap on a phone, not a hunt for the title. */
+.facility-zone:hover {
+  border-color: color-mix(in srgb, var(--foreground) 30%, var(--border));
+}
+/* The whole card opens the zone: its title button reaches over it. */
 .facility-zone h3 button::after {
   content: "";
   position: absolute;
   inset: 0;
   border-radius: inherit;
 }
-.facility-room-water {
-  font-size: 13px;
-  color: var(--muted-foreground);
-  font-variant-numeric: tabular-nums;
+.facility-zone[data-level="warning"] {
+  border-color: var(--warning);
 }
-.facility-room-water strong {
-  color: var(--foreground);
-  font-weight: 600;
+.facility-zone[data-level="critical"] {
+  border-color: var(--destructive);
 }
-.facility-zone-title {
+/* Watering now: the card glows and the water in its slab moves. */
+.facility-zone[data-mode="watering"] {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 35%, transparent);
+}
+.facility-zone[data-mode="watering"] .zone-slab-water {
+  animation: facility-pour 1.6s ease-in-out infinite;
+}
+@keyframes facility-pour {
+  50% {
+    fill-opacity: 0.95;
+  }
+}
+/* Not part of the automation right now: greyed, so it reads as out of play. */
+.facility-zone[data-mode="room-off"],
+.facility-zone[data-mode="offline"],
+.facility-zone[data-mode="paused"],
+.facility-zone[data-mode="watering-off"] {
+  background: repeating-linear-gradient(
+    -45deg,
+    var(--background),
+    var(--background) 8px,
+    color-mix(in srgb, var(--muted-foreground) 8%, var(--background)) 8px,
+    color-mix(in srgb, var(--muted-foreground) 8%, var(--background)) 16px
+  );
+}
+.facility-zone[data-mode="room-off"] .zone-slab,
+.facility-zone[data-mode="offline"] .zone-slab,
+.facility-zone[data-mode="paused"] .zone-slab,
+.facility-zone[data-mode="watering-off"] .zone-slab {
+  filter: grayscale(1);
+  opacity: 0.6;
+}
+.facility-zone-top {
   display: flex;
-  align-items: start;
-  justify-content: space-between;
-  gap: 10px;
-  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+.facility-zone-top .zone-slab {
+  width: 76px;
+  flex: none;
+}
+.facility-zone-head {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
 }
 .facility-zone h3 {
-  font-size: 17px;
+  margin: 0;
+  font-size: var(--text-lg);
   font-weight: 600;
 }
 .facility-zone h3 button {
-  display: flex;
-  gap: 8px;
+  display: inline-flex;
   align-items: center;
-  color: var(--foreground);
-  background: none;
-  border: 0;
+  gap: 6px;
   padding: 0;
+  border: 0;
+  background: none;
+  color: var(--foreground);
+  font: inherit;
   cursor: pointer;
 }
-.facility-zone h3 button:hover {
-  color: var(--primary);
-}
-.facility-readings {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
-  margin: 22px 0 18px;
-}
-.facility-readings dt {
-  font-size: 12px;
-  color: var(--muted-foreground);
-  margin-bottom: 6px;
-}
-.facility-readings dd {
-  font-size: 28px;
-  line-height: 1.2;
-  font-variant-numeric: tabular-nums;
-}
-.facility-readings small {
-  font-size: 12px;
-  color: var(--muted-foreground);
-}
-.facility-phases {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 4px;
-}
-.facility-phases span {
-  font-size: 12px;
-  text-align: center;
-  border-top: 3px solid var(--border);
-  padding-top: 4px;
-  color: var(--muted-foreground);
-}
-.facility-phases span[data-current="true"] {
-  border-color: var(--primary);
-  color: var(--primary);
-}
-.facility-next {
-  font-size: 13px;
-  min-height: 3em;
-  margin: 14px 0 18px;
-  line-height: 1.6;
-}
-.facility-facts {
-  display: grid;
-  gap: 10px;
-  border-top: 1px solid var(--border);
-  padding-top: 16px;
-  font-size: 12px;
-}
-.facility-facts > div {
+.facility-zone-chips {
   display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  align-items: baseline;
-}
-.facility-facts dt {
-  color: var(--muted-foreground);
-}
-.facility-facts dd {
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-}
-.facility-supply {
-  display: flex;
-  gap: 16px;
-  align-items: center;
   flex-wrap: wrap;
-  padding: 14px 18px;
+  gap: 6px;
+}
+.facility-phase {
+  min-width: 24px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: #6b7580;
+  color: #fff;
+  font-size: var(--text-xs);
+  font-weight: 700;
+  text-align: center;
+}
+.facility-phase[data-phase="P1"] {
+  background: #2f6fb5;
+}
+.facility-phase[data-phase="P2"] {
+  background: #6450b0;
+}
+.facility-phase[data-phase="P3"] {
+  background: #34405a;
+}
+.facility-mode {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+.facility-mode::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--muted-foreground);
+}
+.facility-mode[data-mode="automated"]::before {
+  background: var(--success);
+}
+.facility-mode[data-mode="watering"] {
+  border-color: var(--primary);
+  color: var(--foreground);
+}
+.facility-mode[data-mode="watering"]::before {
+  background: var(--primary);
+}
+.facility-mode[data-mode="offline"]::before,
+.facility-mode[data-mode="watering-off"]::before {
+  background: var(--destructive);
+}
+.facility-mode[data-mode="paused"]::before {
+  display: none;
+}
+.facility-zone-drink {
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+.facility-zone-total {
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
+.facility-zone-drink strong {
+  font-size: var(--text-lg);
+  font-weight: 600;
+}
+.facility-zone-readings {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-2);
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+.facility-zone-readings div {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+.facility-zone-readings dt {
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+}
+.facility-zone-readings dd {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  white-space: nowrap;
+}
+/* Out of band: the arrow says which way; the colour only repeats it. */
+.facility-zone-readings [data-state="low"] dd {
+  color: color-mix(in srgb, var(--primary) 80%, var(--foreground));
+}
+.facility-zone-readings [data-state="high"] dd {
+  color: var(--warning);
+}
+
+/* A zone's sensors: one row each, its readings, and its trouble in words when it has any. */
+.facility-sensors {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: var(--space-2) 0 0;
+  border-top: 1px solid var(--border);
+  list-style: none;
+}
+.facility-sensor {
+  display: grid;
+  grid-template-columns: 8px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 2px var(--space-2);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
+.facility-sensor-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--success);
+}
+.facility-sensor[data-health="stale"] .facility-sensor-dot,
+.facility-sensor[data-health="stuck"] .facility-sensor-dot,
+.facility-sensor[data-health="left-out"] .facility-sensor-dot {
+  background: var(--warning);
+}
+.facility-sensor[data-health="no-reading"] .facility-sensor-dot,
+.facility-sensor[data-health="out-of-range"] .facility-sensor-dot {
+  background: var(--destructive);
+}
+.facility-sensor[data-health="not-counted"] .facility-sensor-dot {
+  background: var(--muted-foreground);
+}
+.facility-sensor-name {
+  overflow: hidden;
+  color: var(--muted-foreground);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.facility-sensor-values {
+  display: flex;
+  gap: var(--space-3);
+  font-weight: 500;
+}
+.facility-sensor-issue {
+  grid-column: 2 / -1;
+  color: var(--warning);
+}
+.facility-sensor[data-health="no-reading"] .facility-sensor-issue,
+.facility-sensor[data-health="out-of-range"] .facility-sensor-issue {
+  color: var(--destructive);
+}
+
+/* The room's supply: its feed tank, and its stock tanks under it. */
+.facility-supply {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.facility-stock {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--background);
+  color: var(--foreground);
   text-align: left;
   cursor: pointer;
+}
+.facility-stock-title {
+  align-self: center;
   color: var(--muted-foreground);
-  font-size: 12px;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.facility-stock:hover {
+  border-color: color-mix(in srgb, var(--foreground) 30%, var(--border));
+}
+.facility-stock-title {
   width: 100%;
 }
-.facility-supply strong {
-  color: var(--foreground);
+.facility-stock-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 52px;
 }
-.facility-supply:hover {
-  border-color: var(--primary);
+.facility-stock-item .stock-bottle {
+  width: 24px;
+  height: auto;
+}
+.facility-stock-name {
+  max-width: 72px;
+  overflow: hidden;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.facility-stock-level {
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
+.facility-stock-item[data-state="low"] .facility-stock-level,
+.facility-stock-item[data-state="very-low"] .facility-stock-level {
+  color: var(--warning);
 }
 .facility-note {
-  font-size: 12px;
-  line-height: 1.7;
+  margin: 0;
+  font-size: var(--text-xs);
 }
-.facility-zone button:focus-visible,
-.facility-supply:focus-visible {
-  outline: 2px solid var(--primary);
-  outline-offset: 4px;
+
+@media (prefers-reduced-motion: reduce) {
+  .facility-zone[data-mode="watering"] .zone-slab-water {
+    animation: none;
+  }
 }
-@media (max-width: 600px) {
-  .facility-room-heading {
-    align-items: flex-start;
+/* Narrower windows: the supply moves under the room's head, tank and stock side by side, so the
+   zones keep the full width. */
+@media (max-width: 1360px) {
+  .facility-room {
+    grid-template-columns: minmax(0, 1fr);
   }
-  .facility-room-heading > div {
-    gap: 8px;
-  }
-  .facility-filter {
-    width: 100%;
-  }
-  .facility .page-heading {
-    flex-wrap: wrap;
-    gap: 16px;
+  .facility-supply,
+  .facility-zones {
+    grid-column: 1;
+    grid-row: auto;
   }
   .facility-supply {
-    gap: 12px;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
   }
-  .facility-readings dd {
-    font-size: 26px;
+}
+@media (max-width: 720px) {
+  .facility-room {
+    padding: var(--space-3) var(--space-4) var(--space-4);
   }
-  .facility-zone {
-    padding: 18px;
+  .facility-room-day {
+    margin-left: 0;
   }
+  .facility-zone-readings {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.facility-gauges {
+  display: grid;
+  gap: 6px;
 }

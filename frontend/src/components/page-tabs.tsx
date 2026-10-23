@@ -68,7 +68,11 @@ export function PageTabs({
   const tabs = TABS[section];
   if (!tabs) return null;
   return (
-    <nav className="page-tabs" aria-label={`${SECTION_LABELS[section]} views`}>
+    <nav
+      className="page-tabs"
+      data-section={section}
+      aria-label={`${SECTION_LABELS[section]} views`}
+    >
       {tabs
         .filter((tab) => !hidden.includes(tab.page))
         .map((tab) => (

@@ -25,7 +25,7 @@
 .setpoint-preview-context span {
   display: block;
   color: var(--muted-foreground);
-  font-size: 12px;
+  font-size: var(--text-xs);
   margin-top: 4px;
 }
 
@@ -37,7 +37,7 @@
 .setpoint-preview-note {
   color: var(--muted-foreground);
   font-size: var(--text-xs);
-  line-height: 1.6;
+  line-height: 1.5;
   margin: 12px 0;
 }
 .setpoint-preview-zone {
@@ -84,6 +84,6 @@
 }
 @media (max-width: 620px) {
   .setpoint-preview-context strong {
-    font-size: 12px;
+    font-size: var(--text-xs);
   }
 }

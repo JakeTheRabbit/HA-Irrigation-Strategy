@@ -50,7 +50,7 @@
 }
 .calibration-point legend {
   margin-bottom: 4px;
-  font-weight: 650;
+  font-weight: 600;
 }
 .calibration-note {
   display: grid;
@@ -72,7 +72,7 @@
 .calibration-history caption {
   padding: 0 20px 6px;
   text-align: left;
-  font-weight: 650;
+  font-weight: 600;
 }
 @media (max-width: 640px) {
   .calibration-probes {

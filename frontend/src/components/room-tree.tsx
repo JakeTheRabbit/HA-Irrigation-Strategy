@@ -1,4 +1,3 @@
-import { LayoutGrid } from "lucide-react";
 import { number } from "@/components/dashboard";
 import { facilityRooms } from "@/lib/facility";
 import type { Controller } from "@/lib/types";
@@ -11,16 +10,14 @@ export function RoomTree({
   controller,
   allRooms,
   currentZone,
-  openAll,
   openRoom,
   openZone,
 }: {
   controller: Controller;
-  /** The All rooms page is open. */
+  /** The All rooms page is open (the Status menu entry marks it): no room is marked. */
   allRooms: boolean;
   /** The zone whose page is open, if one is. */
   currentZone: number | null;
-  openAll: () => void;
   openRoom: (room: string) => void;
   openZone: (room: string, zone: number) => void;
 }) {
@@ -28,15 +25,6 @@ export function RoomTree({
   return (
     <nav className="room-tree" aria-label="Rooms">
       <span className="room-tree-heading">Rooms</span>
-      <button
-        type="button"
-        className="room-tree-row room-tree-all"
-        aria-current={allRooms ? "page" : undefined}
-        onClick={openAll}
-      >
-        <LayoutGrid size={16} aria-hidden="true" />
-        <span className="room-tree-name">All rooms</span>
-      </button>
       {rooms.map(({ room, view, status }) => {
         const selected = room.id === controller.roomId;
         return (
@@ -45,6 +33,8 @@ export function RoomTree({
               type="button"
               className="room-tree-row"
               data-tone={status.tone}
+              data-room={room.id}
+              data-selected={selected || undefined}
               aria-current={selected && !allRooms && currentZone === null ? "page" : undefined}
               title={`${room.name}: ${status.text}. ${status.detail}`}
               onClick={() => openRoom(room.id)}

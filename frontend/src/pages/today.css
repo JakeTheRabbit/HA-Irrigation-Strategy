@@ -142,7 +142,7 @@
 }
 .today-notice strong,
 .today-stopped strong {
-  font-weight: 650;
+  font-weight: 600;
 }
 .today-alert-list [data-severity="info"] .today-notice {
   border-color: var(--border);
@@ -258,7 +258,7 @@
   color: var(--warning);
   font-size: var(--text-sm);
   font-weight: 600;
-  line-height: 1.45;
+  line-height: 1.5;
 }
 .today-flag > svg {
   flex: none;
@@ -305,7 +305,7 @@
   padding-top: 7px;
   border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
   font-size: var(--text-sm);
-  line-height: 1.45;
+  line-height: 1.5;
 }
 .today-zone-facts > div {
   display: contents;
@@ -321,7 +321,7 @@
 }
 .today-next[data-stopped] dd {
   color: var(--destructive);
-  font-weight: 550;
+  font-weight: 500;
 }
 /* What the AI assistant changed today. */
 .today-jev {
@@ -339,7 +339,7 @@
 }
 .today-jev-list {
   margin: 0;
-  padding: 0 18px 8px;
+  padding: 0 20px 8px;
   list-style: none;
 }
 .today-jev-list li {

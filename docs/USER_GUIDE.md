@@ -92,7 +92,7 @@ Next to the chips, the top bar shows these items:
 
 ## Status
 
-**All rooms** groups zones by room and shows phase, moisture, pore EC, recent irrigation and water delivery. Each room's heading shows its water today: the litres delivered across its zones and the litres per plant. Paused rooms stay visible. Each feed strip opens its room’s tank view. The header switches act only on the room named beside them.
+**All rooms** is organised room → zones → sensors. Each room carries its run, water drunk today (per plant and total), climate, feed tank and stock tanks. Each zone card shows its phase and automation state (Automated, Watering now, Paused, Watering off, Offline, Room off), water per plant, VWC, dryback, pore EC and root-zone temperature, and lists each of its sensors with its readings. Problems show in place: on the room, zone, sensor or tank. A zone being watered glows; one out of the automation is greyed. The header switches act only on the room named beside them.
 
 **Room** opens the compact Today summary for one room. Choose **Settings › Settings › Display › Default view** to change this browser’s landing page. Bookmarks and notification links take precedence.
 

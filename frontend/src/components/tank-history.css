@@ -25,7 +25,7 @@
   border-radius: 6px;
   background: var(--surface);
   color: var(--foreground);
-  font-size: 12px;
+  font-size: var(--text-xs);
 }
 .tank-history-range button[aria-pressed="true"] {
   background: var(--secondary);
@@ -34,7 +34,7 @@
 }
 .chart-placeholder.tank-history-loading {
   min-height: 280px;
-  font-size: 12px;
+  font-size: var(--text-xs);
 }
 .tank-history-key {
   display: flex;
@@ -105,7 +105,7 @@
   font-weight: 600;
 }
 .tank-history-summary td {
-  font-weight: 550;
+  font-weight: 500;
 }
 .tank-history-note,
 .tank-history-caption {
@@ -115,7 +115,7 @@
   gap: 8px 12px;
   color: var(--muted-foreground);
   font-size: var(--text-xs);
-  line-height: 1.55;
+  line-height: 1.5;
 }
 .tank-history-stale {
   color: var(--warning);
@@ -125,7 +125,7 @@
   border-top: 1px solid var(--border);
 }
 .tank-history-gate h3 {
-  font-size: 13px;
+  font-size: var(--text-sm);
 }
 .tank-history-gate dl {
   display: grid;
@@ -137,7 +137,7 @@
   grid-template-columns: 28px minmax(0, 1fr);
   gap: 8px;
   font-size: var(--text-xs);
-  line-height: 1.55;
+  line-height: 1.5;
 }
 .tank-history-gate dt {
   font-weight: 600;

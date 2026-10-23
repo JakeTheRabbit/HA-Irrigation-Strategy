@@ -33,7 +33,7 @@
   position: absolute;
   transform: translateX(-50%);
   color: var(--muted-foreground);
-  font-size: 12px;
+  font-size: var(--text-xs);
   white-space: nowrap;
 }
 .day-lanes-tick:first-child {

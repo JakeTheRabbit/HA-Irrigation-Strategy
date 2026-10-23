@@ -6,10 +6,10 @@
 .run-records .small {
   color: var(--muted-foreground);
   font-size: var(--text-sm);
-  line-height: 1.55;
+  line-height: 1.5;
 }
 .run-records h3 {
-  font-weight: 650;
+  font-weight: 600;
 }
 .run-records label {
   display: grid;

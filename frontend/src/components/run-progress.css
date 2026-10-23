@@ -44,7 +44,7 @@
 .run-progress dt {
   color: var(--muted-foreground);
   font-size: var(--text-xs);
-  font-weight: 550;
+  font-weight: 500;
 }
 .run-progress dd {
   margin: 0;
@@ -127,7 +127,7 @@
 }
 .run-phases li[aria-current] {
   color: var(--foreground);
-  font-weight: 650;
+  font-weight: 600;
 }
 .run-phase-short {
   display: none;

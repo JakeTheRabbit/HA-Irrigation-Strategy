@@ -113,7 +113,7 @@
   background: var(--surface);
   color: var(--foreground);
   font-size: var(--text-sm);
-  font-weight: 550;
+  font-weight: 500;
   white-space: nowrap;
 }
 .safety-switch:not(:disabled):hover {
@@ -254,7 +254,7 @@
 }
 
 .header-safety-scope {
-  font-size: 12px;
+  font-size: var(--text-xs);
   color: var(--muted-foreground);
   white-space: nowrap;
 }

@@ -16,7 +16,7 @@
   gap: 8px 12px;
 }
 .reservoir-guard-state a {
-  font-size: 12px;
+  font-size: var(--text-xs);
 }
 .reservoir-guard-facts {
   display: grid;
@@ -28,5 +28,5 @@
   font-size: var(--text-xs);
 }
 .reservoir-guard-facts dd {
-  font-weight: 550;
+  font-weight: 500;
 }

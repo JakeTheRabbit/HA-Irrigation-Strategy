@@ -29,7 +29,7 @@ try {
   assert.ok((await page.locator("[data-facility-zone]").count()) >= 6);
   const room = page.locator("[data-facility-room]").nth(1);
   const id = await room.getAttribute("data-facility-room");
-  await room.locator(".facility-zone h3 button").first().click();
+  await room.locator(".facility-zone").first().click();
   await page.locator("[data-zone-page]").waitFor();
   assert.equal(new URL(page.url()).searchParams.get("room"), id);
   await open("#/settings");
