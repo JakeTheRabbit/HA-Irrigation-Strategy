@@ -119,7 +119,7 @@ describe("the menu", () => {
     expect(routeHash({ page: "equipment/dosing" })).toBe("#/equipment/dosing");
     expect(canonicalHash("#/equipment/dosing")).toBeNull();
   });
-  it("opens the site's notifications under Settings & help", () => {
+  it("opens the site's notifications under Settings", () => {
     expect(parseRoute("#/settings/notifications")).toEqual({
       route: { page: "settings/notifications" },
       canonical: true,

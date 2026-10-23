@@ -299,7 +299,7 @@ function AddPhone({
   );
 }
 
-/** Settings & help › Notifications: which phones get a push for which kinds of alert, for the whole
+/** Settings › Notifications: which phones get a push for which kinds of alert, for the whole
  * site (docs/NOTIFICATIONS.md). Edits are a draft until reviewed and saved with `notify_save`
  * against the revision they were read at; the page itself never sends a push but a test one. */
 export function Notifications({
