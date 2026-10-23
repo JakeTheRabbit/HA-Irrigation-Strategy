@@ -76,6 +76,10 @@ RESERVED = {
     ),
     "CS-808": ("feat/mix-check", "a batch's mix off its EC or pH band"),
     "CS-211": ("feat/p6-dosing-ph-autocorrect", "a zone's shots held for too long"),
+    "CS-212": (
+        "fix/one-room-error-does-not-stop-the-others",
+        "a room whose pass raised an error",
+    ),
     "CS-809": ("feat/p6-dosing-ph-autocorrect", "the batch tank's pH not corrected"),
     "CS-810": ("feat/p6-dosing-ph-autocorrect", "the light dimmed on dry substrate"),
     "CS-811": ("feat/p6-dosing-ph-autocorrect", "the light dimmed too long"),

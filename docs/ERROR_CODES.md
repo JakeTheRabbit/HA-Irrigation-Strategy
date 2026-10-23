@@ -15,7 +15,7 @@ once each time the controller app starts, and CS-405 comes at the start. A dismi
 does not clear the hardware hold.
 
 Most alerts stay in Home Assistant until you dismiss them, also after their cause stops. The
-controller removes CS-201, CS-209, CS-210, CS-308 and CS-309 itself. When you set *Room Active* of a room
+controller removes CS-201, CS-209, CS-210, CS-212, CS-308 and CS-309 itself. When you set *Room Active* of a room
 to off, the controller removes the alerts of the room.
 When *Room Active* is off (no plants in the room), the room gives no alerts about water. The
 controller still reports a setup change (CS-201) and a hardware hold (CS-301, CS-308, CS-309).
@@ -51,6 +51,7 @@ controller still reports a setup change (CS-201) and a hardware hold (CS-301, CS
 | [CS-209](#cs-209) | No shots for some hours | Warning | Notification |
 | [CS-210](#cs-210) | Hold entity missing | Warning | Notification |
 | [CS-211](#cs-211) | Shots held for too long | Critical | Notification |
+| [CS-212](#cs-212) | Controller error in room | Critical | Notification |
 | [CS-301](#cs-301) | Hardware fault latch | Critical | Notification |
 | [CS-302](#cs-302) | Pump command error | Warning | Notification |
 | [CS-303](#cs-303) | Main-line valve command error | Warning | Notification |
@@ -480,6 +481,28 @@ controller still reports a setup change (CS-201) and a hardware hold (CS-301, CS
 - If the feed pH or EC is outside its band, correct the tank, or turn on pH auto-correct.
 - If you cannot remove the hold soon, water the zone by hand.
 - To change the hours, or to turn the alert off, set Shots held alert in the settings of the room.
+
+<a id="cs-212"></a>
+
+### CS-212: Controller error in room
+
+*Critical · Notification*
+
+**What it means.** An error stopped the controller in the pass of this room. The alert gives the error. The heartbeat and the status of the room show error. The other rooms continue.
+
+**Effect on water.** The room gets no shots, also no rescue shots, until the error stops. The controller tries the room again each minute. The alert comes again every 30 minutes while the error continues, and clears after the next pass of the room without an error.
+
+**Probable causes**
+
+- A fault in the controller, for example a setting or a state of the room that it cannot use.
+- An entity of the room that gives a value of a type that the controller does not expect.
+
+**What to do**
+
+- CAUTION: Do not leave the room in this state for a long time. The substrate dries out and the plants can wilt.
+- Read the controller log near the time of the alert.
+- Report the error with the log.
+- Until the error stops, water the room by hand.
 
 ## Pumps and valves (CS-3xx)
 

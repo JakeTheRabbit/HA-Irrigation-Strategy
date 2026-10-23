@@ -503,7 +503,7 @@ export function buildRoom(states: States, room: Room): RoomView {
     strategyValidUntil > Date.now();
   const now = Date.now();
   const beat = readHeartbeat(heartbeat, now);
-  const live = beat.health === "fresh";
+  const live = beat.health === "fresh" && !beat.error; // CS-212: its last pass of this room failed
   const decision = resolve(states, room, "sensor", "current_decision");
   const flag = heartbeat?.attributes.enable_flag ?? config?.attributes.enable_flag;
   const engineEntity =
@@ -766,6 +766,13 @@ export function buildRoom(states: States, room: Room): RoomView {
       title: "Controller stopped",
       detail: `${stoppedText(beat, now)} After an update or a restart it starts again by itself, which can take a few minutes; if it doesn't, start the controller app and check its log. Zone phases and statuses are its last report, not live.`,
     });
+  else if (config && beat.error)
+    alerts.push({
+      id: `${room.id}-controller`,
+      severity: "critical",
+      title: "Controller error in this room",
+      detail: `${beat.error}. The controller gives this room no shots until the error stops, and tries it again each minute (CS-212). Read the controller log. Zone phases and statuses are its last report, not live.`,
+    });
   else if (config && !live)
     alerts.push({
       id: `${room.id}-controller`,
@@ -872,7 +879,7 @@ export function staleBanner(states: States, room: Room, now = Date.now()): strin
   if (status.tone === "stale")
     return `The controller has not reported for ${ageText(now - status.reportedAt!)}. Moisture and phases below are its last report, not live. Watering is held by the controller's own safety rules.`;
   const beat = readHeartbeat(resolve(states, room, "sensor", "ai_heartbeat"), now);
-  return status.tone === "stopped" && beat.health !== "fresh"
+  return status.tone === "stopped" && (beat.health !== "fresh" || beat.error)
     ? `${status.detail} Moisture and phases below are its last report, not live.`
     : null;
 }
@@ -928,6 +935,13 @@ export function roomStatus(states: States, room: Room, now = Date.now()): RoomSt
       "stale",
       `Data ${ageText(now - beat.at!)} old`,
       "The controller stopped reporting. Check the controller app and its log.",
+    );
+  // CS-212: the last pass of this room ended in an error; nothing it reported before is live.
+  if (beat.error)
+    return say(
+      "stopped",
+      "Not watering",
+      `Controller error in this room: ${beat.error}. The controller tries the room again each minute, and the other rooms continue. Read the controller log.`,
     );
   const pending = note("setup_pending");
   if (pending)
