@@ -13,7 +13,7 @@ import {
   FLOW_LOW,
   blockedSince,
   dailyRatios,
-  latestReconciled,
+  latestFlowEvent,
   leakIncidents,
   leakVerdict,
   leakWatch,
@@ -128,8 +128,8 @@ function useFlowEvents(controller: Controller, since: number) {
   const roomId = controller.roomId;
   const connected = ["live", "demo"].includes(controller.connection);
   const [read, setRead] = useState<{ key: string; outcome: V2Outcome<{ events: CsEvent[] }> } | null>(null);
-  // A shot the meter has counted since (the live feed): read the Journal again for its bar.
-  const fresh = latestReconciled(controller.recentEvents, roomId);
+  // A shot the meter has counted since, or a CS-319 raised (the live feed): read the Journal again.
+  const fresh = latestFlowEvent(controller.recentEvents, roomId);
   const key = `${roomId}|${since}`;
   useEffect(() => {
     if (!connected) return;
@@ -159,8 +159,12 @@ function FlowCheck({
   oneAtATime: boolean;
 }) {
   const tz = controller.timeZone;
-  // The page's day: read once as it opens (the Journal read is one snapshot).
-  const [now] = useState(() => Date.now());
+  // The page's clock: it moves each minute, so the lanes and "today" roll over at midnight.
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
   const dayStart = startOfDay(now, tz);
   const since = startOfDay(dayStart - 6 * DAY + 12 * 3_600_000, tz);
   const read = useFlowEvents(controller, since);
@@ -211,7 +215,17 @@ function FlowCheck({
         ))}
       </div>
       <div className="wf-lower">
-        <LeakCheck controller={controller} meter={meter} shared={shared} events={events} now={now} dayStart={dayStart} />
+        <LeakCheck
+          controller={controller}
+          meter={meter}
+          shared={shared}
+          // Zones on this meter whose valve Home Assistant does not record, and zones on another meter.
+          blind={zones.filter((zone, i) => meters[i] === meter && !zone.valveEntity).map((zone) => zone.name)}
+          elsewhere={zones.filter((_, i) => meters[i] && meters[i] !== meter).map((zone) => zone.name)}
+          events={events}
+          now={now}
+          dayStart={dayStart}
+        />
         <WaterPerPlant controller={controller} flows={flows} />
       </div>
     </>
@@ -326,7 +340,13 @@ function ShotBars({ flow, tz, zone }: { flow: ZoneFlow; tz: string; zone: string
           <i data-key="asked" /> Asked <i data-key="metered" /> Metered
         </span>
       </figcaption>
-      <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`${zone}: ${shots.length} shots today, asked against metered`}>
+      <svg
+        viewBox={`0 0 ${width} ${height}`}
+        role="img"
+        aria-label={`${zone}, shots today, asked against metered: ${shots
+          .map((s) => `${clock(s.at, tz)} ${formatVolume(s.askedL, 3)} asked, ${formatVolume(s.meteredL, 3)} metered`)
+          .join("; ")}`}
+      >
         <line className="wf-bars-top" x1="0" x2={width} y1={y(maxAsked)} y2={y(maxAsked)} />
         <text className="wf-bars-scale" x={width} y={y(maxAsked) - 3} textAnchor="end">
           {formatVolume(maxAsked, 2)}
@@ -372,16 +392,19 @@ function WeekLine({ days, zone }: { days: (number | null)[]; zone: string }) {
 
 /** The problem in place: on the zone whose metered water fell under 80%. */
 function BlockedCard({ controller, zone, since }: { controller: Controller; zone: Zone; since: number | null }) {
-  const [sent, setSent] = useState<{ at: number } | { error: string } | null>(null);
+  const [sent, setSent] = useState<{ at: number; pressed: number } | { error: string } | null>(null);
+  // The press as the controller recorded it: the test-shot button's last-pressed time.
+  const recorded = Date.parse(controller.states[`button.crop_steering_${controller.room.room.prefix}zone_${zone.id}_test_shot`]?.state ?? "");
   const seconds = Number(controller.states[`number.crop_steering_${controller.room.room.prefix}zone_${zone.id}_manual_shot_seconds`]?.state);
   const label = Number.isFinite(seconds) && seconds > 0 ? `Run ${seconds} s test shot on ${zone.name}` : `Run a test shot on ${zone.name}`;
   const connected = ["live", "demo"].includes(controller.connection);
   const run = () => {
     setSent(null);
+    const pressed = Date.now();
     controller
       .operator<{ requested: string | null }>("test_shot", { room_id: "room:" + controller.room.room.prefix, zone: zone.id })
       .then(
-        (answer) => setSent({ at: Date.parse(answer.requested ?? "") || Date.now() }),
+        (answer) => setSent({ at: Date.parse(answer.requested ?? "") || Date.now(), pressed }),
         (error: unknown) => setSent({ error: errorText(error) }),
       );
   };
@@ -406,7 +429,12 @@ function BlockedCard({ controller, zone, since }: { controller: Controller; zone
         </a>
       </div>
       {sent && (
-        <p className="small" role="status" data-test-shot-receipt>
+        <p
+          className="small"
+          role="status"
+          data-test-shot-receipt
+          data-recorded={sent && "pressed" in sent && recorded >= sent.pressed ? "" : undefined}
+        >
           {"error" in sent
             ? `The test shot was not sent: ${sent.error}`
             : `Test shot asked for at ${clock(sent.at, controller.timeZone)}. Its bar shows here once the meter has counted it.`}
@@ -433,6 +461,8 @@ function LeakCheck({
   controller,
   meter,
   shared,
+  blind,
+  elsewhere,
   events,
   now,
   dayStart,
@@ -441,6 +471,10 @@ function LeakCheck({
   meter: string;
   /** Another room reads this meter too: this room's valves alone cannot tell its shots from a leak. */
   shared: boolean;
+  /** Zones on this meter whose valve is not recorded: their shots cannot be told from a leak. */
+  blind: string[];
+  /** Zones on another meter: not in this check. */
+  elsewhere: string[];
   events: CsEvent[];
   now: number;
   dayStart: number;
@@ -450,31 +484,34 @@ function LeakCheck({
     controller.room.zones.flatMap((zone) => (zone.valveEntity ? [[zone.valveEntity, zone.id] as const] : [])),
   );
   const valveKey = Object.keys(valves).join();
-  const [rows, setRows] = useState<{ key: string; rows: TimelineRows | null; error: string | null } | null>(null);
+  const [rows, setRows] = useState<{ key: string; rows: TimelineRows | null; error: string | null; end: number } | null>(null);
   const key = `${meter}|${valveKey}|${dayStart}`;
+  // Read again every 5 minutes; the last read stays on screen meanwhile.
+  const every = Math.floor(now / 300_000);
   useEffect(() => {
     let live = true;
-    const request = { entityIds: [...Object.keys(valves), meter], attributeIds: [], start: dayStart, end: now };
+    const end = now;
+    const request = { entityIds: [...Object.keys(valves), meter], attributeIds: [], start: dayStart, end };
     const load = controller.demo
-      ? Promise.resolve(demoLeakTimeline(valves, meter, dayStart, dayStart + DAY, now))
+      ? Promise.resolve(demoLeakTimeline(valves, meter, dayStart, dayStart + DAY, end))
       : controller.timeline(request);
     load.then(
-      (answer) => live && setRows({ key, rows: answer, error: null }),
-      (error: unknown) => live && setRows({ key, rows: null, error: errorText(error) }),
+      (answer) => live && setRows({ key, rows: answer, error: null, end }),
+      (error: unknown) => live && setRows({ key, rows: null, error: errorText(error), end }),
     );
     return () => {
       live = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key]);
+  }, [key, every]);
   const read = rows?.key === key ? rows : null;
   const unit = controller.states[meter]?.attributes.unit_of_measurement;
   const watch = read?.rows
-    ? leakWatch(Object.keys(valves).map((id) => read.rows![id] ?? []), read.rows[meter] ?? [], unit, dayStart, now)
+    ? leakWatch(Object.keys(valves).map((id) => read.rows![id] ?? []), read.rows[meter] ?? [], unit, dayStart, read.end)
     : null;
   const incidents = leakIncidents(events);
   const today = incidents.filter((i) => i.at >= dayStart);
-  const verdict = watch ? leakVerdict(watch, today.length, shared) : null;
+  const verdict = watch ? leakVerdict(watch, today.length, shared, blind.length > 0) : null;
   const flowing = verdict === "flowing";
   const days = Array.from({ length: 7 }, (_, i) => startOfDay(dayStart - (6 - i) * DAY + 12 * 3_600_000, tz));
   const last = incidents.at(-1);
@@ -515,7 +552,9 @@ function LeakCheck({
           <p className="wf-shut" data-shut-flow data-tone={flowing ? "warn" : undefined}>
             {shared
               ? "Another room’s zones run through this meter too: only the controller’s alert tells water with every valve shut."
-              : watch.litres === null
+              : blind.length
+                ? `Home Assistant does not record the valve of ${blind.join(", ")}: its shots cannot be told from a leak here, so only the controller’s alert tells.`
+                : watch.litres === null
                 ? `The meter reads in ${String(unit ?? "no unit")}, not litres: nothing to count.`
                 : watch.watchedMs <= 0
                   ? "No meter reading today: nothing watched."
@@ -531,16 +570,23 @@ function LeakCheck({
           </div>
         </div>
       )}
+      {elsewhere.length > 0 && (
+        <p className="muted small" data-leak-elsewhere>
+          {elsewhere.join(", ")} {elsewhere.length === 1 ? "runs" : "run"} through another meter: not in this check.
+        </p>
+      )}
       <div className="wf-days">
         <span>Last 7 days</span>
-        <ol aria-label="Water with every valve shut, last 7 days">
+        {/* A day with no CS-319 is "no alert", not clear: the meter may not have been watched then. */}
+        <ol aria-label="The controller’s alerts for water with every valve shut, last 7 days">
           {days.map((d) => {
             const hit = incidents.some((i) => dayKey(i.at, tz) === dayKey(d, tz));
             const name = dayLabel(d, tz).split(" ")[0];
             return (
-              <li key={d} data-hit={hit ? "" : undefined} aria-label={`${dayLabel(d, tz)}: ${hit ? "water with valves shut" : "clear"}`}>
+              <li key={d} data-hit={hit ? "" : undefined}>
                 <i aria-hidden />
-                {name}
+                <span aria-hidden>{name}</span>
+                <span className="sr-only">{`${dayLabel(d, tz)}: ${hit ? "water with valves shut" : "no alert"}`}</span>
               </li>
             );
           })}
@@ -559,8 +605,8 @@ function LeakCheck({
   );
 }
 
-/** Water per plant in the display's unit: mL under litres, the volume's own unit in gallons. */
-const perPlant = (ml: number) => (getDisplayUnits().volume === "gal" ? formatVolume(ml / 1000, 3) : `${Math.round(ml)} mL`);
+/** Water per plant in the display's volume unit. */
+const perPlant = (ml: number) => formatVolume(ml / 1000, 3);
 
 /** Metered water per plant today, zone against zone, the room's median marked. */
 function WaterPerPlant({ controller, flows }: { controller: Controller; flows: ZoneFlow[] }) {

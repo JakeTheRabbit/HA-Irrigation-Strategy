@@ -330,7 +330,8 @@
   width: 22px;
   height: 22px;
   border-radius: 6px;
-  background: color-mix(in srgb, var(--success) 18%, var(--surface));
+  /* No alert, not proven clear: neutral, not green. */
+  background: color-mix(in srgb, var(--muted-foreground) 14%, var(--surface));
 }
 .wf-days li[data-hit] i {
   background: color-mix(in srgb, var(--warning) 45%, var(--surface));

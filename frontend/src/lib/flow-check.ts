@@ -9,8 +9,6 @@ import { clock, dayKey, startOfDay } from "./time";
 export const FLOW_LOW = 0.8;
 export const FLOW_HIGH = 1.2;
 const EPS = 1e-9;
-/** After a valve closes, its shot's water may still reach the meter's next report. */
-export const SHOT_TAIL_MS = 5 * 60_000;
 
 export type FlowVerdict = "on_target" | "low" | "high" | "no_meter";
 export interface FlowShot {
@@ -133,15 +131,16 @@ function onSpans(rows: TimelineRow[], end: number): Span[] {
 }
 
 /** Leak check over [start, end): when any valve was open, when the meter counted water, and the
- * litres it counted with every valve shut (a reading inside a valve's open span or the
- * `SHOT_TAIL_MS` after it is that shot's water) over the time it watched them shut. `litres` is
- * null when the meter's unit is not one the controller reads. */
+ * litres it counted with every valve shut over the time they were shut. A rise is a shot's water
+ * when its valve was open at any time between the reading before and that reading: so a shot's
+ * water runs up to the meter's first reading after the valve shut, however late the meter reports.
+ * `litres` is null when the meter's unit is not one the controller reads. */
 export function leakWatch(valves: TimelineRow[][], meter: TimelineRow[], unit: unknown, start: number, end: number) {
   const valveOpen = valves
     .flatMap((rows) => onSpans(rows, end))
     .filter((s) => s.end > start && s.start < end)
     .sort((a, b) => a.start - b.start);
-  const busy = (t: number) => valveOpen.some((s) => t >= s.start && t <= s.end + SHOT_TAIL_MS);
+  const busy = (from: number, to: number) => valveOpen.some((s) => s.start <= to && s.end > from);
   const readings = [...meter]
     .sort((a, b) => a.time - b.time)
     .map((row) => ({ time: row.time, litres: meterLitres(row.state, unit) }))
@@ -152,22 +151,23 @@ export function leakWatch(valves: TimelineRow[][], meter: TimelineRow[], unit: u
     const rise = readings[i].litres - readings[i - 1].litres;
     if (rise <= 0) continue; // still, or the meter reset
     if (readings[i].time >= start) meterFlow.push({ start: Math.max(start, readings[i - 1].time), end: readings[i].time });
-    if (readings[i].time >= start && !busy(readings[i].time)) litres += rise;
+    if (readings[i].time >= start && !busy(readings[i - 1].time, readings[i].time)) litres += rise;
   }
   const from = Math.max(start, readings[0]?.time ?? end);
   let watchedMs = Math.max(0, end - from);
   let covered = from;
   for (const s of valveOpen) {
     const a = Math.max(covered, s.start),
-      b = Math.min(end, s.end + SHOT_TAIL_MS);
+      b = Math.min(end, s.end);
     if (b > a) watchedMs -= b - a;
     covered = Math.max(covered, b);
   }
   return { valveOpen, meterFlow, litres: meterLitres("0", unit) === null ? null : litres, watchedMs };
 }
 
-/** The flow meter that counts a zone's water, as the controller looks it up: the zone's own in the
- * supply's `zone_meters`, else its room pump's `flow_meter` (the only pump when the room maps none). */
+/** The flow meter that counts a zone's water, as the controller looks it up (controller.py
+ * _flow_meter, _pump_meter): the zone's own in the supply's `zone_meters`, else the `flow_meter` of
+ * the pump the room names. A room that names no pump reads no pump's meter. */
 export function zoneMeter(
   supply: { zone_meters?: unknown; irrigation_pumps?: unknown } | null | undefined,
   roomId: string,
@@ -177,7 +177,8 @@ export function zoneMeter(
   const meters = (supply?.zone_meters as Record<string, Record<string, unknown>> | undefined)?.[roomId];
   const own = meters?.[String(zone)];
   if (typeof own === "string" && own) return own;
-  const served = roomPump<{ flow_meter?: unknown }>(supply?.irrigation_pumps, pump);
+  const pumps = Array.isArray(supply?.irrigation_pumps) ? (supply.irrigation_pumps as { entity_id?: unknown; flow_meter?: unknown }[]) : [];
+  const served = pump ? pumps.find((p) => p?.entity_id === pump) : undefined;
   return typeof served?.flow_meter === "string" && served.flow_meter ? served.flow_meter : null;
 }
 
@@ -203,21 +204,31 @@ export function meterShared(
 export const METER_IDLE_L = 0.5;
 
 export type LeakVerdict = "flowing" | "clear" | "no_alert" | "unwatched";
-/** The leak check's word for today. `flowing` when the controller raised CS-319 today or, on a meter
- * only this room reads, the litres counted with every valve shut pass METER_IDLE_L. `clear` only
- * when the meter was read in litres for some time. On a meter another room reads too
- * (`shared`), only the controller's alert tells: `no_alert`. */
-export function leakVerdict(watch: { litres: number | null; watchedMs: number }, alertsToday: number, shared: boolean): LeakVerdict {
+/** The leak check's word for today. Only the controller's CS-319 says `flowing`: the page's own
+ * count is shown as litres, never as the verdict. On a meter another room reads too (`shared`),
+ * only the alert tells: `no_alert`. `unwatched` when a zone on the meter has no recorded valve
+ * (`blind`: its shots cannot be told from a leak) or nothing was read in litres. `clear` when the
+ * page counted no more than METER_IDLE_L with every valve shut, else `no_alert`. */
+export function leakVerdict(
+  watch: { litres: number | null; watchedMs: number },
+  alertsToday: number,
+  shared: boolean,
+  blind = false,
+): LeakVerdict {
   if (alertsToday > 0) return "flowing";
   if (shared) return "no_alert";
-  if (watch.litres === null || watch.watchedMs <= 0) return "unwatched";
-  return watch.litres > METER_IDLE_L ? "flowing" : "clear";
+  if (blind || watch.litres === null || watch.watchedMs <= 0) return "unwatched";
+  return watch.litres > METER_IDLE_L ? "no_alert" : "clear";
 }
 
-/** The id of the room's newest `flow.reconciled` in the live feed, or null: a new one re-reads the
- * page's Journal, so a shot's bar shows once the meter has counted it. */
-export function latestReconciled(events: readonly CsEvent[], roomId: string): string | null {
-  return events.filter((e) => e.kind === "flow.reconciled" && e.room_id === roomId).at(-1)?.id ?? null;
+/** The id of the room's newest `flow.reconciled` or CS-319 in the live feed, or null: a new one
+ * re-reads the page's Journal, so a shot's bar shows once the meter has counted it, and a leak
+ * alert shows as it is raised. */
+export function latestFlowEvent(events: readonly CsEvent[], roomId: string): string | null {
+  return (
+    events.filter((e) => e.room_id === roomId && (e.kind === "flow.reconciled" || (e.kind === "alert.raised" && e.code === "CS-319"))).at(-1)
+      ?.id ?? null
+  );
 }
 
 /** A lane's spans in words, for its screen-reader label: "3 times, 06:00 to 15:40". */

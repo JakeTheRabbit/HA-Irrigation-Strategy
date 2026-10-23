@@ -11,11 +11,12 @@
  *   one card per zone, zone 2 "Blocked line?" and the others "On target";
  * - zone 2's gauge aria-label says 62%; the blocked card sits inside zone 2, and only there,
  *   naming the 14:14 shot;
- * - a short tap on the test-shot button sends nothing; a 1.6 s hold sends test_shot (the demo
- *   records the press) and the receipt says when it was asked for;
+ * - a short tap on the test-shot button sends nothing; a 1.6 s hold sends test_shot, the demo
+ *   records the press (the zone's test-shot button state: `data-recorded` on the receipt) and the
+ *   receipt says when it was asked for;
  * - the intro says shots run one zone at a time (the demo pump's max_concurrent_zones is 1);
  * - Leak check: "Clear today", "0.00 L in … watched", the lanes' screen-reader labels count their
- *   spans, one day of the last 7 marked (yesterday, 02:14);
+ *   spans, one day of the last 7 marked (yesterday, 02:14), the other six "no alert", not clear;
  * - Water per plant: a row per zone, zone 2 under the median, said once;
  * - 3.17: "Needs integration 3.18" for the metered flow check, and the estimate chart
  *   (Litres by zone, by grow week) still there.
@@ -103,6 +104,7 @@ await runParity({
     const receipt = page.locator("[data-test-shot-receipt]");
     await receipt.waitFor();
     assert.match(await receipt.innerText(), new RegExp(`^Test shot asked for at ${HHMM}\\.`), `${label}: receipt`);
+    assert.equal(await receipt.getAttribute("data-recorded"), "", `${label}: the demo recorded the test_shot press`);
     region("test shot");
 
     // Leak check.
@@ -116,13 +118,14 @@ await runParity({
     assert.match((await leak.getByRole("img", { name: /^Valve open: / }).getAttribute("aria-label")).replace(/^Valve open: /, ""), span, `${label}: valve lane label`);
     assert.match((await leak.getByRole("img", { name: /^Meter flow: / }).getAttribute("aria-label")).replace(/^Meter flow: /, ""), span, `${label}: meter lane label`);
     assert.equal(await leak.locator("li[data-hit]").count(), 1, `${label}: one day with water through shut valves`);
+    assert.equal(await leak.locator("li:not([data-hit]) .sr-only", { hasText: /: no alert$/ }).count(), 6, `${label}: other days "no alert"`);
     assert.match(await leak.locator("[data-leak-last]").innerText(), new RegExp(`^\\w{3} \\d{1,2}, ${HHMM} Room A: water flows with no zone on \\(CS-319\\)$`), `${label}: last incident`);
     region("leak check");
 
     // Water per plant.
     const plant = page.locator("[data-water-per-plant]");
     assert.equal(await plant.locator("[data-plant-zone]").count(), 3, `${label}: a row per zone`);
-    assert.match(await plant.locator(".wf-plant-note").innerText(), /^Zone 2 is \d+ mL a plant under the median\. It asked for \d+ mL, so the gap is most likely the blocked line, not the plan\.$/, `${label}: plant note`);
+    assert.match(await plant.locator(".wf-plant-note").innerText(), /^Zone 2 is [\d.]+ L a plant under the median\. It asked for [\d.]+ L, so the gap is most likely the blocked line, not the plan\.$/, `${label}: plant note`);
     assert.equal(await page.getByText(/a plant under the median/).count(), 1, `${label}: said once`);
     region("water per plant");
 

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   blockedSince,
   dailyRatios,
-  latestReconciled,
+  latestFlowEvent,
   leakIncidents,
   leakVerdict,
   leakWatch,
@@ -149,9 +149,21 @@ describe("the rest of the page's sums", () => {
       { start: start + H, end: start + 2 * H + 120_000 },
       { start: start + 2 * H + 120_000, end: start + 3 * H },
     ]);
-    // Four hours less the minute the valve was open and the five after it.
-    expect(watch.watchedMs).toBe(4 * H - 6 * 60_000);
+    // Four hours less the minute the valve was open.
+    expect(watch.watchedMs).toBe(4 * H - 60_000);
     expect(leakWatch(valves, meter, "pulses", start, start + 4 * H).litres).toBeNull();
+  });
+
+  it("leakWatch counts a shot's water up to the first reading after its valve shut, however late", () => {
+    const start = T0;
+    const valves = [[{ state: "off", time: start }, { state: "on", time: start + H }, { state: "off", time: start + H + 60_000 }]];
+    const meter = [
+      { state: "100", time: start },
+      // The meter's first report after the shot comes 20 min late: still the shot's water.
+      { state: "101.2", time: start + H + 21 * 60_000 },
+      { state: "101.9", time: start + 2 * H },
+    ];
+    expect(leakWatch(valves, meter, "L", start, start + 3 * H).litres).toBeCloseTo(0.7, 9);
   });
 });
 
@@ -168,7 +180,8 @@ describe("zoneMeter", () => {
     expect(zoneMeter(supply, "room:f2_", 1, "switch.p1")).toBe("sensor.p1_meter");
     expect(zoneMeter(supply, "room:f2_", 1, "switch.p2")).toBeNull();
     expect(zoneMeter(supply, "room:f2_", 1, "switch.other")).toBeNull();
-    expect(zoneMeter({ ...supply, irrigation_pumps: [supply.irrigation_pumps[0]] }, "room:f2_", 1, null)).toBe("sensor.p1_meter");
+    // A room that names no pump reads no pump's meter, even the only one (controller.py _pump_meter).
+    expect(zoneMeter({ ...supply, irrigation_pumps: [supply.irrigation_pumps[0]] }, "room:f2_", 1, null)).toBeNull();
     expect(zoneMeter(null, "room:f2_", 1, null)).toBeNull();
   });
 });
@@ -178,7 +191,9 @@ describe("leakVerdict", () => {
   it("says clear only when the meter was read in litres for some time", () => {
     expect(leakVerdict(watched, 0, false)).toBe("clear");
     expect(leakVerdict({ litres: 0.5, watchedMs: 4 * H }, 0, false)).toBe("clear");
-    expect(leakVerdict({ litres: 0.6, watchedMs: 4 * H }, 0, false)).toBe("flowing");
+    // Over the controller's bound by the page's own count, with no CS-319: the litres are shown,
+    // the word is the controller's.
+    expect(leakVerdict({ litres: 0.6, watchedMs: 4 * H }, 0, false)).toBe("no_alert");
     // A meter whose unit is not litres, m³ or gallons: nothing was counted.
     expect(leakVerdict({ litres: null, watchedMs: 4 * H }, 0, false)).toBe("unwatched");
     // No reading today (the meter unavailable, or no history): nothing was watched.
@@ -187,6 +202,10 @@ describe("leakVerdict", () => {
   it("takes the controller's CS-319 today over the lanes", () => {
     expect(leakVerdict({ litres: null, watchedMs: 0 }, 1, false)).toBe("flowing");
     expect(leakVerdict(watched, 1, true)).toBe("flowing");
+  });
+  it("a zone on the meter with no recorded valve: its shots cannot be told from a leak", () => {
+    expect(leakVerdict(watched, 0, false, true)).toBe("unwatched");
+    expect(leakVerdict(watched, 1, false, true)).toBe("flowing");
   });
   it("on a meter another room reads, only the controller's alert tells", () => {
     expect(leakVerdict({ litres: 3, watchedMs: 4 * H }, 0, true)).toBe("no_alert");
@@ -229,14 +248,16 @@ describe("roomPump", () => {
   });
 });
 
-describe("latestReconciled", () => {
-  it("is the id of this room's newest flow.reconciled in the live feed", () => {
+describe("latestFlowEvent", () => {
+  it("is the id of this room's newest flow.reconciled or CS-319 in the live feed", () => {
     const a = { ...flow(T0, 1, 1), room_id: "room:f2_" };
     const b = { ...flow(T0 + H, 1, 1), room_id: "room:f1_" };
     const c = { ...flow(T0 + 2 * H, 2, 1), room_id: "room:f2_" };
-    expect(latestReconciled([a, b, c], "room:f2_")).toBe(c.id);
-    expect(latestReconciled([a, b], "room:f1_")).toBe(b.id);
-    expect(latestReconciled([event("shot.completed", T0, 1, {})], "room:")).toBeNull();
+    expect(latestFlowEvent([a, b, c], "room:f2_")).toBe(c.id);
+    expect(latestFlowEvent([a, b], "room:f1_")).toBe(b.id);
+    expect(latestFlowEvent([event("shot.completed", T0, 1, {})], "room:")).toBeNull();
+    const leak = event("alert.raised", T0 + 3 * H, null, {}, "CS-319");
+    expect(latestFlowEvent([a, leak, event("alert.raised", T0 + 4 * H, null, {}, "CS-301")], "room:")).toBe(leak.id);
   });
 });
 
