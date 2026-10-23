@@ -525,10 +525,7 @@
   }
 }
 
-/* Until History › Changes is built, and the AI assistant's decisions until its page lists them. */
-.explorer-changes-note {
-  margin: -6px 0 14px;
-}
+/* The AI assistant's decisions, until its page lists them. */
 .explorer-ai {
   margin-bottom: 16px;
 }

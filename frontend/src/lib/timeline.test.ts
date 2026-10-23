@@ -81,8 +81,8 @@ describe("History › Explorer", () => {
     // Without a zone picked, the zone's probe detail waits for one.
     expect(html).not.toContain("data-history-explorer");
     expect(html).toContain("Pick a zone in the room list");
-    // Until History › Changes is built, the page says where setting changes will be.
-    expect(html).toContain("Setting changes will show on History › Changes.");
+    // History › Changes is built (Task 18): the interim pointer to it is gone.
+    expect(html).not.toContain("Setting changes will show on History › Changes.");
     // The AI assistant's decisions that acted, with how each turned out.
     expect(html).toContain("AI assistant decisions");
     expect(html).toMatch(/data-ai-decision=/);

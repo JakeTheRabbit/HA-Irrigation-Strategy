@@ -118,6 +118,8 @@ export interface HistoryChange {
   revertible: boolean;
   user_id: string | null;
   user_name: string | null;
+  /** The writer's own words: "put back" for a revert, "preset …" for a recipe. */
+  detail?: string | null;
 }
 export interface HistoryRevertResult {
   reverted_event_id: string;

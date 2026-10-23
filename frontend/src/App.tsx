@@ -66,6 +66,8 @@ import { AiSettings, BrainPage } from "@/components/brain";
 import { Watering } from "@/pages/watering";
 import { Timers } from "@/pages/timers";
 import { Changes } from "@/pages/changes";
+import { changesHash, changesQuery } from "@/lib/changes";
+import { pickKey } from "@/lib/facility";
 import { PumpCalibration } from "@/pages/pump-calibration";
 import { FeedCalibration } from "@/pages/feed-calibration";
 import { AlertRules } from "@/pages/alert-rules";
@@ -204,9 +206,23 @@ export default function App() {
       window.scrollTo({ top: 0 });
     });
   }
+  /** History › Changes: a room or zone picked in the room list narrows the page to it (its address
+   * carries the pick), and selects that room. */
+  function narrowChanges(id: string, zone?: number) {
+    confirmNavigation(() => {
+      if (id !== controller.roomId) {
+        dropDrafts();
+        controller.changeRoom(id);
+      }
+      const query = changesQuery(window.location.hash);
+      window.location.hash = changesHash({ ...query, room: zone === undefined ? id : pickKey(id, zone), id: undefined });
+      setMobile(false);
+    });
+  }
   /** Opens a room in the section already open: Status opens the room's own page, any other
    * section stays where it is. */
   function openRoom(id: string) {
+    if (page === "history/changes") return narrowChanges(id);
     const next: Page = page === "all-zones" || page === "zone" ? "today" : page;
     if (id === controller.roomId) navigate(next);
     else openRoomPage(id, next);
@@ -259,7 +275,11 @@ export default function App() {
         currentZone={page === "zone" ? (route.zone ?? controller.room.zones[0]?.id ?? null) : null}
         openRoom={openRoom}
         openZone={(room, zone) =>
-          room === controller.roomId ? navigate("zone", zone) : openRoomPage(room, "zone", zone)
+          page === "history/changes"
+            ? narrowChanges(room, zone)
+            : room === controller.roomId
+              ? navigate("zone", zone)
+              : openRoomPage(room, "zone", zone)
         }
         pick={variant === "desktop" && !phone ? roomPick : null}
       />
