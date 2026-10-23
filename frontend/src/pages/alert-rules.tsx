@@ -21,6 +21,7 @@ import {
   sameRule,
   saveReceipt,
   sensorsPhones,
+  testPushLabel,
   sourceLabel,
   type RuleContext,
 } from "@/lib/alert-rules";
@@ -362,7 +363,7 @@ export function AlertRules({ controller, onDirtyChange }: PageProps) {
             />
             <div className="ar-actions">
               <Button variant="outline" onClick={sendTest} disabled={busy !== null || !phones?.length || controller.admin === false}>
-                {phone ? "Send test" : `Send a test push to ${phones?.length ? phones.map((p) => p.name).join(" and ") : "your phone"}`}
+                {testPushLabel(phones?.map((p) => p.name) ?? [], phone)}
               </Button>
               {!isNew && (
                 <Button variant="ghost" onClick={() => editing && void remove(editing)} disabled={busy !== null || controller.admin === false}>
@@ -489,7 +490,7 @@ function LegacyRules({ controller }: { controller: Controller }) {
 
 /** Yesterday's readings as the rule would have seen them: would-alert spans, dips too short to
  * alert, the nights, and the threshold as a dashed line that drags (or steps with the arrows). */
-function RuleReplay({
+export function RuleReplay({
   draft,
   preview,
   error,
@@ -590,15 +591,15 @@ function RuleReplay({
         </div>
         <div className="ar-plot" ref={plot}>
           {nights.map(([a, b], i) => (
-            <div key={`n${i}`} className="ar-night" style={span(a, b)}>
+            <div key={`n${i}`} className="ar-night" style={span(a, b)} aria-hidden="true">
               <span>Lights off</span>
             </div>
           ))}
           {short.map((s) => (
-            <div key={s.start} className="ar-short" style={span(Date.parse(s.start), Date.parse(s.end))} title="Too short to alert" />
+            <div key={s.start} className="ar-short" style={span(Date.parse(s.start), Date.parse(s.end))} title="Too short to alert" aria-hidden="true" />
           ))}
           {fires.map((f) => (
-            <div key={f.at} className="ar-fire" style={span(f.start, f.end)} title="Would alert">
+            <div key={f.at} className="ar-fire" style={span(f.start, f.end)} title="Would alert" aria-hidden="true">
               <span>{clock(f.at, tz)}</span>
             </div>
           ))}
@@ -609,7 +610,7 @@ function RuleReplay({
           </svg>
           {fires.map((f) => {
             const v = valueAt(f.at);
-            return v === null ? null : <i key={`d${f.at}`} className="ar-dot" style={{ left: `${x(f.at)}%`, top: `${y(v)}%` }} />;
+            return v === null ? null : <i key={`d${f.at}`} className="ar-dot" style={{ left: `${x(f.at)}%`, top: `${y(v)}%` }} aria-hidden="true" />;
           })}
           <div
             className="ar-threshold"
@@ -642,7 +643,7 @@ function RuleReplay({
           ))}
         </div>
       </div>
-      <p className="ar-result" role="status" data-replay-sentence data-count={preview?.count ?? undefined}>
+      <p className="ar-result" aria-live="polite" aria-atomic="true" data-replay-sentence data-count={preview?.count ?? undefined}>
         {error && preview ? error : (preview?.sentence ?? "")}
       </p>
     </figure>

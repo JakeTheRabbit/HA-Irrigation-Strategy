@@ -1,9 +1,12 @@
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, test } from "vitest";
 import type { SentenceToken } from "@/components/primitives/sentence";
 import { setDisplayUnits } from "./display-units";
 import type { AlertRule, AlertRuleListItem } from "./parity-types";
 import { parityDemo } from "./parity-demo";
 import { resetDemoAlertRules } from "./parity-demo/settings";
+import { RuleReplay } from "@/pages/alert-rules";
 import {
   RULE_SOURCES,
   deliveryLine,
@@ -18,6 +21,7 @@ import {
   replayKey,
   saveReceipt,
   sensorsPhones,
+  testPushLabel,
   type RuleContext,
 } from "./alert-rules";
 
@@ -325,5 +329,50 @@ describe("review round 2", () => {
       "The rules changed since the delete. Nothing was changed: put it back from History.",
     );
     expect((await list()).rules).toHaveLength(3);
+  });
+});
+
+describe("review round 3", () => {
+  test("a rule switched off reads Off even while its last evaluation still says firing", () => {
+    const off = item({ active: false, state: "firing", firing_since: at("2026-10-23T12:42:00+13:00"), current_value: 50 });
+    expect(ruleStatus(off, NOW, TZ)).toEqual({ text: "Off", tone: "muted" });
+    expect(ruleStatus({ ...off, current_value: 20 }, NOW, TZ)).toEqual({ text: "Off · would fire now (20 %)", tone: "warn" });
+  });
+
+  test("the test button names the phone at both widths", () => {
+    expect(testPushLabel(["Ben's phone"], true)).toBe("Test push to Ben's phone");
+    expect(testPushLabel(["Ben's phone", "Night phone"], false)).toBe("Send a test push to Ben's phone and Night phone");
+    expect(testPushLabel([], true)).toBe("Test push to your phone");
+  });
+
+  test("replay labels inside the plot are hidden from screen readers; the result line is one polite update", () => {
+    const html = renderToStaticMarkup(
+      createElement(RuleReplay, {
+        draft: base,
+        preview: {
+          summary_sentence: "",
+          series: [[at("2026-10-22T14:00:00+13:00"), 40], [at("2026-10-23T02:00:00+13:00"), 20], [at("2026-10-23T14:00:00+13:00"), 40]],
+          fires: [{ start: at("2026-10-23T01:00:00+13:00"), fired_at: at("2026-10-23T01:10:00+13:00"), end: at("2026-10-23T03:00:00+13:00") }],
+          ignored: [{ start: at("2026-10-22T20:00:00+13:00"), end: at("2026-10-22T20:05:00+13:00"), reason: "shorter than min_duration" }],
+          count: 1, min: 20, max: 40, sentence: "Would have alerted once, at 01:10.",
+        },
+        error: null,
+        label: "F2 zone 1 VWC",
+        lights: { on: 6, off: 18 },
+        tz: TZ,
+        now: NOW,
+        phone: false,
+        onThreshold: () => {},
+      }),
+    );
+    for (const cls of ["ar-night", "ar-fire", "ar-short"]) {
+      const tags = html.match(new RegExp(`<div class="${cls}"[^>]*>`, "g")) ?? [];
+      expect(tags.length, cls).toBeGreaterThan(0);
+      for (const tag of tags) expect(tag, cls).toContain('aria-hidden="true"');
+    }
+    const result = html.match(/<p class="ar-result"[^>]*>/)?.[0] ?? "";
+    expect(result).toContain('aria-live="polite"');
+    expect(result).toContain('aria-atomic="true"');
+    expect(result).not.toContain('role="status"');
   });
 });

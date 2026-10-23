@@ -133,14 +133,15 @@ export function ruleStatus(item: AlertRuleListItem, now: number, tz: string): { 
     const [weekday, day, month] = dayLabel(ms, tz).split(" ");
     return `${now - ms < 6 * DAY ? weekday : `${day} ${month}`} ${clock(ms, tz)}`;
   };
-  const since = item.firing_since ? Date.parse(item.firing_since) : NaN;
-  if ((item.state === "firing" || item.state === "acknowledged") && Number.isFinite(since))
-    return { text: `Firing now · since ${when(since)}`, tone: "bad" };
+  // Off first: a rule just switched off can still read firing until the next evaluation.
   if (!item.active) {
     if (item.current_value !== null && breaching(item, item.current_value))
       return { text: `Off · would fire now (${formatRuleValue(item.source, item.current_value)})`, tone: "warn" };
     return { text: "Off", tone: "muted" };
   }
+  const since = item.firing_since ? Date.parse(item.firing_since) : NaN;
+  if ((item.state === "firing" || item.state === "acknowledged") && Number.isFinite(since))
+    return { text: `Firing now · since ${when(since)}`, tone: "bad" };
   const held = item.state === "muted" ? "Held: room muted · " : "";
   const fired = item.last_fired ? Date.parse(item.last_fired) : NaN;
   if (!Number.isFinite(fired)) return { text: `${held}Never fired`, tone: "muted" };
@@ -207,6 +208,10 @@ export function sensorsPhones(recipients: readonly NotifyRecipient[], prefix: st
 export const kindName = (kinds: readonly NotifyKind[], id: string) => kinds.find((k) => k.id === id)?.name ?? id;
 
 const and = (names: string[]) => (names.length < 2 ? (names[0] ?? "") : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`);
+
+/** The test button, naming the phones: "Test push to Ben's phone" on phone, "Send a test push to …" on desktop. */
+export const testPushLabel = (phones: string[], phone: boolean) =>
+  `${phone ? "Test push" : "Send a test push"} to ${phones.length ? and(phones) : "your phone"}`;
 
 const sourceKey = (rule: Pick<AlertRule, "source" | "zones" | "tank_id" | "entity_id">) => {
   const def = sourceOf(rule.source);

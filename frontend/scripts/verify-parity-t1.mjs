@@ -105,6 +105,8 @@ await runParity({
     const sentence = main.locator("[data-replay-sentence]");
     await page.waitForFunction(() => (document.querySelector("[data-replay-sentence]")?.textContent ?? "").length > 0);
     const before = await sentence.innerText();
+    assert.equal(await sentence.getAttribute("aria-live"), "polite", `${label}: replay result is one polite update`);
+    assert.equal(await main.locator(".ar-plot :is(.ar-night, .ar-fire, .ar-short):not([aria-hidden='true'])").count(), 0, `${label}: plot labels hidden from screen readers`);
     await rule.locator('input[aria-label="Threshold"]').fill("40");
     const t0 = Date.now();
     await page.waitForFunction((b) => {
@@ -132,7 +134,7 @@ await runParity({
     if (phone) await shoot("builder");
 
     // A test push.
-    await main.getByRole("button", { name: phone ? "Send test" : "Send a test push to Phone 1" }).click();
+    await main.getByRole("button", { name: phone ? "Test push to Phone 1" : "Send a test push to Phone 1" }).click();
     await main.locator("[data-delivery]").waitFor();
     assert.equal(await main.locator("[data-delivery]").innerText(), "Delivered to Phone 1 ✓.", `${label}: delivery`);
     region("test push");
