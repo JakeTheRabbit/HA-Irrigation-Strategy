@@ -24,7 +24,7 @@ import {
   IDLE_HOURS,
   IDLE_NOTE,
   NotifyRefusal,
-  QUIET_NOTE,
+  quietNote,
   applyChecks,
   canEditRow,
   draftChanges,
@@ -46,7 +46,8 @@ import {
   pressRoom,
   quietSpans,
   quietWords,
-  rebaseDraft,
+  restoreDraft,
+  muteRereads,
   reviewRows,
   roomChipWords,
   roomsWithoutEmergencies,
@@ -67,6 +68,7 @@ import {
   type NotifyConfig,
   type NotifyDocument,
   type NotifyDraft,
+  type StoredDraft,
   type NotifyKind,
   type NotifyPhone,
   type NotifyRecipient,
@@ -378,20 +380,21 @@ export function Notifications({
   /** The setup a save replaced, and the revision the save made: what its Undo writes back. */
   const lastSave = useRef<{ before: NotifyConfig; revision: number } | null>(null);
   const saved = doc ? toDraft(doc.config) : EMPTY;
-  const stored = useDraft<NotifyDraft>("notify", saved);
+  const stored = useDraft<StoredDraft>("notify", saved);
   const dirty = !!doc && !sameDraft(stored.draft, saved);
   const shown = dirty ? stored.draft : saved;
-  const latest = useRef({ doc, shown, dirty });
-  latest.current = { doc, shown, dirty };
+  const kept = stored.dirty ? stored.draft : null;
+  const latest = useRef(kept);
+  latest.current = kept;
   const connected = ["live", "demo"].includes(controller.connection);
 
-  /** A setup read: a draft on the one read before is carried onto it, field by field. */
+  /** A setup read: a draft kept (on this page, or in the tab from before a reload) is carried onto
+   * it field by field when it was made on an older one. */
   const loaded = (next: NotifyDocument) => {
-    const { doc: before, shown: draft, dirty: changed } = latest.current;
-    if (before && changed) {
-      const carried = rebaseDraft(before.config, draft, next.config);
-      if (sameDraft(carried, toDraft(next.config))) stored.discard();
-      else stored.set(carried);
+    if (latest.current) {
+      const restored = restoreDraft(latest.current, next.config);
+      if (restored) stored.set(restored);
+      else stored.discard();
     }
     setDoc(next);
   };
@@ -457,7 +460,7 @@ export function Notifications({
   const edit = (change: (current: NotifyDraft) => NotifyDraft) => {
     const next = change(shown);
     if (sameDraft(next, saved)) stored.discard();
-    else stored.set(next);
+    else stored.set({ ...next, base: doc.config });
   };
   const change = (service: string, next: (row: NotifyRecipient) => Partial<NotifyRecipient>) =>
     edit((current) => {
@@ -600,7 +603,7 @@ export function Notifications({
       if (end === null) delete mutes[prefix];
       else mutes[prefix] = end;
       const back = await saveNotify(controller, mutePayload(base, mutes));
-      setDoc(back);
+      loaded(back);
       return sameMuteEnd(back.config.mutes[prefix], end);
     };
     setMuting(prefix);
@@ -634,7 +637,7 @@ export function Notifications({
     } catch (err) {
       const message = errorText(err);
       toast.error(message === "revision" ? notifyError("revision") : notifyError(message));
-      if (message === "revision") setReads((n) => n + 1);
+      if (muteRereads(err)) setReads((n) => n + 1);
     } finally {
       setMuting(null);
     }
@@ -1003,17 +1006,21 @@ export function Notifications({
                   </span>
                 )}
               </p>
-              <p className="muted small">{QUIET_NOTE}</p>
+              <p className="muted small">
+                {quietNote(
+                  shown.recipients.filter((row) => row.digest).map((row) => rowLabel(row, doc.phones).name),
+                )}
+              </p>
             </>
           )}
         </section>
         <section className="panel notify-idle" aria-labelledby={`${id}-idle`}>
           <div className="label-with-tip">
-            <h2 id={`${id}-idle`}>Watering stopped and room mutes</h2>
+            <h2 id={`${id}-idle`}>Shots stopped and room mutes</h2>
             <UiTip copyKey="tell me when a room has watered nothing for" />
           </div>
           <label className="notify-idle-sentence">
-            Count watering as stopped after{" "}
+            Send Shots stopped after{" "}
             <Input
               type="number"
               inputMode="numeric"

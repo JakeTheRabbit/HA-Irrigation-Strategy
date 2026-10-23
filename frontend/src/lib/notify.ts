@@ -29,6 +29,9 @@ export interface NotifyRecipient {
   /** "HH:MM" on Home Assistant's clock, maybe across midnight: inside them only what is critical
    * reaches the phone, the rest waits for one push when they end. Null: none (and on 3.17). */
   quiet_hours: QuietHours | null;
+  /** Read only (the integration keeps it when a save leaves it out): what is not an emergency goes
+   * to this phone as one push every few hours. Only set when it takes one. */
+  digest?: true;
 }
 export interface QuietHours {
   from: string;
@@ -115,6 +118,7 @@ function parseRecipient(value: unknown): NotifyRecipient | null {
     ),
     urgent_high_priority: raw.urgent_high_priority === true,
     quiet_hours: parseQuiet(raw.quiet_hours),
+    ...(raw.digest === true ? { digest: true as const } : {}),
   };
 }
 /** Quiet hours as the integration keeps them: two different "HH:MM"; anything else is none. */
@@ -441,9 +445,10 @@ export const applyChecks = (draft: NotifyDraft): { ok: boolean | "warn"; text: s
   ...draftErrors(draft).map((text) => ({ ok: false, text })),
   ...(draft.recipients.length ? [] : [{ ok: "warn" as const, text: NO_PHONES_WARNING }]),
 ];
-/** What quiet hours hold back, as notify_api.py routes a push. */
-export const QUIET_NOTE =
-  "During quiet hours emergencies still come through, and so do the AI's setpoint changes with Keep and Undo (unless that phone takes a digest) and alerts this integration does not know yet. Other alerts wait and arrive as one summary when that phone's quiet hours end. A Home Assistant restart drops what is waiting.";
+/** What quiet hours hold back, as notify_api.py routes a push; `digest` names the phones that take
+ * a digest, which get no Keep and Undo pushes (a digest has no buttons). */
+export const quietNote = (digest: readonly string[]) =>
+  `During quiet hours emergencies still come through, and so do the AI's setpoint changes with Keep and Undo${digest.length ? ` (not to ${digest.join(", ")}, which ${digest.length > 1 ? "take" : "takes"} a digest)` : ""} and alerts this integration does not know yet. Other alerts wait and arrive as one summary when that phone's quiet hours end. A Home Assistant restart drops what is waiting.`;
 export const IDLE_NOTE =
   "Sent as CS-209 to the phones that tick Shots stopped, again each time that many hours pass while it lasts, and over at the next shot. A room counts only while a zone is in P1 or P2: the morning dryback (P0) and the night (P3) do not start the clock.";
 
@@ -463,6 +468,12 @@ export function saveRefusal(
     return { kind: "error", code: "forbidden", message: notifyError(message) };
   return { kind: "error", code: "guard_refused", message };
 }
+/** A mute or unmute that threw: read the setup again unless the integration refused it (then it
+ * did not change), so the room never shows a state the write may have changed. */
+export const muteRereads = (error: unknown) => {
+  const refusal = saveRefusal(error);
+  return !refusal || refusal.code === "stale_revision";
+};
 /** What Undo of a mute writes back: the earlier end, or no mute once that end has passed (the
  * integration drops a mute already over). */
 export const muteUndoTarget = (was: number | null, now: number) => (was !== null && was > now ? was : null);
@@ -544,6 +555,23 @@ export function rebaseDraft(
     idle_hours: draft.idle_hours !== before.idle_hours ? draft.idle_hours : after.idle_hours,
     recipients,
   };
+}
+
+/** A draft as this tab keeps it: with the setup it was made on, so it can be placed again. */
+export interface StoredDraft extends NotifyDraft {
+  base?: NotifyConfig;
+}
+/** A kept draft met by a setup read: on the same revision it stands; on a newer one (saved
+ * elsewhere since) it is carried onto that one field by field, so it never puts back what someone
+ * else saved. Null: nothing of it is left, or (no base) it cannot be placed. */
+export function restoreDraft(kept: StoredDraft, fresh: NotifyConfig): StoredDraft | null {
+  if (!kept.base) return null;
+  const draft =
+    kept.base.revision === fresh.revision
+      ? { idle_hours: kept.idle_hours, recipients: kept.recipients }
+      : rebaseDraft(kept.base, kept, fresh);
+  if (sameDraft(draft, toDraft(fresh))) return null;
+  return kept.base.revision === fresh.revision ? kept : { ...draft, base: fresh };
 }
 
 /** A room's name for a prefix, or the prefix of one that is not a room of the site now. */
@@ -696,7 +724,7 @@ export function draftSummary(
   for (const row of saved.recipients)
     if (!listed.has(row.service)) parts.push(`${rowLabel(row, phones).title} removed`);
   if (draft.idle_hours !== saved.idle_hours)
-    parts.push(`Watering stopped after ${draft.idle_hours} h`);
+    parts.push(`Shots stopped after ${draft.idle_hours} h`);
   if (!parts.length) return "";
   const n = parts.length;
   return `${n} ${n === 1 ? "change" : "changes"} not applied yet: ${parts.join(" · ")}`;
@@ -768,7 +796,7 @@ export function reviewRows(changes: DraftChanges): NotifyReviewRow[] {
           {
             id: "idle",
             key: "idle",
-            label: "Watering stopped after",
+            label: "Shots stopped after",
             before: `${changes.idle.before} h`,
             after: `${changes.idle.after} h`,
           },

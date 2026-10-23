@@ -5,6 +5,11 @@
   --quiet: #7462d4;
   --lights: #d9a400;
 }
+/* Dark: the quiet band (at 75%) at least 3:1 on the strip, the lights line at least 3:1 on it. */
+.dark .notify-page {
+  --quiet: #9486ee;
+  --lights: #ffe08a;
+}
 .notify-readonly {
   margin: 0 20px 14px;
   padding: 8px 12px;

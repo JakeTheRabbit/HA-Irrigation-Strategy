@@ -11,7 +11,10 @@ import {
   NO_PHONES_WARNING,
   NOTIFY_CONFIG_ID,
   NotifyRefusal,
-  QUIET_NOTE,
+  quietNote,
+  restoreDraft,
+  muteRereads,
+  parseNotifyConfig,
   applyChecks,
   fieldErrors,
   muteUndoTarget,
@@ -787,7 +790,7 @@ describe("quiet hours, mutes, the bottom bar and test pushes (Task 26)", () => {
     });
     draft = { ...draft, idle_hours: 4 };
     expect(draftSummary(draft, saved, context)).toBe(
-      "4 changes not applied yet: Grower stops getting Stock tanks, Dosing · Grower: emergencies loud · Grower: quiet 22:00–06:00 · Watering stopped after 4 h",
+      "4 changes not applied yet: Grower stops getting Stock tanks, Dosing · Grower: emergencies loud · Grower: quiet 22:00–06:00 · Shots stopped after 4 h",
     );
     draft = { ...toDraft(saved), recipients: [...toDraft(saved).recipients.slice(1), newRecipient(ASSISTANT, DEMO_PHONES)] };
     expect(draftSummary(draft, saved, context)).toBe(
@@ -892,11 +895,11 @@ describe("mutes and the save's receipt (Task 26)", () => {
     const rows = reviewRows(changes);
     expect(rows.map((row) => [row.key, row.label, row.before, row.after])).toEqual([
       [MANAGER, "Manager (Phone 3): New alert kinds", "—", "Dosing"],
-      ["idle", "Watering stopped after", "3 h", "4 h"],
+      ["idle", "Shots stopped after", "3 h", "4 h"],
     ]);
     const at = 1;
     const all = saveReceipt(rows, draft, { ...saved, ...draft, revision: 4 }, at);
-    expect(all).toMatchObject({ ok: true, summary: "Manager (Phone 3): New alert kinds — → Dosing · Watering stopped after 3 h → 4 h" });
+    expect(all).toMatchObject({ ok: true, summary: "Manager (Phone 3): New alert kinds — → Dosing · Shots stopped after 3 h → 4 h" });
     expect(all).not.toHaveProperty("notConfirmed");
     // The integration kept the old threshold: that row is not confirmed, the phone's still is.
     const part = saveReceipt(rows, draft, { ...saved, recipients: draft.recipients, revision: 4 }, at);
@@ -964,11 +967,12 @@ describe("Task 26 review round 1", () => {
 
 describe("notifications review round 2 (Task 26)", () => {
   it("the quiet-hours note says what the integration lets through and what a restart drops", () => {
-    expect(QUIET_NOTE).toMatch(/emergencies/i);
-    expect(QUIET_NOTE).toMatch(/Keep and Undo/);
-    expect(QUIET_NOTE).toMatch(/one summary when that phone's quiet hours end/);
-    expect(QUIET_NOTE).toMatch(/restart.*drops what is waiting/i);
-    expect(QUIET_NOTE).not.toMatch(/only emergencies/i);
+    const note = quietNote([]);
+    expect(note).toMatch(/emergencies/i);
+    expect(note).toMatch(/Keep and Undo/);
+    expect(note).toMatch(/one summary when that phone's quiet hours end/);
+    expect(note).toMatch(/restart.*drops what is waiting/i);
+    expect(note).not.toMatch(/only emergencies/i);
   });
   it("field errors sit on their own fields", () => {
     const base = toDraft(DEMO_NOTIFY);
@@ -1030,5 +1034,40 @@ describe("notifications review round 2 (Task 26)", () => {
     expect(html).toMatch(/role="radio" aria-checked="false" tabindex="-1"[^>]*data-quiet-phone="notify.a"/);
     expect(html).toMatch(/role="radio" aria-checked="true" tabindex="0"[^>]*data-quiet-phone="notify.b"/);
     expect(html).toContain("no quiet hours");
+  });
+});
+
+describe("notifications review round 3 (Task 26)", () => {
+  const A = recipient("notify.a", ["emergency"]);
+  const B = recipient("notify.b", ["stock"]);
+  it("a draft kept in the tab is carried onto a setup saved elsewhere since, not over it", () => {
+    const base = config([A, B], 3, 3);
+    // Mine: B also gets dosing. Elsewhere since: A got stock, the threshold went to 5.
+    const kept = { ...updateRow(toDraft(base), "notify.b", { kinds: ["stock", "dosing"] }), base };
+    const fresh = config([{ ...A, kinds: ["emergency", "stock"] }, B], 4, 5);
+    const restored = restoreDraft(kept, fresh)!;
+    expect(restored.base).toEqual(fresh);
+    expect(restored.idle_hours).toBe(5);
+    expect(restored.recipients).toEqual([
+      { ...A, kinds: ["emergency", "stock"] },
+      { ...B, kinds: ["stock", "dosing"] },
+    ]);
+    // On the same revision it is kept as it was.
+    expect(restoreDraft(kept, base)).toEqual(kept);
+    // Nothing left of mine once carried: no draft.
+    expect(restoreDraft({ ...toDraft(base), base }, fresh)).toBeNull();
+    // A copy with no base cannot be placed: dropped, never sent over the fresh setup.
+    expect(restoreDraft(toDraft(base), fresh)).toBeNull();
+  });
+  it("the quiet-hours note names the phones that take a digest, and says nothing of one with none", () => {
+    expect(quietNote([])).not.toMatch(/digest/);
+    expect(quietNote(["Owner (Phone 1)"])).toMatch(/Keep and Undo \(not to Owner \(Phone 1\), which takes a digest\)/);
+    const parsed = parseNotifyConfig({ revision: 1, recipients: [{ service: "notify.a", digest: true }, { service: "notify.b" }] });
+    expect(parsed.recipients.map((row) => row.digest)).toEqual([true, undefined]);
+  });
+  it("a mute that may have landed reads the setup again; a refusal does not", () => {
+    expect(muteRereads(new Error("socket closed"))).toBe(true);
+    expect(muteRereads(new NotifyRefusal("revision"))).toBe(true);
+    expect(muteRereads(new NotifyRefusal("not allowed: only an administrator can mute a room"))).toBe(false);
   });
 });

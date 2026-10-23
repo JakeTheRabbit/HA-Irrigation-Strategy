@@ -2073,6 +2073,10 @@ try {
         "Grower (Phone 2): New alert kinds",
         "Grower (Phone 2): Rooms",
       ]);
+      assert.deepEqual(await bar.locator(".review-apply-rows .review-apply-diff").allInnerTexts(), [
+        "— → Phase changes",
+        "All rooms → Room B",
+      ]);
       await axe("notifications: the review");
       await applyDraft();
       await expectVisible(receipt);
@@ -2204,7 +2208,7 @@ try {
       assert.equal(await page.getByRole("button", { name: "Add a phone" }).count(), 0);
       assert.equal(await page.getByRole("button", { name: /^Remove / }).count(), 0);
       assert.equal(
-        await page.getByRole("spinbutton", { name: /^Count watering as stopped after/ }).isDisabled(),
+        await page.getByRole("spinbutton", { name: /^Send Shots stopped after/ }).isDisabled(),
         true,
       );
       await box("Grower (Phone 2): Emergencies").check();
@@ -2325,7 +2329,7 @@ try {
         "Owner",
       ]);
       await box("Grower (Pixel 7): Phase changes", live).check();
-      await live.getByRole("spinbutton", { name: /^Count watering as stopped after/ }).fill("4");
+      await live.getByRole("spinbutton", { name: /^Send Shots stopped after/ }).fill("4");
       const liveBar = live.locator(".notify-bar");
       const liveSave = liveBar.getByRole("button", { name: "Apply 2 changes", exact: true });
       await liveSave.click();
