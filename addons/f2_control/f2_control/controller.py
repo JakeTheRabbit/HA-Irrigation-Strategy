@@ -7899,10 +7899,19 @@ class Controller:
         actor manual), and the kill switch and every other guard still hold it. Nothing here writes to Home
         Assistant."""
         modes = self._irrigation_modes(room)
-        state, attrs, _ = ha_get(TIMERS_SENSOR.format(room.prefix))
-        readable = state not in (None, "", "unknown", "unavailable") and isinstance(attrs, dict)
-        programs = [p for p in attrs.get("programs") or [] if isinstance(p, dict)] if readable else []
-        skips = [s for s in attrs.get("skips") or [] if isinstance(s, dict)] if readable else []
+        warned = self.__dict__.setdefault("_timers_warned", set())  # rooms whose timers_config did not parse
+        state = None
+        try:  # whatever it holds, the zones still act on the engine under their modes (R5)
+            state, attrs, _ = ha_get(TIMERS_SENSOR.format(room.prefix))
+            readable = state not in (None, "", "unknown", "unavailable") and isinstance(attrs, dict)
+            programs = [p for p in attrs.get("programs") or [] if isinstance(p, dict)] if readable else []
+            skips = [s for s in attrs.get("skips") or [] if isinstance(s, dict)] if readable else []
+            warned.discard(room.slug)
+        except Exception as e:
+            programs, skips = [], []
+            if room.slug not in warned:
+                warned.add(room.slug)
+                log(f"[{room.slug}] timer programs not read, none run until they are: {e}")
         room._timers = {"modes": modes, "programs": programs, "published": state is not None}
         until = _wall_clock(now)
         self._timer_last_pass[room.slug] = until

@@ -589,3 +589,23 @@ def test_two_programs_on_one_zone_at_one_instant_get_two_ids(rig, engine):
     _pass_at(c, fake, 12, 10)
     first = [i for i in _projection(fake) if i["source"] == "timer"][:2]
     assert first[0]["at"] == first[1]["at"] and first[0]["id"] != first[1]["id"]
+
+
+@pytest.mark.parametrize("bad", [{"programs": 5, "skips": []}, {"programs": [], "skips": 5}])
+def test_an_unparseable_timers_config_never_stops_the_room(rig, engine, monkeypatch, bad):
+    """A timers_config whose programs or skips are not a list: no programs or skips this pass, logged once. Each
+    zone still acts on the engine under its own mode (an off zone stays off), and the room's pass goes on (no
+    CS-212)."""
+    engine[1] = engine[2] = TOPUP
+    c, fake = rig
+    fake.set_state(_mode(2), "off")
+    fake.set_state(TIMERS, "1", {"room_id": "room:", "revision": 1, **bad})
+    lines = []
+    monkeypatch.setattr(controller, "log", lambda *a: lines.append(" ".join(map(str, a))))
+    _pass(c)
+    assert _valves(fake) == [("turn_on", V1), ("turn_off", V1)]
+    _pass_at(c, fake, 12, 5)
+    assert _valves(fake) == [("turn_on", V1), ("turn_off", V1)] * 2
+    assert not [d for dom, svc, d in fake.calls
+                if (dom, svc) == ("persistent_notification", "create") and "(CS-212)" in d["title"]]
+    assert len([line for line in lines if "timer programs" in line]) == 1
