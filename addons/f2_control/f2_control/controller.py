@@ -2024,6 +2024,7 @@ class Controller:
             room.zone_cultivars = self._zone_cultivars(attrs)  # a label, read like the names: never decides anything
             room.room_name = self._room_name(attrs)
             room.substrate = self._substrate(attrs)  # read like the names: needs no adoption
+            room.legacy_feed_ec = self._legacy_feed_ec(attrs)  # the upgrade's kept 3.0 feed EC: needs no adoption
             room.light_entity = str(attrs.get("light_entity") or "").strip()  # checked, never actuated
             room.tank = tank_level.mapping(attrs)  # read only, never actuated: needs no adoption
             # Only ever switched OFF, and only under the room's waste-valve rule; setup changes need it off.
@@ -2754,6 +2755,17 @@ class Controller:
         key = f"feed_unknown_{room.slug}"
         if not room.zones or room.feed_ec_sensor or self._recipe_feed_ec(room) is not None:
             self._dismiss(key)
+        elif key not in self._alerted and getattr(room, "legacy_feed_ec", None) is not None:
+            self._alert(
+                key,
+                "CS-907",
+                "The feed EC is unknown: the old 3.0 mS/cm is assumed",
+                "The room has no feed EC probe and its feed recipe declares no EC. As before the update to "
+                f"3.18, the controller assumes a feed EC of {room.legacy_feed_ec:g} mS/cm for EC flushes and "
+                "holds for a high EC. Set a recipe feed EC or map a feed EC probe: the assumption then stops.",
+                room=room,
+                quiet=False,
+            )
         elif key not in self._alerted:
             self._alert(
                 key,
@@ -3170,6 +3182,8 @@ class Controller:
             feed_ec = None
         if feed_ec is None:  # measured first, then the feed recipe's declared EC, else unknown (None)
             feed_ec = self._recipe_feed_ec(room)
+        if feed_ec is None and not room.feed_ec_sensor:  # ...unless the upgrade kept 3.17.0's 3.0 for a probe-less room
+            feed_ec = getattr(room, "legacy_feed_ec", None)
         new_grow_day = self._new_grow_day(room, st, now, lights_on)
         snap = ZoneSnapshot(
             vwc=vwc,
@@ -4207,6 +4221,16 @@ class Controller:
         none or the value is one this controller does not know."""
         value = (attrs or {}).get("substrate", "generic")
         return value if value in SUBSTRATES else "generic"
+
+    @staticmethod
+    def _legacy_feed_ec(attrs):
+        """The feed EC (mS/cm) controller 3.17.0 assumed when nothing measured or declared one, which the
+        integration's upgrade keeps for a room with no feed EC probe (`legacy_feed_ec_fallback`), or None:
+        absent, or not a number in 0.1-10."""
+        value = (attrs or {}).get("legacy_feed_ec_fallback")
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            return None
+        return float(value) if 0.1 <= value <= 10 else None
 
     @staticmethod
     def _room_name(attrs):
