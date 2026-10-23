@@ -7860,7 +7860,7 @@ class Controller:
                               program_id=timed.program_id, data={"guard": "expired", "reason": why,
                                                                  "would": str(timed)})
                 log(f"[{room.slug}] Z{zone} {why}: would {timed}")
-        used =room.__dict__.setdefault("_skips_used", set())  # (zone, at) of the skips an engine shot used up
+        used = room.__dict__.setdefault("_skips_used", set())  # (zone, at) of the skips an engine shot used up
         now_utc = until.astimezone(timezone.utc)
         used.difference_update([k for k in used if k[1] < now_utc - timedelta(days=1)])  # long past their until
 
