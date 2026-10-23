@@ -11,6 +11,117 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+**⚠️ THIS IS A MASSIVE UPGRADE. It is fucking huge.** Almost every page of the dashboard is new or
+rebuilt: timer programs, presets, alert rules, a new History section, feed and pump calibration, pump
+supply sharing, quiet hours and an Upgrade report.
+
+**If you are running this on a live grow, do NOT just click update** unless you have time for a big
+configuration session straight after. Watering will not stop, but there is a lot to set up and check.
+
+**Your settings come across as far as they can.** The update keeps every zone watering and dosing
+exactly as before, and carries your current settings into the new features wherever it can do that
+without guessing. Nothing new that waters or doses is switched on for you.
+
+- **Carried across:** every zone keeps watering by steering; each recipe stage you had edited is
+  copied as a preset; a "before 3.18 update" preset of your current settings is saved as a rollback
+  point; temperatures in °F if Home Assistant uses °F; every notification recipient; your pH up/down
+  pumps keep their role; your earlier setting changes, stock moves, calibrations and dosing records
+  are imported into History; a room with no feed EC probe keeps the old 3.0 mS/cm assumption so it
+  flushes as before.
+- **Needs you:** the irrigation supply (each pump's real flow, how many zones it feeds at once, its
+  flow meter: nothing is saved until you save it); the 2-point feed pH and EC probe calibration;
+  the solution and a pump calibration for each nutrient pump; ppm instead of mS/cm if that is how
+  you work; automations that still use a retired entity; grow-plan recipes saved only in your
+  browser (export them). Optional: alert rules, quiet hours, camera, CO2 and light panels, new
+  dashboards.
+- Each room's **Upgrade report** lists exactly what was carried and what needs you: Crop Steering →
+  Settings → System status, and a card in Home Assistant's Settings → Repairs.
+
+**Get your AI to configure it.** Point your AI assistant (Claude, ChatGPT, or any assistant connected
+through the Crop Steering MCP server) at the new documentation and have it work through the Upgrade
+report with you, one line at a time, asking you before each save:
+
+- [Upgrading to 3.18](docs/UPGRADING.md): one section per Upgrade report line, written so an AI can
+  follow it step by step.
+- [Configure Crop Steering through MCP](docs/MCP.md): connect an assistant to your Home Assistant, and
+  [Set up an install with an AI assistant](docs/AI-SETUP.md): start read-only and approve each change.
+- [Upgrading to 3.18](docs/UPGRADING-TO-PARITY.md): the plan for update day and how to go back.
+- [User guide](docs/USER_GUIDE.md), [AI assistant](docs/AI_ASSISTANT.md) and the
+  [Crop Steering Academy](https://jaketherabbit.github.io/HA-Irrigation-Strategy/learn/).
+
+**Order:** update the integration first, restart Home Assistant, then update the controller app.
+
+### 🌱 In plain English
+
+A short tour. These are design mockups of the new pages; the released dashboard may differ in
+small details.
+
+- **Status: all rooms.** Every room and every zone on one page: phase, moisture and water today.
+
+  ![Status, all rooms](docs/screens/upgrade/02-S1-AllRooms.png)
+
+- **Zone page.** One zone in full: moisture, EC, what it is waiting for and every shot today.
+
+  ![Zone page](docs/screens/upgrade/04-S3-Zone.png)
+
+- **Timeline.** The day's phases and shots for a room on one line, so you can see what happened when.
+
+  ![Irrigation timeline](docs/screens/upgrade/05-I1-Timeline.png)
+
+- **Timer programs.** Each zone can water by steering (as before), by timer programs, or be off.
+
+  ![Timer programs](docs/screens/upgrade/07-I3-Timers.png)
+
+- **Grow plan & presets.** Save a room's or a zone's targets, phase timing and limits, and copy them to other rooms or zones.
+
+  ![Grow plan and presets](docs/screens/upgrade/08-I4-GrowPlan.png)
+
+- **History: explorer.** Any reading, any room, any period, on one chart.
+
+  ![History explorer](docs/screens/upgrade/09-H1-Explorer.png)
+
+- **History: changes.** Every setting change, who made it and when, including what the upgrade carried across.
+
+  ![History of changes](docs/screens/upgrade/12-H4-Changes.png)
+
+- **Feed & dosing.** Each dosing pump with its solution, its stock tank and its doses.
+
+  ![Feed and dosing](docs/screens/upgrade/14-E2-Dosing.png)
+
+- **Feed pH/EC calibration.** A guided 2-point calibration at the tank; nothing changes until you commit it.
+
+  ![Feed probe calibration](docs/screens/upgrade/16-E4-FeedCal.png)
+
+- **Setup: pumps & valves.** Your pumps, main line and valves, and the new pump supply: real flow and zones at once.
+
+  ![Setup, pumps and valves](docs/screens/upgrade/18-E6-Setup.png)
+
+- **Alert rules.** Your own notifications, with a preview of how often each would have fired.
+
+  ![Alert rules](docs/screens/upgrade/19-T1-AlertRules.png)
+
+- **System status.** The health of every part, and each room's Upgrade report.
+
+  ![System status](docs/screens/upgrade/21-T3-System.png)
+
+- **AI assistant.** The exact instructions it works from, your room notes and what it costs.
+
+  ![AI assistant settings](docs/screens/upgrade/22-T4-AI.png)
+
+- **On your phone.** Every page works on a phone in the grow room.
+
+  ![Phone view](docs/screens/upgrade/24-P1-AllRooms.png)
+
+### 🔧 Technical notes
+
+- Upgrade migration: `custom_components/crop_steering/migration.py`, a run-once, versioned ledger
+  (`crop_steering.migration` store) per room and site. Every seeded value is journaled as
+  `config.changed` with actor `migration`; old stores are read only. The report is served by
+  `crop_steering.migration_report` and raised as the Repairs issue `upgrade_report_3_18` (CS-616)
+  while a room has a "Needs you" line. Row by row: [docs/UPGRADING.md](docs/UPGRADING.md).
+- The tour images in `docs/screens/upgrade/` are design mockups; they are replaced by real
+  screenshots when the dashboard bundle is rebuilt.
+
 **3.18, the parity release (documentation).** This entry covers the documentation for the release; the
 code changes are recorded with the release itself. Read [Upgrading to 3.18](docs/UPGRADING-TO-PARITY.md)
 before updating a room that is in a grow.

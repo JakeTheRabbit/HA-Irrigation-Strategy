@@ -19,6 +19,13 @@ for the people who build the system:
 `tests/test_whats_new.py` checks the shape and the plain words, and that the newest section is the
 version being released.
 
+## Unreleased
+
+- This is a big upgrade: almost every page is new. Your zones keep watering and dosing exactly as before.
+- Your settings were carried across where that was safe. The Upgrade report lists what was carried and what needs you.
+- Find it in Settings, System status, or on the card in Home Assistant's Repairs.
+- Ask your AI assistant to work through the report with you, using the upgrading guide in the documentation.
+
 ## 3.17.0 - 2026-10-21
 
 - Every room and zone is listed in the menu with its phase and moisture: one click opens any of them.
