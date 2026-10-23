@@ -147,6 +147,7 @@ export class FeedCalibrationDemo {
     if (raw === null) throw new Error(`No reading from the feed ${NAME[kind]} probe for 2 min. Check it's plugged in.`);
     // One session per room: a new start replaces the last.
     for (const [id, s] of this.sessions) if (s.roomId === roomId) this.sessions.delete(id);
+    this.expire(now);
     const temperature = typeof attributes.tank_temperature_sensor === "string" ? attributes.tank_temperature_sensor : null;
     const session: Session = {
       id: demoId(now, `feed-cal:${roomId}:${probe}:${this.sessions.size}:${Math.random()}`),
@@ -228,6 +229,7 @@ export class FeedCalibrationDemo {
     doc.records = [record, ...doc.records];
     doc.revision += 1;
     this.sessions.delete(session.id);
+    this.expire(now); // the last session gone: stop the reading timer
     const eventId = demoId(now, `feed-cal-commit:${record.id}`);
     this.events.set(eventId, { roomId: session.roomId, probe: session.probe, recordId: record.id });
     if (!applied)
@@ -260,6 +262,7 @@ export class FeedCalibrationDemo {
     }
     doc.revision += 1;
     for (const [id, s] of this.sessions) if (s.roomId === roomId) this.sessions.delete(id);
+    this.expire(now);
     this.publishCorrected(roomId, probe);
     const data = { probe, revision: doc.revision, reverted_record_id: current.id, record_id: previous?.id ?? null, applied: !!previous };
     return recordId === null

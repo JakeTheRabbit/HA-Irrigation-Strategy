@@ -17,6 +17,7 @@ import {
   captureState,
   digitsOf,
   feedValue,
+  forcedLine,
   isApplied,
   looksSteady,
   proofLine,
@@ -72,7 +73,8 @@ export function FeedCalibration({ controller, navigate }: PageProps) {
   const [startError, setStartError] = useState<string | null>(null);
   const [expired, setExpired] = useState(false);
   const [note, setNote] = useState<CaptureNote>(null);
-  const [startedAt, setStartedAt] = useState<number | null>(null);
+  // calibration_status said the probe has no reading (raw: null), as capture would refuse.
+  const [silent, setSilent] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
   const [done, setDone] = useState<{ session: StoredSession; result: CalibrationCommitResult; receipt: ApplyReceipt; undone: boolean } | null>(
     null,
@@ -99,6 +101,17 @@ export function FeedCalibration({ controller, navigate }: PageProps) {
     },
     [store],
   );
+  /** A change onto the latest session (not the one read before an await), if it is still that one. */
+  const patchSession = useCallback(
+    (id: string, change: (s: StoredSession) => StoredSession) =>
+      setSessionState((s) => {
+        if (!s || s.session_id !== id) return s;
+        const next = change(s);
+        store.set(next);
+        return next;
+      }),
+    [store],
+  );
   const goto = (n: number) => {
     setStep(n);
     if (session) setSession({ ...session, step: n });
@@ -120,10 +133,9 @@ export function FeedCalibration({ controller, navigate }: PageProps) {
   const raw = session ? controller.states[session.raw_entity_id] : undefined;
   const rawValue = raw && raw.state !== "" ? Number(raw.state) : NaN;
   const readings = useRef<Reading[]>([]);
-  const lastReport = useRef<number | null>(null);
   useEffect(() => {
     readings.current = [];
-    lastReport.current = null;
+    setSilent(false);
   }, [session?.session_id]);
   useEffect(() => {
     if (!raw) return;
@@ -133,7 +145,6 @@ export function FeedCalibration({ controller, navigate }: PageProps) {
       return;
     }
     const at = Date.parse(raw.last_updated ?? raw.last_changed ?? "") || Date.now();
-    lastReport.current = Math.max(lastReport.current ?? 0, at);
     const last = readings.current[readings.current.length - 1];
     if (last && (last.value === rawValue || last.at >= at)) return;
     readings.current = [...readings.current.filter((r) => r.at > at - 10 * WINDOW_MS), { at, value: rawValue }];
@@ -154,7 +165,9 @@ export function FeedCalibration({ controller, navigate }: PageProps) {
       const outcome = await callV2<CalibrationStatus>(latest.current, "calibration_status", { session_id: session.session_id });
       if (!live) return;
       if (outcome.kind === "ok") {
-        if (outcome.data.expires_at !== session.expires_at) setSession({ ...session, expires_at: outcome.data.expires_at });
+        setSilent(outcome.data.raw === null);
+        const expires = outcome.data.expires_at;
+        if (expires !== session.expires_at) patchSession(session.session_id, (s) => ({ ...s, expires_at: expires }));
       } else if (outcome.kind === "error" && refusalView(outcome).kind === "expired") setExpired(true);
     };
     const timer = setInterval(() => void check(), STATUS_MS);
@@ -162,7 +175,7 @@ export function FeedCalibration({ controller, navigate }: PageProps) {
       live = false;
       clearInterval(timer);
     };
-  }, [session, done, expired, setSession]);
+  }, [session, done, expired, patchSession]);
 
   useWakeLock(step >= 2 && step <= 4 && !!session);
 
@@ -186,8 +199,8 @@ export function FeedCalibration({ controller, navigate }: PageProps) {
       temperature_entity_id: d.temperature_entity_id,
       dosing_paused: d.dosing_paused,
       points: [null, null],
+      forced: [false, false],
     });
-    setStartedAt(Date.now());
     setExpired(false);
     setNote(null);
     setFailed(null);
@@ -220,9 +233,15 @@ export function FeedCalibration({ controller, navigate }: PageProps) {
     });
     setBusy(false);
     if (outcome.kind === "ok" && outcome.data.raw !== null) {
-      const points = session.points.map((p, i) => (i === index ? outcome.data.raw : p));
-      setSession({ ...session, points });
-      setNote({ point: index, kind: "captured", text: `Captured ${feedValue(outcome.data.raw, kind, digitsOf(raw?.state))}` });
+      const value = outcome.data.raw;
+      const forced = force && !outcome.data.stable;
+      patchSession(session.session_id, (s) => ({
+        ...s,
+        points: s.points.map((p, i) => (i === index ? value : p)),
+        forced: [0, 1].map((i) => (i === index ? forced : !!s.forced?.[i])),
+      }));
+      const captured = `Captured ${feedValue(value, kind, digitsOf(raw?.state))}`;
+      setNote({ point: index, kind: "captured", text: forced ? `${captured} while still moving` : captured });
       return;
     }
     if (outcome.kind === "ok") return setNote({ point: index, kind: "other", text: "The controller had no reading to capture." });
@@ -310,8 +329,10 @@ export function FeedCalibration({ controller, navigate }: PageProps) {
     if (chosen) void start(chosen);
   };
 
+  // A session left open (Back from buffer 1, or ✕) keeps dosing paused until it expires.
+  const resumable = !session && !done && step === 1 ? store.resumable(roomId, Date.now()) : null;
   // ---- header (desktop: crumb and title; phone: a full-screen bar with ✕)
-  const paused = !!session?.dosing_paused;
+  const paused = !!(session ?? resumable)?.dosing_paused;
   const shownStep = done ? 5 : step;
   const title = narrow ? `Calibrate ${room} feed ${name}` : `Calibrate feed ${name} probe`;
   const header = narrow ? (
@@ -372,9 +393,8 @@ export function FeedCalibration({ controller, navigate }: PageProps) {
   const span = spanOver(series);
   const steady = series.length > 0 && looksSteady(span, kind);
   const heldMs = steadyFor(series, kind);
-  const lastAt = Math.max(lastReport.current ?? 0, startedAt ?? 0) || null;
   const buffer = point !== null ? buffers[point] : "";
-  const cap = captureState(Number.isFinite(rawValue) ? lastAt : null, now, steady, { buffer, kind });
+  const cap = captureState(Number.isFinite(rawValue) && !silent, steady, { buffer, kind });
   const captured = point !== null && points[point] !== null;
   const ringState: "settling" | "steady" | "offline" = cap.reason ? "offline" : steady ? "steady" : "settling";
   const temp = session?.temperature_entity_id ? controller.states[session.temperature_entity_id] : undefined;
@@ -388,8 +408,8 @@ export function FeedCalibration({ controller, navigate }: PageProps) {
         ? `Stable ${Math.floor(heldMs / 1000)} s of 30 s`
         : "Settling…";
   const thresholdText = kind === "ph" ? "±0.01" : "±0.5%";
-  const words = result ? verdictWords(result.slope_pct, result.offset, kind) : null;
-  const resumable = !session && !done && step === 1 ? store.resumable(roomId, Date.now()) : null;
+  const words = result ? verdictWords(result, kind) : null;
+  const forcedText = forcedLine(shown?.forced, buffers);
 
   const details = [
     `${room} feed ${name}`,
@@ -418,7 +438,7 @@ export function FeedCalibration({ controller, navigate }: PageProps) {
   const phonePrimary =
     point !== null && !captured && !expired
       ? {
-          label: cap.enabled ? cap.label : "Waiting for a steady reading",
+          label: cap.enabled ? cap.label : cap.reason ? "No probe reading" : "Waiting for a steady reading",
           enabled: cap.enabled && !busy && !admin,
           go: () => void capture(point),
         }
@@ -452,7 +472,7 @@ export function FeedCalibration({ controller, navigate }: PageProps) {
               {!narrow && <h2 className="feed-cal-step-title">Which probe are you calibrating?</h2>}
               {resumable && (
                 <div className="feed-cal-resume">
-                  <span>{`A calibration of the ${room} feed ${NAME_OF[resumable.kind]} probe is still open until ${clock(Date.parse(resumable.expires_at), tz)}.`}</span>
+                  <span>{`A calibration of the ${room} feed ${NAME_OF[resumable.kind]} probe is still open.${resumable.dosing_paused ? ` Dosing for ${room} stays paused until ${clock(Date.parse(resumable.expires_at), tz)}.` : ` It ends at ${clock(Date.parse(resumable.expires_at), tz)}.`}`}</span>
                   <Button variant="outline" disabled={busy} onClick={() => void resume(resumable)}>
                     Resume calibration
                   </Button>
@@ -541,7 +561,7 @@ export function FeedCalibration({ controller, navigate }: PageProps) {
                         {liveText}
                       </span>
                       <span className="feed-cal-caption">
-                        {`${name} · buffer ${buffer}${tempText ? ` · ${tempText}, compensated to 25 °C` : ""}`}
+                        {`${name} · buffer ${buffer}${tempText ? ` · ${tempText}` : ""}`}
                       </span>
                     </div>
                     <Trace series={series.filter((r) => r.at >= now - TRACE_MS)} kind={kind} now={now} />
@@ -602,6 +622,7 @@ export function FeedCalibration({ controller, navigate }: PageProps) {
                       </li>
                     ))}
                   </ul>
+                  {forcedText && <p className="feed-cal-bad">{forcedText}</p>}
                   {result.verdict === "fail" ? (
                     <>
                       <p>A failed result is kept in the history but never applied. Clean or replace the probe and calibrate it again.</p>
@@ -705,7 +726,7 @@ function Proof({
         <>
           <span>{line.text}</span>
           {line.ok ? (
-            <span className="feed-cal-ok" aria-label="within 0.1 of the buffer">
+            <span className="feed-cal-ok" role="img" aria-label="within 0.1 of the buffer">
               {" "}
               ✓
             </span>

@@ -14,8 +14,6 @@ export interface Reading {
 
 /** The backend's window: a point is captured once the reading held still this long. */
 export const WINDOW_MS = 30_000;
-/** calibration.py SILENT: a probe that has not reported for 2 min is offline. */
-export const OFFLINE_AFTER_MS = 120_000;
 export const KIND_OF: Record<FeedProbe, FeedKind> = { feed_ph: "ph", feed_ec: "ec" };
 export const NAME_OF: Record<FeedKind, string> = { ph: "pH", ec: "EC" };
 
@@ -60,14 +58,14 @@ const plain = (n: number) => String(Number(n.toFixed(6)));
 const amount = (value: number, kind: FeedKind) => (kind === "ph" ? `${value.toFixed(2)} pH` : formatEc(value, 2));
 
 /** The result in a grower's words: how far off the probe reads at the anchor (pH 7, EC 0) and how
- * well it still responds. Health is the response only: 95–105 % healthy, 85–115 % clean soon. */
+ * well it still responds. Health is the backend verdict (slope and offset): pass healthy, drifting
+ * clean soon, fail replace, so the words never contradict the Pass/Drift/Fail mark beside them. */
 export function verdictWords(
-  slopePct: number,
-  offset: number,
+  result: { verdict: "pass" | "drifting" | "fail"; slope_pct: number; offset: number },
   kind: FeedKind,
 ): { headline: string; health: "healthy" | "clean_soon" | "replace" } {
-  const health =
-    slopePct >= 95 && slopePct <= 105 ? "healthy" : slopePct >= 85 && slopePct <= 115 ? "clean_soon" : "replace";
+  const { slope_pct: slopePct, offset } = result;
+  const health = result.verdict === "pass" ? "healthy" : result.verdict === "drifting" ? "clean_soon" : "replace";
   const response = `Response ${plain(slopePct)}% — ${
     health === "healthy" ? "healthy" : health === "clean_soon" ? "clean or replace the probe soon" : "replace the probe"
   }.`;
@@ -75,37 +73,42 @@ export function verdictWords(
   return { headline: off + response, health };
 }
 
-/** Whether Capture can be pressed: the probe reported in the last 2 min and the reading looks steady. */
+/** Whether Capture can be pressed: the probe has a reading and it looks steady. A probe holding one
+ * value reports no change, so the time since its last change never counts as offline: only a missing
+ * reading (the raw sensor or calibration_status `raw: null`) does, as the backend's capture refuses. */
 export function captureState(
-  lastReadingAt: number | null,
-  now: number,
+  reading: boolean,
   steady: boolean,
   opts: { buffer: string; kind: FeedKind } = { buffer: "", kind: "ph" },
 ): { enabled: boolean; label: string; reason: string | null } {
   const label = `Capture ${opts.buffer} point`.replace("  ", " ");
-  const probe = `the feed ${NAME_OF[opts.kind]} probe`;
-  if (lastReadingAt === null) return { enabled: false, label, reason: `No reading from ${probe} yet.` };
-  if (now - lastReadingAt > OFFLINE_AFTER_MS)
-    return { enabled: false, label, reason: `No reading from ${probe} for 2 min. Check it's plugged in.` };
+  if (!reading) return { enabled: false, label, reason: `No reading from the feed ${NAME_OF[opts.kind]} probe. Check it's plugged in.` };
   if (!steady) return { enabled: false, label: `${label} · waiting for stable`, reason: null };
   return { enabled: true, label, reason: null };
 }
 
 /** What a refused capture, commit or start means for the wizard. An expired session (`invalid`, the
- * backend's EXPIRED words) starts again from buffer 1 (step 2). */
+ * backend's EXPIRED words) starts a new session from buffer 1. */
 export function refusalView(outcome: Extract<V2Outcome<unknown>, { kind: "error" | "missing" }>): {
   kind: "expired" | "moving" | "missing" | "other";
   text: string;
-  restartStep: number | null;
 } {
-  if (outcome.kind === "missing")
-    return { kind: "missing", text: "This integration has no guided calibration.", restartStep: null };
+  if (outcome.kind === "missing") return { kind: "missing", text: "This integration has no guided calibration." };
   if (outcome.code === "invalid" && /session expired/i.test(outcome.message))
-    return { kind: "expired", text: "Your last calibration session expired. Start again from buffer 1.", restartStep: 2 };
+    return { kind: "expired", text: "Your last calibration session expired. Start again from buffer 1." };
   const data = outcome.data as { stable?: unknown } | undefined;
   if (outcome.code === "guard_refused" && data?.stable === false)
-    return { kind: "moving", text: "Reading still moving — calibration may be off.", restartStep: null };
-  return { kind: "other", text: outcome.message, restartStep: null };
+    return { kind: "moving", text: "Reading still moving — calibration may be off." };
+  return { kind: "other", text: outcome.message };
+}
+
+/** The result step's reminder of each point captured with "Capture anyway" while still moving. */
+export function forcedLine(forced: boolean[] | undefined, buffers: string[]): string | null {
+  const which = (forced ?? []).flatMap((f, i) => (f ? [`${i + 1} (${buffers[i]})`] : []));
+  if (!which.length) return null;
+  return which.length === 1
+    ? `Buffer ${which[0]} was captured while the reading was still moving.`
+    : `Buffers ${which.join(" and ")} were captured while the reading was still moving.`;
 }
 
 /** The open session this browser started, so the wizard can resume it. */
@@ -122,6 +125,8 @@ export interface StoredSession {
   dosing_paused: boolean;
   /** The raw reading captured at each buffer, null until captured. */
   points: (number | null)[];
+  /** Each point captured with "Capture anyway" while the reading was still moving. */
+  forced?: boolean[];
 }
 export const SESSION_KEY = "crop-steering.cal-session";
 type Storage = Pick<globalThis.Storage, "getItem" | "setItem" | "removeItem">;

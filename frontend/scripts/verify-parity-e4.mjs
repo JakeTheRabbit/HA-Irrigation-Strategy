@@ -10,7 +10,9 @@
  *   copy, "Step 2 of 5 · dosing for Room A paused" (phone: "Equipment · step 2 of 5 · dosing paused");
  *   the demo reading settles: Capture is disabled ("Capture 7.00 point · waiting for stable", phone
  *   "Waiting for a steady reading") while it moves, enabled once it held 30 s ("Steady"); Capture
- *   gives "Captured 7.04"; desktop Back keeps the session and step 1 offers "Resume calibration";
+ *   gives "Captured 7.04"; desktop Back keeps the session and step 1 offers "Resume calibration"
+ *   with "Dosing for Room A stays paused until HH:MM" and the footer "Step 1 of 5 · dosing for Room A
+ *   paused" (no "compensated" claim anywhere);
  *   buffer 2 the same ("Captured 4.09"); the result reads "Probe reads 0.04 pH high. Response 98.3% —
  *   healthy." with Pass marked; Apply calibration gives "Written and read back 14:1x" and the proof
  *   "Now reads 4.00 in pH 4.00 buffer ✓"; Undo writes the previous calibration back.
@@ -101,6 +103,14 @@ await runParity({
     if (!phone) {
       // Back keeps the session: step 1 offers to resume it.
       await foot.getByRole("button", { name: "Back", exact: true }).click();
+      // The open session still pauses dosing: the Resume card and the footer say so.
+      assert.match(
+        await main.locator(".feed-cal-resume span").innerText(),
+        /^A calibration of the Room A feed pH probe is still open\. Dosing for Room A stays paused until \d\d:\d\d\.$/,
+        `${label}: resume card pause`,
+      );
+      assert.equal(await foot.locator(".feed-cal-count").innerText(), "Step 1 of 5 · dosing for Room A paused");
+      assert.doesNotMatch(await page.locator(".feed-cal").innerText(), /compensated/, `${label}: no compensation claim`);
       await main.getByRole("button", { name: "Resume calibration" }).click();
       await main.getByText("Captured 7.04", { exact: true }).waitFor();
       region("resume");

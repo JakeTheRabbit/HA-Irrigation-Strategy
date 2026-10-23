@@ -5,8 +5,8 @@ import { callV2 } from "./parity-api";
 import type { States } from "./types";
 import { revertEvents } from "./undo";
 import {
-  OFFLINE_AFTER_MS,
   captureState,
+  forcedLine,
   isApplied,
   looksSteady,
   proofLine,
@@ -69,45 +69,62 @@ describe("looksSteady", () => {
 });
 
 describe("verdictWords", () => {
-  it("verdictWords 97% healthy, 86% clean soon", () => {
-    expect(verdictWords(97, -0.12, "ph")).toEqual({
-      headline: "Probe reads 0.12 pH low. Response 97% — healthy.",
+  const r = (verdict: "pass" | "drifting" | "fail", slope_pct: number, offset: number) => ({ verdict, slope_pct, offset });
+  it("verdictWords 97% healthy; health follows the backend verdict, offset included", () => {
+    expect(verdictWords(r("pass", 97, -0.08), "ph")).toEqual({
+      headline: "Probe reads 0.08 pH low. Response 97% — healthy.",
       health: "healthy",
     });
-    expect(verdictWords(86, 0, "ph")).toEqual({
-      headline: "Response 86% — clean or replace the probe soon.",
+    expect(verdictWords(r("drifting", 92, 0), "ph")).toEqual({
+      headline: "Response 92% — clean or replace the probe soon.",
       health: "clean_soon",
     });
   });
+  it("never calls a probe healthy beside a Drift or Fail mark", () => {
+    expect(verdictWords(r("fail", 98, 0.5), "ph")).toEqual({
+      headline: "Probe reads 0.50 pH high. Response 98% — replace the probe.",
+      health: "replace",
+    });
+    expect(verdictWords(r("drifting", 98, 0.2), "ph").health).toBe("clean_soon");
+    expect(verdictWords(r("fail", 87, 0), "ph").health).toBe("replace");
+  });
   it("reads high, replace, and EC in the display unit", () => {
-    expect(verdictWords(98.3, 0.04, "ph").headline).toBe("Probe reads 0.04 pH high. Response 98.3% — healthy.");
-    expect(verdictWords(78, 0, "ph")).toEqual({ headline: "Response 78% — replace the probe.", health: "replace" });
-    expect(verdictWords(112, 0, "ph").health).toBe("clean_soon");
-    expect(verdictWords(99, -0.05, "ec").headline).toBe("Probe reads 0.05 mS/cm low. Response 99% — healthy.");
+    expect(verdictWords(r("pass", 98.3, 0.04), "ph").headline).toBe("Probe reads 0.04 pH high. Response 98.3% — healthy.");
+    expect(verdictWords(r("fail", 78, 0), "ph")).toEqual({ headline: "Response 78% — replace the probe.", health: "replace" });
+    expect(verdictWords(r("pass", 99, -0.05), "ec").headline).toBe("Probe reads 0.05 mS/cm low. Response 99% — healthy.");
   });
 });
 
 describe("captureState", () => {
-  const now = at(1000);
-  it("stale reading disables Capture", () => {
-    const s = captureState(now - 125_000, now, true, { buffer: "7.00", kind: "ph" });
+  it("only a missing reading locks Capture: a probe holding one value is not offline", () => {
+    const s = captureState(false, true, { buffer: "7.00", kind: "ph" });
     expect(s.enabled).toBe(false);
-    expect(s.reason).toBe("No reading from the feed pH probe for 2 min. Check it's plugged in.");
-    expect(OFFLINE_AFTER_MS).toBe(120_000);
+    expect(s.reason).toBe("No reading from the feed pH probe. Check it's plugged in.");
+    expect(captureState(false, true, { buffer: "1.413 mS/cm", kind: "ec" }).reason).toBe(
+      "No reading from the feed EC probe. Check it's plugged in.",
+    );
   });
   it("waits for stable, then names the point", () => {
-    expect(captureState(now - 2_000, now, false, { buffer: "7.00", kind: "ph" })).toEqual({
+    expect(captureState(true, false, { buffer: "7.00", kind: "ph" })).toEqual({
       enabled: false,
       label: "Capture 7.00 point · waiting for stable",
       reason: null,
     });
-    expect(captureState(now - 2_000, now, true, { buffer: "7.00", kind: "ph" })).toEqual({
+    expect(captureState(true, true, { buffer: "7.00", kind: "ph" })).toEqual({
       enabled: true,
       label: "Capture 7.00 point",
       reason: null,
     });
-    expect(captureState(null, now, true, { buffer: "1.413 mS/cm", kind: "ec" }).reason).toBe(
-      "No reading from the feed EC probe yet.",
+  });
+});
+
+describe("forcedLine", () => {
+  it("names each point captured while the reading was still moving", () => {
+    expect(forcedLine([false, false], ["7.00", "4.00"])).toBeNull();
+    expect(forcedLine(undefined, ["7.00", "4.00"])).toBeNull();
+    expect(forcedLine([true, false], ["7.00", "4.00"])).toBe("Buffer 1 (7.00) was captured while the reading was still moving.");
+    expect(forcedLine([true, true], ["7.00", "4.00"])).toBe(
+      "Buffers 1 (7.00) and 2 (4.00) were captured while the reading was still moving.",
     );
   });
 });
@@ -118,7 +135,6 @@ describe("refusalView", () => {
     expect(v).toEqual({
       kind: "expired",
       text: "Your last calibration session expired. Start again from buffer 1.",
-      restartStep: 2,
     });
   });
   it("a moving reading offers Capture anyway; anything else shows the server's words", () => {
@@ -129,10 +145,10 @@ describe("refusalView", () => {
         message: "The reading is not steady yet: nothing was captured. Wait, or capture it anyway.",
         data: { stable: false, raw: 7.1 },
       }),
-    ).toEqual({ kind: "moving", text: "Reading still moving — calibration may be off.", restartStep: null });
+    ).toEqual({ kind: "moving", text: "Reading still moving — calibration may be off." });
     expect(
       refusalView({ kind: "error", code: "invalid", message: "No reading from the feed pH probe for 2 min. Check it's plugged in." }),
-    ).toEqual({ kind: "other", text: "No reading from the feed pH probe for 2 min. Check it's plugged in.", restartStep: null });
+    ).toEqual({ kind: "other", text: "No reading from the feed pH probe for 2 min. Check it's plugged in." });
   });
 });
 
