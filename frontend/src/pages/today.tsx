@@ -27,6 +27,7 @@ import {
   type JevEntry,
 } from "@/lib/jev";
 import { numeric, readable, roomStatus, staleBanner } from "@/lib/model";
+import { publishedDryback, type PublishedDryback } from "@/lib/published";
 import { buildSetpointPreview } from "@/lib/setpoint-preview";
 import { tankTelemetry } from "@/lib/tank-telemetry";
 import { eventTimes } from "@/lib/timeline";
@@ -98,6 +99,7 @@ interface Card {
   gaps: number;
   water: ReturnType<typeof dailyWater>;
   stopped: string | null;
+  dryback: PublishedDryback;
 }
 
 /** Today: is the room OK, which zone needs a person and why, where each zone is in its day and what
@@ -163,6 +165,7 @@ export function Today({
       gaps: gaps.length,
       water,
       stopped,
+      dryback: publishedDryback(states, prefix, zone.id),
       facts: {
         id: zone.id,
         name: zone.name,
@@ -697,8 +700,8 @@ function ZoneCard({
 }
 
 /** Settings › Display › Zones as › Table: the zones side by side, a row each, from the same facts as
- * the cards. The dryback is the controller's: (peak − VWC) / peak, the peak being today's highest
- * reading since lights-on. A row opens its zone. */
+ * the cards. The dryback is the one the controller publishes and steers on, (peak − VWC) / peak with
+ * its peak since lights-on, or "—" with its reason. A row opens its zone. */
 function ZoneTable({
   cards,
   attention,
@@ -727,11 +730,7 @@ function ZoneTable({
           {cards.map((card) => {
             const { zone, water } = card;
             const reasons = attention.get(zone.id) ?? [];
-            const peak = card.readings.length
-              ? Math.max(...card.readings.map((point) => point.value))
-              : null;
-            const dryback =
-              peak && zone.vwc.value !== null ? ((peak - zone.vwc.value) / peak) * 100 : null;
+            const dryback = card.dryback;
             return (
               <tr
                 key={zone.id}
@@ -759,7 +758,11 @@ function ZoneTable({
                 <td>{/^P[0-3]$/.test(zone.phase) ? zone.phase : "—"}</td>
                 <td>{zone.vwc.value === null ? "—" : `${number(zone.vwc.value)}%`}</td>
                 <td>{zone.ec.value === null ? "—" : number(zone.ec.value, 2)}</td>
-                <td>{dryback === null ? "—" : `${number(Math.max(0, dryback))}% of peak`}</td>
+                <td title={dryback.reason ?? undefined} data-dryback={zone.id}>
+                  {dryback.percent === null
+                    ? "—"
+                    : `${number(Math.max(0, dryback.percent))}% of peak`}
+                </td>
                 <td>
                   {water.mlPerPlant !== null
                     ? `${perPlant(water.mlPerPlant)}/plant`

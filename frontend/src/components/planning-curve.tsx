@@ -6,6 +6,7 @@ import { UiTip } from "@/components/info-tip";
 import { CheckChip, GaugeRow, QualityChip, StatusLine } from "@/components/hmi";
 import { gauge, probeGaps, valueAt, PROBE_GAP_VWC } from "@/lib/hmi";
 import { referenceDryback } from "@/lib/day-chart";
+import type { PublishedDryback } from "@/lib/published";
 import {
   buildPlanningCurve,
   dryRates,
@@ -53,6 +54,8 @@ export interface PlanningCurveProps {
   ecBand?: [number, number] | null;
   /** The stage's reference overnight dryback, in VWC points, when there is one. */
   drybackPoints?: [number, number] | null;
+  /** The zone's dryback and peak as the controller publishes them (published.ts). */
+  dryback?: PublishedDryback;
 }
 const trim = (value: number | null | undefined, digits = 1) =>
   typeof value === "number" && Number.isFinite(value) ? String(Number(value.toFixed(digits))) : "—";
@@ -97,6 +100,7 @@ export function PlanningCurve({
   phase,
   ecBand,
   drybackPoints,
+  dryback,
 }: PlanningCurveProps) {
   const limits =
     bounds ??
@@ -333,9 +337,6 @@ export function PlanningCurve({
       : nowHour === null
         ? null
         : (plan.phases.find((item) => nowHour >= item.start && nowHour < item.end)?.id ?? null);
-  const todayPeak = vwcRecorded.today.length
-    ? Math.max(...vwcRecorded.today.map((point) => point.value))
-    : null;
   const p1Done = nowHour !== null && nowHour >= p1.end;
   const ecTarget =
     phaseNow && phaseNow !== "P3" ? parameters[`ec_target_${phaseNow.toLowerCase()}`] : NaN;
@@ -356,7 +357,8 @@ export function PlanningCurve({
           id: "peak",
           model: gauge({
             label: "Peak today",
-            value: todayPeak,
+            value: dryback?.peak ?? null,
+            quality: dryback?.reason ?? undefined,
             target: parameters.p1_target_vwc,
             unit: "%",
             tolerance: 3,
@@ -367,14 +369,14 @@ export function PlanningCurve({
           id: "dryback",
           model: gauge({
             label: "Dryback so far",
-            value: todayPeak && nowVwc ? ((todayPeak - nowVwc.value) / todayPeak) * 100 : null,
+            value: dryback?.percent ?? null,
             target: parameters.dryback_target,
-            reference: referenceDryback(drybackPoints, todayPeak),
+            reference: referenceDryback(drybackPoints, dryback?.peak),
             unit: "%",
             points: "%",
             tolerance: 3,
             underIsNormal: true,
-            quality: inGap ? "probe gap" : undefined,
+            quality: dryback?.reason ?? undefined,
           }),
         },
         {

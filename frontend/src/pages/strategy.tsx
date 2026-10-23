@@ -7,6 +7,7 @@ import { CanonicalControls } from "@/components/canonical-controls";
 import type { ReactNode } from "react";
 import type { Choice, Controller, Setting } from "@/lib/types";
 import { PlanningCurve } from "@/components/planning-curve";
+import { publishedDryback } from "@/lib/published";
 import { buildSetpointPreview, validateSetpoint } from "@/lib/setpoint-preview";
 import { smoothRecorded } from "@/lib/planning-curve";
 import { useSensorContext } from "@/components/sensor-context";
@@ -340,6 +341,7 @@ export function Strategy({
         phase={sensorZone?.phase}
         ecBand={readJev(states, room.room.prefix).room?.stage?.poreEc ?? null}
         drybackPoints={readJev(states, room.room.prefix).room?.stage?.drybackPoints ?? null}
+        dryback={sensorZone && publishedDryback(states, room.room.prefix, sensorZone.id)}
         parameters={preview.draft.parameters}
         lightsOn={preview.draft.lightsOn}
         lightsOff={preview.draft.lightsOff}

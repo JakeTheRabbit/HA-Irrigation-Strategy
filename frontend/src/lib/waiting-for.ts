@@ -52,7 +52,7 @@ export function readWaiting(
 export interface WaitingFormat {
   number: (value: number) => string;
   clock: (time: number) => string;
-  /** The dashboard's own estimate of the next maintenance shot, from the dry-down rate. */
+  /** The controller's own estimate of the next maintenance shot, at its current dryback rate. */
   shotEstimate?: number | null;
 }
 
@@ -118,7 +118,7 @@ export function waitingText(waiting: Waiting, format: WaitingFormat): string {
     const estimate =
       format.shotEstimate === null || format.shotEstimate === undefined
         ? ""
-        : `, ≈ ${clock(format.shotEstimate)} at this dry-down`;
+        : `, ≈ ${clock(format.shotEstimate)} by the controller's estimate`;
     const dilute = find("p2_dilute");
     // Under the trigger, a maintenance shot may still wait out the time between P2 shots.
     const wait = topup ? when(topup) : null;
