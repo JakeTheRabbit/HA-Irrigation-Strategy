@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from "react";
 import { HEARTBEAT_STALE_MS, parseControllerTime } from "./controller-health";
-import { jevIds, type JevEntry } from "./jev";
+import { attachOutcomes, JEV_TITLES, jevIds, type JevEntry } from "./jev";
 import { roomStatus } from "./model";
 import type { CsEvent } from "./parity-types";
 import type { Controller, EntityState, Room, States } from "./types";
@@ -172,44 +172,36 @@ export interface BrainView {
   declined: string | null;
 }
 
-/** What each judge is called, and what it may change when it acts. */
-export const BRAIN_JUDGES: Record<string, { title: string; may: string }> = {
+/** What each judge may change when it acts (its name: judgeTitle). */
+export const BRAIN_JUDGES: Record<string, { may: string }> = {
   dawn: {
-    title: "Morning start",
     may: "Start filling earlier, never later than the rules would, within the morning-dryback window",
   },
   ramp: {
-    title: "Filling hand-over",
     may: "Stop filling and start holding earlier, once the minimum filling shots are in",
   },
   dusk: {
-    title: "Day end",
     may: "Stop daytime shots earlier, within limits; never for a zone steered vegetative",
   },
   salt: {
-    title: "Pore EC",
     may: "The mode of the EC steer (steer, hold or ease back), inside the limits of the controller",
   },
   probe: {
-    title: "Probe trust",
     may: "Leave a probe out of the zone reading for 90 min unless renewed",
   },
   setpoints: {
-    title: "Setpoints",
     may: "Shot size or re-water point, one small step a day, only with Auto setpoints on",
   },
-  shot: { title: "Shot landing", may: "Flags shots that did not land" },
+  shot: { may: "Flags shots that did not land" },
   night: {
-    title: "Night low",
     may: "Flags real drying against a probe fault near the floor; the rescue shot fires either way",
   },
-  zones: { title: "Zone comparison", may: "Flags a zone drinking very differently" },
-  stage: { title: "Stage check", may: "Flags a zone off its stage's plan" },
+  zones: { may: "Flags a zone drinking very differently" },
+  stage: { may: "Flags a zone off its stage's plan" },
   plan: {
-    title: "Grow plan",
     may: "Says what a drift from the grower's plan means; applies today's plan day only while a stale probe holds it",
   },
-  alerts: { title: "Alert note", may: "Adds one line to an alert card" },
+  alerts: { may: "Adds one line to an alert card" },
 };
 /** What the AI assistant may do in a room, in the integration's order (const.AI_POWERS): one switch each,
  * `switch.crop_steering_<prefix>ai_power_<key>`. With a power off, the AI assistant only advises on it. */
@@ -259,29 +251,29 @@ export function parsePowers(states: States, prefix: string): AiPower[] {
 /** The judges Settings › AI assistant lists, in the controller's order (brain_bridge.ALL, less the ones
  * that only write reports or answers). `act`: the judge can change something, through its power's switch
  * (brain_bridge.JUDGE_POWER); with the power off it only advises. `alerts` and `advice` judges have no
- * switch: the controller's ai_judges option decides whether they are asked. */
+ * switch: the controller's ai_judges option decides whether they are asked, and an acting judge that
+ * option leaves out is not asked either, whatever its switch. */
 export const JUDGES: {
   id: string;
-  name: string;
   blurb: string;
   power: "act" | "alerts" | "advice";
   powerKey?: AiPowerKey;
 }[] = [
-  { id: "dawn", name: "Morning start", blurb: "Starts the morning ramp sooner when the night dryback is big enough.", power: "act", powerKey: "advance_phase" },
-  { id: "ramp", name: "Ramp hand-over", blurb: "Ends the ramp once the slab is full, not when new feed passes the probe.", power: "act", powerKey: "ramp_control" },
-  { id: "salt", name: "Pore EC", blurb: "Lets EC stacking move the re-water point, hold it or move it back.", power: "act", powerKey: "ec_mode" },
-  { id: "dusk", name: "Day end", blurb: "Stops the day's shots early on generative zones.", power: "act", powerKey: "advance_phase" },
-  { id: "probe", name: "Probe trust", blurb: "Sets a stuck, drifting or misplaced probe aside.", power: "act", powerKey: "set_probe_aside" },
-  { id: "shot", name: "Shot landing", blurb: "Checks 20 min after each shot that the water reached the slab.", power: "alerts" },
-  { id: "night", name: "Night low", blurb: "Tells a dry slab from a bad probe near the rescue floor.", power: "alerts" },
-  { id: "zones", name: "Zone comparison", blurb: "Explains a zone drinking far more or less than the others.", power: "alerts" },
-  { id: "channel", name: "Water channel", blurb: "Spots water running past the slab or the probe.", power: "alerts" },
-  { id: "stage", name: "Stage arc", blurb: "Checks today's dryback and pore EC suit the stage.", power: "advice" },
-  { id: "setpoints", name: "Setpoints", blurb: "Moves one setting one step each night, inside your range.", power: "act", powerKey: "nudge_setpoints" },
-  { id: "balance", name: "Balance", blurb: "Suggests moving tomorrow's water toward the room's.", power: "advice" },
-  { id: "targets", name: "Targets", blurb: "Writes tomorrow's field capacity, peak, re-water and dryback targets.", power: "act", powerKey: "set_targets_from_achievable" },
-  { id: "shotsize", name: "Shot sizes", blurb: "Writes ramp and maintenance shot sizes after lights-off.", power: "act", powerKey: "tune_shot_sizes" },
-  { id: "plan", name: "Grow plan", blurb: "Applies today's plan day while a stale probe holds the plan.", power: "act", powerKey: "plan_catch_up" },
+  { id: "dawn", blurb: "Starts the morning ramp sooner when the night dryback is big enough.", power: "act", powerKey: "advance_phase" },
+  { id: "ramp", blurb: "Ends the ramp once the slab is full, not when new feed passes the probe.", power: "act", powerKey: "ramp_control" },
+  { id: "salt", blurb: "Lets EC stacking move the re-water point, hold it or move it back.", power: "act", powerKey: "ec_mode" },
+  { id: "dusk", blurb: "Stops the day's shots early on generative zones.", power: "act", powerKey: "advance_phase" },
+  { id: "probe", blurb: "Sets a stuck, drifting or misplaced probe aside.", power: "act", powerKey: "set_probe_aside" },
+  { id: "shot", blurb: "Checks 20 min after each shot that the water reached the slab.", power: "alerts" },
+  { id: "night", blurb: "Tells a dry slab from a bad probe near the rescue floor.", power: "alerts" },
+  { id: "zones", blurb: "Explains a zone drinking far more or less than the others.", power: "alerts" },
+  { id: "channel", blurb: "Spots water running past the slab or the probe.", power: "alerts" },
+  { id: "stage", blurb: "Checks today's dryback and pore EC suit the stage.", power: "advice" },
+  { id: "setpoints", blurb: "Moves one setting one step each night, inside your range.", power: "act", powerKey: "nudge_setpoints" },
+  { id: "balance", blurb: "Suggests moving tomorrow's water toward the room's.", power: "advice" },
+  { id: "targets", blurb: "Writes tomorrow's field capacity, peak, re-water and dryback targets.", power: "act", powerKey: "set_targets_from_achievable" },
+  { id: "shotsize", blurb: "Writes ramp and maintenance shot sizes after lights-off.", power: "act", powerKey: "tune_shot_sizes" },
+  { id: "plan", blurb: "Applies today's plan day while a stale probe holds the plan.", power: "act", powerKey: "plan_catch_up" },
 ];
 
 export interface JudgeCell {
@@ -301,9 +293,13 @@ export interface JudgeRow {
   perRoom: Record<string, JudgeCell>;
 }
 
+/** Always asked whatever ai_judges says (brain_bridge.POWER_JUDGES), or never in the room's judge list (the
+ * grow plan is a task, not a judge): their switches alone decide. */
+const ALWAYS_ASKED = ["targets", "shotsize", "plan"];
 /** Every judge, with one cell per room: a judge that can act is its power's switch (missing: "No switch";
- * Pore EC where EC stacking is off: "stacking off"); an alert or advice judge is on when the room's brain
- * sensor lists it among the judges it asks, read only. */
+ * left out of the room's published judge list: "Not asked"; Pore EC where EC stacking is off: "stacking
+ * off"); an alert or advice judge is on when the room's brain sensor lists it among the judges it asks,
+ * read only. */
 export function judgeMatrix(states: States, rooms: Room[]): JudgeRow[] {
   return JUDGES.map((judge) => {
     const partner = judge.powerKey
@@ -311,16 +307,18 @@ export function judgeMatrix(states: States, rooms: Room[]): JudgeRow[] {
       : undefined;
     const perRoom = Object.fromEntries(
       rooms.map((room): [string, JudgeCell] => {
+        const asked = states[jevIds(room.prefix).room]?.attributes.judges;
         if (judge.powerKey) {
           const entityId = aiPowerId(room.prefix, judge.powerKey);
           const state = states[entityId]?.state;
           if (state !== "on" && state !== "off") return [room.id, { on: false, entityId: null, note: "No switch" }];
+          if (Array.isArray(asked) && !ALWAYS_ASKED.includes(judge.id) && !asked.includes(judge.id))
+            return [room.id, { on: false, entityId: null, note: "Not asked" }];
           const stacking = states[`switch.crop_steering_${room.prefix}ec_stacking_enabled`]?.state;
           if (judge.id === "salt" && stacking === "off")
             return [room.id, { on: false, entityId, note: "stacking off" }];
           return [room.id, { on: state === "on", entityId }];
         }
-        const asked = states[jevIds(room.prefix).room]?.attributes.judges;
         return [
           room.id,
           Array.isArray(asked)
@@ -330,7 +328,12 @@ export function judgeMatrix(states: States, rooms: Room[]): JudgeRow[] {
       }),
     );
     const { powerKey: _power, ...row } = judge;
-    return { ...row, ...(partner ? { shares: partner.name } : {}), perRoom };
+    return {
+      ...row,
+      name: judgeTitle(judge.id),
+      ...(partner ? { shares: judgeTitle(partner.id) } : {}),
+      perRoom,
+    };
   });
 }
 
@@ -412,12 +415,14 @@ export function outcomes(events: readonly CsEvent[]): AiOutcome[] {
 }
 
 /** The same rows from a 3.17 room's decision log (sensor.crop_steering_<prefix>jev_log): each decision
- * that acted, with the outcome entry that names it (`of`). Advice is left out: nothing checks it. */
+ * that acted, with the outcome entry that names it (`of`: its stamp, or its time before 3.4). Advice is
+ * left out: nothing checks it. */
 export function outcomesFromLog(entries: readonly JevEntry[], roomId: string): AiOutcome[] {
+  const attached = attachOutcomes(entries).outcomes;
   return entries
     .filter((e) => e.kind === "decision" && e.time !== null && e.result === "acted")
     .map((e) => {
-      const found = entries.find((o) => o.kind === "outcome" && o.of !== "" && o.of === e.stamp);
+      const found = attached.get(e.key)?.[0];
       return {
         id: `${roomId}|${e.key}`,
         at: e.time!,
@@ -435,7 +440,7 @@ export function outcomesFromLog(entries: readonly JevEntry[], roomId: string): A
 }
 
 export const judgeTitle = (judge: string) =>
-  BRAIN_JUDGES[judge]?.title ??
+  JEV_TITLES[judge] ??
   (judge ? judge.charAt(0).toUpperCase() + judge.slice(1).replaceAll("_", " ") : "Judge");
 
 /** Money in dollars, never tokens. */

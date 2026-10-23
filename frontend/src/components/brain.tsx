@@ -10,7 +10,6 @@ import {
   AI_POWERS,
   BRAIN_DEMO_STATES,
   BRAIN_JUDGES,
-  JUDGES,
   confidenceWords,
   judgeCount,
   judgeMatrix,
@@ -453,7 +452,9 @@ function JudgesCard({ controller }: { controller: Controller }) {
       : (result.failed[0]?.reason ?? "The controller did not confirm the change.");
   };
   const flip = async (row: JudgeRow, room: Room, entityId: string, on: boolean) => {
-    const what = row.shares ? `${row.name} and ${row.shares}` : row.name;
+    // One switch turns both judges on it, but only the ones this room asks.
+    const partner = rows.find((other) => other.name === row.shares)?.perRoom[room.id];
+    const what = row.shares && partner?.note !== "Not asked" ? `${row.name} and ${row.shares}` : row.name;
     const word = (value: boolean) => (value ? "on" : "off");
     setBusy(entityId);
     setFailed(null);
@@ -478,6 +479,7 @@ function JudgesCard({ controller }: { controller: Controller }) {
     });
   };
   const roomNames = rooms.map((room) => room.name).join(" and ");
+  const notAsked = rows.some((row) => Object.values(row.perRoom).some((cell) => cell.note === "Not asked"));
   return (
     <section className="panel ai-card ai-judges" aria-labelledby="ai-judges-title" data-ai-judges>
       <div className="ai-card-head">
@@ -563,7 +565,9 @@ function JudgesCard({ controller }: { controller: Controller }) {
                             ? `EC stacking is off in ${room.name}, so this judge never asks there`
                             : cell.note === "No switch"
                               ? `This integration has no switch for it in ${room.name}`
-                              : `${room.name} does not report the judges it asks`
+                              : cell.note === "Not asked"
+                                ? `${room.name} does not ask this judge: set in the controller app's options (ai_judges)`
+                                : `${room.name} does not report the judges it asks`
                         }
                       >
                         {cell.note}
@@ -580,6 +584,12 @@ function JudgesCard({ controller }: { controller: Controller }) {
           </tbody>
         </table>
       </div>
+      {notAsked && (
+        <p className="brain-line" data-ai-not-asked>
+          Not asked: the controller app's judge list (ai_judges) leaves it out, so its switch does nothing
+          there. Change the list in the controller app's options.
+        </p>
+      )}
     </section>
   );
 }
@@ -618,10 +628,9 @@ function BudgetCard({ controller, panel }: { controller: Controller; panel: Brai
           aria-valuemax={100}
           aria-valuenow={Math.min(100, pct)}
           aria-valuetext={`${pct.toFixed(1)} %`}
-          data-warn={pct >= 80}
+          data-warn={warning !== undefined}
         >
           <span style={{ width: `${Math.min(100, pct)}%` }} />
-          <i aria-hidden="true" />
         </div>
       )}
       <div className="ai-bar-legend">
@@ -630,7 +639,9 @@ function BudgetCard({ controller, panel }: { controller: Controller; panel: Brai
           {pct === null ? "" : ` (${pct.toFixed(1)} %)`}
           {panel?.resetsAt == null ? "" : ` · resets at lights-on ${wallClock(panel.resetsAt, timeZone)}`}
         </span>
-        <span>CS-706 warns at 80 % by default · rules take over at 100 %</span>
+        <span>
+          CS-706 warns at the share set in the controller app (80 % unless changed) · rules take over at 100 %
+        </span>
       </div>
       {warning && (
         <p className="ai-warning" data-code="CS-706">
@@ -655,14 +666,12 @@ const MODELS = [
   ["opus", "Opus 5.5"],
 ] as const;
 
-/** Dry run and the model, as the controller reports them, and what today cost. Both are controller
- * options: shown, not switched here. */
-function ModelCard({ controller, panel }: { controller: Controller; panel: BrainPanel | null }) {
-  const { calls } = useCalls(controller);
+/** Dry run and the model, as the controller reports them (calls and spend: Budget today). Both are
+ * controller options: shown, not switched here. */
+function ModelCard({ panel }: { panel: BrainPanel | null }) {
   const model = panel?.model ?? null;
   const current = model ? MODELS.find(([key]) => model.includes(key))?.[0] : undefined;
   const dry = panel?.mode === "dry_run";
-  const spent = panel?.spentUsd ?? null;
   return (
     <section className="panel ai-card" aria-labelledby="ai-model-title" data-ai-model>
       <div className="ai-dry">
@@ -689,7 +698,6 @@ function ModelCard({ controller, panel }: { controller: Controller; panel: Brain
       </div>
       <p className="brain-line">
         {model && !current ? `Model ${model}. ` : ""}
-        {calls !== null && spent !== null ? `Today's ${calls} calls cost ${money(spent)}. ` : ""}
         Dry run and the model are set in the controller app's options.
       </p>
     </section>
@@ -770,7 +778,7 @@ function OutcomesCard({ controller }: { controller: Controller }) {
               <span className="ai-what">
                 <span>
                   <b>{where(row)}</b>
-                  <span className="brain-line"> · {JUDGES.find((j) => j.id === row.judge)?.name ?? judgeTitle(row.judge)}</span>
+                  <span className="brain-line"> · {judgeTitle(row.judge)}</span>
                 </span>
                 <span>{row.text}</span>
                 {row.result && <span className="brain-line">→ {row.result}</span>}
@@ -837,7 +845,7 @@ export function AiSettings({
           <JudgesCard controller={controller} />
           <div className="ai-side">
             <BudgetCard controller={controller} panel={panel} />
-            <ModelCard controller={controller} panel={panel} />
+            <ModelCard panel={panel} />
             <OutcomesCard controller={controller} />
           </div>
         </div>

@@ -8,6 +8,7 @@ import {
   demoBrainEntity,
   judgeCount,
   judgeMatrix,
+  judgeTitle,
   keyWords,
   outcomes,
   outcomesFromLog,
@@ -15,6 +16,7 @@ import {
   parsePowers,
   providerWords,
 } from "./brain";
+import { parseControllerTime } from "./controller-health";
 import { createDemo } from "./demo";
 import { buildRoom, discoverRooms, validateChange } from "./model";
 import type { CsEvent } from "./parity-types";
@@ -269,8 +271,10 @@ describe("the judges matrix", () => {
       entity(aiPowerId("f1_", "ec_mode"), "on"),
       entity(aiPowerId("f1_", "set_targets_from_achievable"), "off"),
       entity("switch.crop_steering_f1_ec_stacking_enabled", "off"),
-      entity("sensor.crop_steering_jev", "on", { judges: ["dawn", "shot", "channel", "stage"] }),
-      entity("sensor.crop_steering_f1_jev", "on", { judges: ["dawn", "shot"] }),
+      entity("sensor.crop_steering_jev", "on", {
+        judges: ["dawn", "ramp", "salt", "dusk", "setpoints", "shot", "channel", "stage"],
+      }),
+      entity("sensor.crop_steering_f1_jev", "on", { judges: ["dawn", "salt", "shot"] }),
     ].map((e) => [e.entity_id, e]),
   );
 
@@ -299,7 +303,7 @@ describe("the judges matrix", () => {
     // No switch in a room: said, never shown as on or off.
     expect(row("probe").perRoom["room:f1_"]).toEqual({ on: false, entityId: null, note: "No switch" });
     // Alert and advice judges have no switch: asked or not, as the controller publishes it.
-    expect(row("channel")).toMatchObject({ name: "Water channel", power: "alerts" });
+    expect(row("channel")).toMatchObject({ name: "Water path", power: "alerts" });
     expect(row("channel").perRoom["room:"]).toEqual({
       on: true,
       entityId: null,
@@ -311,14 +315,30 @@ describe("the judges matrix", () => {
       note: "Set in the controller app",
     });
     expect(row("stage").power).toBe("advice");
+    // A judge the room's list leaves out is not asked there, whatever its switch says (ai_judges).
+    expect(row("probe").perRoom["room:"]).toEqual({ on: false, entityId: null, note: "Not asked" });
+    expect(row("dusk").perRoom["room:f1_"]).toEqual({ on: false, entityId: null, note: "Not asked" });
+    // Targets and Shot sizes are always asked; the grow plan is never in the list: their switches decide.
+    expect(row("targets").perRoom["room:"]).toMatchObject({ on: true, entityId: aiPowerId("", "set_targets_from_achievable") });
+    expect(row("shotsize").perRoom["room:"]).toMatchObject({ on: true, entityId: aiPowerId("", "tune_shot_sizes") });
+    expect(row("plan").perRoom["room:"]).toMatchObject({ on: true, entityId: aiPowerId("", "plan_catch_up") });
     // A room that publishes no judge list.
     expect(
       judgeMatrix({}, rooms.slice(0, 1)).find((r) => r.id === "shot")!.perRoom["room:"],
     ).toEqual({ on: false, entityId: null, note: "Not reported" });
   });
 
+  it("names each judge once, as the controller titles it", () => {
+    const matrix = judgeMatrix(states, rooms);
+    for (const row of matrix) expect(row.name, row.id).toBe(judgeTitle(row.id));
+    expect(judgeTitle("ramp")).toBe("Ramp hand-over");
+    expect(judgeTitle("stage")).toBe("Stage arc");
+    expect(judgeTitle("balance")).toBe("Room balance");
+  });
+
   it("counts k of n over the cells with a known state", () => {
-    expect(judgeCount(judgeMatrix(states, rooms))).toEqual({ on: 15, of: 24 });
+    // Not asked, no switch and stacking off are left out of n.
+    expect(judgeCount(judgeMatrix(states, rooms))).toEqual({ on: 13, of: 22 });
   });
 });
 
@@ -406,6 +426,17 @@ describe("what it did, and what happened", () => {
       ],
       "room:",
     );
+    // A controller before 3.4 names the decision by its time, not its stamp.
+    const at = parseControllerTime("2026-10-22T07:30:00")!;
+    expect(
+      outcomesFromLog(
+        [
+          entry({ key: "o", time: at + 3_600_000, stamp: "x2", of: "2026-10-22T07:30", kind: "outcome", verdict: "Ramp ended in band", result: "worked" }),
+          entry({ key: "d", time: at, stamp: "x1", action: "Ended the ramp" }),
+        ],
+        "room:",
+      )[0],
+    ).toMatchObject({ result: "Ramp ended in band", verdict: "worked" });
     expect(rows).toEqual([
       expect.objectContaining({
         judge: "dawn",

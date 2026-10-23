@@ -12,7 +12,8 @@
  * - Budget today: "$0.13 of $1.00", the calls line (3.18: system_status_get.ai "42 of 200 calls
  *   (21.0 %)" with its bar; 3.17: the brain sensor's calls), and the daily budget shown read only
  *   with where to change it: the controller app's options (no write service exists, so no receipt);
- * - Dry run and the model as the controller reports them (Haiku 5.5 current), with the cost line;
+ * - Dry run and the model as the controller reports them (Haiku 5.5 current); calls and spend are said
+ *   once, in Budget today, not again beside the model;
  * - What it did, and what happened: at least one row (3.18 Journal "Worked"; 3.17 decision log);
  *   "Full ledger in History →" opens #/history/changes?actor=ai;
  * - the prompt editor sits under "Instructions and permissions", and the power switches are not
@@ -51,7 +52,7 @@ await runParity({
       `${label}: Room B has no switch`,
     );
     assert.equal(
-      await judges.getByRole("img", { name: /^Water channel in Room A: not asked\. Set in the controller app\.$/ }).count(),
+      await judges.getByRole("img", { name: /^Water path in Room A: not asked\. Set in the controller app\.$/ }).count(),
       1,
       `${label}: alert judge read only`,
     );
@@ -91,7 +92,7 @@ await runParity({
       "Haiku 5.5",
       `${label}: current model`,
     );
-    await model.getByText(/Today's \d+ calls cost \$0\.13\./).waitFor();
+    assert.equal(await model.getByText(/calls|\$\d/).count(), 0, `${label}: calls and spend said once`);
     region("dry run and model");
 
     // Ledger.

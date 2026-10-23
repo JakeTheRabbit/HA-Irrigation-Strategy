@@ -349,14 +349,6 @@
 .ai-bar[data-warn="true"] > span {
   background: var(--warning);
 }
-.ai-bar > i {
-  position: absolute;
-  top: -4px;
-  bottom: -4px;
-  left: 80%;
-  width: 2px;
-  background: var(--foreground);
-}
 .ai-bar-legend {
   display: flex;
   flex-wrap: wrap;
@@ -503,6 +495,9 @@
 @media (max-width: 720px) {
   .ai-judges-table tbody th {
     max-width: 160px;
+  }
+  .ai-judges-table tbody th span {
+    white-space: normal;
   }
   .ai-outcomes > li {
     grid-template-columns: 48px minmax(0, 1fr);
