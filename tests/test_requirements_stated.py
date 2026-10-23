@@ -102,8 +102,17 @@ def test_hacs_and_node_are_the_versions_their_files_ask_for():
 
 def test_the_tests_ha_image_is_the_production_leg():
     dockerfile = (ROOT / "tests_ha" / "Dockerfile").read_text(encoding="utf-8")
-    python = re.search(r"^FROM python:(\d+\.\d+)\.\d+-", dockerfile, re.M).group(1)
+    python = re.search(r"^ARG PYTHON=(\d+\.\d+)\.\d+$", dockerfile, re.M).group(1)
+    assert re.search(r"^FROM python:\$\{PYTHON\}-", dockerfile, re.M)
     (production,) = [leg for leg in _legs() if not leg["suffix"]]
     assert python == production["python"], "tests_ha/Dockerfile Python"
     assert production["install"] == "-r requirements-test-ha.txt"
-    assert "-r /tmp/requirements-test-ha.txt" in dockerfile
+    assert '-r /tmp/requirements-test-ha.txt"' in dockerfile
+
+
+def test_the_oldest_leg_has_a_local_docker_route_that_matches_ci():
+    """docs/TESTING.md gives the build arguments of the oldest supported leg; they are CI's own."""
+    testing = (ROOT / "docs" / "TESTING.md").read_text(encoding="utf-8")
+    (oldest,) = [leg for leg in _legs() if leg["suffix"]]
+    assert f"--build-arg PYTHON={oldest['python']} " in testing
+    assert f'--build-arg PLUGIN="{oldest["install"]}"' in testing

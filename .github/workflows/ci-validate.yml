@@ -29,12 +29,12 @@ jobs:
         python-version: [ '3.11', '3.12' ]
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 1
 
       - name: Setup Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: ${{ matrix.python-version }}
           # no pip cache: the repo intentionally has no requirements.txt/pyproject
@@ -52,7 +52,8 @@ jobs:
           ruff check .
 
       - name: Black (format check)
-        # Scoped to the integration + tests (the add-on is deployed file-for-file, exempt).
+        # Scoped to the integration + tests. The add-on, the engine, tests_ha, tests_container and
+        # scripts are not format-gated, on purpose: docs/TESTING.md, "What the format gate covers".
         run: |
           black --version
           black --check custom_components/ tests/
@@ -115,10 +116,10 @@ jobs:
           PYTHONPATH=crop-steering-engine/src python -m pytest crop-steering-engine/tests -q
 
       - name: Hassfest
-        uses: home-assistant/actions/hassfest@master
+        uses: home-assistant/actions/hassfest@cd6f3635a740c84d8a14f6121a90068b8ece6bf6 # master, 2026-10-17 (no releases)
 
       - name: HACS Validation (integration)
-        uses: hacs/action@main
+        uses: hacs/action@d556e736723344f83838d08488c983a15381059a # 22.5.0
         with:
           category: integration
           # Nothing is ignored: HACS lists a repository in its default store only when this passes
@@ -132,17 +133,17 @@ jobs:
     timeout-minutes: 20
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 1
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
 
       - name: Build the add-on image
         # Proves the Dockerfile builds from a clean checkout (COPY www/public, apk deps,
         # vendored engine). Uses the amd64 base from build.yaml; no push.
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         with:
           context: addons/f2_control
           push: false
@@ -159,25 +160,25 @@ jobs:
     timeout-minutes: 30
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 1
 
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: '3.12'
 
       - name: Install pytest
-        run: python -m pip install pytest==8.2.2
+        run: python -m pip install pytest==8.2.2 pytest-xdist==3.6.1
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
 
       - name: Build the controller image
         # As the add-on build job, plus load: the image must be in the local daemon to be run.
         id: build
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         with:
           context: addons/f2_control
           push: false
@@ -191,7 +192,12 @@ jobs:
           CONTROLLER_IMAGE: ${{ steps.build.outputs.imageid }}
         run: |
           docker image inspect "$CONTROLLER_IMAGE" > /dev/null
-          python -m pytest tests_container -q -rs
+          # Four workers: the tests are slow because they wait (watch periods, restarts, a controller
+          # loop of seconds), not because they compute, and each makes its own network, volume and
+          # container names, so they do not share anything. Run one after another they took 22.9 minutes
+          # of this job's 30 (run 39553259477); 28 tests on four workers took 12.5 minutes on a developer
+          # machine, the longest single test (6 minutes) being the floor. --durations names the slow ones.
+          python -m pytest tests_container -q -rs -n 4 --durations=5
 
   addon-image-per-arch:
     # The image's Python packages come from pinned, hashed files: requirements.txt, and the
@@ -212,7 +218,7 @@ jobs:
           - arch: armv7
             platform: linux/arm/v7
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 1
       - name: Base image from build.yaml
@@ -220,10 +226,10 @@ jobs:
         env:
           ARCH: ${{ matrix.arch }}
         run: echo "from=$(awk -v key="${ARCH}:" '$1 == key {print $2}' addons/f2_control/build.yaml)" >> "$GITHUB_OUTPUT"
-      - uses: docker/setup-qemu-action@v3
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3.7.0
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
       - name: Build the add-on image for ${{ matrix.arch }}
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         with:
           context: addons/f2_control
           platforms: ${{ matrix.platform }}
@@ -282,7 +288,7 @@ jobs:
       contents: read
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 1
       - name: Dependency Review
@@ -290,7 +296,7 @@ jobs:
         # the review visible in PR logs, but do not fail the whole validation suite
         # when GitHub reports repository-level support is unavailable.
         continue-on-error: true
-        uses: actions/dependency-review-action@v4
+        uses: actions/dependency-review-action@2031cfc080254a8a887f58cffee85186f0e49e48 # v4.9.0
         with:
           fail-on-severity: high
 
@@ -328,8 +334,8 @@ jobs:
             install: 'pytest-homeassistant-custom-component==0.13.171 josepy==1.14.0'
             suffix: ' - oldest supported Home Assistant'
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: ${{ matrix.python }}
       - name: Install Home Assistant ${{ matrix.homeassistant }} and its pytest plugin
@@ -354,8 +360,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: '24'
           cache: npm
@@ -422,7 +428,7 @@ jobs:
           node tests/academy-navigation.browser.mjs
           node tests/academy-video.browser.mjs
           node tests/academy-media.browser.mjs
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always()
         with:
           name: dashboard-browser-evidence
@@ -433,8 +439,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: '24'
           cache: npm
