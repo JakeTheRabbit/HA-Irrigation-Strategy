@@ -1,7 +1,16 @@
 import { describe, expect, test } from "vitest";
 import type { OpenAlert } from "./open-alerts";
 import type { StatusEntity, SystemStatus } from "./parity-types";
-import { CARD, ageTone, healthSentence, placeAlert, statusFromEntities } from "./system-status";
+import {
+  CARD,
+  ageTone,
+  healthSentence,
+  heartbeatHour,
+  placeAlert,
+  rowLabel,
+  rowWords,
+  statusFromEntities,
+} from "./system-status";
 import type { States } from "./types";
 
 const NOW = Date.parse("2026-10-23T01:02:11Z");
@@ -88,6 +97,27 @@ describe("placeAlert", () => {
     expect(placeAlert(alert("", null, { code: null }), rows)).toBeNull();
   });
 
+  test("only the AI service codes sit on Software; a zone's 7xx sits on its probe or valve", () => {
+    for (const code of ["CS-706", "CS-708", "CS-709", "CS-609", "CS-610"])
+      expect(placeAlert(alert(code, null), rows), code).toBe(CARD.software);
+    // No water at the zone, unusual water, possible bypass: the zone's valve.
+    expect(placeAlert(alert("CS-701", 2), rows)).toBe("switch.f1_z2_valve");
+    expect(placeAlert(alert("CS-702", 2), rows)).toBe("switch.f1_z2_valve");
+    expect(placeAlert(alert("CS-710", 2), rows)).toBe("switch.f1_z2_valve");
+    // Probe fault, probe set aside, zone off its arc: the zone's probe (the silent one first).
+    expect(placeAlert(alert("CS-703", 2), rows)).toBe("sensor.f1_z2_back_vwc");
+    expect(placeAlert(alert("CS-704", 2), rows)).toBe("sensor.f1_z2_back_vwc");
+    expect(placeAlert(alert("CS-705", 2), rows)).toBe("sensor.f1_z2_back_vwc");
+    // No zone, or another 7xx about the room: the room header.
+    expect(placeAlert(alert("CS-701", null), rows)).toBeNull();
+    expect(placeAlert(alert("CS-713", null), rows)).toBeNull();
+    expect(placeAlert(alert("CS-711", 2), rows)).toBeNull();
+    // Lights dimmed is about the room, not the tank.
+    expect(placeAlert(alert("CS-810", null), rows)).toBeNull();
+    expect(placeAlert(alert("CS-811", null), rows)).toBeNull();
+    expect(placeAlert(alert("CS-809", null), rows)).toBe(CARD.tank);
+  });
+
   test("the alert's own entity wins when the backend names a mapped one", () => {
     expect(placeAlert(alert("CS-102", 2, { entityId: "sensor.f1_z2_front_vwc" }), rows)).toBe(
       "sensor.f1_z2_front_vwc",
@@ -105,14 +135,82 @@ describe("ageTone", () => {
     expect(ageTone({ kind: "valve", last_seen: iso(NOW), ok: false }, NOW)).toBe("bad");
   });
 
-  test("probes turn orange after 120 s and red after 20 min", () => {
+  test("probes turn orange after 120 s; red only when the backend calls them silent", () => {
     const probe = (ageS: number, ok = true) => ({ kind: "probe_vwc", last_seen: iso(NOW - ageS * 1000), ok });
     expect(ageTone(probe(120), NOW)).toBe("ok");
     expect(ageTone(probe(121), NOW)).toBe("warn");
-    expect(ageTone(probe(20 * 60), NOW)).toBe("warn");
-    expect(ageTone(probe(20 * 60 + 1), NOW)).toBe("bad");
+    // A 10-min-rhythm probe the backend counts online is never red.
+    expect(ageTone(probe(25 * 60), NOW)).toBe("warn");
     expect(ageTone(probe(4, false), NOW)).toBe("bad");
-    expect(ageTone({ kind: "feed_probe", last_seen: null, ok: true }, NOW)).toBe("bad");
+    expect(ageTone({ kind: "feed_probe", last_seen: null, ok: true }, NOW)).toBe("warn");
+  });
+});
+
+describe("rowWords", () => {
+  test("screen-reader words follow the backend's ok, not the age alone", () => {
+    expect(rowWords("probe_vwc", true, "ok")).toBe("online");
+    expect(rowWords("probe_vwc", true, "warn")).toBe("online, last report over 2 min ago");
+    expect(rowWords("probe_vwc", false, "bad")).toBe("silent");
+    expect(rowWords("valve", false, "bad")).toBe("not available");
+  });
+});
+
+describe("rowLabel", () => {
+  const row = (name: string, extra: Partial<StatusEntity> = {}) => ({ ...entity(1, true), name, ...extra });
+  test("the room name leads, never twice, and an entity id is never a name", () => {
+    expect(rowLabel(row("Zone 2 back VWC"), "F1")).toBe("F1 Zone 2 back VWC");
+    expect(rowLabel(row("F1 Zone 2 back VWC"), "F1")).toBe("F1 Zone 2 back VWC");
+    // The backend falls back to the entity id when there is no friendly name.
+    expect(rowLabel(row("sensor.probe_1", { zone: 2 }), "F1")).toBe("F1 Zone 2 moisture probe");
+    expect(rowLabel(row("switch.f1_pump", { entity_id: "switch.f1_pump", kind: "pump", zone: null }), "F1")).toBe("F1 pump");
+  });
+});
+
+describe("heartbeatHour", () => {
+  const beat = (ageS: number, missed = false, gap_s?: number) => ({
+    at: iso(NOW - ageS * 1000),
+    missed,
+    readback_ms: null,
+    ...(gap_s === undefined ? {} : { gap_s }),
+  });
+  test("a 25-min outage counts every beat it missed and draws them as one wide bar", () => {
+    // Beats at -40 and -39 min, a 1500 s gap marker at -38 min, beats again from -14 min.
+    const beats = [beat(40 * 60), beat(39 * 60), beat(38 * 60, true, 1500), beat(14 * 60), beat(13 * 60)];
+    const hour = heartbeatHour(beats, 60, NOW);
+    expect(hour.missed).toBe(24);
+    expect(hour.received).toBe(4);
+    expect(hour.strip.map((b) => b.weight)).toEqual([1, 1, 24, 1, 1]);
+  });
+  test("only the missed beats inside the hour count", () => {
+    // The gap began 70 min ago and lasted 25 min: 15 of its 24 missed beats fall in the hour.
+    const beats = [beat(70 * 60), beat(69 * 60, true, 1500), beat(45 * 60)];
+    const hour = heartbeatHour(beats, 60, NOW);
+    expect(hour.missed).toBe(15);
+    expect(hour.received).toBe(1);
+  });
+  test("a marker without gap_s is one missed beat", () => {
+    expect(heartbeatHour([beat(120), beat(60, true)], 60, NOW).missed).toBe(1);
+  });
+});
+
+describe("healthSentence per room", () => {
+  test("a stale room is named even while another runs", () => {
+    const beat = (controller: "running" | "stale" | "absent") => ({ last_beat: null, age_s: null, controller, beats: [], interval_s: 60 });
+    const status: SystemStatus = {
+      controller: "running",
+      addon_version: null,
+      pct_online: 100,
+      ha_version: null,
+      ai: null,
+      card_version: null,
+      rooms: [
+        { room_id: "room:", pct_online: 100, alerts_open: 0, entities: [entity(1, true)], groups: [], heartbeat: beat("running") },
+        { room_id: "room:f1_", pct_online: 100, alerts_open: 0, entities: [entity(2, true)], groups: [], heartbeat: beat("stale") },
+      ],
+    };
+    expect(healthSentence(status, [])).toBe(
+      "System health 100 %: 2 of 2 devices online, controller not reporting in 1 of 2 rooms, no open alerts.",
+    );
   });
 });
 

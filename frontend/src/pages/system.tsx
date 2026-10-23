@@ -13,8 +13,11 @@ import {
   KIND_LABEL,
   ageTone,
   healthSentence,
+  heartbeatHour,
   percent,
   placeAlert,
+  rowLabel,
+  rowWords,
   statusFromEntities,
 } from "@/lib/system-status";
 import { clock, dayKey, dayLabel } from "@/lib/time";
@@ -23,7 +26,6 @@ import type { PageProps } from "./placeholder";
 import "./system.css";
 
 const POLL_MS = 30_000;
-const HOUR_MS = 3_600_000;
 const GROUPS = [...new Set(Object.values(KIND_LABEL))];
 const TANK_GROUP = KIND_LABEL.tank;
 const TONE_ORDER = { bad: 0, warn: 1, ok: 2 } as const;
@@ -42,6 +44,8 @@ export function SystemStatus({ controller }: PageProps) {
   const v2 = useParity<Status>(controller, "system_status_get", {}, []);
   const { reload } = v2;
   const [checkedAt, setCheckedAt] = useState<number | null>(null);
+  // The last answer read, kept on screen when a later poll fails (and that failure said).
+  const [lastGood, setLastGood] = useState<Status | null>(null);
   const [acked, setAcked] = useState<Set<string>>(() => new Set());
   const [acks, setAcks] = useState<Record<string, Ack>>({});
   const [said, setSaid] = useState("");
@@ -50,14 +54,16 @@ export function SystemStatus({ controller }: PageProps) {
     return () => clearInterval(timer);
   }, [reload]);
   useEffect(() => {
-    if (v2.data) setCheckedAt(Date.now());
+    if (!v2.data) return;
+    setCheckedAt(Date.now());
+    setLastGood(v2.data);
   }, [v2.data]);
 
   const now = Date.now();
   const entityOnly = v2.state === "missing";
   const status: Status | null = entityOnly
     ? statusFromEntities(controller.states, controller.rooms, now)
-    : v2.data;
+    : (v2.data ?? lastGood);
   const checked = entityOnly ? controller.lastUpdated : checkedAt;
   const roomName = (id: string) => controller.rooms.find((room) => room.id === id)?.name ?? id;
   const alerts = openAlerts(controller).filter((alert) => !alert.eventId || !acked.has(alert.eventId));
@@ -113,14 +119,7 @@ export function SystemStatus({ controller }: PageProps) {
     );
 
   const rows: Row[] = status.rooms.flatMap((room) =>
-    room.entities.map((entity) => {
-      const name = roomName(room.room_id);
-      return {
-        ...entity,
-        roomId: room.room_id,
-        label: entity.name.startsWith(name) ? entity.name : `${name} ${entity.name}`,
-      };
-    }),
+    room.entities.map((entity) => ({ ...entity, roomId: room.room_id, label: rowLabel(entity, roomName(room.room_id)) })),
   );
   const groups = GROUPS.map((label) => ({
     label,
@@ -164,6 +163,14 @@ export function SystemStatus({ controller }: PageProps) {
             )}
           </p>
         </div>
+        {v2.state === "error" && (
+          <p className="system-poll-error" role="alert">
+            Could not read system status again: {v2.error}. Showing what was read at the Checked time.{" "}
+            <Button size="sm" variant="outline" onClick={reload}>
+              Read again
+            </Button>
+          </p>
+        )}
         {[...onRoom].map(([roomId, list]) => (
           <div key={roomId} className="system-room-alerts" data-room-alerts={roomId}>
             <h2>{roomName(roomId)}</h2>
@@ -179,7 +186,7 @@ export function SystemStatus({ controller }: PageProps) {
 
       <div className="system-grid">
         <div className="system-side">
-          <Software controller={controller} status={status} entityOnly={entityOnly}>
+          <Software controller={controller} status={status}>
             {cards(CARD.software)}
           </Software>
           <Heartbeats
@@ -191,7 +198,7 @@ export function SystemStatus({ controller }: PageProps) {
         <section className="panel system-devices" aria-labelledby="system-devices-title">
           <header className="system-card-head">
             <h2 id="system-devices-title">Every mapped device</h2>
-            <p>Last seen, and the share of the last 7 days it was online. Point at a row for its entity.</p>
+            <p>Last seen, and the share of the last 7 days it was online.</p>
             {entityOnly && <NeedsIntegration feature="Uptime over 7 days" compact />}
           </header>
           <div className="system-groups">
@@ -264,21 +271,22 @@ function seenText(row: Row, controller: Controller, now: number): string {
     const on = controller.states[row.entity_id]?.state === "on";
     if (on) return row.kind === "pump" ? "running" : "open now";
     const changed = instant(row.last_change);
-    if (changed === null) return "never switched";
+    if (changed === null) return "not found in Home Assistant";
     return `switched ${dayKey(changed, tz) === dayKey(now, tz) ? "" : `${dayLabel(changed, tz)} `}${clock(changed, tz)}`;
   }
   const seen = instant(row.last_seen);
-  return seen === null ? "never reported" : `${duration(now - seen)} ago`;
+  return seen === null ? "not found in Home Assistant" : `${duration(now - seen)} ago`;
 }
 
 function DeviceRow({ row, tone, controller, now }: { row: Row; tone: "ok" | "warn" | "bad"; controller: Controller; now: number }) {
   const pct = row.uptime_7d_pct;
   return (
-    <div className="system-row" title={row.entity_id} data-entity={row.entity_id} data-tone={tone}>
+    <div className="system-row" data-entity={row.entity_id} data-tone={tone}>
       <span className="system-dot" aria-hidden="true" />
       <span className="system-row-name">
         {row.label}
-        <span className="sr-only">{tone === "ok" ? ", online" : tone === "warn" ? ", late" : ", silent"}</span>
+        <span className="sr-only">, {rowWords(row.kind, row.ok, tone)}</span>
+        <span className="system-row-entity">{row.entity_id}</span>
       </span>
       <span className="system-row-seen">{seenText(row, controller, now)}</span>
       <span className="system-bar" aria-hidden="true" data-low={pct !== null && pct < 95 ? "" : undefined}>
@@ -289,17 +297,7 @@ function DeviceRow({ row, tone, controller, now }: { row: Row; tone: "ok" | "war
   );
 }
 
-function Software({
-  controller,
-  status,
-  entityOnly,
-  children,
-}: {
-  controller: Controller;
-  status: Status;
-  entityOnly: boolean;
-  children: ReactNode;
-}) {
+function Software({ controller, status, children }: { controller: Controller; status: Status; children: ReactNode }) {
   const integration = runningVersions(controller.states, controller.room.room).integration;
   const addon = status.addon_version;
   const ai = status.ai;
@@ -324,11 +322,7 @@ function Software({
     {
       name: "Dashboard cards",
       version: null,
-      note: status.card_version
-        ? `Loaded as ?v=${status.card_version}`
-        : entityOnly
-          ? "Version not reported"
-          : "No crop_steering card resource found",
+      note: status.card_version ? `Loaded as ?v=${status.card_version}` : "Card version not reported",
       tone: status.card_version ? "ok" : "warn",
     },
     { name: "Home Assistant", version: status.ha_version, note: "", tone: "ok" },
@@ -374,8 +368,7 @@ function Heartbeats({ rooms, entityOnly, now }: { rooms: { name: string; beat: R
         {entityOnly && <NeedsIntegration feature="Heartbeat history" compact />}
       </header>
       {rooms.map(({ name, beat }) => {
-        const hour = beat.beats.filter((b) => (instant(b.at) ?? 0) >= now - HOUR_MS);
-        const missed = hour.filter((b) => b.missed).length;
+        const { strip, missed, received } = heartbeatHour(beat.beats, beat.interval_s, now);
         const readback = [...beat.beats].reverse().find((b) => b.readback_ms !== null)?.readback_ms ?? null;
         return (
           <div key={name} className="system-beat" data-heartbeat={name}>
@@ -394,10 +387,10 @@ function Heartbeats({ rooms, entityOnly, now }: { rooms: { name: string; beat: R
                 <div
                   className="system-strip"
                   role="img"
-                  aria-label={`${hour.length} beats in the last hour, ${missed} missed`}
+                  aria-label={`${received} beats in the last hour, ${missed} missed`}
                 >
-                  {hour.map((b) => (
-                    <span key={b.at} data-missed={b.missed ? "" : undefined} />
+                  {strip.map((b) => (
+                    <span key={b.at} data-missed={b.missed ? "" : undefined} style={{ flexGrow: b.weight }} />
                   ))}
                 </div>
                 <p className="system-beat-note">

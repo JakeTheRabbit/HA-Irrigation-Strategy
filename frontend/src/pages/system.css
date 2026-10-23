@@ -230,6 +230,16 @@
 .system-row-name {
   overflow-wrap: anywhere;
 }
+.system-row-entity {
+  display: block;
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+}
+.system-poll-error {
+  margin: 8px 0 0;
+  color: var(--destructive);
+  font-size: var(--text-sm);
+}
 .system-row-seen {
   color: var(--muted-foreground);
   font-size: var(--text-xs);

@@ -1,6 +1,6 @@
 import { buildRoom, descriptor, runningVersions } from "./model";
 import type { OpenAlert } from "./open-alerts";
-import type { ControllerState, RoomHeartbeat, StatusEntity, SystemStatus } from "./parity-types";
+import type { ControllerState, RoomHeartbeat, StatusBeat, StatusEntity, SystemStatus } from "./parity-types";
 import { zoneProbes } from "./probes";
 import type { EntityState, Room, States } from "./types";
 
@@ -66,7 +66,72 @@ export function healthSentence(s: SystemStatus, alerts: OpenAlert[]): string {
       : alerts.length === 1
         ? "1 open alert, shown below where it happens"
         : `${alerts.length} open alerts, each shown below where it happens`;
-  return `${health}: ${devices}, ${CONTROLLER_WORDS[s.controller]}, ${open}.`;
+  // The site's controller is the best room's; a room whose controller is not running is said too.
+  const beats = s.rooms.flatMap((room) => (room.heartbeat ? [room.heartbeat.controller] : []));
+  const down = beats.filter((c) => c !== "running").length;
+  const controller =
+    s.controller === "running" && down
+      ? `controller not reporting in ${down} of ${beats.length} rooms`
+      : CONTROLLER_WORDS[s.controller];
+  return `${health}: ${devices}, ${controller}, ${open}.`;
+}
+
+const NOUN: Record<StatusEntity["kind"], string> = {
+  probe_vwc: "moisture probe",
+  probe_ec: "EC probe",
+  probe_temp: "root-zone temperature probe",
+  valve: "valve",
+  pump: "pump",
+  main_line: "main line",
+  feed_probe: "feed sensor",
+  tank: "tank sensor",
+  flow_meter: "flow meter",
+};
+
+/** A row's label: the room's name, then the device's. The backend's name falls back to the entity
+ * id, which is not a name: the row then says what the device is. */
+export function rowLabel(row: Pick<StatusEntity, "entity_id" | "name" | "kind" | "zone">, room: string): string {
+  const name =
+    row.name && row.name !== row.entity_id
+      ? row.name
+      : `${row.zone !== null ? `Zone ${row.zone} ` : ""}${NOUN[row.kind] ?? "device"}`;
+  return name.startsWith(room) ? name : `${room} ${name}`;
+}
+
+/** What a screen reader hears after a row's name: the backend's ok decides online or not. */
+export function rowWords(kind: string, ok: boolean, tone: "ok" | "warn" | "bad"): string {
+  if (!ok) return PROBES.has(kind) ? "silent" : "not available";
+  return tone === "warn" ? "online, last report over 2 min ago" : "online";
+}
+
+/** The last hour of a room's heartbeat. The backend puts ONE missed marker per gap, carrying the
+ * gap (gap_s): the beats it stands for are the gap's expected beats, last + k x interval, of which
+ * only those inside the hour count. `weight` is how many beats a strip bar stands for. */
+export function heartbeatHour(beats: StatusBeat[], interval_s: number, now: number) {
+  const from = now - 3_600_000;
+  const strip: { at: string; missed: boolean; weight: number }[] = [];
+  let missed = 0,
+    received = 0;
+  for (const beat of beats) {
+    const at = instant(beat.at);
+    if (at === null) continue;
+    if (!beat.missed) {
+      if (at >= from) {
+        received++;
+        strip.push({ at: beat.at, missed: false, weight: 1 });
+      }
+      continue;
+    }
+    const n = beat.gap_s ? Math.max(1, Math.round(beat.gap_s / interval_s) - 1) : 1;
+    const last = at - interval_s * 1000; // the marker sits one interval after the last beat
+    let weight = 0;
+    for (let k = 1; k <= n; k++) if (last + k * interval_s * 1000 >= from) weight++;
+    if (weight) {
+      missed += weight;
+      strip.push({ at: beat.at, missed: true, weight });
+    }
+  }
+  return { strip, missed, received };
 }
 
 type PlaceRow = { entity_id: string; kind: string; zone: number | null; ok?: boolean };
@@ -74,7 +139,8 @@ type PlaceRow = { entity_id: string; kind: string; zone: number | null; ok?: boo
 /** The row or card an alert sits on, or null for its room's header. The alert's own entity wins
  * where it names a row here; otherwise its code family places it: CS-1xx on the zone's probe (the
  * silent one first, an EC code on an EC probe), CS-3xx on the zone's valve or on the pump or main
- * line, the AI assistant and controller codes on Software, the tank, stock and dosing codes on
+ * line, a zone's CS-7xx water or probe code on its valve or probe, the AI service and controller
+ * codes on Software, lights-dimmed codes on the room header, the tank, stock and dosing codes on
  * the tank and feed card. `rows` are the alert's room's. */
 export function placeAlert(alert: OpenAlert, rows: PlaceRow[]): string | null {
   if (alert.entityId && rows.some((row) => row.entity_id === alert.entityId)) return alert.entityId;
@@ -87,33 +153,33 @@ export function placeAlert(alert: OpenAlert, rows: PlaceRow[]): string | null {
     return (found.find((row) => row.ok === false) ?? found[0])?.entity_id ?? null;
   };
   const inZone = (row: PlaceRow) => alert.zone !== null && row.zone === alert.zone;
-  if (family === "1") {
-    const kinds = n === 104 ? ["probe_ec"] : ["probe_vwc", "probe_ec", "probe_temp"];
-    return pick((row) => inZone(row) && kinds.includes(row.kind));
-  }
+  const probe = (kinds = ["probe_vwc", "probe_ec", "probe_temp"]) => pick((row) => inZone(row) && kinds.includes(row.kind));
+  const valve = () => pick((row) => inZone(row) && row.kind === "valve");
+  if (family === "1") return probe(n === 104 ? ["probe_ec"] : undefined);
   if (family === "3") {
     if (n === 302 || n === 317) return pick((row) => row.kind === "pump");
     if (n === 303) return pick((row) => row.kind === "main_line");
-    return pick((row) => inZone(row) && row.kind === "valve");
+    return valve();
   }
-  if (family === "7" || n === 602 || n === 609 || n === 610) return CARD.software;
+  // The AI service and the controller app on Software; a zone's water or probe on that zone's row.
+  if ([602, 609, 610, 706, 708, 709].includes(n)) return CARD.software;
+  if (n === 701 || n === 702 || n === 710) return valve();
+  if (n === 703 || n === 704 || n === 705) return probe();
+  if (n === 810 || n === 811) return null; // lights dimmed: the room
   if (family === "8" || family === "9" || n === 608) return CARD.tank;
   return null;
 }
 
 const PROBE_WARN_MS = 120_000;
-const PROBE_BAD_MS = 20 * 60_000;
 
-/** A row's dot: a probe by how long ago it reported (orange after 120 s, red after 20 min, red when
- * the backend calls it silent); a valve, pump or other actuator only by whether the backend says it
- * is ok, since it reports when it switches. */
+/** A row's dot: red only when the backend calls the device silent or unavailable (its probe limit
+ * follows the probe's own rhythm); a probe it counts online is orange once its last report is over
+ * 120 s old. A valve, pump or other actuator reports when it switches, so its age is not used. */
 export function ageTone(row: { kind: string; last_seen: string | null; ok: boolean }, now: number): "ok" | "warn" | "bad" {
   if (!row.ok) return "bad";
   if (!PROBES.has(row.kind)) return "ok";
   const seen = instant(row.last_seen);
-  if (seen === null) return "bad";
-  const age = now - seen;
-  return age > PROBE_BAD_MS ? "bad" : age > PROBE_WARN_MS ? "warn" : "ok";
+  return seen === null || now - seen > PROBE_WARN_MS ? "warn" : "ok";
 }
 
 // ------------------------------------------------------------------ older integration

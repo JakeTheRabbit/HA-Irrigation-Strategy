@@ -77,6 +77,8 @@ await runParity({
       assert.equal(await back.getAttribute("data-tone"), "bad", `${label}: silent row`);
       assert.match(await back.locator(".system-row-seen").innerText(), /^3 h ago$/, `${label}: silent 3 h`);
       assert.equal(await back.locator(".system-row-pct").innerText(), "91.4%", `${label}: uptime`);
+      // The entity id is on the row itself, not a hover title a phone cannot reach.
+      assert.equal(await back.locator(".system-row-entity").innerText(), "sensor.demo_room_b_z2_back_vwc", `${label}: entity id`);
       // Silent first in its group.
       const firstProbe = devices.locator('[data-group="Moisture and EC probes"] .system-row').first();
       assert.equal(await firstProbe.getAttribute("data-tone"), "bad", `${label}: silent first`);
