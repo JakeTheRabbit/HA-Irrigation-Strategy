@@ -77,7 +77,8 @@ docs/error-codes.json is in no kind at all.
       "kinds": ["stock", "dosing"],               // ids from the table above
       "rooms": [],                                // room prefixes ("" = the default room, "f1_"); empty = every room
       "urgent_high_priority": true,               // emergencies go out as high-priority / time-sensitive pushes
-      "digest": false                             // true: what is not an emergency waits for the digest
+      "digest": false,                            // true: what is not an emergency waits for the digest
+      "quiet_hours": {"from": "22:00", "to": "06:00"}  // optional; null or absent = none (see Quiet hours)
     }
   ],
   "digest_hours": 4,                              // a digest phone gets one push this often (1 to 24)
@@ -112,7 +113,7 @@ not the whole setup.
 |---|---|---|---|
 | `crop_steering.notify_get` | any signed-in user | none | `{schema_version: 1, config, kinds[{id, name, detail, codes[], events[]}], phones[{service, name, user_id, user_name}], can_edit_all, user_id}` |
 | `crop_steering.notify_save` | admin: any row; a non-admin: only rows whose `user_id` is their own (they cannot add or remove rows) | `expected_revision, recipients, idle_hours?, digest_hours?, mutes?` | as `notify_get`, or `error` ("revision", "not allowed: …", a readable message) |
-| `crop_steering.notify_test` | admin, or the phone's own user | `service` | `{sent: true}` or `error` |
+| `crop_steering.notify_test` | admin, or the phone's own user | `service`, or `services` (a list of up to 20 phones), not both | `{sent: true}` or `error`; with `services`, `{results: [{service, sent, error}]}` |
 | `crop_steering.notify` | admin (the controller) | `key, code?, event?, room?, zone?, title, message, urgent?` | `{sent_to[], error}`, with `muted: true` or `held[]` (below) |
 
 - `notify` works out the push's kinds from `code` (the catalog) or `event`, then sends to every recipient
@@ -160,6 +161,21 @@ not the whole setup.
   updated, or raised again after Home Assistant restarts, and not again within 30 minutes when a card
   clears and comes back (a probe going on and off line), as the controller repeats an alert. The 30 minutes
   start only once a phone has the push: one that reached nobody is pushed again when the card comes back.
+
+## Quiet hours, alert rules and the alerts inbox
+
+These three are described in full in [Alerts](features/alerts.md):
+
+- **Quiet hours** (`quiet_hours` on a recipient row, `HH:MM` to `HH:MM` in Home Assistant's time zone,
+  may cross midnight). Known non-critical pushes are held and sent as one push when quiet hours end; an
+  urgent push always comes through. The Notifications page does not edit them yet: set them with
+  `notify_save`, and a save from the page keeps them ([Quiet hours](features/alerts.md#quiet-hours)).
+- **Alert rules**: your own threshold rules on a zone, feed, tank, stock tank, probe or controller
+  reading. A rule only notifies and never touches watering. Its `routing` picks the kind of alert it is
+  pushed as, and only `routing: emergency` is urgent ([Alert rules](features/alerts.md#alert-rules)).
+- **The alerts inbox**: `sensor.crop_steering_<prefix>alerts_open` counts each room's open alerts, and
+  `crop_steering.alert_ack` acknowledges one. Any signed-in user can acknowledge
+  ([The alerts inbox](features/alerts.md#the-alerts-inbox-and-acknowledging)).
 
 ## The controller
 

@@ -11,6 +11,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+**3.18, the parity release (documentation).** This entry covers the documentation for the release; the
+code changes are recorded with the release itself. Read [Upgrading to 3.18](docs/UPGRADING-TO-PARITY.md)
+before updating a room that is in a grow.
+
+### 🌱 In plain English
+
+- **A plan for update day.** [Upgrading to 3.18](docs/UPGRADING-TO-PARITY.md) says what stays the same,
+  what the update carries across, what needs you, a first-hour checklist and how to go back.
+- **One page per new feature.** Water supply and pump sharing, timer programs, presets, history and
+  putting a change back, alert rules and quiet hours, calibration, system status, and dashboards, in
+  [docs/features](docs/README.md#using-it).
+- **Set up with an AI assistant.** [AI setup](docs/AI-SETUP.md) walks through connecting the MCP server,
+  starting read-only and approving each change.
+- **A shorter README** and a [documentation index](docs/README.md).
+
+### 🔧 Technical notes
+
+- New: `docs/README.md`, `docs/UPGRADING-TO-PARITY.md`, `docs/AI-SETUP.md`, `docs/features/*.md`.
+- `docs/ENTITIES.md` gains `zone_N_irrigation_mode`, `supply_config`, `pump_load_pct`, `timers_config`,
+  `projection_app`, `alerts_open`, `system_health`, `feed_ph_corrected` / `feed_ec_corrected`,
+  `zone_N_flow_ratio`, probe `_corrected` sensors and the binary sensors `rule_<id>` and `shot_queued`.
+- `docs/USER_GUIDE.md`, `UPGRADING.md`, `NOTIFICATIONS.md`, `DOSING.md`, `MCP.md`, `INSTALL.md`,
+  `troubleshooting.md`, `HA_SIDEBAR.md`, `SYSTEM_OVERVIEW.md`, `AI_ASSISTANT.md`, `GROW_PLANS.md`,
+  `RECIPE_LIBRARY.md` and `REPOSITORY_MAP.md` follow the 3.18 page names and link the
+  feature pages. `UPGRADING.md` no longer says a flow meter may report a rate, that quiet hours are set on
+  the Notifications page, or that the report is on System status.
+- No code change.
+
 **Deprecation: the named-stage recipe system and the Irrigation phase select.** Nothing is removed in this change; planned removal: **a future major release**. Merge after #205 and #206 (`apply_recipe` and `save_recipe` take a room).
 
 ### 🌱 In plain English
@@ -26,6 +54,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - INT-003: `apply_recipe` no longer calls `select.select_option`. The recipe select registers itself in `hass.data[DOMAIN]["_recipe_selects"]` and the service calls its `sync_stage()`, which only sets the shown option.
 - INT-014: `buildRoom` picks the EC target family as the controller's `_veg()` does: `zone_N_steering_mode`, else `growth_stage`, else Generative. The room `steering_mode` select stays (the EC ratio sensor uses it). Dashboard bundles rebuilt.
 - No change to the controller, entity ids, the `crop_steering_recipes_<entry>` store, add-on options or `/data/state.json`; a stored recipe from an older install loads as before (`tests_ha/test_recipe_deprecated.py`).
+
 
 ## [3.17.0] - 2026-10-21
 

@@ -8,7 +8,9 @@ Leaving Crop Steering restores the prior kiosk state. This does not change Home 
 
 Opening the native panel hides the Home Assistant sidebar, and the **Home Assistant** button brings it back. This was checked on a real installation; companion apps and third-party kiosk extensions may behave differently.
 
-The workspace combines the former Manual setpoints and Grow plan entries into **Irrigation → Current day / Calendar**. Those are Crop Steering's own navigation views; they do not replace the Home Assistant menu button. Existing `#/strategy` and `#/grow-plan` bookmarks remain valid. Shell behavior was verified in the native HA panel on 2.16.1; current navigation is covered by the compiled-demo browser checks.
+The workspace combines the former Manual setpoints and Grow plan entries into **Irrigation › Current day** and **Irrigation › Grow plan & presets**. Those are Crop Steering's own navigation views; they do not replace the Home Assistant menu button. Existing `#/strategy` and `#/grow-plan` bookmarks remain valid. Every page and its address is listed in [Dashboards and display](features/dashboards-and-display.md#the-pages).
+
+Crop Steering can also write wall, tablet and dosing-station dashboards into Home Assistant's own **Settings › Dashboards**, built from Home Assistant's built-in cards only. They are separate from this sidebar panel; see [Wall, tablet and dosing-station dashboards](features/dashboards-and-display.md#wall-tablet-and-dosing-station-dashboards). Shell behavior was verified in the native HA panel on 2.16.1; current navigation is covered by the compiled-demo browser checks.
 
 ## Implementation references
 

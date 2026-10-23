@@ -10,4 +10,6 @@ P1 ends in one of three ways. At the target it gives one more shot, and ends onc
 
 The live loop applies source-water, sensor, enable/interlock, volume and duration gates before hardware sequencing. Readback failures latch shared equipment out. Local tests exercise these branches with fake HA; production hardware behavior still requires site verification.
 
+From 3.18 the integration also keeps one event journal for the site (`<config>/crop_steering/journal.db`): shots, holds, phase changes, alerts, doses, AI actions and setting changes from both the integration and the controller. The Timeline, Explorer, Changes and the alerts inbox read it. Watering never depends on it: if it fails, the controller keeps watering ([history and changes](features/history-and-changes.md)). The site-wide stores (supply, alert rules, presets) and the per-room stores (timer programs, display, calibration) are each saved against a revision, so a save that crossed another one is refused rather than lost.
+
 See [repository map](REPOSITORY_MAP.md), [installation](INSTALL.md), [grow plans](GROW_PLANS.md) and [validated feature matrix](FEATURE_MATRIX.md).

@@ -2,7 +2,7 @@
 
 Crop Steering can make a batch of nutrient solution and dose single pumps into a room's batch tank:
 fill the tank, mix it, dose each nutrient in order, mix again and stamp the fill. Each room has its
-own dosing page (Equipment › Dosing) for its own tank, so a site with two tanks sees two separate
+own dosing page (Equipment › Feed & dosing) for its own tank, so a site with two tanks sees two separate
 pages, one per room.
 
 It drives dosing pumps whose firmware times each dose itself: Home Assistant sets a volume, presses
@@ -18,7 +18,7 @@ pump name or recipe is assumed.
 |---|---|---|
 | Integration | Each room's dosing configuration and its one pending request, in a revisioned store; the services to read, save and request; `sensor.crop_steering_<prefix>dosing_config` for the controller | Switch, press or set any hardware |
 | Controller app | Every action: doses, batches, stops, the irrigation hold during a batch and while dosing hardware does not read off, recovery after a restart, the mix check after a batch, alerts CS-801 to CS-809; `sensor.crop_steering_<prefix>dosing` with live status | Act on a dose or batch asked for more than 120 s before, or on a room whose configuration it cannot read; switch a dosing pump's power on, except for a prime or a calibration run (A timed run, below) |
-| Dashboard | Equipment › Dosing: pumps, a dose form, the batch, the recipe, history, and the dosing setup | Write any hardware entity; everything goes through `dosing_request` |
+| Dashboard | Equipment › Feed & dosing: pumps, a dose form, the batch, the recipe, history, and the dosing setup | Write any hardware entity; everything goes through `dosing_request` |
 
 ## Configuration (integration store `crop_steering.dosing.<entry_id>`)
 
@@ -352,6 +352,12 @@ The way out (SIGTERM) sends the off and keeps the record, as for a dose; the nex
 back (After a restart) and reports the run "stopped" with `ran_s` 0. Each run is journaled as
 `dose.completed` with `data.kind` "prime" or "calibrate", its `seconds`, `ran_s` and `result`, and
 kept in the history with `kind` "prime" or "calibrate".
+
+The grower's walkthrough (precheck, prime, calibrate, measure, commit) and the integration-side
+services `pump_precheck`, `pump_prime`, `pump_stop`, `pump_calibrate` and `pump_calibration_commit` are in
+[Calibration](features/calibration.md#dosing-pump-prime-and-calibrate). While a feed pH/EC calibration
+session is open, batches and pH auto-correct wait and primes and calibrations are refused; see
+[what waits while a session is open](features/calibration.md#safety-what-waits-while-a-session-is-open).
 
 ### A batch
 
@@ -722,7 +728,7 @@ the low-stock Repairs card (CS-608) as usual. Unknown tank ids are skipped and l
 response. It answers only when asked (`SupportsResponse.OPTIONAL`): the controller asks, over REST
 (`?return_response`); a call without asking (an older controller) is taken all the same.
 
-## The page (Equipment › Dosing)
+## The page (Equipment › Feed & dosing)
 
 For the selected room:
 
@@ -730,7 +736,7 @@ For the selected room:
   state in one line.
 - **Stock**: every stock tank a pump is linked to (`stock_tank`), in pump order: its level, its
   litres, about how many batches or doses it has left, its low mark drawn, and a way to
-  Equipment › Stock tanks.
+  Equipment › Stock.
 - **Pumps**: a card per pump with a peristaltic-pump drawing (the rotor turns while it doses;
   still under reduced motion), its name, a status pill (Idle, Dosing, Unavailable, Not calibrated),
   its flow in mL/s, its last dose (mL, when, result), and a progress bar during a dose (elapsed
