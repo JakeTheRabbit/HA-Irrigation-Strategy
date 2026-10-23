@@ -109,7 +109,11 @@ export function createDemo(now = Date.now()): States {
             feed_ph_sensor: "sensor.demo_tank_ph",
             // The feed EC probe's applied calibration (calibration.py feed_calibration).
             feed_calibration: {
-              ec: { gain: 1.012, bias: -0.03, calibrated_at: new Date(now - 9 * 86_400_000).toISOString() },
+              ec: {
+                gain: 1.012,
+                bias: -0.03,
+                calibrated_at: new Date(now - 9 * 86_400_000).toISOString(),
+              },
             },
           }),
       setup_revision: 1,

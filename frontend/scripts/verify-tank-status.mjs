@@ -91,7 +91,9 @@ try {
   // still opens it.
   await page.goto(`${origin}/dashboard.html?demo=1#/equipment/tank`);
   await page.waitForFunction(() => location.hash === "#/equipment/dosing");
-  await page.getByRole("heading", { name: "Feed & dosing · Room A", exact: true, level: 1 }).waitFor();
+  await page
+    .getByRole("heading", { name: "Feed & dosing · Room A", exact: true, level: 1 })
+    .waitFor();
   const tank = page.locator("[data-plumbing] [data-tank-status]");
   await tank.waitFor();
   assert.equal(

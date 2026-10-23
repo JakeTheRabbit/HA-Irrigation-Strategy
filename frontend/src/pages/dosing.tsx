@@ -49,6 +49,7 @@ import {
   hardwareLabel,
   leftWords,
   levelFall,
+  levelFallUnknown,
   nextBatch,
   protections,
   pumpStock,
@@ -71,6 +72,7 @@ import {
   type DosingRequestResult,
   type MixCheck,
   type NextBatch,
+  type RecipeRow,
   type PumpStock,
   type PumpView,
   type SetupDraft,
@@ -110,33 +112,38 @@ function useTicker(active: boolean, ms = 500) {
   }, [active, ms]);
 }
 
+type RecordedLevel = {
+  state: "loading" | "failed" | "loaded";
+  points: { time: number; value: number }[];
+};
 /** The tank level's last day as the recorder holds it (the level chart's own source), read once per
- * room: how fast the tank falls comes from it. Empty until it loads, or when it cannot. */
-function useRecordedLevel(controller: Controller, levelId: string | null) {
-  const [points, setPoints] = useState<{ time: number; value: number }[]>([]);
+ * room: how fast the tank falls comes from it. "loading" until it loads, "failed" when it cannot. */
+function useRecordedLevel(controller: Controller, levelId: string | null): RecordedLevel {
+  const [recorded, setRecorded] = useState<RecordedLevel>({ state: "loading", points: [] });
   const ready = ["live", "demo"].includes(controller.connection);
   const load = controller.timeline;
   useEffect(() => {
-    setPoints([]);
+    setRecorded({ state: "loading", points: [] });
     if (!levelId || !ready) return;
     let current = true;
     const end = Date.now();
     load({ entityIds: [levelId], attributeIds: [], start: end - 24 * 3_600_000, end })
       .then((rows) => {
         if (!current) return;
-        setPoints(
-          (rows[levelId] ?? []).flatMap((row) => {
+        setRecorded({
+          state: "loaded",
+          points: (rows[levelId] ?? []).flatMap((row) => {
             const value = Number(row.state);
             return row.state.trim() && Number.isFinite(value) ? [{ time: row.time, value }] : [];
           }),
-        );
+        });
       })
-      .catch(() => current && setPoints([]));
+      .catch(() => current && setRecorded({ state: "failed", points: [] }));
     return () => {
       current = false;
     };
-  }, [levelId, ready, controller.roomId]);
-  return points;
+  }, [levelId, ready, load, controller.roomId]);
+  return recorded;
 }
 
 interface RequestReview {
@@ -336,7 +343,13 @@ function PlumbPump({
 }
 
 /** A guard on the plumbing, armed (a check) or not (a cross). */
-function Mark({ item, children }: { item: { label: string; ok: boolean }; children?: React.ReactNode }) {
+function Mark({
+  item,
+  children,
+}: {
+  item: { label: string; ok: boolean };
+  children?: React.ReactNode;
+}) {
   return (
     <p className="plumb-mark" data-protection={item.ok ? "armed" : "off"}>
       {item.ok ? (
@@ -369,7 +382,8 @@ function BandGauge({
     max = Math.max(...ends) * 1.1;
   const x = (v: number) => `${((v - min) / (max - min || 1)) * 100}%`;
   const off =
-    value !== null && ((low !== null && low > 0 && value < low) || (high !== null && high > 0 && value > high));
+    value !== null &&
+    ((low !== null && low > 0 && value < low) || (high !== null && high > 0 && value > high));
   return (
     <div className="mix-gauge" data-mix-gauge={name} data-off={off || undefined}>
       <span className="mix-gauge-name">
@@ -384,7 +398,10 @@ function BandGauge({
           <>
             <i
               className="mix-gauge-band"
-              style={{ left: x(low && low > 0 ? low : min), right: `calc(100% - ${x(high && high > 0 ? high : max)})` }}
+              style={{
+                left: x(low && low > 0 ? low : min),
+                right: `calc(100% - ${x(high && high > 0 ? high : max)})`,
+              }}
             />
             {value !== null && <i className="mix-gauge-tick" style={{ left: x(value) }} />}
           </>
@@ -394,7 +411,10 @@ function BandGauge({
   );
 }
 
-const MIX_TITLE = { "off target": "Mix check failed", "not read": "Mix check could not read the tank" };
+const MIX_TITLE = {
+  "off target": "Mix check failed",
+  "not read": "Mix check could not read the tank",
+};
 const PROBE_NAMES = { ec: "EC", ph: "pH" } as const;
 
 /** The last batch's mix check, in place beside the tank, when it did not pass: both readings on
@@ -429,7 +449,8 @@ export function MixCheckCard({
   const ph = { low: band("ph", "min"), high: band("ph", "max") };
   const ecText = (v: number) => formatEc(v, 2);
   const outside = (v: number | null, b: { low: number | null; high: number | null }) =>
-    v !== null && ((b.low !== null && b.low > 0 && v < b.low) || (b.high !== null && b.high > 0 && v > b.high));
+    v !== null &&
+    ((b.low !== null && b.low > 0 && v < b.low) || (b.high !== null && b.high > 0 && v > b.high));
   const range = (b: { low: number | null; high: number | null }, text: (v: number) => string) =>
     b.low && b.low > 0 && b.high && b.high > 0
       ? `${text(b.low).replace(/ \S+$/, "")}–${text(b.high)}`
@@ -449,25 +470,38 @@ export function MixCheckCard({
           .split("; ")
           .filter((part) => part && !/ outside the feed /.test(part))
           .join("; ") || null;
-  // The probe behind each failure: one off its band, or one that read nothing.
-  const probes = (["ec", "ph"] as const).filter((quantity) => {
+  // The probe behind each failure: one off its band, or one that read nothing. A probe the check
+  // did not cover is not drawn.
+  const probes = mix.probes.filter((quantity) => {
     const value = mix[quantity];
-    return value === null ? mix.verdict !== "off target" : outside(value, quantity === "ec" ? ec : ph);
+    return value === null
+      ? mix.verdict !== "off target"
+      : outside(value, quantity === "ec" ? ec : ph);
   });
   const checked = Date.parse(mix.checked_at ?? mix.gave_up_at ?? "");
-  const title = mix.gave_up_at ? "Mix check not done" : MIX_TITLE[mix.verdict as keyof typeof MIX_TITLE];
+  const title = mix.gave_up_at
+    ? "Mix check not done"
+    : MIX_TITLE[mix.verdict as keyof typeof MIX_TITLE];
   const ago = (ms: number) => {
     const days = Math.floor((now - ms) / 86_400_000);
     return days === 0 ? "today" : `${days} ${days === 1 ? "day" : "days"} ago`;
   };
   return (
-    <section className="plumb-mix" aria-labelledby={id} data-mix-check={mix.gave_up_at ? "not done" : mix.verdict}>
+    <section
+      className="plumb-mix"
+      aria-labelledby={id}
+      data-mix-check={mix.gave_up_at ? "not done" : mix.verdict}
+    >
       <h3 id={id}>
         {title}
         {Number.isFinite(checked) && ` ${at(checked, now, tz)}`}
       </h3>
-      <BandGauge name="EC" value={mix.ec} low={ec.low} high={ec.high} text={ecText} />
-      <BandGauge name="pH" value={mix.ph} low={ph.low} high={ph.high} text={PH} />
+      {mix.probes.includes("ec") && (
+        <BandGauge name="EC" value={mix.ec} low={ec.low} high={ec.high} text={ecText} />
+      )}
+      {mix.probes.includes("ph") && (
+        <BandGauge name="pH" value={mix.ph} low={ph.low} high={ph.high} text={PH} />
+      )}
       <p className="plumb-mix-why">
         {[
           ...wanted,
@@ -500,7 +534,9 @@ export function MixCheckCard({
         return (
           <p className="plumb-mix-cal" key={quantity} data-mix-probe={quantity}>
             {ms === null ? (
-              <a href="#/equipment/feed-calibration">Calibrate the feed {PROBE_NAMES[quantity]} probe</a>
+              <a href="#/equipment/feed-calibration">
+                Calibrate the feed {PROBE_NAMES[quantity]} probe
+              </a>
             ) : (
               <>
                 Feed {PROBE_NAMES[quantity]} probe calibrated {ago(ms)} ·{" "}
@@ -515,7 +551,7 @@ export function MixCheckCard({
 }
 
 /** The tank minimum on the drawing: its mark, and what it is doing when it holds watering. */
-function GuardMark({
+export function GuardMark({
   guard,
   item,
   onConfigure,
@@ -531,7 +567,9 @@ function GuardMark({
         <p className="plumb-guard-line">
           {guard.label} · starts again at {RELEASE_PCT}%
           {guard.aboveMinimumL !== null && ` · about ${litres(guard.aboveMinimumL)} above it`}
-          {guard.litresPerPct !== null && ` · ${litres(guard.litresPerPct)} per 1%`}
+          {guard.litresPerPct !== null
+            ? ` · ${litres(guard.litresPerPct)} per 1%`
+            : " · litres per 1% not learned yet, so no shot waits ahead of the minimum"}
         </p>
       ) : (
         <div className="plumb-guard-problem" role="status">
@@ -552,7 +590,15 @@ function GuardMark({
 }
 
 /** Feed recipes by flower week: the weeks coloured by recipe, this week marked, then each recipe. */
-function FeedRecipes({ doc, room, ec }: { doc: DosingDocument | null; room: string; ec: (v: number) => string }) {
+function FeedRecipes({
+  doc,
+  room,
+  ec,
+}: {
+  doc: DosingDocument | null;
+  room: string;
+  ec: (v: number) => string;
+}) {
   const feed = doc?.config?.feed;
   const now = doc?.feed_now ?? null;
   const pumps = doc?.config?.pumps ?? [];
@@ -620,7 +666,11 @@ function FeedRecipes({ doc, room, ec }: { doc: DosingDocument | null; room: stri
                 </span>
                 {now?.recipe_id === recipe.id && (
                   <span className="feed-recipe-now">
-                    {now.source === "held" ? "Picked by hand" : now.source === "hand" ? "In use" : "This week"}
+                    {now.source === "held"
+                      ? "Picked by hand"
+                      : now.source === "hand"
+                        ? "In use"
+                        : "This week"}
                   </span>
                 )}
               </li>
@@ -636,6 +686,33 @@ function FeedRecipes({ doc, room, ec }: { doc: DosingDocument | null; room: stri
   );
 }
 
+/** The batch's doses on the drawing: each pump's amount and time, a pump the batch passes by, a
+ * line that names no pump of this room, and an amount read from an entity (or not read). */
+export function BatchDoses({ rows }: { rows: RecipeRow[] }) {
+  return (
+    <ul className="plumb-doses">
+      {rows.map((row) => (
+        <li key={row.pump} data-recipe-pump={row.pump} data-skipped={row.skipped || undefined}>
+          <span>
+            {row.name}
+            {(row.fromEntity || row.unreadable) && (
+              <small>
+                from {row.entity}
+                {row.unreadable ? ", which reads nothing" : ""}
+              </small>
+            )}
+            {row.unknown && <small>not a pump of this room</small>}
+          </span>
+          <b>
+            {row.unreadable ? "?" : row.skipped ? "passed by" : `${mL(row.ml)} mL`}
+            {!row.skipped && ` · ${row.seconds === null ? "? s" : seconds(row.seconds)}`}
+          </b>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 const STEP_NAMES: Record<NextBatch["steps"][number]["name"], string> = {
   premix: "premix",
   dose: "dose",
@@ -643,17 +720,18 @@ const STEP_NAMES: Record<NextBatch["steps"][number]["name"], string> = {
   check: "check",
 };
 
-function NextBatchCard({
+export function NextBatchCard({
   next,
   atPct,
-  levelKnown,
+  why,
   now,
   tz,
   navigate,
 }: {
   next: NextBatch;
   atPct: number;
-  levelKnown: boolean;
+  /** Why no time is known (levelFallUnknown). */
+  why: string;
   now: number;
   tz: string;
   navigate: (page: Page) => void;
@@ -670,9 +748,7 @@ function NextBatchCard({
       <div className="next-batch-body">
         <p className="next-batch-when" data-next-batch-at={next.at ?? ""}>
           {next.at === null
-            ? levelKnown
-              ? "Not known yet: the tank level is not falling"
-              : "Not known: no tank level is read"
+            ? why
             : next.at <= now
               ? "Now: the tank is at that level"
               : `${dayLabel(next.at, tz)}, about ${clock(next.at, tz)}`}
@@ -700,7 +776,8 @@ function NextBatchCard({
         )}
         {next.stockWarning && (
           <p className="next-batch-warning" data-stock-warning>
-            <AlertTriangle size={16} aria-hidden="true" /> {next.stockWarning}
+            <AlertTriangle size={16} aria-hidden="true" /> {next.stockWarning}{" "}
+            <a href="#/equipment/stock">Stock tanks</a>
           </p>
         )}
         <div className="next-batch-actions">
@@ -1029,14 +1106,17 @@ export function Dosing({
   const fillValve = config?.batch.fill_valve ? states[config.batch.fill_valve] : undefined;
   const engine = descriptor(states, room.room)?.attributes ?? {};
   const calibratedAt = (quantity: "ec" | "ph") => {
-    const record = (engine.feed_calibration as Record<string, { calibrated_at?: string }> | undefined)?.[
-      quantity
-    ];
+    const record = (
+      engine.feed_calibration as Record<string, { calibrated_at?: string }> | undefined
+    )?.[quantity];
     const ms = Date.parse(record?.calibrated_at ?? "");
     return Number.isFinite(ms) ? ms : null;
   };
   const mix = status?.mix ?? null;
-  const failed = !!mix && !batchRunning && (mix.verdict === "off target" || mix.verdict === "not read" || !!mix.gave_up_at);
+  const failed =
+    !!mix &&
+    !batchRunning &&
+    (mix.verdict === "off target" || mix.verdict === "not read" || !!mix.gave_up_at);
   const feedNow = doc?.feed_now ?? null;
   const inUse = doc ? recipeInUse(doc) : { name: null, lines: [] };
   const started = Date.parse(status?.batch.started_at ?? "");
@@ -1047,10 +1127,11 @@ export function Dosing({
   const recorded = useRecordedLevel(controller, config ? level.entityId : null);
   // The recorded level, then the level it reads now: a level that has held since its last change
   // still counts the time it held.
-  const fall = levelFall([
-    ...recorded,
+  const points = [
+    ...recorded.points,
     ...(level.pct !== null ? [{ time: now, value: level.pct }] : []),
-  ]);
+  ];
+  const fall = levelFall(points);
   const next =
     doc && config
       ? nextBatch({ ...doc, config: { ...doc.config, ...config } }, stock, now, {
@@ -1124,7 +1205,11 @@ export function Dosing({
       )}
       {/* The plumbing: stock and pumps into the tank, the fill, the guards and the mix check, in
           place. The tank and its minimum show also while dosing itself is unavailable. */}
-      <section className="panel plumbing" aria-label={`${room.room.name} feed plumbing`} data-plumbing>
+      <section
+        className="panel plumbing"
+        aria-label={`${room.room.name} feed plumbing`}
+        data-plumbing
+      >
         {config && !!views.length && (
           <div className="plumb-top">
             <div className="plumb-pumps-wrap">
@@ -1146,29 +1231,26 @@ export function Dosing({
               </ul>
               {armed[0] && <Mark item={armed[0]} />}
             </div>
-            <section className="plumb-batch" aria-labelledby={`${formId}-batch-card`} data-batch-card>
+            <section
+              className="plumb-batch"
+              aria-labelledby={`${formId}-batch-card`}
+              data-batch-card
+            >
               <h2 id={`${formId}-batch-card`}>
                 Batch{" "}
                 <span>
                   {[
                     inUse.name ?? feedNow?.recipe,
                     feedNow?.week ? `week ${feedNow.week}` : null,
-                    batchRunning && Number.isFinite(started) ? `started ${at(started, now, tz)}` : null,
+                    batchRunning && Number.isFinite(started)
+                      ? `started ${at(started, now, tz)}`
+                      : null,
                   ]
                     .filter(Boolean)
                     .join(" · ")}
                 </span>
               </h2>
-              <ul className="plumb-doses">
-                {rows
-                  .filter((row) => !row.skipped)
-                  .map((row) => (
-                    <li key={row.pump}>
-                      <span>{row.name}</span>
-                      <b>{row.unreadable ? "?" : `${mL(row.ml)} mL`}</b>
-                    </li>
-                  ))}
-              </ul>
+              <BatchDoses rows={rows} />
               {feedNow?.ec ? <p className="plumb-target">Target EC {ec(feedNow.ec)}</p> : null}
               <p className="plumb-batch-line" data-batch-line>
                 {batchLine}
@@ -1243,7 +1325,7 @@ export function Dosing({
             <NextBatchCard
               next={next}
               atPct={atPct}
-              levelKnown={level.pct !== null}
+              why={levelFallUnknown(level.pct !== null, recorded.state, points)}
               now={now}
               tz={tz}
               navigate={navigate}

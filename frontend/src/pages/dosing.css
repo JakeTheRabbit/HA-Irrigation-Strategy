@@ -575,6 +575,13 @@
   background: var(--surface);
   font-size: var(--text-xs);
 }
+.plumb-doses small {
+  display: block;
+  color: var(--muted-foreground);
+}
+.plumb-doses li[data-skipped] {
+  color: var(--muted-foreground);
+}
 .plumb-doses b {
   font-size: var(--text-md);
   font-variant-numeric: tabular-nums;
@@ -608,6 +615,10 @@
   display: grid;
   gap: 6px;
   min-width: 0;
+}
+/* Alone in the row (no dosing setup to draw beside it): the tank takes the full width. */
+.plumb-tank:only-child {
+  grid-column: 1 / -1;
 }
 .plumb-tank > .panel {
   margin-bottom: 0;

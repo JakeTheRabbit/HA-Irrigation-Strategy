@@ -176,6 +176,9 @@ export interface MixCheck {
   gave_up_at: string | null;
   ec: number | null;
   ph: number | null;
+  /** The probes the check covered: _judge_mix sets a key only for a probe that is mapped and has a
+   * band, so a probe missing here was never part of the check (a null one read nothing). */
+  probes: ("ec" | "ph")[];
 }
 /** `sensor.crop_steering_<prefix>dosing`, the controller's report. */
 export interface DosingStatus {
@@ -384,6 +387,7 @@ function readMix(value: unknown): MixCheck | null {
     gave_up_at: text(raw.gave_up_at),
     ec: count(raw.ec),
     ph: count(raw.ph),
+    probes: (["ec", "ph"] as const).filter((key) => key in raw),
   };
 }
 
@@ -1150,8 +1154,8 @@ export const MIX_SETTLE_MIN = 5;
 const readable = (entity: EntityState | undefined) =>
   !!entity && !UNREADABLE.includes(entity.state);
 
-/** The guards around the batch tank, each armed or not: every dose read back on the pump's own
- * dosing state, the overfill cut and the minimum on the controller's tank level, the mix pump's
+/** The guards around the batch tank, each armed or not: every dose read back (the controller reads
+ * the pump's power switch back, and the pump's dosing state), the overfill cut and the minimum on the controller's tank level, the mix pump's
  * power read back, and the fill's timeout. The page counts how many are armed. */
 export function protections(doc: DosingDocument, states: States): { label: string; ok: boolean }[] {
   const config = doc.config;
@@ -1167,7 +1171,11 @@ export function protections(doc: DosingDocument, states: States): { label: strin
   return [
     {
       label: "Read-back on every dose",
-      ok: pumps.length > 0 && pumps.every((pump) => readable(states[pump.dosing_entity])),
+      ok:
+        pumps.length > 0 &&
+        pumps.every(
+          (pump) => readable(states[pump.power_entity]) && readable(states[pump.dosing_entity]),
+        ),
     },
     { label: `Overfill cut ${OVER_PCT}%`, ok: levelRead },
     { label: `Minimum ${minimum}%`, ok: levelRead },
@@ -1280,6 +1288,27 @@ export function levelFall(points: readonly { time: number; value: number }[]): n
   const hours = (last.time - first.time) / 3_600_000;
   if (hours < 1 || !(first.value > last.value)) return null;
   return (first.value - last.value) / hours;
+}
+
+/** Why the next batch has no time: no level read, the recorded level still loading or not
+ * loaded, less than an hour of it, a fall under an hour old, or an hour and more that does not fall.
+ * `points` are the recorded level then the reading now. */
+export function levelFallUnknown(
+  levelKnown: boolean,
+  history: "loading" | "failed" | "loaded",
+  points: readonly { time: number; value: number }[],
+): string {
+  if (!levelKnown) return "Not known: no tank level is read";
+  if (history === "loading") return "Not known yet: the recorded tank level is still loading";
+  if (history === "failed") return "Not known: the recorded tank level could not be loaded";
+  const span = points.length ? points[points.length - 1].time - points[0].time : 0;
+  if (span < 3_600_000) return "Not known yet: less than an hour of tank level is recorded";
+  // The last run that does not rise, as levelFall walks it: below its start, the tank is falling.
+  let start = points.length - 1;
+  while (start > 0 && points[start - 1].value >= points[start].value) start--;
+  return points[start].value > points[points.length - 1].value
+    ? "Not known yet: the tank has been falling for less than an hour"
+    : "Not known yet: the tank level is not falling";
 }
 
 /** The level the next batch is made at, and the reading that says when: the refill reminder on its

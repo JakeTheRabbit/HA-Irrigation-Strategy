@@ -6,6 +6,7 @@ import {
   canEdit,
   batchLevel,
   levelFall,
+  levelFallUnknown,
   nextBatch,
   protections,
   controllerReach,
@@ -970,6 +971,8 @@ describe("Feed & dosing: the plumbing view's facts", () => {
   const armed: States = {
     "binary_sensor.part_a_dosing": entity("binary_sensor.part_a_dosing", "off"),
     "binary_sensor.part_b_dosing": entity("binary_sensor.part_b_dosing", "off"),
+    "switch.part_a_power": entity("switch.part_a_power", "off"),
+    "switch.part_b_power": entity("switch.part_b_power", "off"),
     "number.part_a_flow": entity("number.part_a_flow", "5"),
     "number.part_b_flow": entity("number.part_b_flow", "5"),
     "switch.mix": entity("switch.mix", "on"),
@@ -991,10 +994,7 @@ describe("Feed & dosing: the plumbing view's facts", () => {
     // No tank level mapped, no power read-back for the mix pump, no fill valve: 1 of 5 armed.
     const bare = { ...armed };
     delete bare["sensor.crop_steering_tank_level"];
-    const list = protections(
-      doc({ fill_valve: null, mix_power_sensor: null, mix_min_w: 0 }),
-      bare,
-    );
+    const list = protections(doc({ fill_valve: null, mix_power_sensor: null, mix_min_w: 0 }), bare);
     expect(list.filter((item) => item.ok).length).toBe(1);
     expect(list.map((item) => item.label)).toEqual([
       "Read-back on every dose",
@@ -1005,7 +1005,18 @@ describe("Feed & dosing: the plumbing view's facts", () => {
     ]);
     // A pump whose dosing state reads nothing: its doses are not read back.
     expect(
-      protections(doc(), { ...armed, "binary_sensor.part_b_dosing": entity("binary_sensor.part_b_dosing", "unavailable") })[0],
+      protections(doc(), {
+        ...armed,
+        "binary_sensor.part_b_dosing": entity("binary_sensor.part_b_dosing", "unavailable"),
+      })[0],
+    ).toEqual({ label: "Read-back on every dose", ok: false });
+    // The controller reads each dose back on the pump's power switch: one that reads nothing is not
+    // read back either.
+    expect(
+      protections(doc(), {
+        ...armed,
+        "switch.part_a_power": entity("switch.part_a_power", "unavailable"),
+      })[0],
     ).toEqual({ label: "Read-back on every dose", ok: false });
   });
 
@@ -1095,7 +1106,11 @@ describe("Feed & dosing: the plumbing view's facts", () => {
         minimum_pct: 10,
       }),
     };
-    expect(batchLevel(states, "")).toEqual({ atPct: 10, entityId: "sensor.crop_steering_tank_level", pct: null });
+    expect(batchLevel(states, "")).toEqual({
+      atPct: 10,
+      entityId: "sensor.crop_steering_tank_level",
+      pct: null,
+    });
   });
   it("levelFall starts the fall where the level last left its peak, not while it sat full", () => {
     const h = 3_600_000;
@@ -1117,5 +1132,58 @@ describe("Feed & dosing: the plumbing view's facts", () => {
         { time: 4 * h, value: 80 },
       ]),
     ).toBe(5);
+  });
+});
+
+describe("Feed & dosing: what the mix check covered and why the next batch has no time", () => {
+  it("keeps a probe that was not in the check apart from one that read nothing", () => {
+    const status = (mix: Record<string, unknown>) =>
+      readStatus(entity("sensor.crop_steering_dosing", "idle", { mix }))!.mix!;
+    // A pH-only room: _judge_mix sets only the keys of the probes it checks.
+    const phOnly = status({
+      verdict: "not read",
+      ph: null,
+      why: "its pH probe (sensor.ph) is not readable",
+    });
+    expect(phOnly.probes).toEqual(["ph"]);
+    expect(phOnly.ph).toBeNull();
+    expect(status({ verdict: "off target", ec: 3.7, ph: 5.8 }).probes).toEqual(["ec", "ph"]);
+    // A check given up on read no probe.
+    expect(
+      status({ gave_up_at: "2026-10-23T10:00:00Z", why: "the dosing setup could not be read" })
+        .probes,
+    ).toEqual([]);
+  });
+
+  it("says why no time is known, and 'not falling' only after an hour of level that does not fall", () => {
+    const h = 3_600_000;
+    const flat = [
+      { time: 0, value: 60 },
+      { time: 2 * h, value: 60 },
+    ];
+    expect(levelFallUnknown(false, "loaded", flat)).toBe("Not known: no tank level is read");
+    expect(levelFallUnknown(true, "loading", [])).toBe(
+      "Not known yet: the recorded tank level is still loading",
+    );
+    expect(levelFallUnknown(true, "failed", [])).toBe(
+      "Not known: the recorded tank level could not be loaded",
+    );
+    expect(
+      levelFallUnknown(true, "loaded", [
+        { time: 0, value: 60 },
+        { time: 0.5 * h, value: 60 },
+      ]),
+    ).toBe("Not known yet: less than an hour of tank level is recorded");
+    expect(levelFallUnknown(true, "loaded", flat)).toBe(
+      "Not known yet: the tank level is not falling",
+    );
+    // Falling, but for less than an hour so far.
+    expect(
+      levelFallUnknown(true, "loaded", [
+        { time: 0, value: 60 },
+        { time: 2 * h, value: 60 },
+        { time: 2.5 * h, value: 58 },
+      ]),
+    ).toBe("Not known yet: the tank has been falling for less than an hour");
   });
 });

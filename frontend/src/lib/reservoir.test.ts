@@ -50,4 +50,3 @@ describe("the reservoir minimum in words", () => {
     expect(reservoirView(states, "room_b_").state).toBe("unmapped");
   });
 });
-
