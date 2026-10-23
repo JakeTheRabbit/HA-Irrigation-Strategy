@@ -13,7 +13,9 @@
  * - Zone 3 dripper flow 4.0 → 3.0: two changes, "was 4.0" under the field;
  * - Apply 2 changes: supply_save takes, setup_save is refused while Room A waters: "Pump settings
  *   were saved. Zone 3 dripper flow was not: controller still holds 4.0 L/h." with Try again, and the
- *   dripper row stays (1 change);
+ *   dripper row stays (1 change); the refusal's reason is on Zone 3's row (aria-describedby), not
+ *   on Zone 2's when that is edited, and editing Zone 3 clears it;
+ * - Max flow retyped as the shown value (900.0): no change;
  * - Discard changes, Max flow 800, Apply 1 change: "Written and read back HH:MM"; Undo writes the
  *   previous values back;
  * - Max flow 250 with 2 zones at once: a red check blocks Apply, the pump card says "The pump can't
@@ -89,10 +91,23 @@ await runParity({
     assert.equal(await sub.innerText(), "1 unsaved change, not active until applied", `${label}: dripper row stays`);
     assert.equal(await maxFlow.inputValue(), "900", `${label}: saved 900`);
     region("partial failure");
+    // The refusal's reason sits on Zone 3's row, tied to its field; another row never shows it, and
+    // editing Zone 3 clears it.
+    const row3 = editor.locator('tr[data-zone="3"]');
+    const reason = row3.locator(".supply-error");
+    await reason.waitFor();
+    assert.equal(await dripper.getAttribute("aria-describedby"), await reason.getAttribute("id"), `${label}: reason tied to field`);
+    await editor.getByLabel("Zone 2 dripper flow", { exact: true }).fill("3.5");
+    assert.equal(await editor.locator('tr[data-zone="2"] .supply-error').count(), 0, `${label}: reason not on zone 2`);
+    await dripper.fill("3.1");
+    assert.equal(await reason.count(), 0, `${label}: reason cleared on edit`);
 
     // A pump change alone: written and read back, then undone.
     await panel.getByRole("button", { name: "Discard changes" }).click();
     assert.equal(await sub.innerText(), "No unsaved changes.", `${label}: discarded`);
+    // Retyping the shown value is no change.
+    await maxFlow.fill("900.0");
+    assert.equal(await sub.innerText(), "No unsaved changes.", `${label}: same value, no change`);
     await maxFlow.fill("800");
     await panel.getByRole("button", { name: "Apply 1 change" }).click();
     const receipt = panel.locator(".review-apply-receipt");

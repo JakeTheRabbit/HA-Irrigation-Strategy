@@ -11,13 +11,14 @@ import {
   applySupply,
   capacityRefusal,
   digitsOf,
+  flowEdit,
   flowText,
   flowUnit,
   flowValue,
   forPump,
   overCapacityText,
   parseFlow,
-  supplyChecks,
+  reviewChecks,
   togetherRows,
   togetherVerdict,
   undoSupply,
@@ -58,7 +59,8 @@ export function SupplyEditor({ controller, onDirtyChange }: { controller: Contro
   const [setupError, setSetupError] = useState<string | null>(null);
   const [draft, setDraft] = useState<Draft>(EMPTY);
   const [refusal, setRefusal] = useState<{ text: string; suggest: number | null } | null>(null);
-  const [dripperReason, setDripperReason] = useState<string | null>(null);
+  // Why a dripper flow was not written, by zone; editing that zone's field clears it.
+  const [dripperReason, setDripperReason] = useState<Record<string, string>>({});
   const [last, setLast] = useState<{ pumps: SupplyDoc["irrigation_pumps"]; groups: SupplyDoc["zone_groups"]; revision: number | null; edits: DripperEdit[] } | null>(null);
 
   const readSetup = useCallback(async () => {
@@ -93,11 +95,15 @@ export function SupplyEditor({ controller, onDirtyChange }: { controller: Contro
   const baseConc = saved?.max_concurrent_zones ?? 1;
   const baseGroups = doc?.zone_groups[roomId] ?? {};
   const zones = (setup?.zones ?? []).filter((z) => z.active);
-  const maxLph = draft.maxFlow === null ? baseMax : parseFlow(draft.maxFlow);
+  // A typed value the same as the shown one (at display precision) is no change: the saved L/h stays.
+  const maxEdit = draft.maxFlow === null ? null : flowEdit(draft.maxFlow, baseMax, baseMax === null ? 0 : digitsOf(baseMax));
+  const typedMax = draft.maxFlow === null ? baseMax : parseFlow(draft.maxFlow);
+  const maxLph = typedMax === null ? null : (maxEdit ?? baseMax ?? typedMax);
   const maxInvalid = draft.maxFlow !== null && draft.maxFlow.trim() !== "" && maxLph === null;
   const conc = draft.concurrency ?? baseConc;
   const groupOf = (zone: number) => draft.groups[zone] ?? baseGroups[String(zone)] ?? "";
-  const dripperOf = (zone: number, base: number) => (draft.drippers[zone] === undefined ? base : parseFlow(draft.drippers[zone]));
+  const dripperEdit = (zone: number, base: number) =>
+    draft.drippers[zone] === undefined ? null : flowEdit(draft.drippers[zone], base, Math.max(1, digitsOf(base)));
 
   // Each zone's demand: the integration's own (sensor.crop_steering_supply_config), else the
   // setup's plants × drippers × flow; an edited dripper flow works its own out.
@@ -107,16 +113,16 @@ export function SupplyEditor({ controller, onDirtyChange }: { controller: Contro
   const demand: Record<string, number> = {};
   for (const z of zones) {
     const base = z.dripper_flow_rate ?? 0;
-    const flow = dripperOf(z.id, base) ?? base;
+    const flow = dripperEdit(z.id, base) ?? base;
     const own = published?.[roomId]?.[String(z.id)];
-    demand[String(z.id)] = draft.drippers[z.id] === undefined && typeof own === "number" ? own : z.plant_count * (z.drippers_per_plant ?? 1) * flow;
+    demand[String(z.id)] = dripperEdit(z.id, base) === null && typeof own === "number" ? own : z.plant_count * (z.drippers_per_plant ?? 1) * flow;
   }
   const groups = Object.fromEntries(zones.map((z) => [String(z.id), groupOf(z.id)]).filter(([, g]) => g));
 
   // The rows of Review & apply.
   const rows: ReviewRow[] = [];
   const edits: DripperEdit[] = [];
-  if (draft.maxFlow !== null && maxLph !== null && maxLph !== baseMax)
+  if (maxEdit !== null && maxLph !== null)
     rows.push({
       id: "max_flow",
       label: "Pump max flow",
@@ -146,8 +152,9 @@ export function SupplyEditor({ controller, onDirtyChange }: { controller: Contro
   }
   for (const z of zones) {
     const base = z.dripper_flow_rate;
-    const after = draft.drippers[z.id] === undefined ? null : parseFlow(draft.drippers[z.id]);
-    if (base === undefined || after === null || after === base) continue;
+    if (base === undefined) continue;
+    const after = dripperEdit(z.id, base);
+    if (after === null) continue;
     const id = `dripper:${z.id}`;
     const digits = Math.max(1, digitsOf(base), digitsOf(after));
     edits.push({ zone: z.id, before: base, after, rowId: id });
@@ -181,8 +188,15 @@ export function SupplyEditor({ controller, onDirtyChange }: { controller: Contro
     payload && doc ? { ...payload, expected_revision: doc.revision, preview: true } : null,
     [payload, doc?.revision],
   );
-  const check = forPump(payload && preview.data ? preview.data.capacity_check : (doc?.capacity_check ?? EMPTY_CHECK), pumpEntity);
-  const checks = maxLph === null || !doc ? [] : supplyChecks({ ...doc, capacity_check: check });
+  // The pump card reads the preview of the draft, else (nothing drafted) the saved check.
+  const check = forPump(
+    payload ? (preview.state === "ready" && preview.data ? preview.data.capacity_check : EMPTY_CHECK) : (doc?.capacity_check ?? EMPTY_CHECK),
+    pumpEntity,
+  );
+  const ownDemand = published?.[roomId];
+  const checks = doc
+    ? reviewChecks({ doc, pumpEntity, pumpDraft: !!payload, dripperDraft: edits.length > 0, preview, ...(ownDemand ? { demand: ownDemand } : {}) })
+    : [];
   const ownRow = check.pumps?.find((p) => p.entity_id === pumpEntity);
   const over =
     refusal ??
@@ -227,7 +241,7 @@ export function SupplyEditor({ controller, onDirtyChange }: { controller: Contro
   };
   const apply = async () => {
     setRefusal(null);
-    setDripperReason(null);
+    setDripperReason({});
     const before = doc!;
     let revision: number | null = null;
     const save = payload && saveSupplyWith(payload, before.revision);
@@ -241,7 +255,8 @@ export function SupplyEditor({ controller, onDirtyChange }: { controller: Contro
         }),
       saveDrippers: async (list) => {
         const result = await saveDrippers(list);
-        setDripperReason(result.reason ?? null);
+        const why = result.reason;
+        if (why) setDripperReason(Object.fromEntries(list.filter((e) => result.holds[e.zone] !== e.after).map((e) => [String(e.zone), why])));
         return result;
       },
     };
@@ -282,9 +297,22 @@ export function SupplyEditor({ controller, onDirtyChange }: { controller: Contro
   const discard = () => {
     setDraft(EMPTY);
     setRefusal(null);
+    setDripperReason({});
   };
 
-  if (load.state === "missing") return <NeedsIntegration feature={FEATURE} />;
+  const title = (
+    <h2>
+      Setup: pumps &amp; valves · {room.name}
+    </h2>
+  );
+  // Under the page's h1: the part's own h2 keeps the note's h3 in order.
+  if (load.state === "missing")
+    return (
+      <div className="supply-editor" data-supply-editor>
+        <header className="supply-head">{title}</header>
+        <NeedsIntegration feature={FEATURE} />
+      </div>
+    );
   if (load.state === "error")
     return (
       <section className="panel supply-editor-error" role="alert">
@@ -307,9 +335,7 @@ export function SupplyEditor({ controller, onDirtyChange }: { controller: Contro
   return (
     <div className="supply-editor" data-supply-editor>
       <header className="supply-head">
-        <h2>
-          Setup: pumps &amp; valves · {room.name}
-        </h2>
+        {title}
         <span className="muted">
           {pumpEntity ? "1 feed pump" : "No pump"}, {valves} zone valve{valves === 1 ? "" : "s"}
         </span>
@@ -324,7 +350,7 @@ export function SupplyEditor({ controller, onDirtyChange }: { controller: Contro
               <p>This room has no pump mapped. Map Room pump under Rooms &amp; mappings below.</p>
             ) : (
               <>
-                {!saved && <p className="supply-empty">Add your pump's output to stop zones starving each other.</p>}
+                {baseMax === null && <p className="supply-empty">Add your pump's output to stop zones starving each other.</p>}
                 <div className="supply-pump-fields">
                   <label className="supply-field">
                     <span>Max flow</span>
@@ -333,6 +359,7 @@ export function SupplyEditor({ controller, onDirtyChange }: { controller: Contro
                         inputMode="decimal"
                         aria-label="Max flow"
                         aria-invalid={maxInvalid || undefined}
+                        aria-describedby={maxInvalid ? "supply-max-error" : undefined}
                         value={draft.maxFlow ?? (baseMax === null ? "" : flowValue(baseMax, digitsOf(baseMax)))}
                         onChange={(e) => setDraft((d) => ({ ...d, maxFlow: e.target.value }))}
                       />
@@ -341,7 +368,11 @@ export function SupplyEditor({ controller, onDirtyChange }: { controller: Contro
                         <small className="supply-was">was {flowValue(baseMax, digitsOf(baseMax))}</small>
                       )}
                     </span>
-                    {maxInvalid && <small className="supply-error">Enter a flow above 0.</small>}
+                    {maxInvalid && (
+                      <small className="supply-error" id="supply-max-error">
+                        Enter a flow above 0.
+                      </small>
+                    )}
                   </label>
                   <div className="supply-field">
                     <span id="supply-conc">Max zones at once</span>
@@ -367,7 +398,7 @@ export function SupplyEditor({ controller, onDirtyChange }: { controller: Contro
                       <CapacityBar
                         segments={segments(worst.zones)}
                         capacityLph={maxLph}
-                        caption={`${zonesText(worst.zones)} together = ${pct(worst.pct)} of pump`}
+                        caption={`${zonesText(worst.zones)} against the pump line`}
                       />
                       <small className={worst.pct > 100 ? "is-warn" : undefined}>
                         {zonesText(worst.zones)} together = {pct(worst.pct)} of pump: {togetherVerdict(worst, groups, conc)}
@@ -419,10 +450,11 @@ export function SupplyEditor({ controller, onDirtyChange }: { controller: Contro
                     {zones.map((z) => {
                       const base = z.dripper_flow_rate ?? 0;
                       const typed = draft.drippers[z.id];
-                      const parsed = typed === undefined ? base : parseFlow(typed);
-                      const changed = typed !== undefined && parsed !== null && parsed !== base;
+                      const invalid = typed !== undefined && parseFlow(typed) === null;
+                      const changed = dripperEdit(z.id, base) !== null;
                       const share = maxLph ? (demand[String(z.id)] / maxLph) * 100 : null;
-                      const failed = dripperReason && typed !== undefined;
+                      const reason = dripperReason[String(z.id)];
+                      const errorId = `supply-dripper-error-${z.id}`;
                       return (
                         <tr key={z.id} data-zone={z.id}>
                           <th scope="row">
@@ -440,15 +472,23 @@ export function SupplyEditor({ controller, onDirtyChange }: { controller: Contro
                               <input
                                 inputMode="decimal"
                                 aria-label={`${z.name} dripper flow`}
-                                aria-invalid={(typed !== undefined && parsed === null) || undefined}
+                                aria-invalid={invalid || undefined}
+                                aria-describedby={invalid || reason ? errorId : undefined}
                                 value={typed ?? flowValue(base, Math.max(1, digitsOf(base)))}
-                                onChange={(e) => setDraft((d) => ({ ...d, drippers: { ...d.drippers, [z.id]: e.target.value } }))}
+                                onChange={(e) => {
+                                  const value = e.target.value;
+                                  setDripperReason((r) => Object.fromEntries(Object.entries(r).filter(([k]) => k !== String(z.id))));
+                                  setDraft((d) => ({ ...d, drippers: { ...d.drippers, [z.id]: value } }));
+                                }}
                               />
                               <span>{unit}</span>
                             </span>
                             {changed && <small className="supply-was">was {flowValue(base, Math.max(1, digitsOf(base)))}</small>}
-                            {typed !== undefined && parsed === null && <small className="supply-error">Enter a flow above 0.</small>}
-                            {failed && <small className="supply-error">{dripperReason}</small>}
+                            {(invalid || reason) && (
+                              <small className="supply-error" id={errorId}>
+                                {invalid ? "Enter a flow above 0." : reason}
+                              </small>
+                            )}
                           </td>
                           <td className="supply-num">{lph(demand[String(z.id)])}</td>
                           <td>

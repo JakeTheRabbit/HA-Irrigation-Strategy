@@ -3,13 +3,16 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, test } from "vitest";
 import { ReviewApplyView, type ReviewRow } from "@/components/review-apply";
 import { answerSupply, demoCapacityCheck, resetDemoSupply } from "./parity-demo/supply";
+import { setDisplayUnits } from "./display-units";
 import type { V2Outcome } from "./parity-api";
 import type { SupplyDoc } from "./parity-types";
 import {
   applySupply,
   capacityRefusal,
+  flowEdit,
   flowText,
   parseFlow,
+  reviewChecks,
   supplyChecks,
   togetherRows,
   togetherVerdict,
@@ -67,8 +70,47 @@ describe("supplyChecks", () => {
     );
     expect(checks).toContainEqual({ ok: false, text: "Zones at once: more than the pump can feed" });
   });
+  test("a zone bigger than the pump at one zone at a time is named", () => {
+    const pump = { entity_id: "switch.f2_feed_pump", worst_case_lph: 1300, max_flow_lph: 900, max_concurrent_zones: 1, ok: false, suggest_max_concurrent: 1 };
+    const checks = supplyChecks(doc({ ok: false, worst_case_lph: 1300, pumps: [pump], pairs: [] }), { "1": 1300, "2": 536, "3": 312 });
+    expect(checks).toContainEqual({ ok: "warn", text: "Zone 1 alone needs 1300 L/h, more than the pump's 900 L/h" });
+    expect(checks.map((c) => c.text)).not.toContain("Every zone fits the pump on its own");
+  });
   test("no max flow: nothing to check", () => {
     expect(supplyChecks(doc({ max_flow_lph: null, pairs: [] }))).toEqual([]);
+  });
+});
+
+describe("reviewChecks", () => {
+  const savedDoc = doc({});
+  const ready = (check: Partial<SupplyDoc["capacity_check"]>) => ({ state: "ready" as const, data: { diff: null, capacity_check: doc(check).capacity_check }, error: null });
+  const base = { doc: savedDoc, pumpEntity: "switch.f2_feed_pump", pumpDraft: true, dripperDraft: false };
+  test("only the preview of the current draft: nothing while it loads", () => {
+    expect(reviewChecks({ ...base, preview: { state: "loading", data: null, error: null } })).toEqual([]);
+  });
+  test("a failed preview says so instead of the saved checks", () => {
+    expect(reviewChecks({ ...base, preview: { state: "error", data: null, error: "timed out" } })).toEqual([
+      { ok: "warn", text: "The draft could not be checked: timed out" },
+    ]);
+  });
+  test("a ready preview gives its own checks", () => {
+    expect(reviewChecks({ ...base, preview: ready({ max_flow_lph: 1200, pairs: [] }) })).toEqual([
+      { ok: true, text: "Pump max flow 1200 L/h is in range" },
+      { ok: true, text: "Every zone fits the pump on its own" },
+    ]);
+  });
+  test("dripper rows only: no pump checks from the saved settings", () => {
+    expect(reviewChecks({ ...base, pumpDraft: false, dripperDraft: true, preview: { state: "idle", data: null, error: null } })).toEqual([]);
+  });
+  test("with dripper rows drafted, the demand checks say they use the saved dripper flows", () => {
+    expect(reviewChecks({ ...base, dripperDraft: true, preview: ready({}) })).toEqual([
+      { ok: true, text: "Pump max flow 900 L/h is in range" },
+      { ok: true, text: "Every zone fits the pump on its own (with the saved dripper flows)" },
+      { ok: "warn", text: "Zones 1 + 2 need 118%: shots queue, one after another (with the saved dripper flows)" },
+    ]);
+  });
+  test("no draft: no checks", () => {
+    expect(reviewChecks({ ...base, pumpDraft: false, preview: { state: "idle", data: null, error: null } })).toEqual([]);
   });
 });
 
@@ -124,6 +166,20 @@ describe("flow units", () => {
     expect(parseFlow("4,5")).toBe(4.5);
     expect(parseFlow("")).toBeNull();
     expect(parseFlow("-1")).toBeNull();
+  });
+  test("an edit compares at display precision: retyping the shown gal/h is no change", () => {
+    setDisplayUnits({ volume: "gal" });
+    try {
+      expect(flowEdit("1.06", 4, 1)).toBeNull();
+      expect(flowEdit("0.79", 4, 1)).toBeCloseTo(0.79 * 3.785411784, 6);
+    } finally {
+      setDisplayUnits({ volume: "L" });
+    }
+    expect(flowEdit("4.0", 4, 1)).toBeNull();
+    expect(flowEdit("4", 4, 1)).toBeNull();
+    expect(flowEdit("3.5", 4, 1)).toBe(3.5);
+    expect(flowEdit("x", 4, 1)).toBeNull();
+    expect(flowEdit("900", null, 0)).toBe(900);
   });
 });
 
@@ -203,7 +259,7 @@ describe("applySupply", () => {
     expect(dripper).toBe(false);
     expect(receipt).toMatchObject({
       ok: false,
-      message: "The pump can't feed 6 zones at once. Set Zones at once to 5 or less. Nothing was changed.",
+      message: "Nothing was changed. The pump card says why.",
     });
   });
   test("a stale supply save is the refusal itself", async () => {

@@ -1,7 +1,7 @@
 import type { ApplyReceipt, ReviewRow } from "@/components/review-apply";
 import { getDisplayUnits } from "./display-units";
 import type { V2Outcome } from "./parity-api";
-import type { CapacityPair, SupplyDoc } from "./parity-types";
+import type { CapacityPair, SupplyDoc, SupplyPreview } from "./parity-types";
 import { UndoError } from "./undo";
 import { LITRES_PER_US_GALLON } from "./units";
 
@@ -33,13 +33,22 @@ export function parseFlow(text: string): number | null {
   return getDisplayUnits().volume === "gal" ? Number((value * LITRES_PER_US_GALLON).toPrecision(12)) : value;
 }
 
+/** A typed flow that differs from `base` as the field shows it (`digits`: base's L/h decimals), in
+ * L/h; null when it is not a flow, or is the same at display precision (retyping the shown gal/h). */
+export function flowEdit(typed: string, base: number | null, digits: number): number | null {
+  const value = parseFlow(typed);
+  if (value === null || base === null) return value;
+  return Number(typed.trim().replace(",", ".")) === Number(flowValue(base, digits)) ? null : value;
+}
+
 const refText = (ref: CapacityPair["zones"][number]) =>
   typeof ref === "number" ? String(ref) : `${ref.zone} (${ref.room_id.replace(/^room:/, "") || "default"})`;
 export const zonesText = (zones: CapacityPair["zones"]) => `Zones ${zones.map(refText).join(" + ")}`;
 const pctText = (pct: number) => `${Math.round(pct)}%`;
 
-/** The review panel's checks, from `capacity_check` only. */
-export function supplyChecks(doc: SupplyDoc): Check[] {
+/** The review panel's checks, from `capacity_check` only. `demand` (each zone's L/h, as the
+ * integration has it) only names a zone the check found bigger than the pump. */
+export function supplyChecks(doc: SupplyDoc, demand?: Record<string, number>): Check[] {
   const c = doc.capacity_check;
   if (c.max_flow_lph == null) return [];
   const max = c.max_flow_lph;
@@ -53,10 +62,37 @@ export function supplyChecks(doc: SupplyDoc): Check[] {
     checks.push({ ok: true, text: "Every zone fits the pump on its own" });
   if ((c.pumps ?? []).some((p) => !p.ok && p.max_concurrent_zones >= 2))
     checks.push({ ok: false, text: "Zones at once: more than the pump can feed" });
+  // One zone at a time is never refused: a zone bigger than its pump still waters (CS-214 warns).
+  if ((c.pumps ?? []).some((p) => !p.ok && p.max_concurrent_zones < 2))
+    for (const [zone, need] of Object.entries(demand ?? {}))
+      if (need > max) checks.push({ ok: "warn", text: `Zone ${zone} alone needs ${flowText(need, digitsOf(need) ? 1 : 0)}, more than the pump's ${flowText(max, 0)}` });
   for (const p of c.pairs)
     if (p.pct_of_pump != null && p.pct_of_pump > 100)
       checks.push({ ok: "warn", text: `${zonesText(p.zones)} need ${pctText(p.pct_of_pump)}: shots queue, one after another` });
   return checks;
+}
+
+/** The checks of Review & apply: only the integration's preview of the current draft (nothing
+ * while it is asked, the error when it fails). The preview sizes zones from their saved dripper
+ * flows, so with dripper rows drafted the demand checks say so. Dripper rows alone: no checks. */
+export function reviewChecks(input: {
+  doc: SupplyDoc;
+  pumpEntity: string;
+  pumpDraft: boolean;
+  dripperDraft: boolean;
+  preview: { state: string; data: SupplyPreview | null; error: string | null };
+  demand?: Record<string, number>;
+}): Check[] {
+  const { preview } = input;
+  if (!input.pumpDraft) return [];
+  if (preview.state === "error") return [{ ok: "warn", text: `The draft could not be checked: ${preview.error}` }];
+  if (preview.state !== "ready" || !preview.data) return [];
+  const checks = supplyChecks(
+    { ...input.doc, capacity_check: forPump(preview.data.capacity_check, input.pumpEntity) },
+    input.dripperDraft ? undefined : input.demand,
+  );
+  if (!input.dripperDraft) return checks;
+  return checks.map((c, i) => (i === 0 ? c : { ...c, text: `${c.text} (with the saved dripper flows)` }));
 }
 
 export interface TogetherRow {
@@ -173,7 +209,8 @@ export async function applySupply(
         at: now,
         ok: false,
         failed: rows.map((r) => ({ id: r.id, holds: r.before })),
-        message: `${over.text} Nothing was changed.`,
+        // The pump card says why (with Use N); the panel only says nothing changed.
+        message: "Nothing was changed. The pump card says why.",
         summary: "",
         eventIds: [],
       };

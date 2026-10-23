@@ -591,7 +591,6 @@ export function Setup({
   );
   return (
     <>
-      {connected && <SupplyEditor key={controller.roomId} controller={controller} onDirtyChange={setSupplyDirty} />}
       <Heading
         title="Rooms and setup"
         action={
@@ -604,6 +603,7 @@ export function Setup({
           </Button>
         }
       />
+      {connected && <SupplyEditor key={controller.roomId} controller={controller} onDirtyChange={setSupplyDirty} />}
       <div className="workspace-tabs" role="tablist" aria-label="Setup view">
         <button role="tab" aria-selected={tab === "rooms"} onClick={() => setTab("rooms")}>
           Rooms & mappings
