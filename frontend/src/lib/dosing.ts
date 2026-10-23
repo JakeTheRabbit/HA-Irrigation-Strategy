@@ -2,7 +2,9 @@ import type { PillTone } from "@/components/mini-visuals";
 import { parseControllerTime, readHeartbeat } from "./controller-health";
 import { numeric } from "./model";
 import type { SetupCandidate } from "./operator-types";
-import { batchesLeft } from "./stock";
+import { formatVolume } from "./display-units";
+import { OVER_PCT, MINIMUM_PCT, tankLevelId } from "./reservoir";
+import { batchesLeft, type StockDocument } from "./stock";
 import type { EntityState, States } from "./types";
 
 /** Batch-tank dosing (docs/DOSING.md): a room's dosing configuration as the integration publishes
@@ -72,11 +74,39 @@ export interface DosingConfig {
   request: DosingRequest | null;
   updated_at: string | null;
 }
+/** A feed recipe of the room (dosing.py clean_feed): what a batch doses while it is in use, and the
+ * feed EC it mixes to (mS/cm), when declared. */
+export interface FeedRecipe {
+  id: string;
+  name: string;
+  doses: RecipeLine[];
+  ec: number | null;
+}
+/** The room's feed recipes and the schedule of them by week, as `dosing_get` holds them. */
+export interface FeedSetup {
+  recipes: FeedRecipe[];
+  schedule: { start: string | null; weeks: string[] };
+  stage: string | null;
+  held_until: string | null;
+}
+/** Which recipe the room doses today and why (dosing.py feed_now). */
+export interface FeedNow {
+  recipe: string | null;
+  recipe_id: string | null;
+  ec: number | null;
+  week: number | null;
+  weeks: number;
+  start: string | null;
+  held_until: string | null;
+  source: "schedule" | "held" | "hand" | "batch";
+}
 /** What `dosing_get` and `dosing_save` answer. */
 export interface DosingDocument {
   schema_version: number;
   room_id: string;
-  config: DosingConfig | null;
+  /** `feed`: the recipes and their schedule; absent from an integration from before them. */
+  config: (DosingConfig & { feed?: FeedSetup | null }) | null;
+  feed_now?: FeedNow | null;
   candidates: SetupCandidate[];
   /** The user is an administrator; absent from an integration from before it. */
   can_edit?: boolean | null;
@@ -135,6 +165,18 @@ export interface HistoryEntry {
   doses: Record<string, number>;
   by: string | null;
 }
+/** The controller's check of a finished batch's tank, read 5 min after its mix stops
+ * (dosing_runner._judge_mix): its EC and pH as read, against the room's feed bands. */
+export interface MixCheck {
+  batch: string | null;
+  due: string | null;
+  verdict: "good" | "off target" | "not read" | null;
+  checked_at: string | null;
+  why: string | null;
+  gave_up_at: string | null;
+  ec: number | null;
+  ph: number | null;
+}
 /** `sensor.crop_steering_<prefix>dosing`, the controller's report. */
 export interface DosingStatus {
   state: "idle" | "dosing" | "batch" | "unavailable";
@@ -143,6 +185,8 @@ export interface DosingStatus {
   handled: string | null;
   handled_result: string | null;
   history: HistoryEntry[];
+  /** The last batch's mix check; absent or null from a controller from before it, or with none. */
+  mix?: MixCheck | null;
   /** The controller's last publish, refreshed at least every 60 s; null from a controller from
    * before it. */
   updated_at: string | null;
@@ -323,7 +367,23 @@ export function readStatus(entity: EntityState | undefined): DosingStatus | null
     handled: text(raw.handled),
     handled_result: text(raw.handled_result),
     history: history.slice(0, 20),
+    mix: readMix(raw.mix),
     updated_at: text(raw.updated_at),
+  };
+}
+function readMix(value: unknown): MixCheck | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const raw = record(value);
+  const verdict = (["good", "off target", "not read"] as const).find((v) => v === raw.verdict);
+  return {
+    batch: text(raw.batch),
+    due: text(raw.due),
+    verdict: verdict ?? null,
+    checked_at: text(raw.checked_at),
+    why: text(raw.why),
+    gave_up_at: text(raw.gave_up_at),
+    ec: count(raw.ec),
+    ph: count(raw.ph),
   };
 }
 
@@ -1081,4 +1141,140 @@ export function setupChanges(
   ] as const)
     add(FIELD_LABELS[field], batch[field], after.batch[field]);
   return changes;
+}
+
+// ------------------------------------------------------------------ Feed & dosing page
+
+/** The controller reads a finished batch's tank this long after its mix stops (MIX_SETTLE_S). */
+export const MIX_SETTLE_MIN = 5;
+const readable = (entity: EntityState | undefined) =>
+  !!entity && !UNREADABLE.includes(entity.state);
+
+/** The guards around the batch tank, each armed or not: every dose read back on the pump's own
+ * dosing state, the overfill cut and the minimum on the controller's tank level, the mix pump's
+ * power read back, and the fill's timeout. The page counts how many are armed. */
+export function protections(doc: DosingDocument, states: States): { label: string; ok: boolean }[] {
+  const config = doc.config;
+  const prefix = doc.room_id.startsWith("room:") ? doc.room_id.slice(5) : "";
+  const pumps = config?.pumps ?? [];
+  const batch = config?.batch ?? parseBatch({});
+  const level = states[tankLevelId(prefix)];
+  const levelRead = readable(level) && Number.isFinite(Number(level!.state));
+  const minimum = count(level?.attributes.minimum_pct) ?? MINIMUM_PCT;
+  const mixOn = batch.mix_pump ? states[batch.mix_pump]?.state === "on" : false;
+  const watts = batch.mix_power_sensor ? numeric(states[batch.mix_power_sensor]) : null;
+  const kw = watts === null || !mixOn ? "" : ` · ${Number((watts / 1000).toFixed(3))} kW`;
+  return [
+    {
+      label: "Read-back on every dose",
+      ok: pumps.length > 0 && pumps.every((pump) => readable(states[pump.dosing_entity])),
+    },
+    { label: `Overfill cut ${OVER_PCT}%`, ok: levelRead },
+    { label: `Minimum ${minimum}%`, ok: levelRead },
+    {
+      label: batch.mix_pump ? `Mix pump ${mixOn ? "on" : "off"}${kw}` : "Mix pump on",
+      ok: !!batch.mix_pump && !!batch.mix_power_sensor && batch.mix_min_w > 0,
+    },
+    { label: `Timeout ${batch.fill_timeout_min} min`, ok: !!batch.fill_valve },
+  ];
+}
+
+/** The recipe the room doses today: the feed recipe in use, else the batch's own. */
+export function recipeInUse(doc: DosingDocument): { name: string | null; lines: RecipeLine[] } {
+  const config = doc.config;
+  const id = doc.feed_now?.recipe_id ?? null;
+  const recipe = id ? config?.feed?.recipes.find((item) => item.id === id) : undefined;
+  return recipe
+    ? { name: recipe.name, lines: recipe.doses }
+    : { name: null, lines: config?.batch.recipe ?? [] };
+}
+
+/** What the page knows of the tank for the next batch: its level, the litres in 1 %, how fast it
+ * falls (from its recorded level), the level the next batch is made at, and whether the controller
+ * checks the mix after it (a feed probe with a band). */
+export interface NextBatchInput {
+  states: States;
+  levelPct: number | null;
+  litresPerPct: number | null;
+  pctPerHour: number | null;
+  atPct: number;
+  checks: boolean;
+}
+export interface NextBatch {
+  /** When the tank reaches `atPct` at its present fall; null when that is not known. */
+  at: number | null;
+  /** About how many litres the fill adds, from `atPct` to full; null until the litres in 1 % are
+   * learned. */
+  litres: number | null;
+  doses: { name: string; ml: number }[];
+  steps: { name: "premix" | "dose" | "postmix" | "check"; min: number }[];
+  stockWarning: string | null;
+}
+/** The next batch: when, how much water, what it doses and how long its steps take, and the stock
+ * tank that one batch takes below its low line. Nothing is guessed: what is not known is null. */
+export function nextBatch(
+  doc: DosingDocument,
+  stock: StockDocument | null,
+  now: number,
+  input: NextBatchInput,
+): NextBatch {
+  const config = doc.config;
+  const { levelPct, pctPerHour, litresPerPct, atPct } = input;
+  const at =
+    levelPct === null
+      ? null
+      : levelPct <= atPct
+        ? now
+        : pctPerHour !== null && pctPerHour > 0
+          ? now + ((levelPct - atPct) / pctPerHour) * 3_600_000
+          : null;
+  const litres =
+    litresPerPct !== null && litresPerPct > 0
+      ? Math.round((100 - atPct) * litresPerPct * 10) / 10
+      : null;
+  const rows = config
+    ? recipeRows(
+        { ...config, batch: { ...config.batch, recipe: recipeInUse(doc).lines } },
+        input.states,
+      ).filter((row) => !row.skipped && !row.unreadable)
+    : [];
+  const doseS = recipeTotals(rows).seconds;
+  const steps: NextBatch["steps"] = [];
+  if (config) {
+    if (config.batch.premix_min > 0) steps.push({ name: "premix", min: config.batch.premix_min });
+    if (doseS !== null && rows.length) steps.push({ name: "dose", min: Math.ceil(doseS / 60) });
+    if (config.batch.postmix_min > 0)
+      steps.push({ name: "postmix", min: config.batch.postmix_min });
+    if (input.checks) steps.push({ name: "check", min: MIX_SETTLE_MIN });
+  }
+  let stockWarning: string | null = null;
+  for (const tank of stock?.tanks ?? []) {
+    const dose = stock?.doses[tank.id] ?? tank.dose_ml;
+    if (!(dose > 0)) continue;
+    const after = Math.max(0, tank.level_l - dose / 1000);
+    if (after >= tank.low_l) continue;
+    const left = batchesLeft({ level_l: after }, dose) ?? 0;
+    stockWarning = `${tank.name} after this batch: ${formatVolume(after, 1)}, ${left} ${left === 1 ? "batch" : "batches"} left`;
+    break;
+  }
+  return {
+    at,
+    litres,
+    doses: rows.map((row) => ({ name: row.name, ml: row.ml })),
+    steps,
+    stockWarning,
+  };
+}
+
+/** How fast the tank's level falls, % per hour, since its last rise (a fill): the newest run of the
+ * recorded level that only goes down. Null with under an hour of it, or a level that is not falling. */
+export function levelFall(points: readonly { time: number; value: number }[]): number | null {
+  if (points.length < 2) return null;
+  let start = points.length - 1;
+  while (start > 0 && points[start - 1].value >= points[start].value) start--;
+  const first = points[start],
+    last = points[points.length - 1];
+  const hours = (last.time - first.time) / 3_600_000;
+  if (hours < 1 || !(first.value > last.value)) return null;
+  return (first.value - last.value) / hours;
 }

@@ -104,7 +104,14 @@ export function createDemo(now = Date.now()): States {
       // no feed-water probe, so its gate is off. Both have been saved in Rooms and setup.
       ...(index
         ? {}
-        : { feed_ec_sensor: "sensor.demo_tank_ec", feed_ph_sensor: "sensor.demo_tank_ph" }),
+        : {
+            feed_ec_sensor: "sensor.demo_tank_ec",
+            feed_ph_sensor: "sensor.demo_tank_ph",
+            // The feed EC probe's applied calibration (calibration.py feed_calibration).
+            feed_calibration: {
+              ec: { gain: 1.012, bias: -0.03, calibrated_at: new Date(now - 9 * 86_400_000).toISOString() },
+            },
+          }),
       setup_revision: 1,
     });
     put(`switch.demo_${prefix}pump`, index ? "off" : "on");
@@ -584,6 +591,19 @@ function demoDosing(
     handled: null,
     handled_result: null,
     history,
+    // Room A's last batch failed its mix check: its EC read over the room's feed band 5 min after
+    // the mix stopped (a hand trim since has brought the tank back). Room B checks nothing.
+    mix: prefix
+      ? null
+      : {
+          batch: at(filled + 0.25),
+          due: at(filled - 5 / 60),
+          verdict: "off target",
+          checked_at: at(filled - 5 / 60),
+          why: "its EC reads 3.71, outside the feed EC band of the room (2.3 to 3.5)",
+          ec: 3.71,
+          ph: 5.82,
+        },
     updated_at: new Date(now - 18_000).toISOString(),
   });
 }

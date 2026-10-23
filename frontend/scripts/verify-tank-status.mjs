@@ -1,10 +1,11 @@
-/** Graphical room telemetry against the isolated compiled demo. */
+/** Graphical room telemetry against the isolated compiled demo. It serves frontend/dist/index.html,
+ * so build first (`node node_modules/vite/bin/vite.js build`); CI builds it before this runs. */
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { readFile, mkdir, writeFile } from "node:fs/promises";
 import { chromium } from "playwright";
 import AxeBuilder from "@axe-core/playwright";
-const html = await readFile(new URL("../../www/dashboard.html", import.meta.url));
+const html = await readFile(new URL("../dist/index.html", import.meta.url));
 const out = new URL("../../output/playwright/", import.meta.url);
 const file = (name) => new URL(name, out).pathname.replace(/^\/([A-Za-z]:)/, "$1");
 // The README's screenshots.
@@ -86,11 +87,12 @@ try {
   await page.goto(`${origin}/dashboard.html?demo=1#/today`);
   await page.locator('[data-last-irrigation="1"]').waitFor();
   assert.ok(await page.locator('[data-last-irrigation="1"]:visible').getAttribute("datetime"));
-  // The tank lives on Equipment › Feed & dosing. The old Tank & pump address still opens it.
+  // The tank lives on Equipment › Feed & dosing, in its plumbing. The old Tank & pump address
+  // still opens it.
   await page.goto(`${origin}/dashboard.html?demo=1#/equipment/tank`);
   await page.waitForFunction(() => location.hash === "#/equipment/dosing");
-  await page.getByRole("heading", { name: "Dosing", exact: true, level: 1 }).waitFor();
-  const tank = page.locator("[data-tank-status]");
+  await page.getByRole("heading", { name: "Feed & dosing · Room A", exact: true, level: 1 }).waitFor();
+  const tank = page.locator("[data-plumbing] [data-tank-status]");
   await tank.waitFor();
   assert.equal(
     await page
@@ -140,16 +142,21 @@ try {
   await tank.screenshot({ path: file("tank-status.png") });
   await tank.screenshot({ path: img("tank-status.png") });
 
-  // The reservoir minimum, in words, between the card and the level chart: watering allowed, its
-  // marks, the litres left above the minimum, and the batch on the tank with a way to Dosing.
-  const guard = page.locator("[data-reservoir-guard]");
+  // The reservoir minimum, on the drawing under the tank card: its mark armed, watering allowed,
+  // where it starts again, the litres left above the minimum and the litres in 1 %. The batch on
+  // the tank is the plumbing's batch card.
+  const guard = page.locator("[data-plumbing] [data-reservoir-guard]");
   assert.equal(await guard.getAttribute("data-reservoir-guard"), "ok");
   const guardText = await guard.innerText();
+  assert.equal(await guard.locator('[data-protection="armed"]').innerText(), "Minimum 8%");
   assert.match(guardText, /Watering allowed/);
-  assert.match(guardText, /8 % · starts again at 12 %/);
-  assert.match(guardText, /About [\d.,]+ L/);
-  assert.match(guardText, /2\.4 L/);
-  assert.match(guardText, /Last batch: |Batch running: |No batch made yet/);
+  assert.match(guardText, /starts again at 12%/);
+  assert.match(guardText, /about [\d.,]+ L above it/);
+  assert.match(guardText, /2\.4 L per 1%/);
+  assert.match(
+    await page.locator("[data-plumbing] [data-batch-line]").innerText(),
+    /^No batch running · last batch finished \d/,
+  );
   assert.doesNotMatch(guardText, /crop_steering|below_minimum|litres_per_pct|vwc/i);
   const order = await page.evaluate(() =>
     ["[data-tank-status]", "[data-reservoir-guard]", "[data-tank-level-chart]"].map(
@@ -325,8 +332,8 @@ try {
       throw new Error("focus did not return to the History button");
     });
 
-  // The tank card is one screen at 1440×800 (a 1440×900 laptop's browser window), with History
-  // beside Map sensors in its heading; the level chart follows it.
+  // The tank card is on the first screen at 1440×800 (a 1440×900 laptop's browser window), under
+  // the pumps, with History beside Map sensors in its heading; the level chart follows it.
   await page.setViewportSize({ width: 1440, height: 800 });
   await page.waitForFunction(() => innerHeight === 800 && innerWidth === 1440);
   const layout = await page.evaluate(() => {
@@ -403,7 +410,7 @@ try {
   );
   assert.match(
     await page.locator("[data-reservoir-guard]").innerText(),
-    /Map the tank level[\s\S]*Off: no tank level mapped/,
+    /Off: no tank level mapped[\s\S]*Map the tank level/,
   );
   // Room B's card and level chart are its own tank's: another level, where its chart ends.
   const roomBLevel = Number(await page.locator("[data-tank-level]").getAttribute("data-tank-level"));
@@ -444,7 +451,7 @@ try {
     "level chart: level, shots, pump runs, filling and recorded fills over 24 h, 3 days and 7 days",
     "level chart tooltip names the zone, length and litres; accessible light, dark and at 390 px",
     "room isolation, and no gate where no feed-water probe is mapped",
-    "Tank & feed: the old tank address redirects, the reservoir minimum and the batch in words",
+    "Feed & dosing: the old tank address redirects; the tank, its minimum and the batch on the drawing",
     "the reservoir minimum is off, and says how to arm it, where no tank level is mapped",
   ];
   await writeFile(

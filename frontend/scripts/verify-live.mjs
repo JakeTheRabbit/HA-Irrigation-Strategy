@@ -526,7 +526,7 @@ try {
       // Feed & dosing owns the tank: its card keeps the last readings and says so, and dosing
       // says why nothing can be dosed.
       await tree("equipment", "Feed & dosing");
-      await visible(page.getByRole("heading", { name: "Dosing", exact: true, level: 1 }));
+      await visible(page.getByRole("heading", { name: /^Feed & dosing · /, level: 1 }));
       await visible(
         page
           .locator("[data-tank-status]")

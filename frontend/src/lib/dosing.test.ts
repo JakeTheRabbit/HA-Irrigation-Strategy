@@ -4,6 +4,8 @@ import {
   batchSteps,
   batchTime,
   canEdit,
+  nextBatch,
+  protections,
   controllerReach,
   deviceDosing,
   doseDeadline,
@@ -32,6 +34,7 @@ import {
   stockSensorId,
   stockState,
   stockTanks,
+  type DosingBatch,
   type DosingDocument,
   type DosingRequestResult,
   type DosingStatus,
@@ -913,5 +916,158 @@ describe("the demo's dosing services and controller", () => {
       ["part_a", "part_a"],
       ["cleaner", "cleaner"],
     ]);
+  });
+});
+
+describe("Feed & dosing: the plumbing view's facts", () => {
+  const batch: DosingBatch = {
+    fill_valve: "switch.fill",
+    full_entity: null,
+    full_state: "on",
+    fill_timeout_min: 12,
+    mix_pump: "switch.mix",
+    mix_valves: [],
+    mix_power_sensor: "sensor.mix_power",
+    mix_min_w: 200,
+    premix_min: 4,
+    postmix_min: 5,
+    close_entities: [],
+    hold_entity: null,
+    filled_at_entity: null,
+    recipe: [
+      { pump: "part_a", ml: 744, ml_entity: null },
+      { pump: "part_b", ml: 744, ml_entity: null },
+    ],
+  };
+  const pump = (id: string, name: string, stock: string) => ({
+    id,
+    name,
+    volume_entity: `number.${id}_volume`,
+    start_entity: `button.${id}_start`,
+    dosing_entity: `binary_sensor.${id}_dosing`,
+    dosing_prefix: "Dosing",
+    power_entity: `switch.${id}_power`,
+    flow_entity: `number.${id}_flow`,
+    max_ml: 2000,
+    restore_volume: true,
+    stock_tank: stock,
+  });
+  const doc = (over: Partial<DosingBatch> = {}): DosingDocument => ({
+    schema_version: 1,
+    room_id: "room:",
+    config: {
+      revision: 1,
+      pumps: [pump("part_a", "Part A", "a"), pump("part_b", "Part B", "b")],
+      batch: { ...batch, ...over },
+      request: null,
+      updated_at: null,
+    },
+    candidates: [],
+    error: null,
+  });
+  const armed: States = {
+    "binary_sensor.part_a_dosing": entity("binary_sensor.part_a_dosing", "off"),
+    "binary_sensor.part_b_dosing": entity("binary_sensor.part_b_dosing", "off"),
+    "number.part_a_flow": entity("number.part_a_flow", "5"),
+    "number.part_b_flow": entity("number.part_b_flow", "5"),
+    "switch.mix": entity("switch.mix", "on"),
+    "sensor.mix_power": entity("sensor.mix_power", "420", { unit_of_measurement: "W" }),
+    "sensor.crop_steering_tank_level": entity("sensor.crop_steering_tank_level", "64", {
+      minimum_pct: 8,
+      litres_per_pct: 4.5,
+    }),
+  };
+
+  it("protections counts armed of total", () => {
+    expect(protections(doc(), armed)).toEqual([
+      { label: "Read-back on every dose", ok: true },
+      { label: "Overfill cut 102%", ok: true },
+      { label: "Minimum 8%", ok: true },
+      { label: "Mix pump on · 0.42 kW", ok: true },
+      { label: "Timeout 12 min", ok: true },
+    ]);
+    // No tank level mapped, no power read-back for the mix pump, no fill valve: 1 of 5 armed.
+    const bare = { ...armed };
+    delete bare["sensor.crop_steering_tank_level"];
+    const list = protections(
+      doc({ fill_valve: null, mix_power_sensor: null, mix_min_w: 0 }),
+      bare,
+    );
+    expect(list.filter((item) => item.ok).length).toBe(1);
+    expect(list.map((item) => item.label)).toEqual([
+      "Read-back on every dose",
+      "Overfill cut 102%",
+      "Minimum 8%",
+      "Mix pump on",
+      "Timeout 12 min",
+    ]);
+    // A pump whose dosing state reads nothing: its doses are not read back.
+    expect(
+      protections(doc(), { ...armed, "binary_sensor.part_b_dosing": entity("binary_sensor.part_b_dosing", "unavailable") })[0],
+    ).toEqual({ label: "Read-back on every dose", ok: false });
+  });
+
+  it("nextBatch warns when stock after batch is below low line", () => {
+    const tank = (id: string, name: string, level: number, low: number) => ({
+      id,
+      name,
+      capacity_l: 20,
+      level_l: level,
+      dose_ml: 744,
+      dose_entity: null,
+      low_l: low,
+      refilled_at: null,
+      updated_at: "",
+    });
+    const stock = {
+      schema_version: 1 as const,
+      room_id: "room:",
+      revision: 1,
+      tanks: [tank("a", "Part A", 12.9, 4), tank("b", "Part B", 5.4, 5)],
+      last_batch: null,
+      history: [],
+      fill_entity: null,
+      doses: { a: 744, b: 744 },
+      low: [],
+      max_tanks: 12,
+      error: null,
+    };
+    const next = nextBatch(doc(), stock, NOW, {
+      states: armed,
+      levelPct: 64,
+      litresPerPct: 4.5,
+      pctPerHour: 2,
+      atPct: 20,
+      checks: true,
+    });
+    // 44 % to go at 2 % an hour: 22 h from now. 80 % of the tank at 4.5 L per 1 %.
+    expect(next.at).toBe(NOW + 22 * 3_600_000);
+    expect(next.litres).toBe(360);
+    expect(next.doses).toEqual([
+      { name: "Part A", ml: 744 },
+      { name: "Part B", ml: 744 },
+    ]);
+    // 1488 mL at 5 mL/s: 297.6 s, about 5 min of dosing.
+    expect(next.steps).toEqual([
+      { name: "premix", min: 4 },
+      { name: "dose", min: 5 },
+      { name: "postmix", min: 5 },
+      { name: "check", min: 5 },
+    ]);
+    expect(next.stockWarning).toBe("Part B after this batch: 4.7 L, 6 batches left");
+    // Above its low line after the batch: no warning. A level that is not falling: no time.
+    const plenty = { ...stock, tanks: [tank("a", "Part A", 12.9, 4), tank("b", "Part B", 9, 5)] };
+    const calm = nextBatch(doc(), plenty, NOW, {
+      states: armed,
+      levelPct: 64,
+      litresPerPct: null,
+      pctPerHour: null,
+      atPct: 20,
+      checks: false,
+    });
+    expect(calm.stockWarning).toBeNull();
+    expect(calm.at).toBeNull();
+    expect(calm.litres).toBeNull();
+    expect(calm.steps.map((step) => step.name)).toEqual(["premix", "dose", "postmix"]);
   });
 });
