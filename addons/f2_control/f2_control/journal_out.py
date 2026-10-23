@@ -40,6 +40,9 @@ class Outbox:
         self.client = "f2_control"  # source.client (the controller sets its version)
         self._lock = threading.Lock()
         self._warned = False
+        # How many events a flush has dropped over the cap since start: the controller's backfill reads it to
+        # send its history again (Controller._journal_backfill), as those were never delivered.
+        self.trimmed = 0
 
     def _warn(self, what, err):
         if not self._warned:  # one line per run: a full disk must not flood the log
@@ -170,6 +173,7 @@ class Outbox:
             current = self._read()
             keep = [e for e in current if e.get("id") and e["id"] not in done]
             if len(keep) > self.cap:
+                self.trimmed += len(keep) - int(self.cap * 0.9)
                 keep = keep[-int(self.cap * 0.9):]
             if len(keep) != len(current):
                 self._rewrite(keep)

@@ -485,6 +485,31 @@ def test_a_backfill_never_drops_a_live_event_and_finishes_over_several_passes(st
     assert passes > 1 and live <= set(sent) and expected <= set(sent)
 
 
+def test_backfill_flag_waits_for_delivery(start, tmp_path):
+    """The add-on updated before the integration: the backfill is queued and flagged, then the integration stays
+    down long enough for live events to push the outbox over its cap, and the flush drops the oldest, the
+    backfill. Queued is not delivered: the flag comes off (saved too) and the same history is queued again once
+    the outbox has room, so none of it is lost for good."""
+    _seed(tmp_path)
+    c = start()
+    c.journal = journal_out.Outbox(str(tmp_path / "small_outbox.jsonl"), cap=20)
+    _pass(c)
+    assert c.rooms[0].journal_backfill is True and c._save_state()
+    for i in range(30):  # live events while the integration is down
+        c.journal.emit("", "alert.raised", data={"key": f"k{i}"})
+    c.journal.flush(lambda room_id, chunk: None)  # nothing delivered: over the cap, the oldest are dropped
+    assert not _expected_ids() & {e["id"] for e in _events(c.journal)}
+    _pass(c)  # the outbox is still over its share: nothing is queued yet, but the flag is off
+    assert c.rooms[0].journal_backfill is False and c._save_state()
+    assert "_journal_backfill" not in json.loads((tmp_path / "state.json").read_text())["default"]
+    c.journal.flush(lambda room_id, chunk: ([e["id"] for e in chunk], []))  # the integration is back
+    _pass(c)
+    assert c.rooms[0].journal_backfill is True
+    assert {e["id"] for e in _events(c.journal)} == _expected_ids()  # the same ids: journal_append keeps them once
+    _pass(c)
+    assert len(_events(c.journal)) == len(_expected_ids())  # once only
+
+
 def test_at_most_200_backfill_events_a_pass(start, tmp_path):
     _big_ledger(tmp_path, 150)  # 300 events
     c = start()

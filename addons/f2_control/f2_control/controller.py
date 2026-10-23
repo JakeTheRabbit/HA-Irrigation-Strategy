@@ -2220,6 +2220,8 @@ class Controller:
                     block.pop("_strategy_required", None)
                 if getattr(room, "journal_backfill", False):  # inside the room's block: a top-level key reads as a room
                     block["_journal_backfill"] = 1
+                else:  # sent again after the outbox dropped some of it (_journal_backfill)
+                    block.pop("_journal_backfill", None)
                 if room.hardware_fault:
                     block["_hardware_fault"] = room.hardware_fault
                 else:
@@ -7469,16 +7471,29 @@ class Controller:
           its cap, so the cap never drops a live event for it.
         - What is left is kept in memory per room and half. After a restart it starts again from the files: the same
           ids, which journal_append keeps once.
-        - The room's `_journal_backfill: 1` is set once both its halves are queued.
+        - The room's `_journal_backfill: 1` is set once both its halves are queued. Queued is not delivered: when a
+          flush has since dropped events over the outbox cap (the integration down for long, Outbox.trimmed), every
+          room's flag is cleared and its history queued again, with the same ids, so none of it is lost for good.
         - Each file is read on its own. One that cannot be read holds back only its own half: it is tried again
           JOURNAL_BACKOFF_PASSES passes later, logged once for each run of failures. After BACKFILL_LEDGER_TRIES failed
           runs the ledger is read line by line and its unreadable lines are left out (a damaged ledger never stops
           anything, brain/ledger.py)."""
         journal = getattr(self, "journal", None)
-        todo = [r for r in self.rooms if not getattr(r, "journal_backfill", False)]
-        if journal is None or not todo:
+        if journal is None:
             return
         queues = self.__dict__.setdefault("_backfill_queue", {})  # (slug, half) -> [(when, kind, keywords)]
+        trimmed = getattr(journal, "trimmed", 0)
+        if trimmed > self.__dict__.setdefault("_backfill_trimmed", 0):
+            self._backfill_trimmed = trimmed
+            if any(getattr(r, "journal_backfill", False) for r in self.rooms) or queues:
+                log("journal backfill: the outbox dropped events before they were delivered; the history is "
+                    "sent again")
+            for room in self.rooms:
+                room.journal_backfill = False
+            queues.clear()
+        todo = [r for r in self.rooms if not getattr(r, "journal_backfill", False)]
+        if not todo:
+            return
         skip = self.__dict__.setdefault("_backfill_skip", {})  # half -> passes it still waits
         failed = self.__dict__.setdefault("_backfill_failed", {})  # half -> failed runs in a row
         for half, read in (("dosing", self._backfill_dosing), ("ledger", self._backfill_ledger)):
