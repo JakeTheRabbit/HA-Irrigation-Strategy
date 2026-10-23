@@ -387,8 +387,9 @@ async def step_recipe_presets(hass, entry, room) -> list[dict]:
 
 
 async def step_snapshot_preset(hass, entry, room) -> list[dict]:
-    """M6, once Home Assistant has started: a preset of the room's settings as they are now, a point
-    to go back to. Skipped (needs you) when any of them cannot be read."""
+    """M6, once Home Assistant has started: a preset of the room's own settings as they are now, a
+    point to go back to (each zone's own values are not in it). When any of them cannot be read it is
+    listed (needs you) and tried again at the next start."""
     from . import presets
 
     site = _site(hass)
@@ -401,17 +402,20 @@ async def step_snapshot_preset(hass, entry, room) -> list[dict]:
     sections = [*SECTIONS, "timers"]
     values, skipped = presets.read_source(hass, {"room_id": room_id}, sections)
     if skipped:
-        return [
+        put(
+            room["report"],
             row(
                 "presets.snapshot",
                 "Rollback preset",
                 "needs_you",
                 "Some settings could not be read at the update, so no preset of your settings was "
-                "saved. Save one yourself under Presets before you change anything.",
+                "saved yet (it is tried again at the next start). Save one yourself under Presets "
+                "before you change anything.",
                 "#/plan/schedule",
                 "presets",
-            )
-        ]
+            ),
+        )
+        raise RuntimeError(f"settings not readable: {', '.join(map(str, skipped))}")
     suffix = " – before 3.18 update"
     name = _room_name(entry)[: PRESET_NAME_MAX - len(suffix)] + suffix
     await _add_presets(
@@ -433,7 +437,8 @@ async def step_snapshot_preset(hass, entry, room) -> list[dict]:
             "presets.snapshot",
             "Rollback preset",
             "carried",
-            "A preset of your current settings was saved as a point to go back to. Nothing was applied.",
+            "A preset of the room's own settings as they were was saved as a point to go back to "
+            "(each zone's own values are not in it). Nothing was applied.",
             "#/plan/schedule",
             "presets",
         )

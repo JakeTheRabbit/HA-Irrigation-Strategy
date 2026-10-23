@@ -53,8 +53,11 @@ in Crop Steering → Irrigation → Grow plan & presets.
 
 - Each recipe stage you had edited (one that differs from the shipped default) was copied as a preset
   named `<room> – <stage> (from 3.17 recipe)`. The recipe itself is unchanged and still works.
-- A preset named `<room> – before 3.18 update` holds the room's settings as they were at the update. It
-  is a point to go back to if you change things and regret it.
+- A preset named `<room> – before 3.18 update` holds the room's own settings as they were at the update.
+  It is a point to go back to if you change things and regret it. A zone's own values (a zone tuned
+  apart from its room) are not in it: before you change one, save a preset from that zone. If some
+  settings could not be read at the update, no preset is saved and the update tries again at the next
+  start.
 
 Nothing was applied. To apply one: `crop_steering.preset_list`, then `crop_steering.preset_apply` with
 `preset_id`, `to: [{room_id}]` or `[{room_id, zone}]` and `preview: true` first to see the changes.

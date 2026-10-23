@@ -312,6 +312,26 @@ async def test_a_rollback_preset_holds_the_room_settings_as_restored(hass, hass_
     targets = snapshot["values"]["targets"]
     assert targets["p2_shot_size"] == 4.5 and targets["maximum_ec"] == 8.0  # what the operator set on 3.17.0
     assert snapshot["values"]["timers"] == {"timers": []}
+    row = next(r for r in (await _report(hass, "room:flower_room_"))["carried"] if r["id"] == "presets.snapshot")
+    assert "each zone's own values are not in it" in row["detail"]  # it holds the room's numbers only
+
+
+async def test_a_rollback_preset_that_could_not_be_read_is_tried_again_at_the_next_start(
+    hass, hass_storage, monkeypatch
+):
+    from custom_components.crop_steering import presets
+
+    real = presets.read_source
+    monkeypatch.setattr(presets, "read_source", lambda *a: (real(*a)[0], ["p2_shot_size"]))
+    entry, _seed, _stores = await _upgrade(hass, hass_storage, V3_17)
+    room = hass.data[DOMAIN]["_migration"].document["rooms"][entry.entry_id]
+    assert room["steps"]["snapshot_preset:v1"]["result"] == "error"
+    assert "presets.snapshot" in _ids((await _report(hass, "room:flower_room_"))["needs_you"])
+    monkeypatch.setattr(presets, "read_source", real)
+    assert await hass.config_entries.async_reload(entry.entry_id)
+    await hass.async_block_till_done()
+    assert "presets.snapshot" in _ids((await _report(hass, "room:flower_room_"))["carried"])
+    assert [p for p in _presets(hass) if p["by"].get("detail") == "migration:snapshot_preset"]
 
 
 async def test_display_units_follow_home_assistant_in_fahrenheit_only(hass, hass_storage):
