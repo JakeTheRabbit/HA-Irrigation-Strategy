@@ -40,6 +40,13 @@ import { resetDemoAlertRules } from "./parity-demo/settings";
 import { resetDemoTimers } from "./parity-demo/timers";
 import { answerPresets, resetDemoPresets } from "./parity-demo/presets";
 import { answerSupply, resetDemoSupply } from "./parity-demo/supply";
+import {
+  answerProbeOffset,
+  demoProbeOffsets,
+  isDemoOffsetWrite,
+  resetDemoProbeOffsets,
+  revertProbeOffset,
+} from "./parity-demo/equipment";
 import { sameValue } from "./utils";
 
 const clone = <T>(value: T): T => structuredClone(value);
@@ -78,6 +85,7 @@ export class OperatorDemo {
     resetDemoAlertRules();
     resetDemoPresets();
     resetDemoSupply();
+    resetDemoProbeOffsets();
     this.whatsNewSeen =
       whatsNew === "unknown"
         ? null
@@ -508,6 +516,11 @@ export class OperatorDemo {
       const envelope = typeof answer === "object" && answer !== null && (answer as { api?: unknown }).api === 2;
       return (envelope ? answer : demoEnvelope(answer, now)) as T;
     }
+    // Probe offsets read and write the demo's own probes (parity-demo/equipment.ts).
+    if (this.backend === "3.18" && action === "probe_offset_set")
+      return answerProbeOffset(data, this.getStates(), this.updateStates, Date.now()) as T;
+    if (action === "history_revert" && this.backend === "3.18" && isDemoOffsetWrite(String(data.event_id)))
+      return revertProbeOffset(String(data.event_id), this.getStates(), this.updateStates, Date.now()) as T;
     if (isParityAction(action)) return (await parityDemo(action, data, Date.now(), this.backend)) as T;
     // An existing service asked for v2: a 3.18 integration wraps its v1 answer in the envelope; a
     // 3.17 one answers v1, which callV2 reads as missing.
@@ -610,7 +623,11 @@ export class OperatorDemo {
     if (action.startsWith("stock_")) return this.stockDemo.call(action, data) as T;
     if (action.startsWith("calibration_")) {
       this.calibrationDemo ||= new CalibrationDemo(this.getStates);
-      return this.calibrationDemo.call(action, data) as T;
+      const document = this.calibrationDemo.call(action, data);
+      // A 3.18 integration keeps each moisture probe's offset in the same store.
+      if (this.backend === "3.18" && action === "calibration_get")
+        return { ...document, probe_user_offsets: demoProbeOffsets(String(data.room_id)) } as T;
+      return document as T;
     }
     if (action.startsWith("dosing_")) {
       // The demo's controller draws each dose from its pump's stock tank with stock_draw.

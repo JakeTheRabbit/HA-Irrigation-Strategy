@@ -105,6 +105,7 @@ const ASKED: Partial<Record<string, Record<string, unknown>>> = {
   alert_rule_test: { rule: TANK_RULE },
   alert_rule_preview: { rule: TANK_RULE },
   dashboard_create: { template: "facility_wall", rooms: ["room:"] },
+  probe_offset_set: { entity_id: "sensor.demo_z1_front_vwc", match_handheld: 60, preview: true },
 };
 test("demo 3.18 answers every parity action ok", async () => {
   for (const a of PARITY_ACTIONS) expect([a, (await callV2(demoController("?demo=1"), a, ASKED[a] ?? {})).kind]).toEqual([a, "ok"]);

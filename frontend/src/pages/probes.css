@@ -2,7 +2,7 @@
    feed water; one tap down, the room map and the controller's own sensors. */
 .probes-status {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0;
   margin-bottom: 16px;
   padding: 0;
@@ -27,17 +27,7 @@
   padding-bottom: 9px;
   vertical-align: middle;
 }
-.probes-table tbody tr.probes-zone th {
-  padding-top: 14px;
-  color: var(--foreground);
-  font-size: var(--text-sm);
-  font-weight: 600;
-}
-.probes-zone .pill {
-  margin-left: 10px;
-  vertical-align: 1px;
-}
-.probes-table tr[data-health]:not([data-health="ok"]) td:first-child strong {
+.probes-table tr[data-health]:not([data-health="ok"]) td[data-label="Probe"] strong {
   color: color-mix(in srgb, var(--warning) 70%, var(--foreground));
 }
 .probes-hardware {
@@ -269,4 +259,325 @@
     grid-template-columns: 1fr;
     gap: 12px;
   }
+}
+
+/* Probes & offsets (E1): every room's moisture probes beside the substrate curve and where to put one. */
+.probes-layout {
+  display: grid;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+@media (min-width: 1200px) {
+  .probes-layout {
+    grid-template-columns: minmax(0, 1fr) 300px;
+    align-items: start;
+  }
+}
+.probes-board {
+  margin: 0;
+  padding: 6px 0 10px;
+}
+.probes-aside {
+  display: grid;
+  gap: 16px;
+}
+.probes-aside .panel {
+  margin: 0;
+  padding: 16px 20px;
+}
+.probes-aside h2 {
+  margin: 0 0 6px;
+  font-size: var(--text-base);
+}
+.probes-missing {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 20px;
+  font-size: var(--text-sm);
+}
+.probes-missing .needs-integration {
+  margin: 0;
+}
+.probes-table tbody tr.probes-room th {
+  padding-top: 16px;
+  font-weight: 400;
+  font-size: var(--text-sm);
+  text-transform: none;
+  letter-spacing: 0;
+}
+.probes-room th {
+  display: table-cell;
+}
+.probes-room-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-right: 12px;
+  color: var(--foreground);
+  font-size: var(--text-base);
+  font-weight: 600;
+}
+.probes-room-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--primary);
+}
+.probes-room-health {
+  float: right;
+  color: var(--muted-foreground);
+}
+.probes-room-health[data-tone="warn"],
+.probes-zone-value [data-tone="warn"] {
+  color: var(--warning);
+}
+.probes-room-blocked > td {
+  color: var(--warning);
+  font-size: var(--text-sm);
+}
+.probes-room-blocked svg {
+  vertical-align: -2px;
+}
+.probes-zone-value {
+  vertical-align: top !important;
+  min-width: 96px;
+}
+.probes-zone-value > span,
+.probes-zone-value > strong {
+  display: block;
+}
+.probes-zone-value strong {
+  font-size: 20px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.probes-spread {
+  position: relative;
+  display: block;
+  width: 92px;
+  height: 6px;
+  margin: 6px 0 4px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--border) 80%, transparent);
+}
+.probes-spread-range {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  min-width: 4px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--success, #81c995) 55%, transparent);
+}
+.probes-spread-tick {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--foreground);
+}
+.probes-vwc {
+  font-weight: 600;
+}
+.probes-vwc[data-tone="bad"] {
+  color: var(--destructive);
+}
+.probes-ec-trouble {
+  color: var(--warning);
+  white-space: nowrap;
+}
+.probes-ec-trouble svg {
+  display: inline;
+  vertical-align: -2px;
+}
+.probe-offset-row > td {
+  padding: 4px 0 12px !important;
+}
+.probe-offset {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--primary);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--primary) 6%, transparent);
+}
+.probe-offset-inputs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 16px 32px;
+}
+.probe-offset-inputs label {
+  display: grid;
+  gap: 6px;
+  font-size: var(--text-sm);
+}
+.probe-offset-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.probe-offset-field input {
+  width: 96px;
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+}
+.probe-offset-result {
+  display: grid;
+  gap: 2px;
+  font-size: var(--text-sm);
+}
+.probe-offset-result strong {
+  color: var(--primary);
+  font-size: 26px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.probe-offset .review-apply {
+  margin: 0;
+}
+.probe-offset-foot {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0;
+}
+.probe-curve-reason {
+  margin: 8px 0 0;
+  font-size: var(--text-sm);
+}
+.probe-placement:focus-visible {
+  outline: 2px solid var(--warning);
+  outline-offset: 2px;
+}
+.probe-placement[data-warning] {
+  border-color: var(--warning);
+}
+.probe-placement-warning {
+  display: flex;
+  gap: 10px;
+  margin: 8px 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--warning) 14%, transparent);
+  font-size: var(--text-sm);
+}
+.probe-placement-warning svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--warning);
+}
+.probe-placement ul {
+  margin: 10px 0 0;
+  padding-left: 18px;
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+.probe-placement-picture {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin: 8px 0;
+}
+.probe-placement-picture .slab {
+  fill: color-mix(in srgb, var(--foreground) 10%, transparent);
+}
+.probe-placement-picture .cone {
+  fill: color-mix(in srgb, var(--primary) 30%, transparent);
+}
+.probe-placement-picture .cube {
+  fill: color-mix(in srgb, var(--foreground) 25%, transparent);
+}
+.probe-placement-picture .dripper,
+.probe-placement-picture .prong,
+.probe-placement-picture .measure {
+  stroke: var(--foreground);
+  stroke-width: 2;
+}
+.probe-placement-picture .measure {
+  stroke: var(--primary);
+}
+.probe-placement-picture .probe-head {
+  fill: var(--muted-foreground);
+}
+.probe-placement-picture .label {
+  fill: var(--muted-foreground);
+  font-size: 12px;
+}
+.probe-placement-picture .label.accent {
+  fill: var(--primary);
+}
+/* Phone: each probe a small card, its fields labelled; the zone's value heads its probes. */
+@media (max-width: 720px) {
+  .probes-status {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .probes-status > div + div {
+    border-left: 0;
+    border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  }
+  .probes-table,
+  .probes-table tbody,
+  .probes-table tr,
+  .probes-table td,
+  .probes-table th {
+    display: block;
+  }
+  .probes-table thead {
+    display: none;
+  }
+  .probes-table tr.probe-row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 4px 12px;
+    padding: 8px 12px;
+    border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  }
+  .probes-table tr.probe-row > td {
+    padding: 2px 0 !important;
+    border: 0;
+    text-align: left;
+  }
+  .probes-table tr.probe-row > td[data-label]:not([data-label=""])::before {
+    content: attr(data-label);
+    display: block;
+    color: var(--muted-foreground);
+    font-size: var(--text-xs);
+  }
+  .probes-zone-value {
+    grid-column: 1 / -1;
+  }
+  .probes-room-health {
+    float: none;
+    display: block;
+  }
+  .probe-offset-row > td {
+    padding: 4px 8px 12px !important;
+  }
+}
+.probes-table th,
+.probes-table td {
+  padding-left: 8px;
+  padding-right: 8px;
+  white-space: normal;
+}
+.probes-table .cell-subtext {
+  display: block;
+}
+.probe-placement ul {
+  list-style: disc;
+}
+.probes-table td.numeric,
+.probes-ec-trouble {
+  white-space: normal;
+}
+.probes-table [data-match-handheld] {
+  height: auto;
+  max-width: 92px;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  white-space: normal;
+  line-height: 1.2;
 }
