@@ -96,7 +96,8 @@
 .unit-undo {
   border: 0;
   background: none;
-  padding: 0 0 0 6px;
+  min-height: 32px;
+  padding: 0 10px;
   color: inherit;
   font-weight: 600;
   text-decoration: underline;

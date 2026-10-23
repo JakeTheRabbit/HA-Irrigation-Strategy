@@ -7,6 +7,7 @@ import {
   displayEntityId,
   storedUnit,
   unitExamples,
+  unitMode,
   type DisplayOptions,
   type DisplayRow,
   type UnitKey,
@@ -218,13 +219,13 @@ function readLocal(): Record<string, unknown> | null {
 export function UnitSettings({ controller }: { controller: Controller }) {
   const display = controller.room.display;
   const roomId = controller.room.room.id;
-  const local = !display.units;
+  const mode = unitMode(controller.states[displayEntityId(controller.room.room.prefix)], controller.connection);
+  const local = mode === "local";
   const [results, setResults] = useState<Partial<Record<UnitKey, RowResult>>>({});
   const [, rerender] = useState(0);
   /** The newest revision this page read back: the sensor may not have caught up with a save yet. */
   const revision = useRef(0);
-  const connected = ["live", "demo"].includes(controller.connection);
-  const blocked = !local && (!connected || controller.admin === false);
+  const blocked = mode !== "local" && (mode !== "room" || controller.admin === false);
   const examples = unitExamples(controller.states, controller.room);
   const now = () => clock(Date.now(), controller.timeZone);
   const set = (key: UnitKey, result: RowResult) => setResults((r) => ({ ...r, [key]: result }));
@@ -305,9 +306,11 @@ export function UnitSettings({ controller }: { controller: Controller }) {
       </div>
       {blocked && (
         <p className="small muted">
-          {connected
-            ? "Only an administrator can change the units of this room."
-            : "Connect to Home Assistant to change the units."}
+          {mode === "offline"
+            ? "Connect to Home Assistant to change the units."
+            : mode === "unavailable"
+              ? "This room's display settings are unavailable in Home Assistant, so the units can't be changed now."
+              : "Only an administrator can change the units of this room."}
         </p>
       )}
       {UNIT_ROWS.map((row) => {

@@ -14,8 +14,8 @@
  *   "Put back and read back 14:10" with Automatic chosen again;
  * - Where the app opens: choosing a view says "Saved and read back 14:10";
  * - Wall and tablet dashboards (3.18): three template cards; Room tablet's "Create in Home
- *   Assistant" → "Created … 14:10 as /crop-steering-room_tablet-1", "Open in Home Assistant" and
- *   "Create again", the line marked confirmed; on 3.17 the "Needs integration 3.18" note sits in the dashboards region;
+ *   Assistant" → "Created … 14:10 for <the chosen room> as /crop-steering-room_tablet-1" (a status
+ *   line), "Open in Home Assistant" and "Create again", the line marked confirmed; on 3.17 the "Needs integration 3.18" note sits in the dashboards region;
  * - "Keep this screen on while open" shows only where the browser has Wake Lock;
  * - "More display options" starts closed and opens to the connection, appearance and display
  *   options. */
@@ -55,7 +55,9 @@ await runParity({
     await ec.getByText("Saved and read back 14:10").waitFor();
     assert.match(await ecExample.innerText(), /\d ppm/, `${label}: EC example in ppm`);
     assert.equal(await ec.getByRole("button", { name: "PPM 500", exact: true }).getAttribute("aria-pressed"), "true");
-    await ec.getByRole("button", { name: "Undo", exact: true }).click();
+    const undo = ec.getByRole("button", { name: "Undo", exact: true });
+    assert.ok((await undo.boundingBox()).height >= 32, `${label}: Undo is at least 32px tall`);
+    await undo.click();
     await ec.getByText("Put back and read back 14:10").waitFor();
     assert.match(await ecExample.innerText(), /mS\/cm/, `${label}: undo puts mS/cm back`);
     await ec.getByRole("button", { name: "PPM 500", exact: true }).click();
@@ -89,7 +91,11 @@ await runParity({
       await tablet.getByRole("button", { name: "Create in Home Assistant", exact: true }).click();
       const created = tablet.locator(".wall-created");
       await created.waitFor();
-      assert.match(await created.innerText(), /^Created .*14:10 as \/crop-steering-room_tablet-1\s*Open in Home Assistant$/, `${label}: created line`);
+      const room = await tablet.locator('.wall-rooms [aria-pressed="true"]').innerText();
+      const line = await created.innerText();
+      assert.match(line, /^Created .*14:10 for .* as \/crop-steering-room_tablet-1\s*Open in Home Assistant$/, `${label}: created line`);
+      assert.ok(line.includes(` for ${room} as `), `${label}: created line names its room ${room}: ${line}`);
+      assert.equal(await created.getAttribute("role"), "status", `${label}: created line announced`);
       assert.equal(await created.getByRole("link", { name: "Open in Home Assistant" }).getAttribute("href"), "/crop-steering-room_tablet-1");
       assert.equal(await created.getAttribute("data-confirmed"), "true", `${label}: created and confirmed`);
       await tablet.getByRole("button", { name: "Create again", exact: true }).waitFor();

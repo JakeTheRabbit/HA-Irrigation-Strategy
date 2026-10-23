@@ -8,6 +8,7 @@ import {
   readDisplay,
   storedUnit,
   unitExamples,
+  unitMode,
 } from "./display";
 import { formatEc, getDisplayUnits, parseEc, readDisplayUnits, setDisplayUnits } from "./display-units";
 import { createDemo } from "./demo";
@@ -119,6 +120,36 @@ describe("display units in the room's display options", () => {
     states[root] = { ...states[root], state: String(21.8 + 0.1) };
     setDisplayUnits({ temp: "C" });
     expect(unitExamples(states, room).temp).toBe("Root zone 21.9 °C");
+  });
+  it("shows a root zone that reads in °F, converted, rather than claiming no reading", () => {
+    const states = createDemo(Date.UTC(2026, 9, 23, 3, 0));
+    const room = buildRoom(states, discoverRooms(states)[0]);
+    const config = states[`sensor.crop_steering_${room.room.prefix}engine_config`].attributes;
+    const root = (config.substrate_temperature_sensors as Record<string, string>)["1"];
+    states[root] = {
+      ...states[root],
+      state: "70.2",
+      attributes: { ...states[root].attributes, unit_of_measurement: "°F" },
+    };
+    setDisplayUnits({ temp: "C" });
+    expect(unitExamples(states, room).temp).toBe("Root zone 21.2 °C");
+    setDisplayUnits({ temp: "F" });
+    expect(unitExamples(states, room).temp).toBe("Root zone 70.2 °F");
+  });
+  it("unitMode saves in the room, in this browser on 3.17, and not at all offline or unavailable", () => {
+    const room = entity("4", { ec_unit: "mS/cm", temp_unit: "C", volume_unit: "auto", clock: 24 });
+    const old = entity("3", {});
+    expect(unitMode(room, "live")).toBe("room");
+    expect(unitMode(room, "demo")).toBe("room");
+    expect(unitMode(old, "live")).toBe("local");
+    // No display sensor at all: an integration older still.
+    expect(unitMode(undefined, "live")).toBe("local");
+    // Not loaded yet or gone: never this browser, which the room's units would later override.
+    for (const connection of ["connecting", "offline"] as const) {
+      expect(unitMode(undefined, connection)).toBe("offline");
+      expect(unitMode(old, connection)).toBe("offline");
+    }
+    expect(unitMode(entity("unavailable", {}), "live")).toBe("unavailable");
   });
   it('storedUnit keeps "auto" as the room or this browser stores it', () => {
     const room = readDisplay(entity("4", { ec_unit: "mS/cm", temp_unit: "C", volume_unit: "auto", clock: 24 }));

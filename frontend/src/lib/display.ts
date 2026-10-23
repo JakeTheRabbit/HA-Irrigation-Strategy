@@ -240,6 +240,17 @@ export function readDisplay(entity: EntityState | undefined): RoomDisplay {
 
 /** The unit `key` as stored, "auto" unresolved: the room's option on 3.18, else this browser's
  * choice (`stored`, the JSON under crop-steering.units), else the default. */
+/** How Settings › Units saves: in the room's display store (3.18), in this browser (an integration
+ * without units), or not at all: offline or still connecting (the room's units are not known yet,
+ * and would later override this browser's), or the room's display sensor is unavailable. */
+export type UnitMode = "room" | "local" | "offline" | "unavailable";
+export function unitMode(entity: EntityState | undefined, connection: string): UnitMode {
+  if (connection !== "live" && connection !== "demo") return "offline";
+  const display = readDisplay(entity);
+  if (entity && !display.available) return "unavailable";
+  return display.units ? "room" : "local";
+}
+
 export function storedUnit(display: RoomDisplay, stored: string | null, key: UnitKey): string | number {
   if (display.units) return display.options[key];
   const local = readDisplayUnits(undefined, stored);
@@ -282,7 +293,7 @@ const numberOf = (entity: EntityState | undefined) => {
 };
 
 /** One live example per unit row of Settings, from the room's own readings through the display
- * store: average EC, a °C sensor of the room, water today, lights off. A row whose reading the
+ * store: average EC, a °C or °F sensor of the room, water today, lights off. A row whose reading the
  * room lacks says so and shows the unit on a plain example number. */
 export function unitExamples(
   states: States,
@@ -301,14 +312,18 @@ export function unitExamples(
     ] as const
   )
     .map(([label, id]) => ({ label, entity: typeof id === "string" ? states[id] : undefined }))
-    .find(({ entity }) => entity?.attributes.unit_of_measurement === "°C" && numberOf(entity) !== null);
-  const temp = numberOf(thermometer?.entity);
+    .find(({ entity }) => ["°C", "°F"].includes(String(entity?.attributes.unit_of_measurement)) && numberOf(entity) !== null);
+  const reading = numberOf(thermometer?.entity);
+  // A probe on US units reads in °F: stored and formatted as °C, kept to a tenth at least.
+  const fahrenheit = thermometer?.entity?.attributes.unit_of_measurement === "°F";
+  const temp = reading !== null && fahrenheit ? ((reading - 32) * 5) / 9 : reading;
+  const tempDigits = reading === null ? 0 : fahrenheit ? Math.max(1, digitsOf(reading)) : digitsOf(reading);
   const off = numberOf(states[`number.crop_steering_${room.room.prefix}lights_off_hour`]);
   return {
     ec: ec !== null ? `Average EC ${formatEc(ec, digitsOf(ec))}` : `No EC reading yet, for example ${formatEc(2, 1)}`,
     temp:
       thermometer && temp !== null
-        ? `${thermometer.label} ${formatTemp(temp, digitsOf(temp))}`
+        ? `${thermometer.label} ${formatTemp(temp, tempDigits)}`
         : `No temperature reading yet, for example ${formatTemp(21, 1)}`,
     volume:
       water !== null
