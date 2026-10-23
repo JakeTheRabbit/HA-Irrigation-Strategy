@@ -973,7 +973,7 @@ controller still reports a setup change (CS-201) and a hardware hold (CS-301, CS
 
 *Warning · Notification*
 
-**What it means.** A flow meter is set in the supply in Crop Steering. Between shots, with no shot of its room running, the meter counted more than 0.5 L. The count starts from the first reading after the last shot, so the late report of a shot is not counted. The alert names the meter.
+**What it means.** A flow meter is set in the supply in Crop Steering. Between shots, with no shot of its room running, the meter counted more than 0.5 L. After each shot that the meter measured, the count moves past the water of the shot: what the meter saw, or what the controller counted if the meter has not reported all of it yet. So the late report of a shot is not counted, and a leak is still seen in a room that waters on most loops. A meter that the shot did not measure, for example the pump's meter behind a zone with its own meter, starts again from its first reading after the shot. Water that flows through it between the shot and that reading is not counted. The alert names the meter.
 
 **Effect on water.** The alert does not change the water. The controller does not switch anything off. The alert clears when the meter stops counting.
 

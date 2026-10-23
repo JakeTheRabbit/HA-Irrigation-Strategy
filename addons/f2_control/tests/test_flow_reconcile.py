@@ -1,6 +1,7 @@
 """G4, flow reconciliation (Task 26): with a flow meter saved in the integration's supply (a zone's meter in
 zone_meters, else its pump's flow_meter), each shot that completes compares the litres the meter saw with the litres
-the controller counted. flow.reconciled {ratio, commanded_l, metered_l} carries the shot's intent id, its
+the controller counted. flow.reconciled {ratio, commanded_l, metered_l} (plus flow.reconcile's verdict, an additive
+field the brief did not ask for and kept on review) carries the shot's intent id, its
 shot.completed carries metered_l, sensor.crop_steering_<px>zone_N_flow_ratio shows it after the pass, and a shot that
 got under 80 % raises CS-318. Between shots a meter that rises more than 0.5 L raises CS-319. With no meter nothing
 changes: no read, no event, no sensor. Every new state write and alert comes after the room's pass (R5)."""
@@ -232,14 +233,17 @@ def test_meter_rise_with_every_valve_shut_raises_cs_319(rig, fire):
 def test_a_shots_own_water_is_never_cs_319(rig, fire, monkeypatch):
     c, fake = rig
     fire.discard(2)
+    monkeypatch.setattr(controller, "METER_IDLE_L", 0.01)  # the rig's shots are 0.1 L: a late report must count
     fake.set_state(METER, "100.0", {"unit_of_measurement": "L"})
     fake.set_state(PUMP_METER, "100.0", {"unit_of_measurement": "L"})
     _supply(fake, zone_meters={"1": METER}, pump_meter=PUMP_METER)
-    _meters_flow(c, fake, monkeypatch, {V1: [METER, PUMP_METER]}, 1.0)
+    _meters_flow(c, fake, monkeypatch, {V1: [METER, PUMP_METER]}, 0.25)
     _pass(c)  # a baseline, then the shot
     fire.clear()
-    for meter in (METER, PUMP_METER):  # the meters report the end of the shot late
-        fake.set_state(meter, str(float(fake.ha_get(meter)[0]) + 2), {"unit_of_measurement": "L"})
+    late = 0.75 * _events(c, "shot.started")[-1]["data"]["commanded_l"]
+    assert late > 2 * controller.METER_IDLE_L
+    for meter in (METER, PUMP_METER):  # the meters report the rest of the shot late
+        fake.set_state(meter, str(float(fake.ha_get(meter)[0]) + late), {"unit_of_measurement": "L"})
     _pass(c)
     _pass(c)
     assert _alerts(fake, "CS-319") == []
@@ -247,3 +251,82 @@ def test_a_shots_own_water_is_never_cs_319(rig, fire, monkeypatch):
     _pass(c)
     alert, = _alerts(fake, "CS-319")
     assert PUMP_METER in alert["message"]
+
+
+# ------------------------------------------------------------------------------------------- review fixes (task 26)
+def test_the_watch_reads_each_meter_within_the_shot_paths_timeout(rig, fire, monkeypatch):
+    c, fake = rig
+    fire.clear()
+    fake.set_state(METER, "100.0", {"unit_of_measurement": "L"})
+    _supply(fake, zone_meters={"1": METER})
+    timeouts = []
+    real = controller.ha_get
+    monkeypatch.setattr(controller, "ha_get",
+                        lambda e, timeout=8: (timeouts.append(timeout) if e == METER else None, real(e, timeout))[1])
+    _pass(c)
+    _pass(c)
+    assert timeouts and set(timeouts) == {controller.METER_READ_TIMEOUT_S}
+
+
+def test_a_leak_in_a_room_that_shoots_every_pass_is_still_cs_319(rig, fire, monkeypatch):
+    c, fake = rig
+    fire.discard(2)
+    fake.set_state(METER, "100.0", {"unit_of_measurement": "L"})
+    _supply(fake, zone_meters={"1": METER})
+    _meters_flow(c, fake, monkeypatch, {V1: [METER]}, 1.0)
+    for _ in range(4):  # zone 1 shoots every pass, and 0.3 L leaks between passes
+        _pass(c)
+        fake.set_state(METER, str(float(fake.ha_get(METER)[0]) + 0.3), {"unit_of_measurement": "L"})
+    assert len(_events(c, "shot.completed")) == 4
+    alert, = _alerts(fake, "CS-319")
+    assert METER in alert["message"]
+
+
+@pytest.mark.parametrize("gone", ["meter", "supply"])
+def test_a_meter_taken_out_of_the_supply_takes_its_cards_down(rig, fire, monkeypatch, gone):
+    c, fake = rig
+    fire.discard(2)
+    fake.set_state(METER, "100.0", {"unit_of_measurement": "L"})
+    _supply(fake, zone_meters={"1": METER})
+    _meters_flow(c, fake, monkeypatch, {V1: [METER]}, 0.5)
+    _pass(c)  # a baseline, then a short shot: CS-318
+    fire.clear()
+    _pass(c)
+    fake.set_state(METER, str(float(fake.ha_get(METER)[0]) + 5), {"unit_of_measurement": "L"})
+    _pass(c)  # water with no shot: CS-319
+    assert len(_alerts(fake, "CS-318")) == 1 and len(_alerts(fake, "CS-319")) == 1
+    if gone == "meter":
+        _supply(fake)
+    else:
+        fake.states.pop(SUPPLY)
+    fake.calls.clear()
+    _pass(c)
+    dismissed = {d["notification_id"] for dom, svc, d in fake.calls
+                 if (dom, svc) == ("persistent_notification", "dismiss")}
+    assert dismissed == {f"f2_flow_idle_{METER}", "f2_flow_low_default_z1"}
+
+
+def test_a_meter_shared_with_a_room_whose_shot_is_still_recorded_is_not_watched(rig):
+    from types import SimpleNamespace
+
+    c, fake = rig
+    fake.set_state(PUMP_METER, "100.0", {"unit_of_measurement": "L"})
+    _supply(fake, pump_meter=PUMP_METER)
+    c._supply = c._read_supply()
+    other = SimpleNamespace(prefix="f1_", slug="f1", zones=[1], hw={"pump": PUMP}, shot_inflight=None)
+    c.rooms.append(other)
+    c._watch_meters()  # the baseline
+    other.shot_inflight = {"zone": 1}  # f1's interrupted shot, still recorded: its water may be flowing
+    fake.set_state(PUMP_METER, "105.0", {"unit_of_measurement": "L"})
+    c._watch_meters()
+    assert _alerts(fake, "CS-319") == []
+
+
+def test_a_rooms_pending_flow_rows_keep_only_each_zones_latest(rig):
+    c, _fake = rig
+    room = c.rooms[0]
+    for n in range(5):
+        c._flow_reconciled(room, 1, f"id{n}", 2.0, 1.0 + n * 0.1)
+    c._flow_reconciled(room, 2, "z2", 2.0, 2.0)
+    rows = list(room.__dict__["_flow_pending"].values())
+    assert [(r["zone"], r["intent_id"]) for r in rows] == [(1, "id4"), (2, "z2")]

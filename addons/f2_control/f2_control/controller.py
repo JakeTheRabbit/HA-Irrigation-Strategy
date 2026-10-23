@@ -6318,6 +6318,10 @@ class Controller:
                 after = self._meter_litres(meter, METER_READ_TIMEOUT_S)
                 if after is not None and after >= meter_before:
                     journaled["metered_l"] = after - meter_before
+                    # CS-319 moves past this shot's water, not past what leaked before it: what the meter saw, or
+                    # what the shot counted when the meter has yet to report all of it (_meters_rebase)
+                    journaled["meter_moved"] = (meter, max(after - meter_before, nominal_l * min(
+                        1.0, elapsed / duration_s if duration_s > 0 else 1.0)))
             if aborted:
                 stopped_early(aborted, elapsed)
         except _ShotStopped as stopped:
@@ -6401,8 +6405,8 @@ class Controller:
             finally:
                 self._busy = False
                 self._shot_room = None
-                if commanded:  # this shot's water is no leak: the room's meters start again (_watch_meters)
-                    self._meters_rebase(room)
+                if commanded:  # this shot's water is no leak (_watch_meters)
+                    self._meters_rebase(room, journaled.get("meter_moved"))
                 if journaled["intent_id"] is not None:  # its end, after its water is counted (#197)
                     self._journal_shot_end(room, zone, journaled, valve_started)
 
@@ -6490,12 +6494,13 @@ class Controller:
                 "verdict": verdict["verdict"]}
         self._journal(room.prefix, "flow.reconciled", zone=zone, actor="system",
                       correlation={"intent_id": intent_id}, data=data)
-        room.__dict__.setdefault("_flow_pending", []).append({"zone": zone, "intent_id": intent_id, **data})
+        # one row a zone, its latest shot's: a pass that errors before _flow_done never piles them up
+        room.__dict__.setdefault("_flow_pending", {})[zone] = {"zone": zone, "intent_id": intent_id, **data}
 
     def _flow_done(self, room):
         """The end of the room's pass: each reconciled shot's sensor.crop_steering_<px>zone_N_flow_ratio, and CS-318
         raised for a zone that got under flow.LOW of its water, taken down by a shot that got enough. Only tells."""
-        for row in room.__dict__.pop("_flow_pending", []):
+        for row in room.__dict__.pop("_flow_pending", {}).values():
             try:
                 zone, key = row["zone"], f"flow_low_{room.slug}_z{row['zone']}"
                 ha_set(f"sensor.crop_steering_{room.prefix}zone_{zone}_flow_ratio", row["ratio"],
@@ -6571,58 +6576,71 @@ class Controller:
                 log(f"flow meter {entity} reports in {unit!r}, not L, m³ or gal: it is not read")
         return litres
 
-    def _meters_rebase(self, room):
-        """A shot of this room ran: its meters' baselines go, and the next pass takes them again (_watch_meters)."""
+    def _meters_rebase(self, room, moved=None):
+        """A shot of this room ran. The meter it read before and after (`moved`: (entity, litres)) keeps its baseline,
+        moved up by that shot's water, so a leak that runs while the room shoots is still seen. Every other meter of
+        the room, which the shot did not read, loses its baseline and the next pass takes it again (_watch_meters)."""
         watch = self.__dict__.get("_meter_watch")
         try:
+            read, litres = moved or (None, 0.0)
             for entity, _zone in self._room_meters(room) if watch else ():
-                watch.pop(entity, None)
+                if entity == read and entity in watch:
+                    watch[entity]["base"] += litres
+                else:
+                    watch.pop(entity, None)
         except Exception as e:
             log("flow meter error", room.slug, e)
 
     # ---------- CS-319: water through a meter with no shot in flight (alert only) ----------
     def _watch_meters(self):
-        """Once a pass, before any room waters: each flow meter of the supply is read. Its baseline is the first
-        reading after the last shot of its room had ended (_meters_rebase), so the meter's late report of that shot is
-        not counted. A rise of more than METER_IDLE_L above it, with no shot in flight, is CS-319, and the baseline
-        moves up to it; the card goes once the meter stops. A meter that falls (a reset) starts again. Only tells."""
+        """Once a pass, before any room waters: each flow meter of the supply is read. Its baseline moves past each
+        shot's own water (_meters_rebase), or is the first reading after a shot that did not read it, so the meter's
+        late report of a shot is not counted. A rise of more than METER_IDLE_L above it, with no shot in flight in any
+        room that reads it, is CS-319, and the baseline moves up to it; the card goes once the meter stops. A meter
+        that falls (a reset) starts again. A meter, or a zone's meter, no longer in the supply takes its CS-319, or
+        the zone's CS-318, down. Only tells."""
         watch = self.__dict__.setdefault("_meter_watch", {})
-        if not getattr(self, "_supply", None):
-            watch.clear()
-            return
-        seen = set()
+        listed = {}  # meter -> [(room, zone)] of every room that reads it; none with no supply
         for room in self.rooms:
-            meters = [(e, z) for e, z in self._room_meters(room) if e not in seen]
-            seen.update(e for e, _z in meters)
-            for entity, zone in meters:
-                key = f"flow_idle_{entity}"
-                if getattr(room, "shot_inflight", None):  # a shot still recorded: its water may be flowing
-                    watch.pop(entity, None)
-                    continue
-                litres = self._meter_litres(entity)
-                if litres is None:
-                    continue
-                st = watch.get(entity)
-                if st is None or litres < st["last"]:
-                    watch[entity] = {"base": litres, "last": litres}
-                    continue
-                rise = litres - st["base"]
-                if rise > METER_IDLE_L:
-                    st["base"] = litres
-                    self._alert(
-                        key,
-                        "CS-319",
-                        "water flows with no zone on",
-                        f"The flow meter counted {rise:.2f} L while the controller ran no shot. A valve can be stuck open or leak, a line can be broken, or "
-                        "someone waters by hand. Check the valves and the lines of this meter now. The controller "
-                        f"does not switch anything off.\n\nMeter: {entity}",
-                        room=room,
-                        zone=zone,
-                        entity_id=entity,
-                    )
-                elif litres <= st["last"]:
-                    self._dismiss(key)
-                st["last"] = litres
+            for entity, zone in self._room_meters(room):
+                listed.setdefault(entity, []).append((room, zone))
+            for zone in room.zones:
+                if not self._flow_meter(room, zone):
+                    self._dismiss(f"flow_low_{room.slug}_z{zone}")
+        for entity in [e for e in watch if e not in listed]:
+            del watch[entity]
+        for key in [k for k in self._alerted if k.startswith("flow_idle_") and k[len("flow_idle_"):] not in listed]:
+            self._dismiss(key)
+        for entity, readers in listed.items():
+            room, zone = readers[0]
+            key = f"flow_idle_{entity}"
+            if any(getattr(r, "shot_inflight", None) for r, _z in readers):  # a shot still recorded: its water may
+                watch.pop(entity, None)  # be flowing through this meter, whichever room it is in
+                continue
+            litres = self._meter_litres(entity, METER_READ_TIMEOUT_S)
+            if litres is None:
+                continue
+            st = watch.get(entity)
+            if st is None or litres < st["last"]:
+                watch[entity] = {"base": litres, "last": litres}
+                continue
+            rise = litres - st["base"]
+            if rise > METER_IDLE_L:
+                st["base"] = litres
+                self._alert(
+                    key,
+                    "CS-319",
+                    "water flows with no zone on",
+                    f"The flow meter counted {rise:.2f} L while the controller ran no shot. A valve can be stuck open or leak, a line can be broken, or "
+                    "someone waters by hand. Check the valves and the lines of this meter now. The controller "
+                    f"does not switch anything off.\n\nMeter: {entity}",
+                    room=room,
+                    zone=zone,
+                    entity_id=entity,
+                )
+            elif litres <= st["last"]:
+                self._dismiss(key)
+            st["last"] = litres
 
     def _safe_off(self, deadline=None):
         """Stopping (SIGTERM: the app stopped, updated or restarted): close only what this controller has
