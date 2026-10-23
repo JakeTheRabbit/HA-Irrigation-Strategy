@@ -8,7 +8,6 @@ import { UiTip } from "@/components/info-tip";
 import { JevTrouble, jevUsage } from "@/components/jev-status";
 import { Pill, Sparkline } from "@/components/mini-visuals";
 import { NeedsIntegration } from "@/components/needs-integration";
-import { ProbeCalibration } from "@/components/probe-calibration";
 import { ReviewApply, type ReviewRow } from "@/components/review-apply";
 import { ageText, readHeartbeat } from "@/lib/controller-health";
 import { formatEc, formatTemp } from "@/lib/display-units";
@@ -119,7 +118,7 @@ interface RoomGroup {
 
 /** Equipment › Probes & offsets: the selected room's probes, under the room's name, whether to believe each one,
  * and each moisture probe's offset, matched to a handheld meter in place. Then the substrate curve, where
- * to put a probe, the probes that count, the feed-water probes' calibration, and one tap down the room
+ * to put a probe, the probes that count, a link to the feed-water probes' calibration, and one tap down the room
  * map and the controller's own sensors. */
 export function Probes({
   controller,
@@ -346,7 +345,9 @@ export function Probes({
           </ul>
         </section>
       )}
-      <ProbeCalibration controller={controller} />
+      <p className="probes-feed-cal">
+        <a href="#/equipment/feed-calibration">Feed pH and EC probes: Calibrate →</a>
+      </p>
       <RoomMap controller={controller} navigate={navigate} />
       <ControllerInternals controller={controller} />
       <p className="footnote">

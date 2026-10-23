@@ -581,3 +581,10 @@
   white-space: normal;
   line-height: 1.2;
 }
+.probes-feed-cal {
+  margin: 0;
+  font-weight: 600;
+}
+.probes-feed-cal a {
+  color: var(--primary-strong);
+}

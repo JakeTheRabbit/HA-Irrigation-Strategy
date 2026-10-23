@@ -1,4 +1,6 @@
-/** The feed-probe two-point calibration flow on Equipment › Probes, against the compiled demo. */
+/** The feed-probe two-point check (the v1 form) on Equipment › Feed pH/EC calibration with an integration
+ * older than 3.18 (`backend=3.17`), against the compiled demo. 3.18 runs the guided wizard instead
+ * (verify-parity-e4.mjs). */
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { readFile, mkdir } from "node:fs/promises";
@@ -12,7 +14,8 @@ const server = createServer((req, res) => {
   res.writeHead(200, { "Content-Type": "text/html" });
   res.end(html);
 });
-await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+// PORT: a fixed port for a run beside other checks; an ephemeral one without.
+await new Promise((resolve) => server.listen(Number(process.env.PORT) || 0, "127.0.0.1", resolve));
 const origin = `http://127.0.0.1:${server.address().port}`;
 const browser = await chromium.launch({
   headless: true,
@@ -33,7 +36,7 @@ try {
       }
       return route.continue();
     });
-    await page.goto(`${origin}/dashboard.html?demo=1#/equipment/probes`);
+    await page.goto(`${origin}/dashboard.html?demo=1&backend=3.17#/equipment/feed-calibration`);
     const panel = page.getByRole("region", { name: "Feed probe calibration" });
     await panel.waitFor();
     // Room A maps both feed probes; its pH probe was checked before and was drifting.
@@ -83,7 +86,7 @@ try {
   }
   // Room B maps no feed-water probe: nothing to check, and it says where to map one.
   const page = await browser.newPage();
-  await page.goto(`${origin}/dashboard.html?demo=1&room=room%3Aroom_b_#/equipment/probes`);
+  await page.goto(`${origin}/dashboard.html?demo=1&backend=3.17&room=room%3Aroom_b_#/equipment/feed-calibration`);
   await page
     .getByRole("region", { name: "Feed probe calibration" })
     .getByText("No feed-water probe is mapped")

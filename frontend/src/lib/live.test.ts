@@ -158,6 +158,9 @@ describe("watched entities", () => {
       "sensor.crop_steering_zone_2_jev",
       "sensor.crop_steering_room_b_jev_log",
       "sensor.crop_steering_room_b_zone_1_jev",
+      // Feed calibration's corrected readings: the wizard's proof line reads them once applied.
+      "sensor.crop_steering_feed_ph_corrected",
+      "sensor.crop_steering_room_b_feed_ec_corrected",
     ])
       expect(ids).toContain(id);
     expect(ids).not.toContain("sensor.crop_steering_room_b_zone_2_phase");

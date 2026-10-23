@@ -49,8 +49,12 @@ await runParity({
     await page.locator(".probes-table [data-sensor-trend] .sparkline").first().waitFor({ timeout: 15_000 });
     region("rooms");
 
-    // The feed calibration region stays until Task 24.
-    assert.equal(await page.locator("section.probe-calibration").count(), 1, `${label}: feed calibration region`);
+    // The feed probes are calibrated on their own page (Task 24): a link to it.
+    assert.equal(
+      await page.getByRole("link", { name: "Feed pH and EC probes: Calibrate →", exact: true }).getAttribute("href"),
+      "#/equipment/feed-calibration",
+      `${label}: feed calibration link`,
+    );
     region("feed calibration");
 
     const curve = page.locator("[data-substrate-curve]");

@@ -224,6 +224,9 @@ const ROOM_SENSORS = [
   "jev_log",
   // Batch-tank dosing: pumps, the batch and their history (docs/DOSING.md).
   "dosing",
+  // Feed calibration's corrected readings (calibration.py): the wizard's proof line.
+  "feed_ph_corrected",
+  "feed_ec_corrected",
 ];
 const ZONE_SENSORS = [
   "jev",

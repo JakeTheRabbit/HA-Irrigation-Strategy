@@ -285,7 +285,8 @@ try {
     ["equipment/stock", "Stock tanks · Room A"],
     ["equipment/dosing", "Feed & dosing · Room A"],
     ["equipment/pump-calibration", "Pump calibration"],
-    ["equipment/feed-calibration", "Feed pH/EC calibration"],
+    // Desktop names the probe under the room crumb; the phone's full-screen bar names the room.
+    ["equipment/feed-calibration", /^Calibrate (feed pH probe|Room A feed pH)$/],
     ["equipment/setup", "Rooms and setup"],
     ["settings", "Dashboards & display"],
     ["settings/alerts", "Alert rules"],

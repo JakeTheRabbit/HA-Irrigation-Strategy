@@ -4,6 +4,7 @@ import { DosingDemo } from "./dosing-demo";
 import { NotifyDemo } from "./notify-demo";
 import { StockDemo } from "./stock-demo";
 import { CalibrationDemo } from "./calibration";
+import { FeedCalibrationDemo } from "./parity-demo/feed-calibration";
 import type {
   OperatorAction,
   StrategyDocument,
@@ -50,6 +51,14 @@ import {
 import { sameValue } from "./utils";
 
 const clone = <T>(value: T): T => structuredClone(value);
+const FEED_CALIBRATION: readonly string[] = [
+  "calibration_start",
+  "calibration_capture",
+  "calibration_status",
+  "calibration_commit",
+  "calibration_revert",
+  "calibration_abandon",
+];
 export class OperatorDemo {
   private instructions = new InstructionsDemo();
   private runDemo?: RunDemo;
@@ -58,6 +67,7 @@ export class OperatorDemo {
   private stockDemo: StockDemo;
   private dosingDemo?: DosingDemo;
   private calibrationDemo?: CalibrationDemo;
+  private feedCalibrationDemo?: FeedCalibrationDemo;
   private notifyDemo?: NotifyDemo;
   private plans = new Map<string, StrategyDocument>();
   private rooms: SetupRoom[] | null = null;
@@ -490,6 +500,13 @@ export class OperatorDemo {
     const newId = journalDemoTargetWrite(write.room_id, prefix, write.entity_id, Number(write.new), write.old, now, "put back");
     return demoEnvelope({ reverted_event_id: eventId, new_event_id: newId, readback: "verified" }, now, roomId);
   }
+  private feedCalibration() {
+    return (this.feedCalibrationDemo ||= new FeedCalibrationDemo(
+      this.getStates,
+      this.updateStates,
+      () => (this.calibrationDemo ||= new CalibrationDemo(this.getStates)),
+    ));
+  }
   async call<T>(action: OperatorAction, data: Record<string, unknown>): Promise<T> {
     if (action === "history_changes" && this.backend === "3.18") seedDemoChanges(this.getStates(), Date.now());
     if (action === "history_revert" && this.backend === "3.18" && demoTargetWrite(String(data.event_id)))
@@ -521,6 +538,13 @@ export class OperatorDemo {
       return answerProbeOffset(data, this.getStates(), this.updateStates, Date.now()) as T;
     if (action === "history_revert" && this.backend === "3.18" && isDemoOffsetWrite(String(data.event_id)))
       return revertProbeOffset(String(data.event_id), this.getStates(), this.updateStates, Date.now()) as T;
+    // The guided feed pH/EC calibration drives the demo's feed probes and its calibration store.
+    if (
+      this.backend === "3.18" &&
+      ((FEED_CALIBRATION.includes(action) && this.feedCalibration().handles(action, data)) ||
+        (action === "history_revert" && this.feedCalibration().owns(String(data.event_id))))
+    )
+      return this.feedCalibration().call(action, data) as T;
     if (isParityAction(action)) return (await parityDemo(action, data, Date.now(), this.backend)) as T;
     // An existing service asked for v2: a 3.18 integration wraps its v1 answer in the envelope; a
     // 3.17 one answers v1, which callV2 reads as missing.

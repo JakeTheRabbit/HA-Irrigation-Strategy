@@ -347,9 +347,14 @@ export interface SystemStatus {
   }[];
 }
 
-// calibration_* (backend Task 17)
+// calibration_* (backend Task 17; calibration.py)
 export interface CalibrationSession {
   session_id: string;
+  room_id: string;
+  probe: "feed_ph" | "feed_ec";
+  kind: "ph" | "ec";
+  /** The two reference solutions, in the order they are captured. */
+  solutions: number[];
   raw_entity_id: string;
   temperature_entity_id: string | null;
   dosing_paused: boolean;
@@ -359,7 +364,7 @@ export interface CaptureResult {
   reading: number | null;
   raw: number | null;
   stable: boolean;
-  drift: number;
+  drift: number | null;
   stable_s: number;
 }
 export interface CalibrationStatus extends CaptureResult {
@@ -367,6 +372,8 @@ export interface CalibrationStatus extends CaptureResult {
   expires_at: string;
 }
 export interface CalibrationCommitResult {
+  record_id: string;
+  revision: number;
   slope_pct: number;
   offset: number;
   verdict: "pass" | "drifting" | "fail";
