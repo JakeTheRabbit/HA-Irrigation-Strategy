@@ -324,3 +324,275 @@
     padding: 0.6rem 0.5rem 0.4rem;
   }
 }
+/* Compare runs, room-wide (mockup 11): run cards and four small multiples. The run colours are the
+   grow-week charts' (above), so a run reads the same in both. */
+.run-compare {
+  --rw-run-0: #0277bd;
+  --rw-run-1: #a35f00;
+  --rw-run-2: #7b4fc9;
+  --rw-run-3: #00796b;
+  display: grid;
+  gap: 0.8rem;
+  margin-bottom: 1rem;
+}
+.dark .run-compare {
+  --rw-run-0: #29b6f6;
+  --rw-run-1: #f0a83c;
+  --rw-run-2: #b39ddb;
+  --rw-run-3: #4db6ac;
+}
+.rc-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.75rem;
+  font-size: var(--text-sm);
+  color: var(--muted-foreground);
+}
+.rc-scope {
+  margin: 0 auto 0 0;
+}
+.rc-head select {
+  min-height: 2.25rem;
+  padding: 0 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  background: var(--background);
+  color: var(--foreground);
+}
+.rc-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: 0.75rem;
+}
+.rc-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.4rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  background: var(--muted);
+}
+.rc-card[data-on] {
+  background: var(--card);
+}
+.rc-card-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.5rem;
+  width: 100%;
+}
+.rc-tick-run {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 1.75rem;
+  font-weight: 600;
+}
+.rc-tick-run input {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+.rc-tick-run i,
+.rc-legend i {
+  width: 1rem;
+  height: 0.2rem;
+  border-radius: 2px;
+}
+.rc-dates {
+  margin-left: auto;
+  font-size: var(--text-xs);
+  color: var(--muted-foreground);
+}
+.rc-result {
+  font-size: var(--text-sm);
+}
+.rc-result[data-missing] {
+  color: var(--muted-foreground);
+}
+.rc-add {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: var(--text-sm);
+}
+.rc-add input {
+  width: 6rem;
+}
+.rc-limit {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--warning-foreground, var(--foreground));
+}
+.rc-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.9rem;
+}
+.rc-chart {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-width: 0;
+  padding: 0.7rem 1rem 2.4rem;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  background: var(--card);
+}
+.rc-chart header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.6rem;
+}
+.rc-chart h2 {
+  margin: 0;
+  font-size: var(--text-base);
+}
+.rc-chart header > span {
+  font-size: var(--text-xs);
+  color: var(--muted-foreground);
+}
+.rc-band-key {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-left: auto;
+}
+.rc-band-key i {
+  width: 0.9rem;
+  height: 0.65rem;
+  border: 1px dashed rgba(129, 201, 149, 0.7);
+  background: rgba(129, 201, 149, 0.22);
+}
+.rc-callout {
+  align-self: center;
+  max-width: 34rem;
+  margin: 0;
+  padding: 0.3rem 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  background: var(--muted);
+  font-size: var(--text-sm);
+  line-height: 1.35;
+}
+.rc-plot {
+  position: relative;
+  height: 13rem;
+  margin-left: 2.8rem;
+  font-size: var(--text-xs);
+}
+.rc-plot svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.rc-tick {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-top: 1px solid var(--border);
+}
+.rc-tick span {
+  position: absolute;
+  right: calc(100% + 0.35rem);
+  transform: translateY(-50%);
+  white-space: nowrap;
+  color: var(--muted-foreground);
+}
+.rc-band {
+  position: absolute;
+  box-sizing: border-box;
+  border-top: 1px dashed rgba(129, 201, 149, 0.6);
+  border-bottom: 1px dashed rgba(129, 201, 149, 0.6);
+  background: rgba(129, 201, 149, 0.13);
+}
+.rc-today {
+  position: absolute;
+  top: -0.4rem;
+  bottom: 0;
+  border-left: 1px dashed var(--muted-foreground);
+}
+.rc-box {
+  position: absolute;
+  box-sizing: border-box;
+  border: 2px solid var(--foreground);
+  border-radius: 6px;
+}
+.rc-stages span {
+  position: absolute;
+  bottom: -0.45rem;
+  height: 4px;
+}
+.rc-axis span {
+  position: absolute;
+  bottom: -1.75rem;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  color: var(--muted-foreground);
+}
+.rc-axis span[data-edge="start"] {
+  transform: none;
+}
+.rc-axis span[data-edge="end"] {
+  transform: translateX(-100%);
+}
+.rc-empty {
+  margin: 0;
+  padding: 2rem 0;
+  text-align: center;
+  font-size: var(--text-sm);
+  color: var(--muted-foreground);
+}
+.rc-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1.1rem;
+  font-size: var(--text-xs);
+  color: var(--muted-foreground);
+}
+.rc-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.rc-legend .rc-today-key {
+  width: 0;
+  height: 0.75rem;
+  border-left: 1px dashed var(--muted-foreground);
+  border-radius: 0;
+}
+@media (max-width: 760px) {
+  .rc-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .rc-chart {
+    padding: 0.6rem 0.75rem 2.4rem;
+  }
+  .rc-plot {
+    height: 11rem;
+  }
+}
+/* The page's stacked field labels and full-width selects are not for these. */
+.comparison-page .rc-head label,
+.comparison-page .rc-add label {
+  display: inline;
+  font-size: var(--text-sm);
+}
+.comparison-page .rc-head select {
+  width: auto;
+}
+.comparison-page .rc-tick-run {
+  display: inline-flex;
+  font-size: var(--text-base);
+}
+@media (max-width: 760px) {
+  .rc-scope {
+    flex-basis: 100%;
+  }
+}

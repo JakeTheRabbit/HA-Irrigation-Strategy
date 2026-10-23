@@ -1,4 +1,8 @@
-import type { DailyReading, HistoryPoint, RunRecord } from "./comparison-types";
+import type { ComparedRun, DailyReading, HistoryPoint, RunRecord } from "./comparison-types";
+import { formatEc, formatVolume } from "./display-units";
+import { yieldFigures, type GrowDay, type Harvest } from "./grows";
+import type { Stage } from "./stage-arc";
+import { dayLabel } from "./time";
 const DAY = 86_400_000;
 const formatters = new Map<string, Intl.DateTimeFormat>();
 function formatter(zone: string) {
@@ -231,4 +235,139 @@ export function dailyStatistics(result: unknown, timeZone: string): Record<strin
       ),
     ]),
   );
+}
+
+/** The smallest gap each Compare runs chart speaks about: VWC points, dryback points, mS/cm and
+ * litres per plant a day. A smaller gap is noise between grows, so the chart says nothing. */
+export const CALLOUT_FLOOR = { vwc: 0.5, dryback: 0.5, pore_ec: 0.2, water: 0.02 } as const;
+export type CalloutMetric = keyof typeof CALLOUT_FLOOR;
+/** Fewer days than this in common is not a comparison. */
+const CALLOUT_MIN_DAYS = 3;
+
+/** "flower setting (stretch)" reads "stretch", "flower bulk" reads "bulk". */
+export const stageWord = (name: string) =>
+  /\(([^)]+)\)/.exec(name)?.[1] ?? name.replace(/^flower /i, "");
+/** Decimals of the readings themselves (at most 3): a gap is never shown finer than its source. */
+function sourceDigits(values: number[]) {
+  return Math.min(3, Math.max(0, ...values.map((v) => (String(v).split(".")[1] ?? "").length)));
+}
+const average = (values: number[]) => values.reduce((a, b) => a + b, 0) / values.length;
+
+/** One callout for a Compare runs chart: the biggest gap, stage by stage, between the reference run
+ * (this run, else the first) and each other run, over the grow days both have. Null when no gap
+ * reaches the metric's floor. The box is the days the gap was measured over. */
+export function runCallout(
+  metric: CalloutMetric,
+  runs: ComparedRun[],
+  stages: Stage[],
+): { text: string; box: { fromDay: number; toDay: number } } | null {
+  const reference = runs.find((r) => r.current) ?? runs[0];
+  if (!reference) return null;
+  const refDays = new Map((reference.days[metric] ?? []).map((d) => [d.day, d.value]));
+  let best: { run: ComparedRun; stage: Stage; delta: number; from: number; to: number; digits: number } | null = null;
+  for (const run of runs) {
+    if (run === reference) continue;
+    for (const stage of stages) {
+      const common = (run.days[metric] ?? []).filter(
+        (d) => d.day >= stage.first && d.day <= stage.last && refDays.has(d.day),
+      );
+      if (common.length < CALLOUT_MIN_DAYS) continue;
+      const theirs = common.map((d) => d.value),
+        ours = common.map((d) => refDays.get(d.day)!);
+      const delta = average(theirs) - average(ours);
+      if (Math.abs(delta) + 1e-9 < CALLOUT_FLOOR[metric]) continue;
+      if (best && Math.abs(delta) <= Math.abs(best.delta)) continue;
+      const days = common.map((d) => d.day);
+      best = {
+        run,
+        stage,
+        delta,
+        from: Math.min(...days),
+        to: Math.max(...days),
+        digits: Math.max(
+          run.digits?.[metric] ?? sourceDigits(theirs),
+          reference.digits?.[metric] ?? sourceDigits(ours),
+        ),
+      };
+    }
+  }
+  if (!best) return null;
+  const { run, stage, delta, from, to, digits } = best;
+  const ref = reference.current ? "this run" : reference.name;
+  const Ref = reference.current ? "This run" : reference.name;
+  const word = stageWord(stage.name);
+  const span = from === stage.first && to === stage.last ? `all through ${word}` : `in ${word}, days ${from}–${to}`;
+  const size = Math.abs(delta).toFixed(digits);
+  // The reference run's side of the gap, for the sentences it is the subject of.
+  const ourDelta = -delta;
+  const text =
+    metric === "vwc"
+      ? `${run.name} sat ${size} pts ${delta > 0 ? "wetter" : "drier"} than ${ref} ${span}.`
+      : metric === "dryback"
+        ? `${Ref} dries back ${size} pts ${ourDelta > 0 ? "more" : "less"} than ${run.name} ${span}.`
+        : metric === "pore_ec"
+          ? `${Ref} is ${formatEc(Math.abs(delta), digits)} ${ourDelta > 0 ? "higher" : "lower"} than ${run.name} ${span}.`
+          : `${run.name} gave ${formatVolume(Math.abs(delta), digits)} (${Math.round(
+              (Math.abs(delta) / average((reference.days.water ?? []).filter((d) => d.day >= from && d.day <= to).map((d) => d.value))) * 100,
+            )}%) ${delta > 0 ? "more" : "less"} water a plant a day than ${ref} ${span}.`;
+  return { text, box: { fromDay: from, toDay: to } };
+}
+
+/** A run's whole-room daily values from the room's grow-day summaries (crop_steering.grow_days_get):
+ * each grow day's zones averaged, a missing reading left out (never zero). */
+export function comparedRun(run: RunRecord, growDays: GrowDay[], current: boolean): ComparedRun {
+  const pick: Record<CalloutMetric, (d: GrowDay) => number | null | undefined> = {
+    vwc: (d) => d.vwc?.mean,
+    dryback: (d) => d.p0?.drop_pts,
+    pore_ec: (d) => d.ec?.mean,
+    water: (d) => d.litres_per_plant,
+  };
+  const inRun = growDays.filter(
+    (d) => d.date >= run.start_date && (!run.end_date || d.date <= run.end_date),
+  );
+  const dates = [...new Set(inRun.map((d) => d.date))].sort();
+  const days: ComparedRun["days"] = {};
+  const digits: NonNullable<ComparedRun["digits"]> = {};
+  for (const metric of Object.keys(pick) as CalloutMetric[]) {
+    const out: { day: number; value: number }[] = [];
+    const raw: number[] = [];
+    for (const date of dates) {
+      const values = inRun
+        .filter((d) => d.date === date)
+        .map(pick[metric])
+        .filter((v): v is number => typeof v === "number" && Number.isFinite(v));
+      raw.push(...values);
+      if (values.length) out.push({ day: daysBetween(run.start_date, date) + 1, value: average(values) });
+    }
+    if (out.length) {
+      days[metric] = out;
+      digits[metric] = sourceDigits(raw);
+    }
+  }
+  return { id: run.id, name: run.name, current, days, digits };
+}
+
+/** A calendar date ("2026-08-10") as "Mon 10 Aug". */
+const dateLabel = (date: string) => dayLabel(Date.parse(date + "T12:00:00Z"), "UTC");
+
+/** What a run's card says it ended with: its harvest as recorded (dry weight in kg and g/m² only
+ * where entered), else that none is; a run in progress, its planned harvest date if the plan has one.
+ * `missing` asks for the Add harvest result button. */
+export function runResult(
+  run: RunRecord,
+  harvest: Harvest | undefined,
+  harvestDue: string | null,
+): { text: string; missing: boolean } {
+  if (!harvest && !run.end_date)
+    return {
+      text: harvestDue ? `Growing · harvest due ${dateLabel(harvestDue)}` : "Growing · no harvest date planned",
+      missing: false,
+    };
+  if (!harvest) return { text: "No harvest result recorded", missing: true };
+  const figures = yieldFigures(harvest, run, "room", null);
+  const when = harvest.harvest_date ?? run.end_date;
+  const parts = [when ? `Harvested ${dateLabel(when)}` : "Harvested"];
+  if (figures.dryG !== null) parts.push(`${Number((figures.dryG / 1000).toFixed(3))} kg dry`);
+  if (figures.gramsPerM2 !== null) parts.push(`${Math.round(figures.gramsPerM2)} g/m²`);
+  return { text: parts.join(" · "), missing: false };
 }

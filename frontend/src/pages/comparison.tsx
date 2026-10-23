@@ -7,7 +7,13 @@ import { InfoTip, UiTip } from "@/components/info-tip";
 import type { Controller } from "@/lib/types";
 import type { HistoryWindow, RunsDocument, RunZone } from "@/lib/comparison-types";
 import { addDays, boundedRange, comparisonRange, dateInZone } from "@/lib/comparison";
-import { ComparisonChart, ComparisonSummary, format, type Loaded } from "./comparison-views";
+import {
+  ComparisonChart,
+  ComparisonSummary,
+  format,
+  RunCompare,
+  type Loaded,
+} from "./comparison-views";
 import { RunWeeks } from "./comparison-weeks";
 import { buildSetpointPreview } from "@/lib/setpoint-preview";
 import { buildComparisonTarget } from "@/lib/comparison-target";
@@ -278,6 +284,7 @@ export function Comparison({
           </Button>
         }
       />
+      <RunCompare controller={controller} runs={document} />
       <section className="panel comparison-controls">
         <div className="comparison-field">
           <span className="label-with-tip">
