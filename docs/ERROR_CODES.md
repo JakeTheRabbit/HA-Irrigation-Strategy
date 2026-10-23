@@ -6,7 +6,7 @@ Each alert from the Crop Steering controller app, and each Crop Steering card in
 **Settings → Repairs**, ends with a code, for example **CS-101**. The regular status summary of
 the controller has no code. Find the code below. It tells you what the alert means, what occurs
 to the water, the probable causes and what to do. The same list is in the Crop Steering sidebar
-under **Settings & help → Help → Error codes**.
+under **Settings → Help → Error codes**.
 
 A critical alert, or a warning about a zone that gets no water, comes again each 30 min while its
 cause continues. Other warnings come again after 15 min, then less frequently. An information
@@ -15,7 +15,7 @@ once each time the controller app starts, and CS-405 comes at the start. A dismi
 does not clear the hardware hold.
 
 Most alerts stay in Home Assistant until you dismiss them, also after their cause stops. The
-controller removes CS-201, CS-209, CS-210, CS-308 and CS-309 itself. When you set *Room Active* of a room
+controller removes CS-201, CS-209, CS-210, CS-212, CS-308 and CS-309 itself. When you set *Room Active* of a room
 to off, the controller removes the alerts of the room.
 When *Room Active* is off (no plants in the room), the room gives no alerts about water. The
 controller still reports a setup change (CS-201) and a hardware hold (CS-301, CS-308, CS-309).
@@ -51,6 +51,7 @@ controller still reports a setup change (CS-201) and a hardware hold (CS-301, CS
 | [CS-209](#cs-209) | No shots for some hours | Warning | Notification |
 | [CS-210](#cs-210) | Hold entity missing | Warning | Notification |
 | [CS-211](#cs-211) | Shots held for too long | Critical | Notification |
+| [CS-212](#cs-212) | Controller error in room | Critical | Notification |
 | [CS-301](#cs-301) | Hardware fault latch | Critical | Notification |
 | [CS-302](#cs-302) | Pump command error | Warning | Notification |
 | [CS-303](#cs-303) | Main-line valve command error | Warning | Notification |
@@ -89,6 +90,7 @@ controller still reports a setup change (CS-201) and a hardware hold (CS-301, CS
 | [CS-609](#cs-609) | Second controller for room | Warning | Notification |
 | [CS-610](#cs-610) | Engine Enabled not kill switch | Warning | Repairs card |
 | [CS-611](#cs-611) | Settings above zone limit | Warning | Repairs card |
+| [CS-613](#cs-613) | Deprecated feature in use | Warning | Repairs card |
 | [CS-614](#cs-614) | Retired entities in use | Warning | Repairs card |
 | [CS-701](#cs-701) | No water at the zone | Warning | Notification |
 | [CS-702](#cs-702) | Unusual water for each plant | Information | Notification |
@@ -120,6 +122,7 @@ controller still reports a setup change (CS-201) and a hardware hold (CS-301, CS
 | [CS-904](#cs-904) | Tank above full mark | Warning | Notification |
 | [CS-905](#cs-905) | Estimated tank level low | Warning | Notification |
 | [CS-906](#cs-906) | Batch tank low | Information | Notification |
+| [CS-907](#cs-907) | EC flushing off, feed EC unknown | Warning | Notification |
 
 ## Probes (CS-1xx)
 
@@ -481,6 +484,28 @@ controller still reports a setup change (CS-201) and a hardware hold (CS-301, CS
 - If you cannot remove the hold soon, water the zone by hand.
 - To change the hours, or to turn the alert off, set Shots held alert in the settings of the room.
 
+<a id="cs-212"></a>
+
+### CS-212: Controller error in room
+
+*Critical · Notification*
+
+**What it means.** An error stopped the controller in the pass of this room. The alert gives the error. The heartbeat and the status of the room show error. The other rooms continue.
+
+**Effect on water.** The room gets no shots, also no rescue shots, until the error stops. The controller tries the room again each minute. The alert comes again every 30 minutes while the error continues, and clears after the next pass of the room without an error.
+
+**Probable causes**
+
+- A fault in the controller, for example a setting or a state of the room that it cannot use.
+- An entity of the room that gives a value of a type that the controller does not expect.
+
+**What to do**
+
+- CAUTION: Do not leave the room in this state for a long time. The substrate dries out and the plants can wilt.
+- Read the controller log near the time of the alert.
+- Report the error with the log.
+- Until the error stops, water the room by hand.
+
 ## Pumps and valves (CS-3xx)
 
 <a id="cs-301"></a>
@@ -515,13 +540,14 @@ controller still reports a setup change (CS-201) and a hardware hold (CS-301, CS
 
 *Warning · Notification*
 
-**What it means.** Home Assistant returned an error when the controller tried to start the pump. A device that reads "unavailable" does not cause this alert, because no shot starts then.
+**What it means.** The pump did not start. Home Assistant returned an error when the controller tried to start it, or took the command but the pump did not read on within 16 s. A device that already reads "unavailable" does not cause this alert, because no shot starts then.
 
-**Effect on water.** The controller cancels the shot and does not count it. It closes the pump, the main-line valve and the zone valve, and reads them back. If they do not read off, it latches a hardware hold (CS-301). If they read off, the next shot runs as usual.
+**Effect on water.** The controller cancels the shot and does not count it. It closes the pump, the main-line valve and the zone valve, and reads them back. If they do not read off, it latches a hardware hold (CS-301). If they read off, the next shot runs as usual. After 3 such shots of a zone in a row (CS-302, CS-303 or CS-304), the controller tries that zone at most once every 30 min, rescue shots too, until its switches read on again. A Test Shot is not held.
 
 **Probable causes**
 
 - Home Assistant did not reply (it restarted, or the network has a fault), or it returned an error for the command.
+- The device took the command but did not switch: a dead relay, or an offline Zigbee plug that still accepts commands. Or it reports its new state more than 16 s late.
 - A switch that reads "unavailable" does not cause this alert. No shot starts while a switch on the feed path reads neither on nor off. The status of the zone names the offline switch. The zone gets water again when the switch reads again.
 
 **What to do**
@@ -538,13 +564,14 @@ controller still reports a setup change (CS-201) and a hardware hold (CS-301, CS
 
 *Warning · Notification*
 
-**What it means.** Home Assistant returned an error when the controller tried to start the main-line valve. A device that reads "unavailable" does not cause this alert, because no shot starts then.
+**What it means.** The main-line valve did not open. Home Assistant returned an error when the controller tried to open it, or took the command but the main-line valve did not read on within 16 s. A device that already reads "unavailable" does not cause this alert, because no shot starts then.
 
-**Effect on water.** The controller cancels the shot and does not count it. It closes the pump, the main-line valve and the zone valve, and reads them back. If they do not read off, it latches a hardware hold (CS-301). If they read off, the next shot runs as usual.
+**Effect on water.** The controller cancels the shot and does not count it. It closes the pump, the main-line valve and the zone valve, and reads them back. If they do not read off, it latches a hardware hold (CS-301). If they read off, the next shot runs as usual. After 3 such shots of a zone in a row (CS-302, CS-303 or CS-304), the controller tries that zone at most once every 30 min, rescue shots too, until its switches read on again. A Test Shot is not held.
 
 **Probable causes**
 
 - Home Assistant did not reply (it restarted, or the network has a fault), or it returned an error for the command.
+- The device took the command but did not switch: a dead relay, or an offline Zigbee plug that still accepts commands. Or it reports its new state more than 16 s late.
 - A switch that reads "unavailable" does not cause this alert. No shot starts while a switch on the feed path reads neither on nor off. The status of the zone names the offline switch. The zone gets water again when the switch reads again.
 
 **What to do**
@@ -560,13 +587,14 @@ controller still reports a setup change (CS-201) and a hardware hold (CS-301, CS
 
 *Warning · Notification*
 
-**What it means.** Home Assistant returned an error when the controller tried to start the zone valve. A device that reads "unavailable" does not cause this alert, because no shot starts then.
+**What it means.** The zone valve did not open. Home Assistant returned an error when the controller tried to open it, or took the command but the zone valve did not read on within 16 s, or by the end of a shorter shot (at least 6 s). A device that already reads "unavailable" does not cause this alert, because no shot starts then.
 
-**Effect on water.** The controller cancels the shot and does not count it. It closes the pump, the main-line valve and the zone valve, and reads them back. If they do not read off, it latches a hardware hold (CS-301). If they read off, the next shot runs as usual.
+**Effect on water.** The controller cancels the shot. If every read of the valve was a definite off, no water went to the zone and the controller does not count the shot. If a read was anything else (unavailable, unknown, opening, or on too late), water may have flowed, so the controller counts the time from opening the valve to closing it. It closes the pump, the main-line valve and the zone valve, and reads them back. If they do not read off, it latches a hardware hold (CS-301). If they read off, the next shot runs as usual. After 3 such shots of a zone in a row (CS-302, CS-303 or CS-304), the controller tries that zone at most once every 30 min, rescue shots too, until its switches read on again. A Test Shot is not held.
 
 **Probable causes**
 
 - Home Assistant did not reply (it restarted, or the network has a fault), or it returned an error for the command.
+- The device took the command but did not switch: a dead relay, or an offline Zigbee plug that still accepts commands. Or it reports its new state more than 16 s late.
 - A switch that reads "unavailable" does not cause this alert. No shot starts while a switch on the feed path reads neither on nor off. The status of the zone names the offline switch. The zone gets water again when the switch reads again.
 
 **What to do**
@@ -1356,6 +1384,26 @@ controller still reports a setup change (CS-201) and a hardware hold (CS-301, CS
 - If the zone size is wrong, correct it in Rooms and setup, and the limit changes with it.
 - If the size is correct, decrease the setting to its limit at the next change. The card clears when each setting is inside its limit.
 
+<a id="cs-613"></a>
+
+### CS-613: Deprecated feature in use
+
+*Warning · Repairs card*
+
+**What it means.** Something called a service or chose a select that the integration will remove. The Repairs card names it, says what to use instead and gives the release that removes it.
+
+**Effect on water.** Water continues. The service or the select works as before until it is removed.
+
+**Probable causes**
+
+- A person, an automation or a script called apply_recipe or save_recipe, or chose a value in the Recipe stage or Irrigation phase select.
+
+**What to do**
+
+- Open the card and read what it names and what to use instead.
+- Change the automation or script that makes the call. For a stage of the grow, set the targets of the room in the dashboard or use a grow plan. To move one zone to a phase, use its Set phase select.
+- The card does not come back until Home Assistant restarts.
+
 <a id="cs-614"></a>
 
 ### CS-614: Retired entities in use
@@ -2072,3 +2120,23 @@ controller still reports a setup change (CS-201) and a hardware hold (CS-301, CS
 
 - Refill the tank by hand, or make a batch.
 - To stop the reminders, set the refill reminder to 0% in the dosing setup.
+
+<a id="cs-907"></a>
+
+### CS-907: EC flushing off, feed EC unknown
+
+*Warning · Notification*
+
+**What it means.** The room has no feed EC probe, and the feed recipe in use declares no feed EC. The controller does not know the EC of the feed water.
+
+**Effect on water.** The zones get water on their VWC only. The controller does not flush high pore EC and does not hold a zone for high EC, because it cannot tell if the feed can decrease the pore EC. The alert comes once and goes when the room gets a feed EC.
+
+**Probable causes**
+
+- No feed EC probe is set for the room in the controller app options (feed_ec_sensor).
+- The feed recipe in use has no EC, or the room has no dosing setup.
+
+**What to do**
+
+- CAUTION: Do not ignore this alert for many days. Salt can build up in the substrate when the controller cannot flush.
+- Set the feed EC on the feed recipe in use (Crop Steering → Dosing), or set a feed EC probe in the controller app options.
