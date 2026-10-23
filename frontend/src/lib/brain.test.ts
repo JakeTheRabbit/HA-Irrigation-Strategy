@@ -10,6 +10,8 @@ import {
   judgeMatrix,
   judgeTitle,
   keyWords,
+  listWords,
+  modelKey,
   outcomes,
   outcomesFromLog,
   parseBrainPanel,
@@ -322,6 +324,9 @@ describe("the judges matrix", () => {
     expect(row("targets").perRoom["room:"]).toMatchObject({ on: true, entityId: aiPowerId("", "set_targets_from_achievable") });
     expect(row("shotsize").perRoom["room:"]).toMatchObject({ on: true, entityId: aiPowerId("", "tune_shot_sizes") });
     expect(row("plan").perRoom["room:"]).toMatchObject({ on: true, entityId: aiPowerId("", "plan_catch_up") });
+    // ...but the controller builds the plan task only when ai_judges names plan: the switch says so.
+    expect(row("plan").hint).toMatch(/ai_judges/);
+    expect(row("targets").hint).toBeUndefined();
     // A room that publishes no judge list.
     expect(
       judgeMatrix({}, rooms.slice(0, 1)).find((r) => r.id === "shot")!.perRoom["room:"],
@@ -374,7 +379,8 @@ describe("what it did, and what happened", () => {
       event("01F", "2026-10-21T03:00:00Z", "ai.judgement", { judge: "dawn", label: "Start early", action: "refused" }, { outcome: "refused", ...ledger("9") }),
     ]);
     expect(rows.map((r) => [r.judge, r.verdict, r.result])).toEqual([
-      ["shotsize", "measuring", ""],
+      // Shot sizes has no scheduled check (outcome_after_min): nothing will measure it.
+      ["shotsize", "not checked", ""],
       ["setpoints", "worked", "Dryback back in band"],
       ["setpoints", "did not work", "Dryback overshot"],
     ]);
@@ -390,13 +396,42 @@ describe("what it did, and what happened", () => {
     expect(rows[2]).toMatchObject({ band: [18, 22], value: 24.1 });
   });
 
-  it("pairs an outcome without a ledger id with the next one in the same room and zone", () => {
+  it("measures only judges the controller checks later; alerts and unchecked actions say Not checked", () => {
     const rows = outcomes([
-      event("01A", "2026-10-22T07:30:00Z", "ai.judgement", { judge: "dryback", label: "Dryback on target", action: "advice" }, { zone: 1 }),
-      event("01C", "2026-10-22T08:00:00Z", "ai.outcome", { what: "Another zone", good: false }, { zone: 3 }),
-      event("01B", "2026-10-22T10:00:00Z", "ai.outcome", { what: "Dryback came back to target.", good: true }, { zone: 1 }),
+      // ramp, salt, dusk, setpoints, targets (outcome_after_min) and plan (6 h) are checked.
+      ...["ramp", "salt", "dusk", "setpoints", "targets", "plan"].map((judge, i) =>
+        event(`02${i}`, `2026-10-22T0${i}:00:00Z`, "ai.judgement", { judge, label: judge, action: "setpoint" }, ledger(`c${i}`)),
+      ),
+      // Alerts and the other acting judges are never checked.
+      ...["channel", "night", "stage", "zones", "dawn", "probe", "shotsize"].map((judge, i) =>
+        event(`03${i}`, `2026-10-22T1${i}:00:00Z`, "ai.judgement", { judge, label: judge, action: i < 4 ? "alert" : "setpoint" }, ledger(`u${i}`)),
+      ),
     ]);
-    expect(rows.map((r) => [r.verdict, r.result])).toEqual([["worked", "Dryback came back to target."]]);
+    expect(Object.fromEntries(rows.map((r) => [r.judge, r.verdict]))).toEqual({
+      ramp: "measuring",
+      salt: "measuring",
+      dusk: "measuring",
+      setpoints: "measuring",
+      targets: "measuring",
+      plan: "measuring",
+      channel: "not checked",
+      night: "not checked",
+      stage: "not checked",
+      zones: "not checked",
+      dawn: "not checked",
+      probe: "not checked",
+      shotsize: "not checked",
+    });
+  });
+
+  it("pairs an outcome without a ledger id with the next one in the same room, zone and judge", () => {
+    const rows = outcomes([
+      event("01A", "2026-10-22T07:30:00Z", "ai.judgement", { judge: "ramp", label: "Ended the ramp", action: "setpoint" }, { zone: 1 }),
+      event("01C", "2026-10-22T08:00:00Z", "ai.outcome", { what: "Another zone", good: false }, { zone: 3, source: { actor: "ai", detail: "ramp" } }),
+      event("01D", "2026-10-22T09:00:00Z", "ai.outcome", { what: "Another judge", good: false }, { zone: 1, source: { actor: "ai", detail: "salt" } }),
+      event("01B", "2026-10-22T10:00:00Z", "ai.outcome", { what: "Peak reached in band.", good: true }, { zone: 1, source: { actor: "ai", detail: "ramp" } }),
+    ]);
+    expect(rows.map((r) => [r.verdict, r.result])).toEqual([["worked", "Peak reached in band."]]);
   });
 
   it("reads the 3.17 ledger: decisions and the outcome that names them", () => {
@@ -423,6 +458,8 @@ describe("what it did, and what happened", () => {
         entry({ key: "a", time: 2000, stamp: "t2", of: "t1", kind: "outcome", verdict: "Peak reached in band", result: "worked" }),
         entry({ key: "b", time: 1000, stamp: "t1", action: "Started the ramp sooner" }),
         entry({ key: "c", time: 900, stamp: "t0", zone: 2, judge: "salt", result: "refused" }),
+        entry({ key: "e", time: 800, stamp: "s0", zone: 2, judge: "salt", action: "Diluted" }),
+        entry({ key: "f", time: 700, stamp: "p0", zone: 2, judge: "probe", action: "Held the probe" }),
       ],
       "room:",
     );
@@ -445,7 +482,25 @@ describe("what it did, and what happened", () => {
         verdict: "worked",
         at: 1000,
       }),
+      expect.objectContaining({ judge: "salt", verdict: "measuring" }),
+      expect.objectContaining({ judge: "probe", verdict: "not checked" }),
     ]);
+  });
+});
+
+describe("model and room names", () => {
+  it("names the model only by its exact priced id, after a router prefix too", () => {
+    expect(modelKey("claude-haiku-5-5")).toBe("claude-haiku-5-5");
+    expect(modelKey("openrouter/claude-sonnet-5-5")).toBe("claude-sonnet-5-5");
+    expect(modelKey("claude-opus-5-5")).toBe("claude-opus-5-5");
+    expect(modelKey("claude-haiku-4-5")).toBeNull();
+    expect(modelKey("")).toBeNull();
+  });
+
+  it("lists room names as a sentence", () => {
+    expect(listWords(["Room A"])).toBe("Room A");
+    expect(listWords(["Room A", "Room B"])).toBe("Room A and Room B");
+    expect(listWords(["Room A", "Room B", "Room C"])).toBe("Room A, Room B, and Room C");
   });
 });
 

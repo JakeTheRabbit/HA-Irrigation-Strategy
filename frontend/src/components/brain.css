@@ -279,9 +279,11 @@
   font-weight: 600;
 }
 .ai-judges-table tbody th {
-  display: grid;
   max-width: 340px;
   font-weight: 400;
+}
+.ai-judge-name {
+  display: grid;
 }
 .ai-judges-table tbody th strong {
   font-weight: 600;

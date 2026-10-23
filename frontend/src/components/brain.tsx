@@ -15,7 +15,9 @@ import {
   judgeMatrix,
   judgeTitle,
   keyWords,
+  listWords,
   modeWords,
+  modelKey,
   money,
   outcomes,
   outcomesFromLog,
@@ -478,7 +480,7 @@ function JudgesCard({ controller }: { controller: Controller }) {
       },
     });
   };
-  const roomNames = rooms.map((room) => room.name).join(" and ");
+  const roomNames = listWords(rooms.map((room) => room.name));
   const notAsked = rows.some((row) => Object.values(row.perRoom).some((cell) => cell.note === "Not asked"));
   return (
     <section className="panel ai-card ai-judges" aria-labelledby="ai-judges-title" data-ai-judges>
@@ -514,11 +516,13 @@ function JudgesCard({ controller }: { controller: Controller }) {
             {rows.map((row) => (
               <tr key={row.id} data-judge={row.id}>
                 <th scope="row">
-                  <strong>
-                    {row.name}
-                    {row.shares && <small> · one switch with {row.shares}</small>}
-                  </strong>
-                  <span title={row.blurb}>{row.blurb}</span>
+                  <div className="ai-judge-name">
+                    <strong>
+                      {row.name}
+                      {row.shares && <small> · one switch with {row.shares}</small>}
+                    </strong>
+                    <span title={row.blurb}>{row.blurb}</span>
+                  </div>
                 </th>
                 <td>
                   <span className="ai-tag" data-power={row.power}>
@@ -537,7 +541,7 @@ function JudgesCard({ controller }: { controller: Controller }) {
                         className="switch"
                         aria-checked={cell.on}
                         aria-label={label}
-                        title={locked ? LOCKED : undefined}
+                        title={locked ? LOCKED : row.hint}
                         disabled={locked || busy === cell.entityId}
                         onClick={() => void flip(row, room, cell.entityId!, !cell.on)}
                       >
@@ -661,16 +665,16 @@ function BudgetCard({ controller, panel }: { controller: Controller; panel: Brai
 }
 
 const MODELS = [
-  ["haiku", "Haiku 5.5"],
-  ["sonnet", "Sonnet 5.5"],
-  ["opus", "Opus 5.5"],
+  ["claude-haiku-5-5", "Haiku 5.5"],
+  ["claude-sonnet-5-5", "Sonnet 5.5"],
+  ["claude-opus-5-5", "Opus 5.5"],
 ] as const;
 
 /** Dry run and the model, as the controller reports them (calls and spend: Budget today). Both are
  * controller options: shown, not switched here. */
 function ModelCard({ panel }: { panel: BrainPanel | null }) {
   const model = panel?.model ?? null;
-  const current = model ? MODELS.find(([key]) => model.includes(key))?.[0] : undefined;
+  const current = model ? modelKey(model) : null;
   const dry = panel?.mode === "dry_run";
   return (
     <section className="panel ai-card" aria-labelledby="ai-model-title" data-ai-model>
@@ -704,7 +708,12 @@ function ModelCard({ panel }: { panel: BrainPanel | null }) {
   );
 }
 
-const VERDICT = { worked: "Worked", measuring: "Measuring", "did not work": "Did not work" } as const;
+const VERDICT = {
+  worked: "Worked",
+  measuring: "Measuring",
+  "did not work": "Did not work",
+  "not checked": "Not checked",
+} as const;
 
 /** The AI assistant's decisions over the last week and what each check found: the Journal on 3.18, each
  * room's decision log on 3.17. */
@@ -784,9 +793,15 @@ function OutcomesCard({ controller }: { controller: Controller }) {
                 {row.result && <span className="brain-line">→ {row.result}</span>}
               </span>
               <span className="ai-verdict">
-                <span className="ai-pill" data-verdict={row.verdict}>
-                  {VERDICT[row.verdict]}
-                </span>
+                {row.verdict === "not checked" ? (
+                  <span className="brain-line" title="The controller does not check this kind of decision later">
+                    {VERDICT[row.verdict]}
+                  </span>
+                ) : (
+                  <span className="ai-pill" data-verdict={row.verdict}>
+                    {VERDICT[row.verdict]}
+                  </span>
+                )}
                 {row.band && row.value !== null && <BandTick band={row.band} value={row.value} />}
               </span>
             </li>

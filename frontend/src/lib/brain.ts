@@ -290,12 +290,16 @@ export interface JudgeRow {
   power: "act" | "alerts" | "advice";
   /** The other judge on the same power switch: one switch turns both. */
   shares?: string;
+  /** What else decides whether its switch does anything (shown on the switch). */
+  hint?: string;
   perRoom: Record<string, JudgeCell>;
 }
 
 /** Always asked whatever ai_judges says (brain_bridge.POWER_JUDGES), or never in the room's judge list (the
- * grow plan is a task, not a judge): their switches alone decide. */
+ * grow plan is a task, not a judge). Targets and Shot sizes: their switches alone decide. The grow plan runs
+ * only when ai_judges names plan (brain_bridge.build), which no published list shows: its switch says so. */
 const ALWAYS_ASKED = ["targets", "shotsize", "plan"];
+const PLAN_HINT = "Also needs plan in the controller app's judge list (ai_judges), as it is by default";
 /** Every judge, with one cell per room: a judge that can act is its power's switch (missing: "No switch";
  * left out of the room's published judge list: "Not asked"; Pore EC where EC stacking is off: "stacking
  * off"); an alert or advice judge is on when the room's brain sensor lists it among the judges it asks,
@@ -332,6 +336,7 @@ export function judgeMatrix(states: States, rooms: Room[]): JudgeRow[] {
       ...row,
       name: judgeTitle(judge.id),
       ...(partner ? { shares: judgeTitle(partner.id) } : {}),
+      ...(judge.id === "plan" ? { hint: PLAN_HINT } : {}),
       perRoom,
     };
   });
@@ -356,13 +361,19 @@ export interface AiOutcome {
   judge: string;
   /** What it did, as the controller wrote it. */
   text: string;
-  /** What the check found; "" while it is still measuring. */
+  /** What the check found; "" while it is still measuring, or when nothing checks it. */
   result: string;
-  verdict: "worked" | "measuring" | "did not work";
+  /** "not checked": the judge has no later check (only ramp, salt, dusk, setpoints, targets and plan do). */
+  verdict: "worked" | "measuring" | "did not work" | "not checked";
   /** The target band and the value the check read, only when the controller sent both. */
   band: [number, number] | null;
   value: number | null;
 }
+
+/** Judges whose decisions the controller checks later: outcome_after_min (ramp 60, salt 240, dusk 120,
+ * setpoints and targets 1440 min) and the grow plan's 6 h check. Any other decision never gets an outcome. */
+const CHECKED = ["ramp", "salt", "dusk", "setpoints", "targets", "plan"];
+const pending = (judge: string): AiOutcome["verdict"] => (CHECKED.includes(judge) ? "measuring" : "not checked");
 
 const ledgerOf = (event: CsEvent) => {
   const id = event.correlation?.ledger_id;
@@ -371,8 +382,8 @@ const ledgerOf = (event: CsEvent) => {
 
 /** The AI assistant's decisions from the Journal (`ai.judgement`), each with the `ai.outcome` that judges
  * it, newest first. An outcome names its decision's ledger row (correlation.ledger_id); one without a
- * ledger id goes to the next decision without one in the same room and zone. Refused decisions changed
- * nothing and are left out. */
+ * ledger id goes to the next decision without one in the same room, zone and judge (source.detail). Refused
+ * decisions changed nothing and are left out. */
 export function outcomes(events: readonly CsEvent[]): AiOutcome[] {
   const sorted = [...events]
     .filter((e) => e.kind === "ai.judgement" || e.kind === "ai.outcome")
@@ -390,7 +401,10 @@ export function outcomes(events: readonly CsEvent[]): AiOutcome[] {
         !used.has(other.id) &&
         (ledger
           ? ledgerOf(other) === ledger
-          : !ledgerOf(other) && other.room_id === event.room_id && other.zone === event.zone),
+          : !ledgerOf(other) &&
+            other.room_id === event.room_id &&
+            other.zone === event.zone &&
+            other.source.detail === event.source.detail),
     );
     if (found) used.add(found.id);
     const good = found?.data.good;
@@ -398,15 +412,16 @@ export function outcomes(events: readonly CsEvent[]): AiOutcome[] {
     const value = finite(found?.data.value);
     const bandOk =
       Array.isArray(band) && band.length === 2 && band.every((n) => finite(n) !== null) && value !== null;
+    const judge = text(data.judge) || text(event.source.detail);
     rows.push({
       id: event.id,
       at: Date.parse(event.ts),
       roomId: event.room_id,
       zone: event.zone,
-      judge: text(data.judge) || text(event.source.detail),
+      judge,
       text: text(data.label) || text(data.action).replaceAll("_", " "),
       result: found ? text(found.data.what) : "",
-      verdict: good === true ? "worked" : good === false ? "did not work" : "measuring",
+      verdict: good === true ? "worked" : good === false ? "did not work" : pending(judge),
       band: bandOk ? [Number(band[0]), Number(band[1])] : null,
       value: bandOk ? value : null,
     });
@@ -432,7 +447,7 @@ export function outcomesFromLog(entries: readonly JevEntry[], roomId: string): A
         text: e.action || e.verdict,
         result: found ? found.verdict || found.reason : "",
         verdict:
-          found?.result === "worked" ? "worked" : found?.result === "did not work" ? "did not work" : "measuring",
+          found?.result === "worked" ? "worked" : found?.result === "did not work" ? "did not work" : pending(e.judge),
         band: null,
         value: null,
       };
@@ -442,6 +457,17 @@ export function outcomesFromLog(entries: readonly JevEntry[], roomId: string): A
 export const judgeTitle = (judge: string) =>
   JEV_TITLES[judge] ??
   (judge ? judge.charAt(0).toUpperCase() + judge.slice(1).replaceAll("_", " ") : "Judge");
+
+/** The model the controller prices (brain/client.py PRICES), also after a router prefix; null for any other. */
+const PRICED = ["claude-haiku-5-5", "claude-sonnet-5-5", "claude-opus-5-5"];
+export const modelKey = (model: string) => {
+  const name = model.slice(model.lastIndexOf("/") + 1);
+  return PRICED.includes(name) ? name : null;
+};
+
+/** "A", "A and B", "A, B, and C". */
+export const listWords = (names: readonly string[]) =>
+  new Intl.ListFormat("en", { type: "conjunction" }).format(names);
 
 /** Money in dollars, never tokens. */
 export const money = (usd: number) => `$${usd.toFixed(2)}`;
