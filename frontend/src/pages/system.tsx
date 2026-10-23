@@ -16,11 +16,13 @@ import {
   heartbeatHour,
   percent,
   placeAlert,
+  readbackText,
   rowLabel,
   rowWords,
+  seenText,
   statusFromEntities,
 } from "@/lib/system-status";
-import { clock, dayKey, dayLabel } from "@/lib/time";
+import { clock } from "@/lib/time";
 import type { Controller } from "@/lib/types";
 import type { PageProps } from "./placeholder";
 import "./system.css";
@@ -29,7 +31,6 @@ const POLL_MS = 30_000;
 const GROUPS = [...new Set(Object.values(KIND_LABEL))];
 const TANK_GROUP = KIND_LABEL.tank;
 const TONE_ORDER = { bad: 0, warn: 1, ok: 2 } as const;
-const ACTUATORS = new Set(["valve", "pump", "main_line", "flow_meter"]);
 const instant = (text: string | null | undefined) => {
   const ms = text ? Date.parse(text) : NaN;
   return Number.isFinite(ms) ? ms : null;
@@ -267,20 +268,6 @@ function AlertCard({ alert, ack, onAck }: { alert: OpenAlert; ack: Ack | undefin
   );
 }
 
-/** "4 s ago" for a probe or sensor; "open now", "running" or "switched 13:58" for an actuator. */
-function seenText(row: Row, controller: Controller, now: number): string {
-  const tz = controller.timeZone;
-  if (ACTUATORS.has(row.kind)) {
-    const on = controller.states[row.entity_id]?.state === "on";
-    if (on) return row.kind === "pump" ? "running" : "open now";
-    const changed = instant(row.last_change);
-    if (changed === null) return "not found in Home Assistant";
-    return `switched ${dayKey(changed, tz) === dayKey(now, tz) ? "" : `${dayLabel(changed, tz)} `}${clock(changed, tz)}`;
-  }
-  const seen = instant(row.last_seen);
-  return seen === null ? "not found in Home Assistant" : `${duration(now - seen)} ago`;
-}
-
 function DeviceRow({ row, tone, controller, now }: { row: Row; tone: "ok" | "warn" | "bad"; controller: Controller; now: number }) {
   const pct = row.uptime_7d_pct;
   return (
@@ -291,7 +278,7 @@ function DeviceRow({ row, tone, controller, now }: { row: Row; tone: "ok" | "war
         <span className="sr-only">, {rowWords(row.kind, row.ok, tone)}</span>
         <span className="system-row-entity">{row.entity_id}</span>
       </span>
-      <span className="system-row-seen">{seenText(row, controller, now)}</span>
+      <span className="system-row-seen">{seenText(row, controller.states[row.entity_id]?.state, controller.timeZone, now)}</span>
       <span className="system-bar" aria-hidden="true" data-low={pct !== null && pct < 95 ? "" : undefined}>
         {pct !== null && <span style={{ width: `${Math.max(0, Math.min(100, pct))}%` }} />}
       </span>
@@ -402,7 +389,7 @@ function Heartbeats({ rooms, entityOnly, now }: { rooms: { name: string; beat: R
                 <p className="system-beat-note">
                   Every {beat.interval_s} s ·{" "}
                   {recorded ? `${missed} missed in ${span}` : "no beats recorded since Home Assistant started"}
-                  {readback !== null && ` · read-back ${readback / 1000} s`}
+                  {readback !== null && ` · read-back ${readbackText(readback)}`}
                 </p>
               </>
             )}

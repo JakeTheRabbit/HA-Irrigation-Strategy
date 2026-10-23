@@ -7,8 +7,10 @@ import {
   healthSentence,
   heartbeatHour,
   placeAlert,
+  readbackText,
   rowLabel,
   rowWords,
+  seenText,
   statusFromEntities,
 } from "./system-status";
 import type { States } from "./types";
@@ -124,6 +126,49 @@ describe("placeAlert", () => {
     );
     // An entity this page does not show: placed by its code.
     expect(placeAlert(alert("CS-102", 2, { entityId: "sensor.other" }), rows)).toBe("sensor.f1_z2_back_vwc");
+  });
+});
+
+describe("placeAlert moisture codes", () => {
+  test("CS-101 and CS-103 sit on a moisture probe, not on a silent EC probe", () => {
+    const rows = [
+      { entity_id: "sensor.f1_z2_front_vwc", kind: "probe_vwc", zone: 2, ok: true },
+      { entity_id: "sensor.f1_z2_front_ec", kind: "probe_ec", zone: 2, ok: false },
+    ];
+    expect(placeAlert(alert("CS-101", 2), rows)).toBe("sensor.f1_z2_front_vwc");
+    expect(placeAlert(alert("CS-103", 2), rows)).toBe("sensor.f1_z2_front_vwc");
+    // A silent-probe code still prefers the silent probe of any kind.
+    expect(placeAlert(alert("CS-102", 2), rows)).toBe("sensor.f1_z2_front_ec");
+  });
+});
+
+describe("seenText", () => {
+  const TZ = "Pacific/Auckland";
+  const row = (kind: StatusEntity["kind"]) => ({
+    entity_id: `x.${kind}`,
+    kind,
+    last_seen: iso(NOW - 4_000),
+    last_change: iso(NOW - 600_000),
+  });
+
+  test("a flow meter is a sensor: it reads its last report, not a switch time", () => {
+    expect(seenText(row("flow_meter"), undefined, TZ, NOW)).toBe("4 s ago");
+    expect(seenText(row("probe_vwc"), undefined, TZ, NOW)).toBe("4 s ago");
+  });
+
+  test("a valve reads open now or the time it switched", () => {
+    expect(seenText(row("valve"), "on", TZ, NOW)).toBe("open now");
+    expect(seenText(row("pump"), "on", TZ, NOW)).toBe("running");
+    expect(seenText(row("valve"), "off", TZ, NOW)).toMatch(/^switched \d\d:\d\d/);
+  });
+});
+
+describe("readbackText", () => {
+  test("rounds the read-back time to a tenth of a second", () => {
+    expect(readbackText(1234)).toBe("1.2 s");
+    expect(readbackText(1200)).toBe("1.2 s");
+    expect(readbackText(2000)).toBe("2 s");
+    expect(readbackText(85)).toBe("85 ms");
   });
 });
 

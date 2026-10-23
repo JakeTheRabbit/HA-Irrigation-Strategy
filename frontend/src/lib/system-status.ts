@@ -1,7 +1,9 @@
+import { duration } from "./day-timeline";
 import { buildRoom, descriptor, runningVersions } from "./model";
 import type { OpenAlert } from "./open-alerts";
 import type { ControllerState, RoomHeartbeat, StatusBeat, StatusEntity, SystemStatus } from "./parity-types";
 import { zoneProbes } from "./probes";
+import { clock, dayKey, dayLabel } from "./time";
 import type { EntityState, Room, States } from "./types";
 
 /** Settings › System status (mockup 21): every mapped device, each open alert on the device it is
@@ -173,7 +175,9 @@ export function placeAlert(alert: OpenAlert, rows: PlaceRow[]): string | null {
   const inZone = (row: PlaceRow) => alert.zone !== null && row.zone === alert.zone;
   const probe = (kinds = ["probe_vwc", "probe_ec", "probe_temp"]) => pick((row) => inZone(row) && kinds.includes(row.kind));
   const valve = () => pick((row) => inZone(row) && row.kind === "valve");
-  if (family === "1") return probe(n === 104 ? ["probe_ec"] : undefined);
+  // Flat and out-of-range moisture on a moisture probe, EC out of range on an EC probe.
+  if (family === "1")
+    return probe(n === 101 || n === 103 ? ["probe_vwc"] : n === 104 ? ["probe_ec"] : undefined);
   if (family === "3") {
     if (n === 302 || n === 317) return pick((row) => row.kind === "pump");
     if (n === 303) return pick((row) => row.kind === "main_line");
@@ -189,6 +193,29 @@ export function placeAlert(alert: OpenAlert, rows: PlaceRow[]): string | null {
 }
 
 const PROBE_WARN_MS = 120_000;
+const ACTUATORS = new Set(["valve", "pump", "main_line"]);
+
+/** "4 s ago" for a probe or sensor (a flow meter too); "open now", "running" or "switched 13:58"
+ * for a valve, pump or main line. `state` is the row's Home Assistant state. */
+export function seenText(
+  row: Pick<StatusEntity, "kind" | "last_seen" | "last_change">,
+  state: string | undefined,
+  tz: string,
+  now: number,
+): string {
+  if (ACTUATORS.has(row.kind)) {
+    if (state === "on") return row.kind === "pump" ? "running" : "open now";
+    const changed = instant(row.last_change);
+    if (changed === null) return "not found in Home Assistant";
+    return `switched ${dayKey(changed, tz) === dayKey(now, tz) ? "" : `${dayLabel(changed, tz)} `}${clock(changed, tz)}`;
+  }
+  const seen = instant(row.last_seen);
+  return seen === null ? "not found in Home Assistant" : `${duration(now - seen)} ago`;
+}
+
+/** The controller's read-back time: milliseconds under a second, else seconds to a tenth. */
+export const readbackText = (ms: number) =>
+  ms < 1000 ? `${Math.round(ms)} ms` : `${(ms / 1000).toLocaleString("en", { maximumFractionDigits: 1 })} s`;
 
 /** A row's dot: red only when the backend calls the device silent or unavailable (its probe limit
  * follows the probe's own rhythm); a probe it counts online is orange once its last report is over
