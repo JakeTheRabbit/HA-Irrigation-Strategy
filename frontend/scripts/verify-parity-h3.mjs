@@ -5,15 +5,16 @@
  * today) are the same on every run.
  *
  * Interactions asserted, at 1440 and 390 on both backends:
- * - "<room> · whole-room daily values" and "Line runs up by" (Day of flower; Day of run disabled:
- *   run records carry no clone date);
+ * - "<room> · whole-room daily values" and "Line runs up by" (Day of run; Day of flower disabled:
+ *   run records carry no flip date), and the legend says the stages assume run day 1 = flower day 1;
  * - a card per run: this run first, ticked and locked, "Growing · …"; the ended run "Harvested …";
  * - four small multiples (VWC, overnight dryback, pore EC, water per plant), each with every ticked
  *   run's line; the callouts name the other run and each has its box;
  * - unticking that run removes its lines and its callouts;
  * - a run registered in History › Grows without a harvest shows "No harvest result recorded";
- *   Add harvest result opens the form (Dry kg); saving reads it back ("Written and read back HH:MM")
- *   and the card says the dry weight; Undo takes it back out. */
+ *   Add harvest result opens the form (Dry kg), and Cancel closes it while Dry kg is empty; saving
+ *   reads it back ("Written and read back HH:MM") and the card says the run's end and the dry weight,
+ *   never a harvest date that was not entered; Undo takes it back out. */
 import assert from "node:assert/strict";
 import { runParity } from "./parity-harness.mjs";
 
@@ -36,8 +37,9 @@ await runParity({
     // Header.
     assert.match(await compare.locator(".rc-scope").innerText(), / · whole-room daily values$/, `${label}: scope`);
     const align = compare.getByLabel("Line runs up by");
-    assert.equal(await align.inputValue(), "flower", `${label}: line up`);
-    assert.equal(await align.locator('option[value="run"]').isDisabled(), true, `${label}: day of run disabled`);
+    assert.equal(await align.inputValue(), "run", `${label}: line up`);
+    assert.equal(await align.locator('option[value="flower"]').isDisabled(), true, `${label}: day of flower disabled`);
+    assert.match(await compare.locator(".rc-hedge").innerText(), /assume run day 1 was flower day 1/, `${label}: stage hedge`);
     region("header");
 
     // Run cards.
@@ -100,6 +102,10 @@ await runParity({
     await card.getByRole("button", { name: "Add harvest result", exact: true }).click();
     const kg = card.getByLabel("Dry kg", { exact: true });
     await kg.waitFor();
+    await card.getByRole("button", { name: "Cancel", exact: true }).click();
+    assert.equal(await kg.count(), 0, `${label}: cancel closes the empty form`);
+    await card.getByRole("button", { name: "Add harvest result", exact: true }).click();
+    await kg.waitFor();
     region("add harvest form");
     await kg.fill("38.4");
     const review = page.getByRole("region", { name: "Review and apply" });
@@ -108,7 +114,7 @@ await runParity({
     const receipt = review.getByRole("status");
     await receipt.waitFor();
     assert.match(await receipt.innerText(), new RegExp(`Written and read back ${HHMM}`), `${label}: receipt`);
-    assert.match(await card.locator(".rc-result").innerText(), /^Harvested \w{3} \d{1,2} \w{3} · 38\.4 kg dry$/, `${label}: card result`);
+    assert.match(await card.locator(".rc-result").innerText(), /^Ended \w{3} \d{1,2} \w{3} · 38\.4 kg dry$/, `${label}: card result`);
     await review.getByRole("button", { name: "Undo: write back the previous values", exact: true }).click();
     await review.getByText(/^Previous values written back/).waitFor();
     assert.equal((await card.locator(".rc-result").innerText()).trim(), "No harvest result recorded", `${label}: undone`);

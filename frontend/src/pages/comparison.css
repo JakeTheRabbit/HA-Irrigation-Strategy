@@ -561,6 +561,9 @@
   align-items: center;
   gap: 0.4rem;
 }
+.rc-legend .rc-hedge {
+  flex-basis: 100%;
+}
 .rc-legend .rc-today-key {
   width: 0;
   height: 0.75rem;

@@ -4,9 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ReviewApply, type ApplyReceipt, type ReviewRow } from "@/components/review-apply";
 import type { ComparedRun, RunsDocument } from "@/lib/comparison-types";
-import { comparedRun, runCallout, runResult, stageWord, type CalloutMetric } from "@/lib/comparison";
+import { comparedRun, harvestResult, runCallout, runResult, stageWord, type CalloutMetric } from "@/lib/comparison";
 import { formatEc, formatVolume, getDisplayUnits } from "@/lib/display-units";
-import type { GrowDaysDocument, HarvestsDocument } from "@/lib/grows";
+import type { GrowDaysDocument, Harvest, HarvestsDocument } from "@/lib/grows";
 import { NOMINAL_FLOWER_DAYS, stageArc, type Stage } from "@/lib/stage-arc";
 import { dayKey, dayLabel } from "@/lib/time";
 import type { Controller } from "@/lib/types";
@@ -467,7 +467,7 @@ function RunChart({
       {!!bands.length && (
         <span className="rc-band-key">
           <i aria-hidden="true" />
-          Plan target
+          Guide range
         </span>
       )}
     </header>
@@ -513,7 +513,7 @@ function RunChart({
   const axis = [1];
   for (let d = 15; d <= maxDay - 5; d += 14) axis.push(d);
   if (maxDay > 1) axis.push(maxDay);
-  const summary = `${spec.title} by day of flower: ${runs.map((r) => r.name).join(", ")}.${callout ? " " + callout.text : ""}`;
+  const summary = `${spec.title} by day of run: ${runs.map((r) => r.name).join(", ")}.${callout ? " " + callout.text : ""}`;
   return (
     <section className="rc-chart" aria-label={spec.title} data-compare-chart={spec.metric}>
       {header}
@@ -590,7 +590,7 @@ export function RunCompare({ controller, runs }: { controller: Controller; runs:
   const [ticked, setTicked] = useState<string[] | null>(null),
     [limit, setLimit] = useState<string | null>(null);
   const [adding, setAdding] = useState<{ runId: string; kg: string } | null>(null),
-    [saved, setSaved] = useState<{ runId: string; grams: number; receipt: ApplyReceipt } | null>(null);
+    [saved, setSaved] = useState<{ runId: string; stored: Harvest | undefined; receipt: ApplyReceipt } | null>(null);
   useEffect(() => {
     let live = true;
     setError("");
@@ -670,15 +670,7 @@ export function RunCompare({ controller, runs }: { controller: Controller; runs:
     const answer = await controller.operator<HarvestsDocument>("runs_set_harvest", {
       run_id: run.id,
       expected_revision: harvests!.revision,
-      harvest: {
-        harvest_date: run.end_date,
-        room: { dry_weight_g: written, wet_weight_g: null, plants_harvested: null, canopy_m2: null },
-        zones: {},
-        plants: [],
-        quality: null,
-        notes: null,
-        lab: { thc_pct: null, terpenes: {} },
-      },
+      harvest: harvestResult(written),
     });
     setHarvests(answer);
     const held = answer.harvests[run.id]?.room?.dry_weight_g ?? null;
@@ -692,16 +684,16 @@ export function RunCompare({ controller, runs }: { controller: Controller; runs:
             summary: "",
             eventIds: [],
           };
-    setSaved({ runId: run.id, grams: written, receipt });
+    setSaved({ runId: run.id, stored: answer.harvests[run.id], receipt });
     if (receipt.ok) setAdding(null);
     return receipt;
   }
   /** Takes the harvest result back out, only while it is still the one saved here. */
   async function undoHarvest() {
-    const { runId, grams: written } = saved!;
+    const { runId, stored } = saved!;
     const now = await controller.operator<HarvestsDocument>("harvests_get");
-    const stored = now.harvests[runId];
-    if (!stored || stored.room?.dry_weight_g !== written) {
+    // Every field, not just the dry weight: anything added elsewhere since would go with harvest: null.
+    if (!stored || JSON.stringify(now.harvests[runId]) !== JSON.stringify(stored)) {
       setHarvests(now);
       throw new Error("The harvest result changed since it was saved here. Reload and check before trying again.");
     }
@@ -720,10 +712,10 @@ export function RunCompare({ controller, runs }: { controller: Controller; runs:
       <div className="rc-head">
         <p className="rc-scope">{controller.room.room.name} · whole-room daily values</p>
         <label htmlFor="rc-align">Line runs up by</label>
-        <select id="rc-align" defaultValue="flower">
-          <option value="flower">Day of flower</option>
-          <option value="run" disabled>
-            Day of run (no clone dates recorded)
+        <select id="rc-align" defaultValue="run">
+          <option value="run">Day of run</option>
+          <option value="flower" disabled>
+            Day of flower (no flip dates recorded)
           </option>
         </select>
       </div>
@@ -765,6 +757,11 @@ export function RunCompare({ controller, runs }: { controller: Controller; runs:
                     value={adding.kg}
                     onChange={(e) => setAdding({ runId: run.id, kg: e.target.value })}
                   />
+                  {!rows.length && (
+                    <Button variant="outline" size="sm" onClick={() => setAdding(null)}>
+                      Cancel
+                    </Button>
+                  )}
                 </span>
               )}
             </div>
@@ -815,6 +812,7 @@ export function RunCompare({ controller, runs }: { controller: Controller; runs:
             {capital(stageWord(s.name))} · days {s.first}–{s.last}
           </span>
         ))}
+        <span className="rc-hedge">Stages and guide ranges assume run day 1 was flower day 1: no flip dates are recorded.</span>
         {today !== null && (
           <span>
             <i aria-hidden="true" className="rc-today-key" />

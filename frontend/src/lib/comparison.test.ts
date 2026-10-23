@@ -8,6 +8,7 @@ import {
   comparisonRange,
   dailyStatistics,
   downsample,
+  harvestResult,
   midnight,
   runCallout,
   runResult,
@@ -261,14 +262,14 @@ describe("compare runs callouts", () => {
     days: Partial<Record<keyof typeof CALLOUT_FLOOR, { day: number; value: number }[]>>,
   ): ComparedRun => ({ id: name, name, current, days });
 
-  it("runCallout names run, delta at source precision and stage for each metric", () => {
+  it("runCallout names run, delta at source precision and run days for each metric", () => {
     const vwc = runCallout(
       "vwc",
       [run("Run 15", true, { vwc: series(1, 38, 60.2) }), run("Run 13", false, { vwc: series(1, 63, 61.9) })],
       stages,
     );
     expect(vwc).toEqual({
-      text: "Run 13 sat 1.7 pts wetter than this run all through stretch.",
+      text: "Run 13 sat 1.7 pts wetter than this run on run days 1–21.",
       box: { fromDay: 1, toDay: 21 },
     });
     const dryback = runCallout(
@@ -280,7 +281,7 @@ describe("compare runs callouts", () => {
       stages,
     );
     expect(dryback).toEqual({
-      text: "This run dries back 1.2 pts less than Run 14 in bulk, days 22–38.",
+      text: "This run dries back 1.2 pts less than Run 14 on run days 22–38.",
       box: { fromDay: 22, toDay: 38 },
     });
     const ec = runCallout(
@@ -288,14 +289,14 @@ describe("compare runs callouts", () => {
       [run("Run 15", true, { pore_ec: series(22, 38, 5.6) }), run("Run 14", false, { pore_ec: series(1, 63, 5.2) })],
       stages,
     );
-    expect(ec?.text).toBe("This run is 0.4 mS/cm higher than Run 14 in bulk, days 22–38.");
+    expect(ec?.text).toBe("This run is 0.4 mS/cm higher than Run 14 on run days 22–38.");
     const water = runCallout(
       "water",
       [run("Run 15", true, { water: series(1, 21, 0.22) }), run("Run 13", false, { water: series(1, 63, 0.18) })],
       stages,
     );
     expect(water?.text).toBe(
-      "Run 13 gave 0.04 L (18%) less water a plant a day than this run all through stretch.",
+      "Run 13 gave 0.04 L (18%) less water a plant a day than this run on run days 1–21.",
     );
     // Three runs: the biggest gap is the one named.
     const three = runCallout(
@@ -307,7 +308,31 @@ describe("compare runs callouts", () => {
       ],
       stages,
     );
-    expect(three?.text).toBe("Run 13 sat 1.5 pts drier than this run all through stretch.");
+    expect(three?.text).toBe("Run 13 sat 1.5 pts drier than this run on run days 1–21.");
+  });
+
+  it("runCallout counts the days it measured when the run days have gaps", () => {
+    const gappy = [...series(1, 4, 60), ...series(7, 21, 60)];
+    expect(
+      runCallout("vwc", [run("Run 15", true, { vwc: gappy }), run("Run 14", false, { vwc: series(1, 21, 61) })], stages)
+        ?.text,
+    ).toBe("Run 14 sat 1 pts wetter than this run on 19 of run days 1–21.");
+  });
+
+  it("runCallout's water share is of this run's water on the days compared, and absent when that is zero", () => {
+    // This run's days 5-10 are not in common (Run 13 has none), so their 1 L does not count.
+    const ours = [...series(1, 4, 0.2), ...series(5, 10, 1), ...series(11, 21, 0.2)];
+    const theirs = [...series(1, 4, 0.1), ...series(11, 21, 0.1)];
+    expect(
+      runCallout("water", [run("Run 15", true, { water: ours }), run("Run 13", false, { water: theirs })], stages)?.text,
+    ).toBe("Run 13 gave 0.1 L (50%) less water a plant a day than this run on 15 of run days 1–21.");
+    expect(
+      runCallout(
+        "water",
+        [run("Run 15", true, { water: series(1, 21, 0) }), run("Run 13", false, { water: series(1, 21, 0.2) })],
+        stages,
+      )?.text,
+    ).toBe("Run 13 gave 0.2 L more water a plant a day than this run on run days 1–21.");
   });
 
   it("runCallout returns null under each metric's floor", () => {
@@ -322,7 +347,7 @@ describe("compare runs callouts", () => {
     expect(pair("pore_ec", 5, 5.1)).toBeNull();
     expect(pair("water", 0.2, 0.21)).toBeNull();
     // At the floor it speaks.
-    expect(pair("vwc", 60, 60.5)?.text).toBe("Run 14 sat 0.5 pts wetter than this run all through stretch.");
+    expect(pair("vwc", 60, 60.5)?.text).toBe("Run 14 sat 0.5 pts wetter than this run on run days 1–21.");
     // One run, or fewer than three days in common, is not a comparison.
     expect(runCallout("vwc", [run("Run 15", true, { vwc: series(1, 21, 60) })], stages)).toBeNull();
     expect(
@@ -362,7 +387,19 @@ describe("compare runs callouts", () => {
       vwc: [{ day: 1, value: 61 }],
       dryback: [{ day: 1, value: 11 }],
       pore_ec: [{ day: 1, value: 3.5 }],
-      water: [{ day: 1, value: 0.15000000000000002 }],
+      water: [{ day: 1, value: expect.closeTo(0.15) }],
+    });
+  });
+
+  it("a harvest result added here carries only the dry weight, never a date the grower did not enter", () => {
+    expect(harvestResult(38_400)).toEqual({
+      harvest_date: null,
+      room: { dry_weight_g: 38_400, wet_weight_g: null, plants_harvested: null, canopy_m2: null },
+      zones: {},
+      plants: [],
+      quality: null,
+      notes: null,
+      lab: { thc_pct: null, terpenes: {} },
     });
   });
 
@@ -382,6 +419,8 @@ describe("compare runs callouts", () => {
       "Harvested Mon 10 Aug · 41.2 kg dry",
     );
     expect(runResult(record, undefined, null)).toEqual({ text: "No harvest result recorded", missing: true });
+    // No harvest date entered: the run's end is named as its end, not as a harvest date.
+    expect(runResult(record, { ...harvest, harvest_date: null }, null).text).toBe("Ended Mon 10 Aug · 41.2 kg dry · 515 g/m²");
     const open = { ...record, end_date: null };
     expect(runResult(open, undefined, "2026-11-16").text).toBe("Growing · harvest due Mon 16 Nov");
     expect(runResult(open, undefined, null).text).toBe("Growing · no harvest date planned");

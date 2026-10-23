@@ -264,7 +264,15 @@ export function runCallout(
   const reference = runs.find((r) => r.current) ?? runs[0];
   if (!reference) return null;
   const refDays = new Map((reference.days[metric] ?? []).map((d) => [d.day, d.value]));
-  let best: { run: ComparedRun; stage: Stage; delta: number; from: number; to: number; digits: number } | null = null;
+  let best: {
+    run: ComparedRun;
+    delta: number;
+    share: number | null;
+    from: number;
+    to: number;
+    days: number;
+    digits: number;
+  } | null = null;
   for (const run of runs) {
     if (run === reference) continue;
     for (const stage of stages) {
@@ -274,16 +282,18 @@ export function runCallout(
       if (common.length < CALLOUT_MIN_DAYS) continue;
       const theirs = common.map((d) => d.value),
         ours = common.map((d) => refDays.get(d.day)!);
-      const delta = average(theirs) - average(ours);
+      const delta = average(theirs) - average(ours),
+        base = average(ours);
       if (Math.abs(delta) + 1e-9 < CALLOUT_FLOOR[metric]) continue;
       if (best && Math.abs(delta) <= Math.abs(best.delta)) continue;
       const days = common.map((d) => d.day);
       best = {
         run,
-        stage,
         delta,
+        share: base > 0 ? Math.abs(delta) / base : null,
         from: Math.min(...days),
         to: Math.max(...days),
+        days: days.length,
         digits: Math.max(
           run.digits?.[metric] ?? sourceDigits(theirs),
           reference.digits?.[metric] ?? sourceDigits(ours),
@@ -292,11 +302,11 @@ export function runCallout(
     }
   }
   if (!best) return null;
-  const { run, stage, delta, from, to, digits } = best;
+  const { run, delta, share, from, to, days, digits } = best;
   const ref = reference.current ? "this run" : reference.name;
   const Ref = reference.current ? "This run" : reference.name;
-  const word = stageWord(stage.name);
-  const span = from === stage.first && to === stage.last ? `all through ${word}` : `in ${word}, days ${from}–${to}`;
+  // Run days, not stage names: no flip date is recorded, so a stage on run days would be a guess.
+  const span = days === to - from + 1 ? `on run days ${from}–${to}` : `on ${days} of run days ${from}–${to}`;
   const size = Math.abs(delta).toFixed(digits);
   // The reference run's side of the gap, for the sentences it is the subject of.
   const ourDelta = -delta;
@@ -307,9 +317,9 @@ export function runCallout(
         ? `${Ref} dries back ${size} pts ${ourDelta > 0 ? "more" : "less"} than ${run.name} ${span}.`
         : metric === "pore_ec"
           ? `${Ref} is ${formatEc(Math.abs(delta), digits)} ${ourDelta > 0 ? "higher" : "lower"} than ${run.name} ${span}.`
-          : `${run.name} gave ${formatVolume(Math.abs(delta), digits)} (${Math.round(
-              (Math.abs(delta) / average((reference.days.water ?? []).filter((d) => d.day >= from && d.day <= to).map((d) => d.value))) * 100,
-            )}%) ${delta > 0 ? "more" : "less"} water a plant a day than ${ref} ${span}.`;
+          : `${run.name} gave ${formatVolume(Math.abs(delta), digits)}${
+              share === null ? "" : ` (${Math.round(share * 100)}%)`
+            } ${delta > 0 ? "more" : "less"} water a plant a day than ${ref} ${span}.`;
   return { text, box: { fromDay: from, toDay: to } };
 }
 
@@ -365,9 +375,28 @@ export function runResult(
     };
   if (!harvest) return { text: "No harvest result recorded", missing: true };
   const figures = yieldFigures(harvest, run, "room", null);
-  const when = harvest.harvest_date ?? run.end_date;
-  const parts = [when ? `Harvested ${dateLabel(when)}` : "Harvested"];
+  const parts = [
+    harvest.harvest_date
+      ? `Harvested ${dateLabel(harvest.harvest_date)}`
+      : run.end_date
+        ? `Ended ${dateLabel(run.end_date)}`
+        : "Harvested",
+  ];
   if (figures.dryG !== null) parts.push(`${Number((figures.dryG / 1000).toFixed(3))} kg dry`);
   if (figures.gramsPerM2 !== null) parts.push(`${Math.round(figures.gramsPerM2)} g/m²`);
   return { text: parts.join(" · "), missing: false };
+}
+
+/** The harvest result Compare runs saves: the dry weight the grower entered and nothing else, so no
+ * harvest date is stored that was never entered or reviewed. */
+export function harvestResult(dryG: number): Harvest {
+  return {
+    harvest_date: null,
+    room: { dry_weight_g: dryG, wet_weight_g: null, plants_harvested: null, canopy_m2: null },
+    zones: {},
+    plants: [],
+    quality: null,
+    notes: null,
+    lab: { thc_pct: null, terpenes: {} },
+  };
 }
