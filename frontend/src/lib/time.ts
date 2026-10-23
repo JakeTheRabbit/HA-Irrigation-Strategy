@@ -126,3 +126,14 @@ export function dayLabel(ms: number, tz: string): string {
 /** Whole days from one calendar date ("2026-09-15") to another. */
 export const daysBetween = (start: string, end: string) =>
   (Date.parse(end + "T00:00:00Z") - Date.parse(start + "T00:00:00Z")) / 86_400_000;
+
+const dateLabels = new Map<string, Intl.DateTimeFormat>();
+/** The zone's date as "2 Oct". */
+export function shortDate(ms: number, tz: string): string {
+  let f = dateLabels.get(tz);
+  if (!f) {
+    f = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", timeZone: tz });
+    dateLabels.set(tz, f);
+  }
+  return f.format(ms);
+}

@@ -12,116 +12,11 @@
   padding: 0;
   font-size: inherit;
 }
-.stock-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 20px;
-  margin-bottom: 20px;
-}
-/* Doubled class: styles.css loads after this file and sets .panel padding. */
-.panel.stock-card {
-  display: grid;
-  gap: 14px;
-  padding: 18px 20px;
-}
-.stock-card-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-}
-.stock-card-head h2 {
-  margin: 0;
-  font-size: var(--text-lg);
-}
-.stock-card-body {
-  display: grid;
-  grid-template-columns: 64px minmax(0, 1fr);
-  gap: 18px;
-  align-items: center;
-}
-.stock-gauge {
-  width: 64px;
-  height: 106px;
-}
-.stock-shell {
-  fill: color-mix(in srgb, var(--foreground) 5%, var(--surface));
-  stroke: var(--border);
-  stroke-width: 1.5;
-}
-.stock-liquid {
-  fill: color-mix(in srgb, var(--primary) 45%, var(--surface));
-}
-.stock-gauge[data-tone="high"] .stock-liquid {
-  fill: color-mix(in srgb, var(--warning) 55%, var(--surface));
-}
-.stock-gauge[data-tone="over"] .stock-liquid {
-  fill: color-mix(in srgb, var(--destructive) 50%, var(--surface));
-}
-.stock-low-mark {
-  stroke: var(--foreground);
-  stroke-width: 1.5;
-  stroke-dasharray: 4 3;
-}
-.stock-percent {
-  fill: var(--foreground);
-  font-size: 14px;
-  font-weight: 600;
-}
-.stock-facts {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px 14px;
-  margin: 0;
-}
-.stock-facts dt {
-  font-size: var(--text-xs);
-  color: var(--muted-foreground);
-}
-.stock-facts dd {
-  margin: 2px 0 0;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-}
-.stock-facts small {
-  display: block;
-  font-size: var(--text-xs);
-  color: var(--muted-foreground);
-  overflow-wrap: anywhere;
-}
 .stock-actions {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
-}
-.stock-actions .muted {
-  margin-left: auto;
-}
-/* A linked tank's recent draws, one line each. */
-.stock-draws h3 {
-  margin-bottom: 4px;
-  font-size: var(--text-xs);
-  color: var(--muted-foreground);
-}
-.stock-draws ul {
-  display: grid;
-  gap: 2px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  font-size: var(--text-xs);
-}
-.stock-draws li {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
-  gap: 10px;
-}
-.stock-draw-ml {
-  min-width: 64px;
-  text-align: right;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
 }
 .stock-level-form {
   display: grid;
@@ -167,11 +62,6 @@
     grid-column: 1 / -1;
   }
 }
-/* The headline: which tank runs out first. */
-.stock-next {
-  margin: 0 0 16px;
-  font-size: var(--text-sm);
-}
 .stock-history-more {
   margin-top: 16px;
 }
@@ -184,4 +74,255 @@
 }
 .stock-history-more[open] > summary {
   margin-bottom: 10px;
+}
+/* E5: each tank keeps one colour (the dosing pumps' palette) on its bottle, its bars and its refills. */
+.stock-page {
+  --stock-hue-0: #2f8f6a;
+  --stock-hue-1: #c2702a;
+  --stock-hue-2: #6a5acd;
+  --stock-hue-3: #2a86b8;
+  --stock-hue-4: #b8456e;
+  --stock-hue-5: #7a8a2e;
+  --stock-hue-6: #8a5a3c;
+  --stock-hue-7: #3c9aa0;
+}
+.dark .stock-page {
+  --stock-hue-0: #4fbf94;
+  --stock-hue-1: #e8964d;
+  --stock-hue-2: #9a8cf0;
+  --stock-hue-3: #5eb3e6;
+  --stock-hue-4: #e27aa0;
+  --stock-hue-5: #aab84f;
+  --stock-hue-6: #c08a66;
+  --stock-hue-7: #6cc9cf;
+}
+.stock-page [data-stock-hue="0"] {
+  --pump-hue: var(--stock-hue-0);
+}
+.stock-page [data-stock-hue="1"] {
+  --pump-hue: var(--stock-hue-1);
+}
+.stock-page [data-stock-hue="2"] {
+  --pump-hue: var(--stock-hue-2);
+}
+.stock-page [data-stock-hue="3"] {
+  --pump-hue: var(--stock-hue-3);
+}
+.stock-page [data-stock-hue="4"] {
+  --pump-hue: var(--stock-hue-4);
+}
+.stock-page [data-stock-hue="5"] {
+  --pump-hue: var(--stock-hue-5);
+}
+.stock-page [data-stock-hue="6"] {
+  --pump-hue: var(--stock-hue-6);
+}
+.stock-page [data-stock-hue="7"] {
+  --pump-hue: var(--stock-hue-7);
+}
+/* Doubled class: styles.css loads after this file and sets .panel padding. */
+.panel.stock-shelf {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 20px;
+  padding: 16px;
+}
+.stock-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  text-align: center;
+}
+.stock-card[data-stock-next] {
+  border-color: var(--warning);
+}
+.stock-card h2 {
+  margin: 8px 0 0;
+  font-size: var(--text-lg);
+}
+/* Every bottle stands in the same box, on one baseline: a smaller tank is a smaller bottle. */
+.stock-bottle-box {
+  position: relative;
+  width: 140px;
+  height: 217px;
+}
+.stock-bottle-box .stock-bottle {
+  width: 100%;
+  height: 100%;
+}
+.stock-bottle-percent {
+  position: absolute;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-weight: 700;
+  font-size: var(--text-lg);
+  color: var(--foreground);
+  font-variant-numeric: tabular-nums;
+}
+.stock-bottle-low {
+  position: absolute;
+  transform: translateY(-50%);
+  font-size: var(--text-xs);
+  color: var(--muted-foreground);
+  white-space: nowrap;
+}
+.stock-level {
+  margin: 0;
+  color: var(--muted-foreground);
+}
+.stock-level strong {
+  color: var(--foreground);
+  font-variant-numeric: tabular-nums;
+}
+.stock-card[data-state="very-low"] .stock-level strong {
+  color: var(--warning);
+}
+.stock-outlook,
+.stock-drawn {
+  margin: 0;
+  font-size: var(--text-sm);
+}
+.stock-drawn {
+  color: var(--muted-foreground);
+}
+.stock-warning {
+  display: flex;
+  gap: 6px;
+  margin: 4px 0 0;
+  color: var(--warning);
+  font-size: var(--text-sm);
+  text-align: left;
+}
+.stock-warning svg {
+  flex: none;
+  margin-top: 3px;
+}
+.stock-card .stock-actions {
+  flex-direction: column;
+  align-self: stretch;
+  margin-top: auto;
+  padding-top: 12px;
+}
+.stock-card .stock-actions > button:first-child {
+  width: 100%;
+}
+.stock-lower {
+  display: grid;
+  grid-template-columns: minmax(0, 1.9fr) minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+.stock-panel-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  margin-bottom: 8px;
+}
+.stock-weekly h2,
+.stock-refills h2 {
+  margin: 0;
+  font-size: var(--text-lg);
+}
+.stock-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-sm);
+}
+.stock-legend li,
+.stock-refill-tank {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.stock-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  background: var(--pump-hue);
+}
+.stock-refills h2 {
+  margin-bottom: 8px;
+}
+.stock-refill-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.stock-refill-list li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: var(--text-sm);
+}
+.stock-refill-tank {
+  font-weight: 600;
+}
+.stock-refill-date {
+  color: var(--muted-foreground);
+}
+.stock-refill-amount {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.stock-side .stock-source {
+  margin: 12px 0 0;
+  font-size: var(--text-xs);
+}
+@media (max-width: 1100px) {
+  .stock-lower {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 720px) {
+  .panel.stock-shelf {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    padding: 10px;
+  }
+  .stock-card {
+    padding: 10px 8px;
+  }
+  .stock-bottle-box {
+    width: 84px;
+    height: 130px;
+  }
+  .stock-bottle-percent {
+    font-size: var(--text-sm);
+  }
+  .stock-refill-list li {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .stock-refill-amount {
+    grid-column: 1 / -1;
+    text-align: left;
+  }
+}
+@media (max-width: 720px) {
+  /* No room beside a phone's bottle: the dashed line stays, its litres are in the bottle's label. */
+  .stock-bottle-low {
+    display: none;
+  }
+}
+.panel.stock-weekly,
+.panel.stock-refills {
+  padding: 16px 20px;
+}
+.stock-rhythm {
+  margin: -8px 0 12px;
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
 }

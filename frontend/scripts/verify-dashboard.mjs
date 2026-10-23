@@ -240,7 +240,7 @@ try {
       ["insights", "equipment/probes", "Probes"],
       ["activity", "history/explorer", "Explorer"],
       ["sensors", "equipment/probes", "Probes"],
-      ["stock", "equipment/stock", "Stock tanks"],
+      ["stock", "equipment/stock", "Stock tanks · Room A"],
       ["setup", "equipment/setup", "Rooms and setup"],
       ["plan", "plan/watering", "Timeline"],
       ["history", "history/explorer", "Explorer"],
@@ -282,7 +282,7 @@ try {
     ["history/compare", "Compare runs"],
     ["history/changes", "Changes"],
     ["equipment/probes", "Probes"],
-    ["equipment/stock", "Stock tanks"],
+    ["equipment/stock", "Stock tanks · Room A"],
     ["equipment/dosing", "Dosing"],
     ["equipment/pump-calibration", "Pump calibration"],
     ["equipment/feed-calibration", "Feed pH/EC calibration"],
@@ -1421,36 +1421,37 @@ try {
     await page.setViewportSize({ width: 1440, height: 1000 });
   });
   await check(
-    "stock tanks: the next to run out, refill, set a level, record a batch and add a tank",
+    "stock tanks: the next to run out, refill with undo, set a level, record a batch and add a tank",
     async () => {
       await go("equipment/stock");
       const card = (id) => page.locator(`[data-stock-tank="${id}"]`);
       await expectVisible(card("part_b"));
       assert.equal(await page.locator("[data-stock-tank]").count(), 4);
-      assert.equal(
-        await page.locator("[data-stock-next]").innerText(),
-        "Next to run out: Part B, about 3 batches left.",
-      );
+      // Part B runs out first: its card is the one marked, about 3 batches left.
+      assert.equal(await page.locator("[data-stock-next]").getAttribute("data-stock-tank"), "part_b");
+      assert.match(await card("part_b").locator("[data-stock-outlook]").innerText(), /^3 batches/);
       await page.screenshot({ path: img("stock-tanks.png") });
-      // Each tank is linked to its dosing pump: drawn by what the pump doses, its draws listed.
+      // Each tank is linked to its dosing pump: drawn by what the pump doses.
       assert.equal(
         await card("part_b").locator("[data-stock-drawn]").innerText(),
-        "Drawn by\nPart B as it doses",
+        "Drawn by Part B as it doses",
       );
-      assert.match(
-        await card("silica").locator("[data-stock-draws] li").first().innerText(),
-        /Dose\s+25 mL$/,
+      // Part B starts within half again of its low mark: amber, "low" in its bottle's words.
+      assert.equal(await card("part_b").getAttribute("data-state"), "low");
+      assert.match(await card("part_b").getByRole("img").getAttribute("aria-label"), /, low$/);
+      await card("part_b").getByRole("button", { name: "Log refill to 20 L", exact: true }).click();
+      await expectVisible(
+        page
+          .locator("[data-sonner-toast]")
+          .filter({ hasText: /^Part B refilled to 20 L\. Written and read back/ }),
       );
-      // Part B starts within half again of its low mark: amber, "Getting low".
-      assert.equal(await card("part_b").locator(".pill").textContent(), "Getting low");
-      await card("part_b").getByRole("button", { name: "Refilled", exact: true }).click();
-      await expectVisible(card("part_b").getByText("OK", { exact: true }));
-      assert.match(await card("part_b").locator("dd").first().textContent(), /^20 of 20 L$/);
+      assert.equal(await card("part_b").getAttribute("data-state"), "ok");
+      assert.equal(await card("part_b").locator("[data-stock-level]").textContent(), "20 L of 20 L");
 
       await card("cleaner").getByRole("button", { name: "Set level" }).click();
       await card("cleaner").getByLabel("Tank level (L)", { exact: true }).fill("0.8");
       await card("cleaner").getByRole("button", { name: "Save level", exact: true }).click();
-      await expectVisible(card("cleaner").getByText("Low", { exact: true }));
+      await expectVisible(card("cleaner").getByText("Below the low line. Order now."));
 
       await page.getByRole("button", { name: "Record a batch", exact: true }).click();
       const confirm = page.getByRole("dialog");
@@ -1462,7 +1463,9 @@ try {
       assert.equal(await history.getAttribute("open"), null);
       await history.locator("summary").click();
       await expectVisible(history.getByRole("heading", { name: "Recent draws" }));
-      assert.match(await card("part_b").locator("dd").first().textContent(), /^18\.2 of 20 L$/);
+      // Silica's hand dose from before, listed with what it drew.
+      assert.match(await history.locator("tr", { hasText: "Dose" }).first().innerText(), /\b25 mL/);
+      assert.equal(await card("part_b").locator("[data-stock-level]").textContent(), "18.2 L of 20 L");
 
       await page.getByRole("button", { name: "Edit stock tanks" }).click();
       const editor = page.getByRole("dialog");
@@ -1473,7 +1476,7 @@ try {
       await expectVisible(card("enzymes"));
       // No pump draws Enzymes: each batch takes its dose.
       assert.equal(await card("enzymes").locator("[data-stock-drawn]").count(), 0);
-      await expectVisible(card("enzymes").getByText("Per batch"));
+      await expectVisible(card("enzymes").getByText("No dose per batch set"));
       await axe("stock tanks after edits");
       await noOverflow();
     },
@@ -1866,7 +1869,7 @@ try {
       await page.screenshot({ path: path.join(out, "mobile-dosing.png"), fullPage: true });
       await page.setViewportSize({ width: 1440, height: 1000 });
       await strip.getByRole("button", { name: /^Stock tanks/ }).click();
-      await expectVisible(page.getByRole("heading", { name: "Stock tanks", exact: true }));
+      await expectVisible(page.getByRole("heading", { name: /^Stock tanks · Room [AB]$/ }));
       assert.match(page.url(), /#\/equipment\/stock$/);
     },
   );
