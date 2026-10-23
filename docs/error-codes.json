@@ -1097,6 +1097,21 @@
       ]
     },
     {
+      "code": "CS-614",
+      "title": "Retired entities in use",
+      "source": "repairs",
+      "severity": "warning",
+      "meaning": "An automation or a script uses an entity of Crop Steering that is retired. Nothing in Crop Steering reads it, and the controller never used it: the EC ratio, the adjusted re-water point, the high and low P2 EC ratios, the P3 EC targets and the irrigation phase select. The integration keeps these entities, hidden, so that the automation or the script still loads.",
+      "watering": "Water continues as before. The retired entities do not change the shots.",
+      "causes": [
+        "An automation or a script was made when these entities showed values of their own."
+      ],
+      "fixes": [
+        "Remove the entities that the card names from the automations and scripts that it names. The re-water point in force for each zone is on its zone page, under Waiting for.",
+        "The card clears at the next start of Home Assistant after no automation or script uses one."
+      ]
+    },
+    {
       "code": "CS-701",
       "title": "No water at the zone",
       "source": "notification",

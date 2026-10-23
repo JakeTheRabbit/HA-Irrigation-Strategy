@@ -69,6 +69,10 @@ RESERVED = {
         "fix/deprecate-the-unused-recipe-system",
         "a deprecated service or select in use",
     ),
+    "CS-614": (
+        "fix/one-source-for-derived-watering-values",
+        "a retired entity an automation or script still uses",
+    ),
     "CS-708": ("feat/claude-haiku-brain", "the brain"),
     "CS-709": ("feat/claude-haiku-brain", "the brain"),
     "CS-710": ("feat/brain-channel", "the brain: water finding a channel"),

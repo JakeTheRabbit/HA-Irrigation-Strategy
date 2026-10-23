@@ -79,6 +79,8 @@ from crop_steering_engine.core import SETTLED_VWC_MIN, ec_flush_goal, floor_shar
 from crop_steering_engine.defaults import CONTROLLER_FALLBACKS as FALLBACK
 # Every number read from a device goes through the one device-unit table (_device).
 from crop_steering_engine.defaults import UNITS, to_canonical
+# How long a shot runs, the one rule the integration's shot-duration sensors show too.
+from crop_steering_engine.shot_length import DEFAULT_MAX_SHOT_S, MIN_SHOT_S, raw_seconds, shot_seconds, valid_cap
 # What depends on what a room grows in (its substrate select): "generic" is what every room ran on before.
 from crop_steering_engine.defaults import SUBSTRATE_PROFILES
 
@@ -590,9 +592,6 @@ CLOSE_FAILURES = {
     "unreadable": "could not be read from Home Assistant",
     "late": f"reported OFF only after the {SWITCH_ON_S:g} s check",
 }
-
-# The shortest shot the controller runs, in seconds (a shot sized shorter is lengthened to this).
-MIN_SHOT_S = 5
 
 # The minimum daily water stops once moisture is this many VWC points above field capacity.
 MIN_FLOOR_FC_MARGIN = 5.0
@@ -2203,11 +2202,8 @@ class Controller:
                     room=room,
                 )
                 return None
-            try:
-                value = float(raw)
-            except (TypeError, ValueError):
-                value = None
-            if value is not None and math.isfinite(value) and value >= 5:
+            value = valid_cap(raw)
+            if value is not None:
                 room._cap_seen = value
                 self._dismiss(f"duration_config_{room.slug}")
                 return value
@@ -2223,7 +2219,7 @@ class Controller:
             )
             return None
         # Keep the existing installation fallback only when neither room entity exists.
-        return 900.0
+        return DEFAULT_MAX_SHOT_S
 
     def _num_or_none(self, entity):
         """Read a number entity as float, or None if it doesn't exist / isn't a number."""
@@ -6475,13 +6471,13 @@ class Controller:
                 )
                 return
             test = getattr(reason, "kind", None) == "test_shot"
-            raw_dur = float(getattr(reason, "seconds", TEST_SHOT_S)) if test else size / 100.0 * substrate / flow
+            raw_dur = float(getattr(reason, "seconds", TEST_SHOT_S)) if test else raw_seconds(size, substrate, flow)
             max_dur = self._room_duration_cap(room)
             if max_dur is None:
                 return
             # Hydraulic sizing determines nominal runtime; the room's duration
             # limit bounds every physical shot independently of its requested volume.
-            dur = max(MIN_SHOT_S, min(int(max_dur), int(raw_dur)))
+            dur = shot_seconds(raw_dur, max_dur)
             if raw_dur > max_dur:
                 self._alert(
                     f"durcap_{room.slug}_z{zone}",
@@ -6938,14 +6934,13 @@ class Controller:
     def _blind_time_transition(self, room, zone, now, lights_on, lights_just_on, p=None):
         """Time-only phase forces for a BLIND zone (dead/missing probe), so it can never
         strand overnight while `decide()` is skipped: lights-off -> P3, and P3 -> P0 at the
-        new photoperiod (with the daily-counter reset, mirroring the P0 branch in _loop_room),
+        new photoperiod (with the daily-counter reset: _change_phase, as for decide()),
         also from a P1/P2 left over from a grow-day the controller did not see end (as decide()).
         With the zone's params `p`, decide()'s two exits that need no probe as well: P0 -> P1
         once p0_max_wait_min has passed, and P1 -> P2 at p1_max_shots. The VWC-driven
         transitions (dryback, the P1 rise rule, predictive P3) need a probe and stay paused.
         """
         st = room.state[zone]
-        gds = self._grow_day_start(room, now)
         new_grow_day = self._new_grow_day(room, st, now, lights_on)
         waited = (now - st["last_phase_change"]).total_seconds() / 60.0
         new_phase = None
@@ -6961,21 +6956,34 @@ class Controller:
         elif p is not None and st["phase"] == "P1" and st["shots"] >= p.p1_max_shots:
             new_phase, why = "P2", f"P1 max shots {st['shots']}/{p.p1_max_shots} (no moisture reading)"
         if new_phase and new_phase != st["phase"]:
-            if new_phase == "P0":
-                self._close_grow_day(room, zone, st, now, p)
-                self._keep_day_peak(st)  # the grow-day ending: tomorrow's P1 target (_vwc_maxima)
-                st["daily_vol"], st["shots"], st["peak"] = 0.0, 0, 0.0  # _snapshot takes the peak from the next reading
-                st["ec_offset"], st["last_ec_steer"] = 0.0, None
-                st["last_daily_reset"] = gds
-            if new_phase == "P1":  # the ramp counts its shots from one again, as the engine's own P1 does
-                self._record_phase(room, zone, st, st["phase"], "P1", now, why)
-                st["shots"] = 0
-            was = st["phase"]
-            st["phase"] = new_phase
-            st["last_phase_change"] = now
-            log(f"[{room.slug}] Z{zone} {was} -> {new_phase}: {why}")
-            self._save_state()
-            self._notify_event("phase", room, zone, was, new_phase, why)
+            log(f"[{room.slug}] Z{zone} {st['phase']} -> {new_phase}: {why}")
+            self._change_phase(room, zone, st, new_phase, why, now, p)
+
+    def _change_phase(self, room, zone, st, new_phase, why, now, p=None, snap=None):
+        """Move a zone to `new_phase`, for decide() and for the dead-probe path alike: tell the
+        operator, keep the zone's history, and reset what the new phase starts from. Into P0 (a new
+        grow-day): the day is closed, its counters, EC offset and P1 wet-up curve start again, and the
+        peak is the reading now (no reading: 0.0, and _snapshot takes it from the next one). Into P1:
+        the ramp counts its shots from one again, as the engine's own P1 does."""
+        was = st["phase"]
+        self._notify_event("phase", room, zone, was, new_phase, why)
+        self._record_phase(room, zone, st, was, new_phase, now, why, snap, p)
+        if new_phase == "P0":
+            self._close_grow_day(room, zone, st, now, p)
+            self._keep_day_peak(st)  # the grow-day ending: tomorrow's P1 target (_vwc_maxima)
+            st["daily_vol"], st["shots"] = 0.0, 0
+            st["peak"] = snap.vwc if snap is not None else 0.0
+            st["ec_offset"], st["last_ec_steer"] = 0.0, None
+            st["last_daily_reset"] = self._grow_day_start(room, now)
+            st["vmax_wetup"] = []  # fresh wet-up curve for today's ramp
+        if new_phase == "P1":
+            st["shots"] = 0
+            if snap is not None:
+                # entering P1 already at the target: the shot decide() fires on this tick is the extra shot
+                st["p1_reached"] = snap.vwc >= min(p.p1_target, p.field_capacity)
+        st["phase"] = new_phase
+        st["last_phase_change"] = now
+        self._save_state()
 
     def _apply_phase_request(self, room, zone, st, now):
         """Move a zone to the phase the operator picked on its Set Phase select, once. The select is
@@ -7465,22 +7473,7 @@ class Controller:
             if new_phase != st["phase"]:
                 log(f"[{room.slug}] Z{zone} {st['phase']} -> {new_phase}: {log_words.transition(reason)}")
                 # decide()'s reason leads with why the phase moved ("lights-off -> P3 | ..."): the push says it.
-                self._notify_event("phase", room, zone, st["phase"], new_phase, str(reason).split(" | ")[0])
-                self._record_phase(room, zone, st, st["phase"], new_phase, now, str(reason).split(" | ")[0], snap, p)
-                if new_phase == "P0":
-                    self._close_grow_day(room, zone, st, now, p)
-                    self._keep_day_peak(st)  # the grow-day ending: tomorrow's P1 target (_vwc_maxima)
-                    st["daily_vol"], st["shots"], st["peak"] = 0.0, 0, snap.vwc
-                    st["ec_offset"], st["last_ec_steer"] = 0.0, None
-                    st["last_daily_reset"] = self._grow_day_start(room, now)
-                    st["vmax_wetup"] = []  # fresh wet-up curve for today's ramp
-                if new_phase == "P1":
-                    st["shots"] = 0
-                    # entering P1 already at the target: the shot decide() fires on this tick is the extra shot
-                    st["p1_reached"] = snap.vwc >= min(p.p1_target, p.field_capacity)
-                st["phase"] = new_phase
-                st["last_phase_change"] = now
-                self._save_state()
+                self._change_phase(room, zone, st, new_phase, str(reason).split(" | ")[0], now, p, snap)
                 # The snapshot was taken in the old phase: what the new one starts from.
                 shown = dataclasses.replace(
                     snap, phase=new_phase, phase_minutes=0.0,

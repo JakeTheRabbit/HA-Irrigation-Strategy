@@ -383,6 +383,7 @@ NUMBER_DESCRIPTIONS = [
         native_max_value=3.00,
         native_step=0.05,
         mode="box",
+        entity_registry_visible_default=False,  # deprecated, nothing reads it (deprecation.py)
     ),
     NumberEntityDescription(
         key="p2_ec_low_threshold",
@@ -392,6 +393,7 @@ NUMBER_DESCRIPTIONS = [
         native_max_value=2.00,
         native_step=0.05,
         mode="box",
+        entity_registry_visible_default=False,  # deprecated, nothing reads it (deprecation.py)
     ),
     # P3 Phase Parameters
     NumberEntityDescription(
@@ -467,6 +469,7 @@ NUMBER_DESCRIPTIONS = [
         native_step=0.1,
         native_unit_of_measurement="mS/cm",
         mode="box",
+        entity_registry_visible_default=False,  # deprecated, nothing reads it (deprecation.py)
     ),
     NumberEntityDescription(
         key="ec_target_gen_p0",
@@ -507,6 +510,7 @@ NUMBER_DESCRIPTIONS = [
         native_step=0.1,
         native_unit_of_measurement="mS/cm",
         mode="box",
+        entity_registry_visible_default=False,  # deprecated, nothing reads it (deprecation.py)
     ),
     # Source-Water Quality Gate (global; the veg batch tank feeds every row).
     # The engine blocks irrigation while the live tank pH/EC sit outside
