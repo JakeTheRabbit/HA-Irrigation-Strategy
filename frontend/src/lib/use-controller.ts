@@ -3,6 +3,7 @@ import { demoDisplay } from "./display";
 import type { DailyRanges, HistoryRequest, HistoryWindow, RunsDocument } from "./comparison-types";
 import { demoHistoryWindow } from "./comparison-demo";
 import type { TimelineRequest } from "./day-timeline";
+import { SUPPLY_SENSOR, zoneMeter } from "./flow-check";
 import { explorerSensors } from "./history-explorer";
 import type { OperatorAction } from "./operator-types";
 import { OperatorDemo } from "./operator-demo";
@@ -837,6 +838,11 @@ export class ControllerStore {
       }),
       // Every sensor the zone page's history explorer offers: probes, climate, feed and tank.
       ...explorerSensors(room, this.states).map((sensor) => sensor.entityId),
+      // The flow meters the integration's supply maps to the room's zones: History › Water & flow.
+      ...room.zones.flatMap((zone) => {
+        const meter = zoneMeter(this.states[SUPPLY_SENSOR]?.attributes, "room:" + room.room.prefix, zone.id, mapped?.pump);
+        return meter ? [meter] : [];
+      }),
     ]);
     const ids = [...request.entityIds, ...request.attributeIds];
     if (!ids.length || ids.some((id) => !allowed.has(id)))

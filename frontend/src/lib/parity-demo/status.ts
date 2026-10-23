@@ -1,5 +1,6 @@
 import type { States } from "../types";
-import { demoId, demoJournal, demoLightsOn, demoZonePause } from "./journal";
+import { DEMO_MAIN_METER, demoId, demoJournal, demoLightsOn, demoZonePause } from "./journal";
+import { demoMeterRows } from "./water";
 
 /** The 3.18 room entities the All rooms page reads, for the demo (`?demo=1`; not with
  * `?backend=3.17`). As in the Journal: Room A plays F2 (flower bulk, day 38 of 63; zone 2 waits
@@ -106,6 +107,12 @@ export function demoParityStatus(states: States, now: number): States {
     out[switchId] = { ...out[switchId], last_changed: new Date(pause.at).toISOString() };
   // The Journal's shot size (1.21 L commanded); 0.96 L arrived.
   put("sensor.crop_steering_zone_2_flow_ratio", 0.79, { commanded_l: 1.21, metered_l: 0.96, shot_id: demoId(now - 600_000, "room::shot:2") });
+  // Room A's main-line meter (H2 Water & flow): its total as the Journal's shots left it.
+  const meter = demoMeterRows(now).at(-1);
+  if (meter) {
+    put(DEMO_MAIN_METER, meter.state, { friendly_name: "Room A main-line meter", unit_of_measurement: "L", device_class: "water", state_class: "total_increasing" });
+    out[DEMO_MAIN_METER].last_changed = new Date(meter.time).toISOString();
+  }
   return out;
 }
 

@@ -271,7 +271,7 @@ try {
     ["plan/watering", "Timeline"],
     ["plan/timers", "Timer programs"],
     ["history/explorer", "Explorer"],
-    ["history/water", "Water use"],
+    ["history/water", "Water & flow"],
     ["history/compare", "Compare runs"],
     ["history/changes", "Changes"],
     ["equipment/probes", "Probes"],
