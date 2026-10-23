@@ -82,7 +82,7 @@ The build fails when any of these checks fails:
 5. **Generated files current** (`--check`): every output matches, and no file is left in `compiled/` that the
    build no longer produces (a write run deletes such files). An output goes stale only when a value the pack
    prints changes: from `core.py` (constants, parameter bounds, cap exemptions, the `ec_adjust` table, the
-   status-tile words, the assumed feed EC default) or from `defaults.py` (the default dryback targets and P0 wait
+   status-tile words) or from `defaults.py` (the default dryback targets and P0 wait
    that PH-11 quotes).
 6. **Controller copy.** When the controller's copy of `compiled/` exists (`addons/<app>/<package>/doctrine/`),
    `--check` compares it byte for byte with `compiled/` (a one-byte edit, a missing file or an extra file fails)
@@ -223,8 +223,9 @@ These were stale or wrong in the advisor notes or in earlier drafts. The doctrin
    and otherwise the raw `ec` (EC-07).
 9. **Feed gate.** Each half of the source-water gate runs only when its feed sensor is configured and its band set;
    the feed sensors default to empty (the pH band ships set, the EC band does not). With no live feed EC reading
-   the controller hands `decide()` an assumed feed EC of 3.0, and every dilutive test uses it. FEED-01 says so,
-   and that a feed EC in the evidence may be that assumption (CT-6, CT-8, OD-2).
+   the controller hands `decide()` the recipe's declared EC, else no feed EC: an unknown feed gets no dilutive
+   test, so no EC flush and no feed-based high-EC hold. FEED-01 says so, and that a feed EC in the evidence may be
+   a recipe's declaration (CT-6, CT-8, OD-2).
 10. **P2 start in young plants.** RMP-10 and the coco start-up keep the vendor advice to hold P2 back until the
    daily dryback passes about 25 % relative, say plainly that the engine cannot, and name the nearest lever (a
    lower P2 threshold, never P2 off, never a lower rescue floor). Kept as advice: OD-1.
@@ -296,7 +297,7 @@ the code, kept on purpose.
 | # | Decision | Reason |
 |---|---|---|
 | OD-1 | **Vendor advice the engine cannot follow stays, as advice.** RMP-10 and the coco start-up keep "maintenance shots only once the daily dryback passes about 25 %" and say the engine cannot do it. | Growers read that guidance and will ask why the engine waters young plants in P2. The rule names the one lever that exists (a lower P2 threshold). A P2 start gate would be an engine change with its own soak, and would regenerate the doctrine. |
-| OD-2 | **The assumed feed EC of 3.0 is documented, not changed.** FEED-01 and CT-8 describe what the code does with no feed sensor. ACT-05 tells the salt call not to rely on that test. | The doctrine may not contradict `decide()`. A code change that treats a missing feed EC as unknown would fail CT-8 until FEED-01 is reworded. |
+| OD-2 | **A feed EC never measured or declared is unknown, not an assumed 3.0** (CTL-008). FEED-01 and CT-8 describe what the code does with no feed sensor. ACT-05 tells the salt call not to rely on a declared feed. | The doctrine may not contradict `decide()`: an invented feed EC made the engine flush, or hold a zone (CS-206), on a feed it never measured. CT-8 checks that `decide()` gets no feed EC and takes neither. |
 | OD-3 | **Default stage arc `slab_default`.** | The vendor handbook and the slab guide agree on it. It is the default of a setting, never a hard-coded site choice. |
 | OD-4 | **Vendor numbers in the arcs and substrate tables.** | Facts and numbers only, paraphrased and cited, tagged `vendor` so the brain weighs them below research. |
 | OD-5 | **Shapes in the public list, words in the private one.** | A word in a shipped list publishes what it forbids. The cost is that a fork pull request is not checked for the private words; the merge push and every release pull request check them. |

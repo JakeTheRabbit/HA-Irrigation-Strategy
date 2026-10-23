@@ -1047,7 +1047,7 @@
    "id": "FEED-01",
    "topic": "feed",
    "priority": 1,
-   "text": "Read feed EC from a live or recent mapped sensor. Without that measurement, the dilution comparison uses declared recipe EC where available, otherwise the fallback 3.0 mS/cm. These are assumptions, not measurements: mark the feed unchecked and do not claim a measured feed strength.",
+   "text": "Read feed EC from a live or recent mapped sensor. Without that measurement, the dilution comparison uses declared recipe EC where available; otherwise the feed EC is unknown and the engine takes no EC flush and no feed-based high-EC hold. A recipe EC is an assumption, not a measurement: mark the feed unchecked and do not claim a measured feed strength.",
    "evidence": "product-rule",
    "params": []
   },

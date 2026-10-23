@@ -126,6 +126,7 @@ def test_blind_fallback_and_sibling_copy_stop_at_own_daily_cap(rig, healthy_sibl
         # Live sibling may legitimately need a high-EC emergency above its own cap.
         fake.set_state("sensor.crop_steering_vwc_zone_2", "30")
         fake.set_state("sensor.crop_steering_ec_zone_2", "12")
+        fake.set_state("sensor.crop_steering_dosing_config", "3", {"feed": {"ec": 3.0}})  # flushable: a known feed
     pub = c._loop_room(room, now)
     assert pub[1]["fire"] is False
     assert "daily-cap" in pub[1]["reason"]
@@ -533,3 +534,133 @@ def test_blind_fallback_does_not_water_at_night(rig):
     assert pub[1]["fire"] is False and pub[2]["fire"] is False
     assert not any(dom == "switch" and svc == "turn_on" for dom, svc, _data in fake.calls)
     assert room.state[1]["daily_vol"] == 0.0 and room.state[2]["daily_vol"] == 0.0
+
+
+def _blind_day(c, fake, now, phase, daily_vol=0.0, since_shot=30):
+    """Both probes dead (no sibling to copy), a 4 L minimum daily water on zone 1 (1000 mL x 4 plants)."""
+    room = c.rooms[0]
+    fake.set_state("number.crop_steering_zone_1_min_daily_ml_per_plant", "1000")
+    fake.set_state("number.crop_steering_zone_1_plant_count", "4")
+    for st in room.state.values():
+        st.update(phase=phase, last_shot=now - timedelta(minutes=since_shot), daily_vol=0.0,
+                  last_phase_change=now - timedelta(minutes=10), last_daily_reset=now.date())
+    room.state[1]["daily_vol"] = daily_vol
+    return room
+
+
+@pytest.mark.usefixtures("no_blind_grace")
+@pytest.mark.parametrize("phase", ["P2", "P3"])
+def test_a_blind_zone_behind_its_minimum_daily_water_gets_the_floor(rig, phase):
+    """CTL-031: the minimum daily water does not need the probe; a blind zone behind it is watered with the lights on,
+    between the timer shots (30 min since the last, under the 90 min timer)."""
+    c, fake, _clock = rig
+    now = datetime(2026, 9, 7, 14, 0)  # lights 10-22: on, 4 h in, the floor's line at 4/9 of 4 L
+    room = _blind_day(c, fake, now, phase)
+    room._was_lights_on = True
+    pub = c._loop_room(room, now)
+    assert pub[1]["fire"] is True and "MIN-DAILY floor" in str(pub[1]["reason"])
+    assert pub[2]["fire"] is False  # no floor set on zone 2
+    assert room.state[1]["daily_vol"] > 0.0
+
+
+@pytest.mark.usefixtures("no_blind_grace")
+@pytest.mark.parametrize(
+    "hour, phase, daily_vol",
+    [
+        (23, "P3", 0.0),  # lights off: never at night
+        (11, "P0", 0.0),  # the morning dryback comes first, as for a zone with a probe
+        (14, "P2", 2.0),  # already ahead of the line (4/9 of 4 L): the water so far counts
+    ],
+)
+def test_a_blind_zone_gets_no_floor_shot_when_none_is_due(rig, hour, phase, daily_vol):
+    c, fake, _clock = rig
+    now = datetime(2026, 9, 7, hour, 0)
+    room = _blind_day(c, fake, now, phase, daily_vol)
+    room._was_lights_on = hour < 22
+    pub = c._loop_room(room, now)
+    assert pub[1]["fire"] is False
+    assert room.state[1]["daily_vol"] == daily_vol
+
+
+@pytest.mark.usefixtures("no_blind_grace")
+def test_the_blind_timer_shot_is_not_doubled_by_the_floor(rig):
+    """A timer shot due fires once, as the timer shot; the floor counts it and waits its interval."""
+    c, fake, _clock = rig
+    now = datetime(2026, 9, 7, 14, 0)
+    room = _blind_day(c, fake, now, "P2", since_shot=120)
+    room._was_lights_on = True
+    pub = c._loop_room(room, now)
+    assert pub[1]["fire"] is True and "FALLBACK" in str(pub[1]["reason"])
+    after = room.state[1]["daily_vol"]
+    pub = c._loop_room(room, now + timedelta(minutes=1))
+    assert pub[1]["fire"] is False and room.state[1]["daily_vol"] == after
+
+
+@pytest.mark.usefixtures("no_blind_grace")
+@pytest.mark.parametrize("held", [1, 2])
+def test_no_floor_shot_into_a_table_that_is_not_draining(rig, held):
+    """CS-310 holds the floor (the engine zeroes it for a backed-up zone): the blind zone's own table (1), or the
+    sibling it copies (2)."""
+    c, fake, _clock = rig
+    now = datetime(2026, 9, 7, 14, 0)
+    room = _blind_day(c, fake, now, "P2")
+    room._was_lights_on = True
+    if held == 2:
+        fake.set_state("sensor.crop_steering_vwc_zone_2", "60")
+    room._backed_up = {held: now}
+    pub = c._loop_room(room, now)
+    assert pub[1]["fire"] is False and room.state[1]["daily_vol"] == 0.0
+
+
+@pytest.mark.usefixtures("no_blind_grace")
+def test_a_blind_zone_copying_a_sibling_gets_the_floor_and_no_copy_on_top_of_it(rig):
+    c, fake, _clock = rig
+    now = datetime(2026, 9, 7, 14, 0)
+    room = _blind_day(c, fake, now, "P2")
+    room._was_lights_on = True
+    fake.set_state("sensor.crop_steering_vwc_zone_2", "60")  # the sibling: wet, nothing due
+    pub = c._loop_room(room, now)
+    assert pub[2]["fire"] is False
+    assert pub[1]["fire"] is True and "MIN-DAILY floor" in str(pub[1]["reason"])
+    after = room.state[1]["daily_vol"]
+    fake.set_state("sensor.crop_steering_vwc_zone_2", "30")  # the sibling now wants a routine top-up
+    pub = c._loop_room(room, now + timedelta(minutes=2))
+    assert pub[2]["fire"] is True
+    assert pub[1]["fire"] is False and "waits" in str(pub[1]["reason"])
+    assert room.state[1]["daily_vol"] == after
+
+
+@pytest.mark.usefixtures("no_blind_grace")
+def test_the_blind_alert_names_the_daily_minimum(rig):
+    c, fake, _clock = rig
+    now = datetime(2026, 9, 7, 14, 0)
+    room = _blind_day(c, fake, now, "P2")
+    room._was_lights_on = True
+    c._loop_room(room, now)
+    card = next(d for dom, svc, d in fake.calls if (dom, svc) == ("persistent_notification", "create")
+                and d["notification_id"] == "f2_blind_default_z1")
+    assert "daily minimum of 4 L" in card["message"]
+
+
+@pytest.mark.usefixtures("no_blind_grace")
+def test_a_blind_zone_copies_every_ramp_shot_even_inside_the_ec_interval(rig):
+    """Only a floor shot makes a copy wait: a P1 ramp every 5 min (under the 10 min EC interval) is copied every time."""
+    c, fake, _clock = rig
+    room = c.rooms[0]
+    now = datetime(2026, 9, 7, 11, 0)
+    room._was_lights_on = True
+    fake.set_state("number.crop_steering_max_daily_volume", "1000")
+    fake.set_state("number.crop_steering_p1_time_between_shots", "5")
+    fake.set_state("number.crop_steering_ec_min_interval", "10")
+    fake.set_state("sensor.crop_steering_vwc_zone_2", "30")  # the sibling: dry, ramping
+    for st in room.state.values():
+        st.update(phase="P1", shots=0, last_shot=now - timedelta(hours=1), daily_vol=0.0,
+                  last_phase_change=now - timedelta(minutes=30), last_daily_reset=now.date())
+    for step in range(3):
+        at = now + timedelta(minutes=5 * step)
+        fake.set_state("sensor.crop_steering_vwc_zone_2", str(30 + 3 * step))  # each ramp shot takes
+        pub = c._loop_room(room, at)
+        assert pub[2]["fire"] is True, (step, pub[2]["reason"], pub[2].get("phase"))
+        assert pub[1]["fire"] is True and "COPY Z2" in str(pub[1]["reason"]), (step, pub[1]["reason"])
+        for st in room.state.values():  # the shots land at the pass's time (the rig's wall clock is real)
+            st["last_shot"] = at
