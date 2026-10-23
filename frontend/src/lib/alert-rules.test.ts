@@ -106,9 +106,9 @@ describe("ruleTokens", () => {
 
   test("sensorsPhones: the phones ticked for Sensors that cover this room", () => {
     const recipients = [
-      { service: "notify.a", name: "Ben's phone", user_id: null, kinds: ["sensors", "stock"], rooms: [], urgent_high_priority: false },
-      { service: "notify.b", name: "Night phone", user_id: null, kinds: ["sensors"], rooms: ["f1_"], urgent_high_priority: false },
-      { service: "notify.c", name: "Sam's phone", user_id: null, kinds: ["stock"], rooms: [], urgent_high_priority: false },
+      { service: "notify.a", name: "Ben's phone", user_id: null, kinds: ["sensors", "stock"], rooms: [], urgent_high_priority: false, quiet_hours: null },
+      { service: "notify.b", name: "Night phone", user_id: null, kinds: ["sensors"], rooms: ["f1_"], urgent_high_priority: false, quiet_hours: null },
+      { service: "notify.c", name: "Sam's phone", user_id: null, kinds: ["stock"], rooms: [], urgent_high_priority: false, quiet_hours: null },
     ];
     expect(sensorsPhones(recipients, "f2_")).toEqual([{ service: "notify.a", name: "Ben's phone" }]);
     expect(sensorsPhones(recipients, "f1_").map((p) => p.name)).toEqual(["Ben's phone", "Night phone"]);
@@ -258,8 +258,8 @@ describe("the demo's alert rules", () => {
 describe("review round 2", () => {
   afterEach(() => resetDemoAlertRules());
   const recipients = [
-    { service: "notify.a", name: "Ben's phone", user_id: null, kinds: ["sensors"], rooms: [], urgent_high_priority: false },
-    { service: "notify.b", name: "Night phone", user_id: null, kinds: ["emergency"], rooms: [], urgent_high_priority: true },
+    { service: "notify.a", name: "Ben's phone", user_id: null, kinds: ["sensors"], rooms: [], urgent_high_priority: false, quiet_hours: null },
+    { service: "notify.b", name: "Night phone", user_id: null, kinds: ["emergency"], rooms: [], urgent_high_priority: true, quiet_hours: null },
   ];
 
   test("phones follow the rule's routing kind, and the kind is named by the catalog", () => {
