@@ -24,12 +24,12 @@ Where to do it today:
 |---|---|---|
 | Moisture probe offset (match handheld) | **Equipment › Probes & offsets** | `crop_steering.probe_offset_set` |
 | Moisture probe curve | Shown read-only on **Equipment › Probes & offsets** | `crop_steering.probe_offset_set` (`curve`) |
-| Feed pH/EC 2-point wizard | **Equipment › Feed pH/EC calibration** is not built yet (it shows "Coming in this release") | `crop_steering.calibration_start` … `calibration_commit` |
+| Feed pH/EC 2-point wizard | **Equipment › Feed pH/EC calibration** | `crop_steering.calibration_start` … `calibration_commit` |
 | Feed probe check (judged only, never applied) | **Equipment › Probes & offsets › Feed probe calibration** | `crop_steering.calibration_record` |
-| Dosing pump prime and calibrate | **Equipment › Pump calibration** is not built yet (it shows "Coming in this release") | `crop_steering.pump_precheck`, `pump_prime`, `pump_stop`, `pump_calibrate`, `pump_calibration_commit` |
+| Dosing pump prime and calibrate | **Equipment › Prime & calibrate a pump** | `crop_steering.pump_precheck`, `pump_prime`, `pump_stop`, `pump_calibrate`, `pump_calibration_commit` |
 
-Until those two pages are built, run the wizard and the pump services from **Developer Tools ›
-Actions** in Home Assistant, with **Return response** ticked.
+An AI assistant or an automation can call the same services from **Developer Tools › Actions** in
+Home Assistant, with **Return response** ticked.
 
 ## Who can do what
 

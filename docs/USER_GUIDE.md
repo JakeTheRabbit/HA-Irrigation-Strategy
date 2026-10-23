@@ -10,7 +10,7 @@ The menu has five sections, and under them a live list of rooms and zones (see [
 - **Status**: **All rooms**, every configured room and zone together.
 - **Irrigation**: **Timeline**, **Current day**, **Timer programs** and **Grow plan & presets**.
 - **History**: **Explorer**, **Water & flow**, **Compare runs** and **Changes**.
-- **Equipment**: **Probes & offsets**, **Feed & dosing**, **Stock**, **Pump calibration**, **Feed pH/EC calibration** and **Setup: pumps & valves**.
+- **Equipment**: **Probes & offsets**, **Feed & dosing**, **Stock**, **Prime & calibrate a pump**, **Feed pH/EC calibration** and **Setup: pumps & valves**.
 - **Settings**: **Alert rules**, **Notifications**, **System status**, **AI assistant**, **Dashboards & display** and **Help**.
 
 Some pages have no menu entry: **Today** (one room; click the room in the room list), each zone's page
@@ -18,8 +18,8 @@ Some pages have no menu entry: **Today** (one room; click the room in the room l
 **Capabilities** (from System status). Select the room before you change a value. The zone numbers
 belong to that room.
 
-> **Note:** **Pump calibration** and **Feed pH/EC calibration** show "Coming in this release" in this
-> build. Feed-probe calibration is on **Probes & offsets** until then ([Calibration](features/calibration.md)).
+> **Note:** calibrating a dosing pump is on **Prime & calibrate a pump**, and the two-point feed pH and
+> EC calibration on **Feed pH/EC calibration** ([Calibration](features/calibration.md)).
 
 Old bookmarks and notification links open the page that now has their content:
 

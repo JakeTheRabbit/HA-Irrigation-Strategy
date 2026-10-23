@@ -5,6 +5,7 @@ import {
   readLandingView,
   saveLandingView,
   LANDING_KEY,
+  LANDING_VIEWS,
 } from "./landing-view";
 import { facilityRooms } from "./facility";
 import { createDemo } from "./demo";
@@ -69,5 +70,11 @@ describe("facility zones", () => {
     expect(
       new Set(views.flatMap((r) => r.view.zones.map((z) => `${r.room.id}/${z.id}`))).size,
     ).toBe(views.reduce((n, r) => n + r.view.zones.length, 0));
+  });
+});
+
+describe("the landing view names", () => {
+  it("calls History's water page what the menu calls it", () => {
+    expect(LANDING_VIEWS.find((v) => v.value === "history/water")?.label).toBe("History · Water & flow");
   });
 });

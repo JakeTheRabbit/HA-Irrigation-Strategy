@@ -59,7 +59,7 @@ export function paletteEntries(controller: Controller): PaletteEntry[] {
     ...calibrate,
     {
       label: "Prime a dosing pump",
-      hint: "Equipment › Pump calibration",
+      hint: "Equipment › Prime & calibrate a pump",
       hash: routeHash({ page: "equipment/pump-calibration" }),
       keywords: ["dose", "fill", "air"],
     },

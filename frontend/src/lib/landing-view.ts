@@ -6,7 +6,7 @@ export const LANDING_VIEWS = [
   { value: "plan/targets", label: "Irrigation · current day" },
   { value: "plan/schedule", label: "Irrigation · calendar" },
   { value: "history/explorer", label: "History · explorer" },
-  { value: "history/water", label: "History · water use" },
+  { value: "history/water", label: "History · Water & flow" },
   { value: "equipment/setup", label: "Equipment · rooms and zones" },
 ] as const satisfies readonly { value: Page; label: string }[];
 export type LandingView = (typeof LANDING_VIEWS)[number]["value"];

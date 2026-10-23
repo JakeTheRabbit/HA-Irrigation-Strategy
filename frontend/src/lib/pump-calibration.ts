@@ -1,7 +1,7 @@
 import type { DosingConfig, DosingDocument, DosingPump } from "./dosing";
 import { dayMonth, monthName } from "./time";
 
-/** Equipment › Pump calibration (G3): prime a dosing pump's line while held, run it 30 s into a
+/** Equipment › Prime & calibrate a pump (G3): prime a dosing pump's line while held, run it 30 s into a
  * measuring jug, and turn the mL measured into its flow (dosing_api.py `pump_*`). The integration
  * works the flow out (`ml_min`); this file only words what it reports. */
 

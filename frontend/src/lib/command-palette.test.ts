@@ -135,3 +135,8 @@ describe("the jump-to palette", () => {
     expect(focusAfterClose(null, button)).toBe(button);
   });
 });
+
+test("the prime action names the pump page as the menu does", () => {
+  const prime = paletteEntries(demoController("?demo=1")).find((e) => e.label === "Prime a dosing pump");
+  expect(prime?.hint).toBe("Equipment › Prime & calibrate a pump");
+});

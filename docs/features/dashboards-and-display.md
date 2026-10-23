@@ -73,8 +73,8 @@ Each page's address is shown after its name. `?zone=N` keeps a zone in focus on 
 | Probes & offsets | `#/equipment/probes` | The room's probes with trust and health, moisture probe offsets matched to a handheld meter, substrate curves, placement guidance, feed-water probe calibration, the room map and all sensors. |
 | Feed & dosing | `#/equipment/dosing` | The batch tank (level, float, EC, pH, temperature), linked stock bottles, pump cards for dosing by hand, making a batch, history, the recipe by week and dosing setup. |
 | Stock | `#/equipment/stock` | Stock tanks: which runs out next, levels against their low marks, refill or set level, batches left, litres drawn per week, and refills from the journal with undo. |
-| Pump calibration | `#/equipment/pump-calibration` | **Not built yet.** The page shows "Coming in this release". |
-| Feed pH/EC calibration | `#/equipment/feed-calibration` | **Not built yet.** The page shows "Coming in this release". Until it is built, feed-probe calibration lives on Probes & offsets. |
+| Prime & calibrate a pump | `#/equipment/pump-calibration` | Prime a dosing pump's line while the button is held, run it for a measured time and save the mL/min you measured. |
+| Feed pH/EC calibration | `#/equipment/feed-calibration` | The two-point calibration of the feed pH and EC probes in buffer solutions, applied only when committed. |
 | Setup: pumps & valves | `#/equipment/setup` | Administrator setup: rooms and zones, plumbing type, pump, main line and valve mapping, probes per zone, plant count, substrate and dripper sizing, commissioning, test shot, catch test, the supply editor and the long-history connection. |
 
 ### Settings
@@ -154,7 +154,7 @@ This sets which page opens when you go to the dashboard without a page in the ad
 - Irrigation · current day
 - Irrigation · calendar
 - History · explorer
-- History · water use
+- History · Water & flow
 - Equipment · rooms and zones
 
 A link to a page always opens that page. If the browser blocks storage, the app opens on Status · all rooms.

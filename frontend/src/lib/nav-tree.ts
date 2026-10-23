@@ -54,7 +54,7 @@ export const NAV_TREE: readonly NavSection[] = [
       { page: "equipment/probes", label: "Probes & offsets" },
       { page: "equipment/dosing", label: "Feed & dosing" },
       { page: "equipment/stock", label: "Stock" },
-      { page: "equipment/pump-calibration", label: "Pump calibration" },
+      { page: "equipment/pump-calibration", label: "Prime & calibrate a pump" },
       { page: "equipment/feed-calibration", label: "Feed pH/EC calibration" },
       { page: "equipment/setup", label: "Setup: pumps & valves" },
     ],

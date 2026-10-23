@@ -67,7 +67,7 @@ each one turns on something new. Do the first three before you change anything e
 | `presets.snapshot` (needs you) | Some settings could not be read at the restart, so no rollback preset was saved. Save one yourself before you change anything. | Irrigation › Grow plan & presets |
 | `entities.retired` | An automation or script uses an entity Crop Steering no longer reads. Settings › Repairs names each one (CS-614). Fix it, or the automation silently does nothing. | HA Settings › Repairs |
 | `supply.pumps` | The update found each room's pump and main line but **did not save a supply**. Saving one turns on pump sharing: rooms on one pump take turns, and a long wait raises CS-214. Measure the pump's real flow first. | Equipment › Setup: pumps & valves › Supply |
-| `calibration.feed_ph`, `calibration.feed_ec` | Each feed probe reads raw, as before. The 2-point calibration is new. | See [Calibration pages](#pages-not-built-yet) |
+| `calibration.feed_ph`, `calibration.feed_ec` | Each feed probe reads raw, as before. The 2-point calibration is new. | See [Calibration pages](#calibration-pages) |
 | `dosing.pump.<id>` | Each pump that has neither a pH role nor a solution yet: pick its solution and run a pump calibration. Pumps that already have a solution are not listed. Until then it doses from its flow sensor, as before. | Equipment › Feed & dosing |
 | `presets.recipe_keys` | A recipe setting fits no preset section and was not copied. Set it on the room's settings if you use it. | Irrigation › Grow plan & presets |
 | `irrigation.mode` (needs you) | A zone shows no irrigation mode. Pick **Steering** to keep it as it was. | Status › All rooms |
@@ -106,14 +106,14 @@ the service. The Repairs card's own text says the opposite ("open the Upgrade re
 Settings → System status" and "The report stays in Settings → System status"). That text is wrong for
 this build: once you mark the card as read, the report is only in the service.
 
-<a id="pages-not-built-yet"></a>
-### Pages not built yet
+<a id="calibration-pages"></a>
+### Calibration pages
 
-**Equipment › Pump calibration** and **Equipment › Feed pH/EC calibration** show "Coming in this
-release". The services behind them ship (`pump_precheck`, `pump_prime`, `pump_calibrate`,
-`pump_calibration_commit`, `calibration_start`, `calibration_capture`, `calibration_commit` and the
-rest), but a grower should wait for the pages rather than step a calibration by hand. Nothing changes
-until a calibration is committed, so leaving these rows open is safe.
+**Equipment › Prime & calibrate a pump** primes a dosing pump's line while you hold the button, runs
+it for a measured time and saves the mL/min you measured. **Equipment › Feed pH/EC calibration** walks
+a feed probe through two buffer solutions and applies the correction only when you commit it. Nothing
+changes until a calibration is committed, so leaving these rows open until you have the buffers and a
+measuring cylinder is safe. In full: [Calibration](features/calibration.md).
 
 ## Before you update
 

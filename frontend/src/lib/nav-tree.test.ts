@@ -92,3 +92,8 @@ describe("the tree menu", () => {
     for (const s of NAV_TREE) for (const i of s.items) expect(RENDERED_PAGES).toContain(i.page);
   });
 });
+
+test("the pump page is named for what it does: prime and calibrate", () => {
+  const equipment = NAV_TREE.find((s) => s.section === "equipment")!;
+  expect(equipment.items.find((i) => i.page === "equipment/pump-calibration")?.label).toBe("Prime & calibrate a pump");
+});

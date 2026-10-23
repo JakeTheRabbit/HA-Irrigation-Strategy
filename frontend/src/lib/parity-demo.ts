@@ -1,6 +1,6 @@
 import { demoBackend, type DemoBackend } from "./demo";
 import { PARITY_ACTIONS, type ParityAction } from "./parity-api";
-import { DEMO_MAIN_METER, DEMO_TIMER_PROGRAM_ID, demoId, demoJournal } from "./parity-demo/journal";
+import { DEMO_TIMER_PROGRAM_ID, demoId, demoJournal } from "./parity-demo/journal";
 import { demoSystemStatus } from "./parity-demo/system";
 import { demoTargetChanges } from "./parity-demo/targets";
 import type {
@@ -9,7 +9,6 @@ import type {
   CsEvent,
   DashboardList,
   HistoryChange,
-  SupplyDoc,
   TimelineBlock,
   TimelineGetData,
   TimelineSummary,
@@ -175,19 +174,6 @@ function allChanges(data: Record<string, unknown>, rooms: string[], now: number,
     ].sort((a, b) => Date.parse(b.ts) - Date.parse(a.ts));
 }
 
-const SUPPLY: SupplyDoc = {
-  revision: 1,
-  irrigation_pumps: [{ entity_id: "switch.demo_irrigation_pump", max_flow_lph: 1200, max_concurrent_zones: 1, flow_meter: null }],
-  water_sources: [],
-  zone_groups: {},
-  // Room A's main-line meter counts each of its zones' shots (they run one at a time).
-  zone_meters: { "room:": { "1": DEMO_MAIN_METER, "2": DEMO_MAIN_METER, "3": DEMO_MAIN_METER } },
-  capacity_check: {
-    worst_case_lph: 480, max_flow_lph: 1200, ok: true, suggest_max_concurrent: 2,
-    pairs: [{ zones: [1, 2], lph: 960, pct_of_pump: 80, verdict: "one_after_another" }],
-  },
-};
-
 const timerProgram = (now: number): TimerProgramListItem => ({
   id: DEMO_TIMER_PROGRAM_ID, room_id: "room:", name: "Zone 3 day timer", zones: [3], type: "recycle",
   duration_s: 60, interval_min: 45, frequency_per_day: null, start_at: null,
@@ -218,10 +204,10 @@ const DASHBOARDS: DashboardList = {
   ],
 };
 
-/** The presets and copy_config: OperatorDemo answers them from the demo's own states
- * (parity-demo/presets.ts). */
-type StatefulAction = "preset_list" | "preset_save" | "preset_apply" | "preset_delete" | "copy_config";
-const STATEFUL: readonly string[] = ["preset_list", "preset_save", "preset_apply", "preset_delete", "copy_config"];
+/** The presets, copy_config and the supply: OperatorDemo answers them from the demo's own states
+ * (parity-demo/presets.ts, and the supply from the demo rooms' own zone sizing). */
+type StatefulAction = "preset_list" | "preset_save" | "preset_apply" | "preset_delete" | "copy_config" | "supply_get" | "supply_save";
+const STATEFUL: readonly string[] = ["preset_list", "preset_save", "preset_apply", "preset_delete", "copy_config", "supply_get", "supply_save"];
 /** migration_report for the demo: Room A came from 3.17 (a report with both lists), Room B is new
  * (two empty lists, so its report is hidden), as migration.py answers them. */
 function demoUpgradeReport(roomId: string) {
@@ -264,8 +250,6 @@ const DEFAULTS: Record<Exclude<ParityAction, StatefulAction>, (data: Record<stri
   timeline_summary: summary,
   history_changes: changes,
   history_revert: (d, now) => ({ reverted_event_id: d.event_id ?? null, new_event_id: demoId(now, `revert:${String(d.event_id)}`), readback: "verified" }),
-  supply_get: () => structuredClone(SUPPLY),
-  supply_save: (d) => ({ ...structuredClone(SUPPLY), revision: Number(d.expected_revision ?? SUPPLY.revision) + (d.preview ? 0 : 1) }),
   pump_precheck: () => ({ ok: true, blockers: [] }),
   pump_prime: (d, now) =>
     // The integration's schema caps a prime at 1–30 s; the envelope reports it as `invalid`.
