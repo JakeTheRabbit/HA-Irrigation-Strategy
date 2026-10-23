@@ -1182,6 +1182,21 @@
       ]
     },
     {
+      "code": "CS-616",
+      "title": "Upgrade report",
+      "source": "repairs",
+      "severity": "warning",
+      "meaning": "The room was updated to 3.18. The update carried its settings into the new features where it could do so without guessing, and listed the rest in the room's Upgrade report under Needs you.",
+      "watering": "Water and dosing continue as before. The update turns on nothing that waters or doses.",
+      "causes": [
+        "The room was set up on a release before 3.18 and has just been updated."
+      ],
+      "fixes": [
+        "Open Crop Steering → Settings → System → Upgrade report. Each line under Needs you links to the page to open and to the section of the upgrade guide to read.",
+        "Mark the card as read to close it. The report stays in Settings."
+      ]
+    },
+    {
       "code": "CS-701",
       "title": "No water at the zone",
       "source": "notification",

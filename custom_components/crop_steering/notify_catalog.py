@@ -130,11 +130,11 @@ KINDS = (
         "detail": "Alerts about a setup change that waits, and a setting that is "
         "missing, out of range or read from a new place. Also the grow plan, and an "
         "Engine Enabled switch that does not stop water. Also a retired entity that "
-        "an automation or a script still uses. A push with no code or an unknown code "
-        "that is not critical also comes here.",
+        "an automation or a script still uses, and the upgrade report of an update. A "
+        "push with no code or an unknown code that is not critical also comes here.",
         "codes": _codes(
             "CS-201 CS-401 CS-402 CS-403 CS-405 CS-601 CS-605 CS-606 CS-607 CS-610 CS-611 "
-            "CS-614 CS-713"
+            "CS-614 CS-616 CS-713"
         ),
         "events": (),
     },
@@ -145,7 +145,7 @@ EMERGENCY = KINDS[0]["codes"]
 # Every code whose severity is info in docs/error-codes.json: a digest lists them apart from the warnings.
 INFO = _codes("CS-205 CS-305 CS-403 CS-501 CS-702 CS-705 CS-711 CS-712 CS-906")
 
-# The integration's own Repairs cards (health.py, stock_api.py, bounds.py, deprecation.py) by translation key, with the code each one
+# The integration's own Repairs cards (health.py, stock_api.py, bounds.py, deprecation.py, migration.py) by translation key, with the code each one
 # carries in its title (strings.json). tests/test_notify_catalog.py keeps the two in step.
 REPAIRS = {
     "kill_switch_missing": "CS-601",
@@ -162,6 +162,7 @@ REPAIRS = {
     "calibration_due": "CS-612",
     "deprecated_entities": "CS-614",
     "probe_offsets_unreadable": "CS-615",
+    "upgrade_report_3_18": "CS-616",
 }
 
 

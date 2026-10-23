@@ -96,6 +96,7 @@ controller still reports a setup change (CS-201) and a hardware hold (CS-301, CS
 | [CS-612](#cs-612) | Feed probe calibration due | Warning | Repairs card |
 | [CS-614](#cs-614) | Retired entities in use | Warning | Repairs card |
 | [CS-615](#cs-615) | Probe offsets unreadable | Warning | Repairs card |
+| [CS-616](#cs-616) | Upgrade report | Warning | Repairs card |
 | [CS-701](#cs-701) | No water at the zone | Warning | Notification |
 | [CS-702](#cs-702) | Unusual water for each plant | Information | Notification |
 | [CS-703](#cs-703) | Overnight probe fault suspected | Warning | Notification |
@@ -1512,6 +1513,25 @@ controller still reports a setup change (CS-201) and a hardware hold (CS-301, CS
 
 - Look in the Home Assistant log for the line that says the probe offsets could not be read.
 - Restore the file from a backup, or ask for help. The card clears when the offsets read again.
+
+<a id="cs-616"></a>
+
+### CS-616: Upgrade report
+
+*Warning · Repairs card*
+
+**What it means.** The room was updated to 3.18. The update carried its settings into the new features where it could do so without guessing, and listed the rest in the room's Upgrade report under Needs you.
+
+**Effect on water.** Water and dosing continue as before. The update turns on nothing that waters or doses.
+
+**Probable causes**
+
+- The room was set up on a release before 3.18 and has just been updated.
+
+**What to do**
+
+- Open Crop Steering → Settings → System → Upgrade report. Each line under Needs you links to the page to open and to the section of the upgrade guide to read.
+- Mark the card as read to close it. The report stays in Settings.
 
 ## AI assistant (CS-7xx)
 

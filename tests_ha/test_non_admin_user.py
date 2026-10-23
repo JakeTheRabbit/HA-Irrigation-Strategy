@@ -124,6 +124,7 @@ READS = {
     "dosing_get": {"room_id": ROOM},
     "pump_precheck": {"room_id": ROOM, "pump": "balance"},
     "display_get": {"room_id": ROOM},
+    "migration_report": {"room_id": ROOM},
     "supply_get": {},
     "preset_list": {},
     "dashboard_list": {},

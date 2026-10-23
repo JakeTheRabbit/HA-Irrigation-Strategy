@@ -857,6 +857,17 @@
     "deprecated_entities": {
       "title": "Crop Steering: {count} retired entity(s) in use (CS-614)",
       "description": "Nothing in Crop Steering reads these entities any more, and the controller never used them. They are kept, hidden, so that your automations and scripts still load. These automations and scripts use them:\n\n{entities}\n\nThe shots do not change. The entities do not show what the controller does: the EC ratio and the adjusted re-water point read unknown, and the settings change nothing.\n\nRemove the entities from the automations and scripts above. Dashboards and their cards are not checked: look there too. The card clears at the next start of Home Assistant after none of them uses one.\n\nCode CS-614. What it means and what to do: Crop Steering → Help & tools → Error codes."
+    },
+    "upgrade_report_3_18": {
+      "title": "Crop Steering 3.18: Upgrade report (CS-616)",
+      "fix_flow": {
+        "step": {
+          "confirm": {
+            "title": "Upgrade report",
+            "description": "Crop Steering 3.18 is a big upgrade. Watering carries on as before. {carried} things were carried across and {needs_you} need you: open the Upgrade report in Crop Steering → Settings → System. Each line there links to the page to open and to the section of the upgrade guide (docs/UPGRADING.md) to read.\n\nCode CS-616. What it means and what to do: Crop Steering → Help & tools → Error codes.\n\nMark as read to close this card. The report stays in Settings → System."
+          }
+        }
+      }
     }
   },
   "selector": {

@@ -41,6 +41,8 @@ ISSUE_IDS = (
     "probe_offsets_unreadable",
     # Raised and cleared by deprecation.py, once Home Assistant has started.
     "deprecated_entities",
+    # Raised by migration.py while the room's Upgrade report lists something for the grower.
+    "upgrade_report_3_18",
 )
 # The platforms whose entities the controller reads by exact id and has no other way to find.
 # Fused sensors are left out: the controller tolerates their legacy naming and an add-on option

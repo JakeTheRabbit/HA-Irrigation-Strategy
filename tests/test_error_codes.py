@@ -74,6 +74,7 @@ RESERVED = {
         "a retired entity an automation or script still uses",
     ),
     "CS-615": ("feat/parity-system", "probe offsets that cannot be read"),
+    "CS-616": ("feat/parity-backend", "the room's 3.18 upgrade report"),
     "CS-708": ("feat/claude-haiku-brain", "the brain"),
     "CS-709": ("feat/claude-haiku-brain", "the brain"),
     "CS-710": ("feat/brain-channel", "the brain: water finding a channel"),

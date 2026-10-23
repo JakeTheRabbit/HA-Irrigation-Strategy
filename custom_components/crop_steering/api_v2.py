@@ -208,6 +208,7 @@ NEVER_ANSWERS_REFUSAL = frozenset(
         "history_long",
         "journal_append",
         "journal_query",
+        "migration_report",
         "notify_get",
         "overlay_get",
         "preset_delete",

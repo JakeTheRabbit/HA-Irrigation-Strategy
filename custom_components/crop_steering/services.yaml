@@ -2747,3 +2747,20 @@ alert_rule_list:
       required: false
       selector:
         text:
+migration_report:
+  name: Read the upgrade report
+  description: >-
+    Returns the room's upgrade report for 3.18: the settings the update carried into the new
+    features ("carried") and the ones it could not carry without guessing ("needs_you"), each with
+    the dashboard page to open and the section of docs/UPGRADING.md to read. Empty for a room set up
+    on 3.18. Changes nothing. It has no administrator check.
+  fields:
+    room_id:
+      name: Room ID
+      description: >-
+        The canonical ID of the room: `room:` for the default room, or `room:` and the room prefix for a
+        named room. The integration refuses an unknown ID. Example: `room:f1_` for a named room, or
+        `room:` for the default room.
+      required: true
+      selector:
+        text:

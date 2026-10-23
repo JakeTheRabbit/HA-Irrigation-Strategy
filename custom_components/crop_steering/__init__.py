@@ -288,10 +288,22 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # waits on it).
     try:
         from .journal_api import async_backfill_room
+        from .migration import note_history
 
-        hass.async_create_task(async_backfill_room(hass, entry))
+        async def _backfill():
+            added = await async_backfill_room(hass, entry)
+            # The Upgrade report says how much history came across.
+            if added and not fresh:
+                await note_history(hass, entry, added)
+
+        hass.async_create_task(_backfill())
     except Exception as err:  # pragma: no cover - never block setup on the journal
         _LOGGER.warning("Journal backfill unavailable: %s", err)
+    # The upgrade to 3.18 (migration.py): the room's settings carried into the new features, and its
+    # Upgrade report. Never stops the room loading.
+    from .migration import async_migrate_room
+
+    await async_migrate_room(hass, entry, fresh)
     await async_setup_panel(hass)
     # What's new: the release highlights the dashboard shows once after an update.
     try:
@@ -514,8 +526,10 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     ]
     if not others_loaded:
         from .journal_api import async_unload_journal
+        from .migration import async_unload_migration
 
         await async_unload_journal(hass)
+        await async_unload_migration(hass)
         await async_unload_services(hass)
         from .selftest import async_unload_selftest
 

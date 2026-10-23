@@ -333,6 +333,16 @@ class CropSteeringEngineConfigSensor(SensorEntity):
                 self.async_write_ha_state,
             )
         )
+        # ... and when the upgrade keeps the old feed EC assumption (legacy_feed_ec_fallback).
+        from .migration import SIGNAL as MIGRATION_SIGNAL
+
+        self.async_on_remove(
+            async_dispatcher_connect(
+                self.hass,
+                f"{MIGRATION_SIGNAL}_{self._entry.entry_id}",
+                self.async_write_ha_state,
+            )
+        )
 
     def _feed_calibration(self) -> dict:
         hass = getattr(self, "hass", None)
@@ -342,6 +352,14 @@ class CropSteeringEngineConfigSensor(SensorEntity):
             else None
         )
         return manager.feed_calibration() if manager is not None else {}
+
+    def _legacy_feed_ec(self):
+        hass = getattr(self, "hass", None)
+        if hass is None:
+            return None
+        from .migration import fallback_for
+
+        return fallback_for(hass, self._entry)
 
     @callback
     def _substrate_changed(self, _event) -> None:
@@ -383,6 +401,7 @@ class CropSteeringEngineConfigSensor(SensorEntity):
             entry_id=self._entry.entry_id,
             substrate=self._substrate(),
             feed_calibration=self._feed_calibration(),
+            legacy_feed_ec_fallback=self._legacy_feed_ec(),
         )
 
 

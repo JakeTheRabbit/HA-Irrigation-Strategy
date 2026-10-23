@@ -64,6 +64,10 @@ async def test_upgrade_then_backfill_then_history_changes_equals_the_old_setpoin
         return_response=True,
         context=Context(user_id=hass_admin_user.id),
     )
+    # The upgrade's own saves (migration.py: the presets it made) are listed too, as the system's.
+    upgrade = [c for c in out["changes"] if (c["detail"] or "").startswith("migration:")]
+    assert {c["actor"] for c in upgrade} == {"system"} and upgrade
+    out["changes"] = [c for c in out["changes"] if c not in upgrade]
     got = [
         (c["ts"], c["key"], c["scope"], c["old"], c["new"], c["actor"], c["reason"])
         for c in out["changes"]

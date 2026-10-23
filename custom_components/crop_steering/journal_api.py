@@ -1178,11 +1178,11 @@ def _build(room_id, cutoff, rows, names) -> dict:
     return out
 
 
-async def async_backfill_room(hass, entry) -> None:
+async def async_backfill_room(hass, entry) -> int:
     """Once per source per room, after its stores are set up: import the setpoint log, stock history,
     calibration history and held overlays as journal events. Ids come from the rows, so a run that is cut
     short and repeated adds nothing twice. Never raises: a journal that is down just has no history yet, and
-    tries again next start.
+    tries again next start. -> how many events it added.
     """
     from datetime import UTC
 
@@ -1192,7 +1192,7 @@ async def async_backfill_room(hass, entry) -> None:
     try:
         hub = hass.data.get(DOMAIN, {}).get(HUB)
         if hub is None or hub.failed or hub.closed:
-            return
+            return 0
         room_id = "room:" + room_prefix(entry)
         added = await hub.backfill(
             room_id,
@@ -1201,8 +1201,10 @@ async def async_backfill_room(hass, entry) -> None:
         )
         if added:
             _LOGGER.info("Journal backfilled %d events for %s", added, room_id)
+        return added
     except Exception as err:
         _LOGGER.warning("Journal backfill failed: %s", err)
+        return 0
 
 
 def async_leave_journal(hass, entry) -> None:
