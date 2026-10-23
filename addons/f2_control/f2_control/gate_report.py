@@ -150,8 +150,9 @@ def _rescue_past_dead_probe(c, room, m, reason):
 def _feed_ec(c, room, m, reason=None):
     if not room.feed_ec_sensor:
         return None
-    lo = c._num(f"number.crop_steering_{room.prefix}irrigation_ec_min", 0)
-    hi = c._num(f"number.crop_steering_{room.prefix}irrigation_ec_max", 0)
+    lo, hi, unread = c._feed_band(room, "ec")
+    if unread:
+        return f"source-water EC band unreadable ({unread}) — holding (fail-closed)"
     if not (lo > 0 or hi > 0):
         return None
     feed = c._read_feed_ec(room)
@@ -169,8 +170,9 @@ def _feed_ec(c, room, m, reason=None):
 def _feed_ph(c, room, m, reason=None):
     if not room.feed_ph_sensor:
         return None
-    lo = c._num(f"number.crop_steering_{room.prefix}irrigation_ph_min", 0)
-    hi = c._num(f"number.crop_steering_{room.prefix}irrigation_ph_max", 0)
+    lo, hi, unread = c._feed_band(room, "ph")
+    if unread:
+        return f"source-water pH band unreadable ({unread}) — holding (fail-closed)"
     if not (lo > 0 or hi > 0):
         return None
     ph = c._read_feed_ph(room)
