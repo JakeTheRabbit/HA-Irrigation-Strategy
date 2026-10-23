@@ -13,8 +13,13 @@ import {
   FLOW_LOW,
   blockedSince,
   dailyRatios,
+  latestReconciled,
   leakIncidents,
+  leakVerdict,
   leakWatch,
+  meterShared,
+  roomPump,
+  spanWords,
   trendWord,
   zoneFlow,
   zoneMeter,
@@ -45,6 +50,13 @@ export function WaterUsePage({ controller }: { controller: Controller }) {
   const pump = descriptor(controller.states, controller.room.room)?.attributes.pump;
   const meters = supply.data ? zones.map((zone) => zoneMeter(supply.data, roomId, zone.id, pump)) : [];
   const meter = mostCommon(meters);
+  const others = controller.rooms.map((room) => {
+    const attributes = descriptor(controller.states, room)?.attributes;
+    const count = Number(attributes?.num_zones) || 0;
+    return { id: "room:" + room.prefix, pump: attributes?.pump, zones: Array.from({ length: count }, (_, i) => i + 1) };
+  });
+  const shared = !!meter && meterShared(supply.data, others, roomId, meter);
+  const oneAtATime = roomPump<{ max_concurrent_zones?: unknown }>(supply.data?.irrigation_pumps, pump)?.max_concurrent_zones === 1;
   return (
     <>
       <Heading title="Water & flow" action={meter ? <MeterLine controller={controller} meter={meter} /> : undefined} />
@@ -61,7 +73,7 @@ export function WaterUsePage({ controller }: { controller: Controller }) {
         </p>
       ) : supply.state === "ready" && zones.length ? (
         meter ? (
-          <FlowCheck controller={controller} meters={meters} meter={meter} />
+          <FlowCheck controller={controller} meters={meters} meter={meter} shared={shared} oneAtATime={oneAtATime} />
         ) : (
           <section className="panel wf-no-meter" data-no-meter>
             <p>Add a flow meter to prove water reached the plants.</p>
@@ -94,7 +106,8 @@ function mostCommon(values: (string | null)[]): string | null {
   return [...counts].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
 }
 
-/** The room's meter, as Home Assistant reads it now. */
+/** The room's meter, as Home Assistant reads it now. Home Assistant's live states carry when the
+ * value last changed, not when the meter last reported: a still meter shows an older time. */
 function MeterLine({ controller, meter }: { controller: Controller; meter: string }) {
   const entity = controller.states[meter];
   const name = String(entity?.attributes.friendly_name ?? meter);
@@ -105,7 +118,7 @@ function MeterLine({ controller, meter }: { controller: Controller; meter: strin
       <span className="wf-dot" data-ok={reading ? "" : undefined} aria-hidden />
       {name}
       {reading && Number.isFinite(changed)
-        ? ` · last reading ${clock(changed, controller.timeZone)}`
+        ? ` · last changed ${clock(changed, controller.timeZone)}`
         : " · not reading"}
     </p>
   );
@@ -115,6 +128,8 @@ function useFlowEvents(controller: Controller, since: number) {
   const roomId = controller.roomId;
   const connected = ["live", "demo"].includes(controller.connection);
   const [read, setRead] = useState<{ key: string; outcome: V2Outcome<{ events: CsEvent[] }> } | null>(null);
+  // A shot the meter has counted since (the live feed): read the Journal again for its bar.
+  const fresh = latestReconciled(controller.recentEvents, roomId);
   const key = `${roomId}|${since}`;
   useEffect(() => {
     if (!connected) return;
@@ -126,11 +141,23 @@ function useFlowEvents(controller: Controller, since: number) {
       live = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key, connected]);
+  }, [key, connected, fresh]);
   return read?.key === key ? read.outcome : null;
 }
 
-function FlowCheck({ controller, meters, meter }: { controller: Controller; meters: (string | null)[]; meter: string }) {
+function FlowCheck({
+  controller,
+  meters,
+  meter,
+  shared,
+  oneAtATime,
+}: {
+  controller: Controller;
+  meters: (string | null)[];
+  meter: string;
+  shared: boolean;
+  oneAtATime: boolean;
+}) {
   const tz = controller.timeZone;
   // The page's day: read once as it opens (the Journal read is one snapshot).
   const [now] = useState(() => Date.now());
@@ -144,7 +171,14 @@ function FlowCheck({ controller, meters, meter }: { controller: Controller; mete
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [events, dayStart, zones.map((zone) => zone.id).join()],
   );
-  if (!read) return <p className="wf-loading muted">Reading the controller’s Journal…</p>;
+  if (!read)
+    return controller.connection === "offline" ? (
+      <p className="panel wf-note" role="alert">
+        Not connected to Home Assistant: the controller’s Journal cannot be read.
+      </p>
+    ) : (
+      <p className="wf-loading muted">Reading the controller’s Journal…</p>
+    );
   if (read.kind === "missing") return <NeedsIntegration feature="Metered flow check" />;
   if (read.kind === "error")
     return (
@@ -159,8 +193,8 @@ function FlowCheck({ controller, meters, meter }: { controller: Controller; mete
       <div className="wf-intro">
         <h2>Did the water reach the plants?</h2>
         <p>
-          {controller.room.room.name} today · metered litres against what each shot asked for. Shots run one zone at a
-          time, so every litre is counted against its own zone.
+          {controller.room.room.name} today · metered litres against what each shot asked for.
+          {oneAtATime && !shared ? " Shots run one zone at a time, so every litre is counted against its own zone." : ""}
         </p>
       </div>
       <div className="wf-zones">
@@ -177,7 +211,7 @@ function FlowCheck({ controller, meters, meter }: { controller: Controller; mete
         ))}
       </div>
       <div className="wf-lower">
-        <LeakCheck controller={controller} meter={meter} events={events} now={now} dayStart={dayStart} />
+        <LeakCheck controller={controller} meter={meter} shared={shared} events={events} now={now} dayStart={dayStart} />
         <WaterPerPlant controller={controller} flows={flows} />
       </div>
     </>
@@ -238,7 +272,7 @@ function ZoneCard({
               <span>metered vs asked, last 3 shots</span>
               {flow.todayPct !== null && (
                 <span className="wf-today">
-                  <b>Today {pct(flow.todayPct)}</b> · {formatVolume(got, 1).replace(/\s\S+$/, "")} of {formatVolume(asked, 1)}
+                  <b>Today {pct(flow.todayPct)}</b> · {formatVolume(got, 3).replace(/\s\S+$/, "")} of {formatVolume(asked, 3)}
                 </span>
               )}
             </div>
@@ -387,16 +421,26 @@ const span = (ms: number) => {
   return `${Math.floor(minutes / 60)} h ${String(minutes % 60).padStart(2, "0")} min`;
 };
 
+const LEAK_CHIP = {
+  flowing: "Water with valves shut",
+  clear: "Clear today",
+  no_alert: "No alert today",
+  unwatched: "Not watched",
+} as const;
+
 /** Water through the meter while every valve is shut: today's lanes, then the last 7 days' CS-319s. */
 function LeakCheck({
   controller,
   meter,
+  shared,
   events,
   now,
   dayStart,
 }: {
   controller: Controller;
   meter: string;
+  /** Another room reads this meter too: this room's valves alone cannot tell its shots from a leak. */
+  shared: boolean;
   events: CsEvent[];
   now: number;
   dayStart: number;
@@ -430,12 +474,13 @@ function LeakCheck({
     : null;
   const incidents = leakIncidents(events);
   const today = incidents.filter((i) => i.at >= dayStart);
-  const flowing = today.length > 0 || (watch?.litres ?? 0) > 0.5;
+  const verdict = watch ? leakVerdict(watch, today.length, shared) : null;
+  const flowing = verdict === "flowing";
   const days = Array.from({ length: 7 }, (_, i) => startOfDay(dayStart - (6 - i) * DAY + 12 * 3_600_000, tz));
   const last = incidents.at(-1);
   const x = (t: number) => (((Math.min(dayStart + DAY, Math.max(dayStart, t)) - dayStart) / DAY) * 100).toFixed(2);
-  const lane = (spans: Span[], kind: string) => (
-    <div className="wf-lane" data-lane={kind}>
+  const lane = (spans: Span[], kind: string, words: string) => (
+    <div className="wf-lane" data-lane={kind} role="img" aria-label={`${words}: ${spanWords(spans, tz)}`}>
       {spans.map((s) => (
         <span key={s.start} style={{ left: `${x(s.start)}%`, width: `max(2px, ${(Number(x(s.end)) - Number(x(s.start))).toFixed(2)}%)` }} />
       ))}
@@ -448,9 +493,9 @@ function LeakCheck({
         <h3 id="wf-leak-title">
           Leak check <small>water through the meter while every valve is shut</small>
         </h3>
-        {watch && (
-          <Pill dot tone={flowing ? "warn" : "on"} data-leak-chip>
-            {flowing ? "Water with valves shut" : "Clear today"}
+        {verdict && (
+          <Pill dot={verdict === "flowing" || verdict === "clear"} tone={flowing ? "warn" : verdict === "clear" ? "on" : "neutral"} data-leak-chip>
+            {LEAK_CHIP[verdict]}
           </Pill>
         )}
       </header>
@@ -462,15 +507,19 @@ function LeakCheck({
         <p className="muted">Reading the recorded valves and meter…</p>
       ) : (
         <div className="wf-lanes">
-          <span>Valve open</span>
-          {lane(watch.valveOpen, "valve")}
+          <span>{shared ? "This room’s valves" : "Valve open"}</span>
+          {lane(watch.valveOpen, "valve", shared ? "This room’s valves open" : "Valve open")}
           <span>Meter flow</span>
-          {lane(watch.meterFlow, "meter")}
+          {lane(watch.meterFlow, "meter", "Meter flow")}
           <span>Flow, valves shut</span>
           <p className="wf-shut" data-shut-flow data-tone={flowing ? "warn" : undefined}>
-            {watch.litres === null
-              ? `The meter reads in ${String(unit ?? "no unit")}, not litres: nothing to count.`
-              : `${formatVolume(watch.litres, 2)} in ${span(watch.watchedMs)} watched`}
+            {shared
+              ? "Another room’s zones run through this meter too: only the controller’s alert tells water with every valve shut."
+              : watch.litres === null
+                ? `The meter reads in ${String(unit ?? "no unit")}, not litres: nothing to count.`
+                : watch.watchedMs <= 0
+                  ? "No meter reading today: nothing watched."
+                  : `${formatVolume(watch.litres, 2)} in ${span(watch.watchedMs)} watched`}
           </p>
           <span aria-hidden />
           <div className="wf-ticks" aria-hidden>
@@ -562,7 +611,7 @@ function WaterPerPlant({ controller, flows }: { controller: Controller; flows: Z
           {/* Most of the gap is water asked for that did not arrive, or the plan asked for less. */}
           {under.asked - under.metered >= (median - under.metered) / 2
             ? under.low
-              ? ", so the gap is the blocked line, not the plan."
+              ? ", so the gap is most likely the blocked line, not the plan."
               : ", so the gap is water that did not arrive, not the plan."
             : ", so the gap is mostly the plan asking for less."}
         </p>

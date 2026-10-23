@@ -3,7 +3,7 @@
  * alerts (water through a meter with no shot in flight) and the meter's recorded readings. */
 import type { Span, TimelineRow } from "./day-timeline";
 import type { CsEvent } from "./parity-types";
-import { dayKey, startOfDay } from "./time";
+import { clock, dayKey, startOfDay } from "./time";
 
 /** The controller's own bounds (crop_steering_engine/flow.py LOW, HIGH). */
 export const FLOW_LOW = 0.8;
@@ -177,9 +177,54 @@ export function zoneMeter(
   const meters = (supply?.zone_meters as Record<string, Record<string, unknown>> | undefined)?.[roomId];
   const own = meters?.[String(zone)];
   if (typeof own === "string" && own) return own;
-  const pumps = Array.isArray(supply?.irrigation_pumps) ? (supply.irrigation_pumps as { entity_id?: unknown; flow_meter?: unknown }[]) : [];
-  const served = pumps.find((p) => p.entity_id === pump) ?? (pumps.length === 1 ? pumps[0] : undefined);
+  const served = roomPump<{ flow_meter?: unknown }>(supply?.irrigation_pumps, pump);
   return typeof served?.flow_meter === "string" && served.flow_meter ? served.flow_meter : null;
+}
+
+/** The room's pump in the supply's `irrigation_pumps`: the one the room names, else the only one. */
+export function roomPump<P extends object>(pumps: unknown, pump: unknown): (P & { entity_id?: unknown }) | undefined {
+  const list = Array.isArray(pumps) ? (pumps as (P & { entity_id?: unknown })[]) : [];
+  return list.find((p) => p.entity_id === pump) ?? (list.length === 1 ? list[0] : undefined);
+}
+
+/** Whether another room's zone reads `meter` (its own in `zone_meters`, or its pump's): the
+ * controller then holds CS-319 while any of those rooms has a shot in flight (_watch_meters), and
+ * this room's valves alone cannot tell its shots from a leak. */
+export function meterShared(
+  supply: { zone_meters?: unknown; irrigation_pumps?: unknown } | null | undefined,
+  rooms: { id: string; zones: number[]; pump: unknown }[],
+  roomId: string,
+  meter: string,
+): boolean {
+  return rooms.some((room) => room.id !== roomId && room.zones.some((zone) => zoneMeter(supply, room.id, zone, room.pump) === meter));
+}
+
+/** The controller's CS-319 bound (controller.py METER_IDLE_L): a rise above it, with no shot in flight. */
+export const METER_IDLE_L = 0.5;
+
+export type LeakVerdict = "flowing" | "clear" | "no_alert" | "unwatched";
+/** The leak check's word for today. `flowing` when the controller raised CS-319 today or, on a meter
+ * only this room reads, the litres counted with every valve shut pass METER_IDLE_L. `clear` only
+ * when the meter was read in litres for some time. On a meter another room reads too
+ * (`shared`), only the controller's alert tells: `no_alert`. */
+export function leakVerdict(watch: { litres: number | null; watchedMs: number }, alertsToday: number, shared: boolean): LeakVerdict {
+  if (alertsToday > 0) return "flowing";
+  if (shared) return "no_alert";
+  if (watch.litres === null || watch.watchedMs <= 0) return "unwatched";
+  return watch.litres > METER_IDLE_L ? "flowing" : "clear";
+}
+
+/** The id of the room's newest `flow.reconciled` in the live feed, or null: a new one re-reads the
+ * page's Journal, so a shot's bar shows once the meter has counted it. */
+export function latestReconciled(events: readonly CsEvent[], roomId: string): string | null {
+  return events.filter((e) => e.kind === "flow.reconciled" && e.room_id === roomId).at(-1)?.id ?? null;
+}
+
+/** A lane's spans in words, for its screen-reader label: "3 times, 06:00 to 15:40". */
+export function spanWords(spans: Span[], tz: string): string {
+  if (!spans.length) return "none today";
+  const times = spans.length === 1 ? "once" : `${spans.length} times`;
+  return `${times}, ${clock(spans[0].start, tz)} to ${clock(Math.max(...spans.map((s) => s.end)), tz)}`;
 }
 
 /** The integration's published supply (backend Task 11): its attributes carry `zone_meters` and

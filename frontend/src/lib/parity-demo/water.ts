@@ -3,9 +3,10 @@ import { DEMO_MAIN_METER, demoJournal } from "./journal";
 
 /** H2 Water & flow's recorded readings for the demo, from the demo Journal: each zone valve is on
  * from its shot's start to its close, and Room A's main-line meter counts each shot's metered litres
- * as the shot closes, plus yesterday's 0.3 L at 02:18 with every valve shut (the Journal's CS-319). */
+ * as the shot closes, plus yesterday's 0.6 L at 02:18 with every valve shut (the Journal's CS-319,
+ * over the controller's 0.5 L METER_IDLE_L). */
 const BASE_L = 1520.4;
-const LEAK_L = 0.3;
+const LEAK_L = 0.6;
 
 /** Room A's meter readings, in litres, oldest first. */
 export function demoMeterRows(now: number): TimelineRow[] {

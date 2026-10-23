@@ -1,5 +1,19 @@
 import { describe, expect, it } from "vitest";
-import { blockedSince, dailyRatios, leakIncidents, leakWatch, meterLitres, trendWord, zoneFlow, zoneMeter } from "./flow-check";
+import {
+  blockedSince,
+  dailyRatios,
+  latestReconciled,
+  leakIncidents,
+  leakVerdict,
+  leakWatch,
+  meterLitres,
+  meterShared,
+  roomPump,
+  spanWords,
+  trendWord,
+  zoneFlow,
+  zoneMeter,
+} from "./flow-check";
 import type { CsEvent } from "./parity-types";
 
 const H = 3_600_000;
@@ -77,11 +91,11 @@ describe("leakIncidents", () => {
       event("alert.raised", T0, null, { key: "flow_idle_sensor.m", title: "Room A: water flows with no zone on (CS-319)" }, "CS-319"),
       event("alert.raised", T0 + H, 2, { key: "flow_low__z2", title: "Less water than expected (CS-318)" }, "CS-318"),
       event("alert.cleared", T0 + 2 * H, null, { key: "flow_idle_sensor.m" }, "CS-319"),
-      event("alert.raised", T0 + 3 * H, null, { key: "flow_idle_sensor.m", title: "Water again", litres: 0.3 }, "CS-319"),
+      event("alert.raised", T0 + 3 * H, null, { key: "flow_idle_sensor.m", title: "Water again", litres: 0.6 }, "CS-319"),
     ];
     expect(leakIncidents(alerts)).toEqual([
       { at: T0, title: "Room A: water flows with no zone on (CS-319)", litres: null },
-      { at: T0 + 3 * H, title: "Water again", litres: 0.3 },
+      { at: T0 + 3 * H, title: "Water again", litres: 0.6 },
     ]);
   });
 });
@@ -156,5 +170,80 @@ describe("zoneMeter", () => {
     expect(zoneMeter(supply, "room:f2_", 1, "switch.other")).toBeNull();
     expect(zoneMeter({ ...supply, irrigation_pumps: [supply.irrigation_pumps[0]] }, "room:f2_", 1, null)).toBe("sensor.p1_meter");
     expect(zoneMeter(null, "room:f2_", 1, null)).toBeNull();
+  });
+});
+
+describe("leakVerdict", () => {
+  const watched = { litres: 0, watchedMs: 4 * H };
+  it("says clear only when the meter was read in litres for some time", () => {
+    expect(leakVerdict(watched, 0, false)).toBe("clear");
+    expect(leakVerdict({ litres: 0.5, watchedMs: 4 * H }, 0, false)).toBe("clear");
+    expect(leakVerdict({ litres: 0.6, watchedMs: 4 * H }, 0, false)).toBe("flowing");
+    // A meter whose unit is not litres, m³ or gallons: nothing was counted.
+    expect(leakVerdict({ litres: null, watchedMs: 4 * H }, 0, false)).toBe("unwatched");
+    // No reading today (the meter unavailable, or no history): nothing was watched.
+    expect(leakVerdict({ litres: 0, watchedMs: 0 }, 0, false)).toBe("unwatched");
+  });
+  it("takes the controller's CS-319 today over the lanes", () => {
+    expect(leakVerdict({ litres: null, watchedMs: 0 }, 1, false)).toBe("flowing");
+    expect(leakVerdict(watched, 1, true)).toBe("flowing");
+  });
+  it("on a meter another room reads, only the controller's alert tells", () => {
+    expect(leakVerdict({ litres: 3, watchedMs: 4 * H }, 0, true)).toBe("no_alert");
+  });
+  it("an empty meter history watches nothing", () => {
+    const watch = leakWatch([[{ state: "off", time: T0 }]], [], "L", T0, T0 + 4 * H);
+    expect(watch.watchedMs).toBe(0);
+    expect(leakVerdict(watch, 0, false)).toBe("unwatched");
+  });
+});
+
+describe("meterShared", () => {
+  const supply = {
+    zone_meters: { "room:f2_": { "1": "sensor.main" }, "room:f1_": { "2": "sensor.main" } },
+    irrigation_pumps: [{ entity_id: "switch.p1", max_concurrent_zones: 1, flow_meter: "sensor.p1_meter" }],
+  };
+  const rooms = [
+    { id: "room:f2_", zones: [1, 2], pump: "switch.p1" },
+    { id: "room:f1_", zones: [1, 2], pump: "switch.p9" },
+    { id: "room:veg_", zones: [1], pump: "switch.p1" },
+  ];
+  it("is true when another room's zone reads the meter, its own or its pump's", () => {
+    expect(meterShared(supply, rooms, "room:f2_", "sensor.main")).toBe(true);
+    expect(meterShared(supply, rooms, "room:f2_", "sensor.p1_meter")).toBe(true);
+    expect(meterShared(supply, rooms.slice(0, 1), "room:f2_", "sensor.main")).toBe(false);
+    expect(meterShared(supply, [rooms[0], rooms[2]], "room:f2_", "sensor.main")).toBe(false);
+  });
+});
+
+describe("roomPump", () => {
+  it("is the room's pump, else the only one", () => {
+    const pumps = [
+      { entity_id: "switch.p1", max_concurrent_zones: 1 },
+      { entity_id: "switch.p2", max_concurrent_zones: 2 },
+    ];
+    expect(roomPump<{ max_concurrent_zones: number }>(pumps, "switch.p2")?.max_concurrent_zones).toBe(2);
+    expect(roomPump(pumps, "switch.other")).toBeUndefined();
+    expect(roomPump(pumps.slice(0, 1), null)?.entity_id).toBe("switch.p1");
+    expect(roomPump(undefined, "switch.p1")).toBeUndefined();
+  });
+});
+
+describe("latestReconciled", () => {
+  it("is the id of this room's newest flow.reconciled in the live feed", () => {
+    const a = { ...flow(T0, 1, 1), room_id: "room:f2_" };
+    const b = { ...flow(T0 + H, 1, 1), room_id: "room:f1_" };
+    const c = { ...flow(T0 + 2 * H, 2, 1), room_id: "room:f2_" };
+    expect(latestReconciled([a, b, c], "room:f2_")).toBe(c.id);
+    expect(latestReconciled([a, b], "room:f1_")).toBe(b.id);
+    expect(latestReconciled([event("shot.completed", T0, 1, {})], "room:")).toBeNull();
+  });
+});
+
+describe("spanWords", () => {
+  it("counts the spans and names the first start and the last end", () => {
+    expect(spanWords([], "UTC")).toBe("none today");
+    expect(spanWords([{ start: T0, end: T0 + 60_000 }], "UTC")).toMatch(/^once, (08:00|8:00 am) to (08:01|8:01 am)$/);
+    expect(spanWords([{ start: T0, end: T0 + 60_000 }, { start: T0 + H, end: T0 + 2 * H }], "UTC")).toMatch(/^2 times, (08:00|8:00 am) to (10:00|10:00 am)$/);
   });
 });

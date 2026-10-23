@@ -3,7 +3,8 @@
  *
  * The clock is pinned to today 16:00 local. Room A's main-line meter counts all three zones; zone 2's
  * line blocks from its 14:14 shot (0.53 of 1.21 L, twice), so its last three shots average 62%;
- * zones 1 and 3 run at 98%. Yesterday at 02:14 the meter counted water with every valve shut (CS-319).
+ * zones 1 and 3 run at 98%. Yesterday at 02:14 the meter counted 0.6 L with every valve shut (CS-319,
+ * over the controller's 0.5 L bound). The demo's main-line meter is Room A's only: no other room reads it.
  *
  * Interactions asserted, at 1440 and 390 on both backends:
  * - 3.18: the header "Water & flow" and the meter line; "Did the water reach the plants?";
@@ -12,8 +13,9 @@
  *   naming the 14:14 shot;
  * - a short tap on the test-shot button sends nothing; a 1.6 s hold sends test_shot (the demo
  *   records the press) and the receipt says when it was asked for;
- * - Leak check: "Clear today", "0.00 L in … watched", one day of the last 7 marked (yesterday,
- *   02:14);
+ * - the intro says shots run one zone at a time (the demo pump's max_concurrent_zones is 1);
+ * - Leak check: "Clear today", "0.00 L in … watched", the lanes' screen-reader labels count their
+ *   spans, one day of the last 7 marked (yesterday, 02:14);
  * - Water per plant: a row per zone, zone 2 under the median, said once;
  * - 3.17: "Needs integration 3.18" for the metered flow check, and the estimate chart
  *   (Litres by zone, by grow week) still there.
@@ -56,8 +58,9 @@ await runParity({
     }
 
     // Header.
-    assert.match(await page.locator("[data-meter-line]").innerText(), new RegExp(`^Room A main-line meter · last reading ${HHMM}$`), `${label}: meter line`);
+    assert.match(await page.locator("[data-meter-line]").innerText(), new RegExp(`^Room A main-line meter · last changed ${HHMM}$`), `${label}: meter line`);
     await page.getByRole("heading", { name: "Did the water reach the plants?", exact: true }).waitFor();
+    assert.match(await page.locator(".wf-intro p").innerText(), /Shots run one zone at a time, so every litre is counted against its own zone\.$/, `${label}: one zone at a time`);
     region("header");
 
     // Zone cards.
@@ -109,6 +112,9 @@ await runParity({
     assert.match(await leak.locator("[data-shut-flow]").innerText(), /^0\.00 L in \d+ h \d{2} min watched$/, `${label}: shut flow`);
     assert.ok((await leak.locator('[data-lane="valve"] span').count()) > 5, `${label}: valve lane`);
     assert.ok((await leak.locator('[data-lane="meter"] span').count()) > 5, `${label}: meter lane`);
+    const span = new RegExp(`^\\d+ times, ${HHMM} to ${HHMM}$`);
+    assert.match((await leak.getByRole("img", { name: /^Valve open: / }).getAttribute("aria-label")).replace(/^Valve open: /, ""), span, `${label}: valve lane label`);
+    assert.match((await leak.getByRole("img", { name: /^Meter flow: / }).getAttribute("aria-label")).replace(/^Meter flow: /, ""), span, `${label}: meter lane label`);
     assert.equal(await leak.locator("li[data-hit]").count(), 1, `${label}: one day with water through shut valves`);
     assert.match(await leak.locator("[data-leak-last]").innerText(), new RegExp(`^\\w{3} \\d{1,2}, ${HHMM} Room A: water flows with no zone on \\(CS-319\\)$`), `${label}: last incident`);
     region("leak check");
@@ -116,7 +122,7 @@ await runParity({
     // Water per plant.
     const plant = page.locator("[data-water-per-plant]");
     assert.equal(await plant.locator("[data-plant-zone]").count(), 3, `${label}: a row per zone`);
-    assert.match(await plant.locator(".wf-plant-note").innerText(), /^Zone 2 is \d+ mL a plant under the median\. It asked for \d+ mL, so the gap is the blocked line, not the plan\.$/, `${label}: plant note`);
+    assert.match(await plant.locator(".wf-plant-note").innerText(), /^Zone 2 is \d+ mL a plant under the median\. It asked for \d+ mL, so the gap is most likely the blocked line, not the plan\.$/, `${label}: plant note`);
     assert.equal(await page.getByText(/a plant under the median/).count(), 1, `${label}: said once`);
     region("water per plant");
 
