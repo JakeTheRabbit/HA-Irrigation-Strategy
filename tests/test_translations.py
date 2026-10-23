@@ -11,6 +11,7 @@ likely to trip are checked here with hassfest's OWN patterns, where a failure ta
 
 import json
 import re
+import string
 from pathlib import Path
 
 from .test_setup_flows import flow_module  # noqa: F401  (pytest fixture)
@@ -93,12 +94,16 @@ def test_translations_follow_the_hassfest_rules_that_are_easy_to_break():
        keys too, so an option stored as "L/hr" fails the whole repository's validation);
     2. no placeholder inside single quotes: Home Assistant formats messages with ICU
        MessageFormat, where single quotes ESCAPE braces, so '{unit}' shows the literal {unit};
-    3. a tooltip (data_description) may only exist for a field that has a label (data).
+    3. a tooltip (data_description) may only exist for a field that has a label (data);
+    4. every {placeholder} is an identifier (`{from, to}` is not), and nothing looks like an
+       HTML tag (`<entry id>` does).
     """
     translation_key = re.compile(r"^(?!.+[_-]{2})(?![_-])[a-z0-9-_]+(?<![_-])$")
     placeholder_in_single_quotes = re.compile(r"'{\w+}'")
+    identifier = re.compile(r"[a-zA-Z_][a-zA-Z0-9_]*")
+    html = re.compile(r"<[a-z].*?>", re.IGNORECASE)
     strings = _strings()
-    bad_keys, bad_quotes = [], []
+    bad_keys, bad_quotes, bad_placeholders, bad_html = [], [], [], []
 
     def walk(node, path):
         if isinstance(node, dict):
@@ -106,12 +111,22 @@ def test_translations_follow_the_hassfest_rules_that_are_easy_to_break():
                 if not translation_key.match(key):
                     bad_keys.append(f"{path}.{key}")
                 walk(value, f"{path}.{key}")
-        elif isinstance(node, str) and placeholder_in_single_quotes.search(node):
-            bad_quotes.append(path)
+        elif isinstance(node, str):
+            if placeholder_in_single_quotes.search(node):
+                bad_quotes.append(path)
+            names = [
+                f for _, f, _, _ in string.Formatter().parse(node) if f is not None
+            ]
+            if not all(identifier.fullmatch(name) for name in names):
+                bad_placeholders.append(path)
+            if html.search(node):
+                bad_html.append(path)
 
     walk(strings, "strings")
     assert bad_keys == []
     assert bad_quotes == []
+    assert bad_placeholders == []
+    assert bad_html == []
     for flow in ("config", "options"):
         for step, body in strings[flow]["step"].items():
             orphans = set(body.get("data_description", {})) - set(body.get("data", {}))

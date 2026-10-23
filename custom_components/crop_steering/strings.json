@@ -852,7 +852,7 @@
     },
     "probe_offsets_unreadable": {
       "title": "Crop Steering: Probe offsets could not be read (CS-615)",
-      "description": "The stored offsets of the moisture probes in {room} could not be read, so these probes now read WITHOUT their offsets and the zones steer on the raw readings:\n\n{probes}\n\nNothing has been overwritten. Probe offsets cannot be changed until this is fixed. Check the Home Assistant log for the error, restore the file crop_steering.calibration.<entry id> from a backup, or ask for help. The card clears when the offsets read again.\n\nCode CS-615. What it means and what to do: Crop Steering \u2192 Help & tools \u2192 Error codes."
+      "description": "The stored offsets of the moisture probes in {room} could not be read, so these probes now read WITHOUT their offsets and the zones steer on the raw readings:\n\n{probes}\n\nNothing has been overwritten. Probe offsets cannot be changed until this is fixed. Check the Home Assistant log for the error, restore the file crop_steering.calibration.ENTRY_ID (ENTRY_ID is the entry ID) from a backup, or ask for help. The card clears when the offsets read again.\n\nCode CS-615. What it means and what to do: Crop Steering \u2192 Help & tools \u2192 Error codes."
     },
     "outside_zone_bounds": {
       "title": "Crop Steering: {count} setting(s) above zone limit (CS-611)",
@@ -1129,7 +1129,7 @@
         },
         "recipients": {
           "name": "Recipients",
-          "description": "The row of each phone: service, name, user ID, alert types, rooms, high priority, digest and quiet hours. The stored rows become this list. Maximum: 20 rows. Quiet hours are `{from, to}` as HH:MM in the Home Assistant time zone, and can cross midnight. In quiet hours, a notification that is not critical waits and goes to the phone as one notification at the end. This includes the warnings that a room does not water, for example CS-206. A critical notification always goes. Default: no quiet hours. Example: one row for `notify.mobile_app_my_phone`."
+          "description": "The row of each phone: service, name, user ID, alert types, rooms, high priority, digest and quiet hours. The stored rows become this list. Maximum: 20 rows. Quiet hours are a from time and a to time, as HH:MM in the Home Assistant time zone, and can cross midnight. In quiet hours, a notification that is not critical waits and goes to the phone as one notification at the end. This includes the warnings that a room does not water, for example CS-206. A critical notification always goes. Default: no quiet hours. Example: one row for `notify.mobile_app_my_phone`."
         },
         "idle_hours": {
           "name": "Hours without water",
