@@ -10,7 +10,7 @@ A more vegetative irrigation approach generally keeps water more available; gene
 
 ## Build a grow
 
-1. Select the room, then **Irrigation → Calendar**. Set each zone's grow start date.
+1. Select the room, then **Irrigation › Grow plan & presets**. Set each zone's grow start date.
 2. Open **Endpoint profiles**. Review both endpoint columns; duplicate a profile when a zone needs different bounds. A shared profile affects every schedule block referencing it.
 3. In **Schedule & curve**, select a zone row and week. Set its profile and steering slider. Switch to **Days** for exceptions. Editing a range splits existing blocks and preserves surrounding days.
 4. Review the combined planning curve and hydraulic estimates below. The same selected date, zone and interpolated parameters drive both the curve and preview.

@@ -2,9 +2,11 @@
 
 The [standalone MCP server](../mcp-server/README.md) lets an assistant inspect Crop Steering and prepare specific configuration changes in an existing Home Assistant installation. It uses local stdio and the official TypeScript MCP SDK. Read tools and previews are available by default; writes are opt-in and limited to reviewed proposals: setup changes, draft plans, timer programs, alert rules, preset applies, copies, probe offsets and the site's supply. No tool runs a pump, opens a valve, submits an irrigation intent or steps a calibration.
 
+For the step-by-step runbook (a Home Assistant user for the assistant, read-only first, the order of work, example payloads and a copy-paste prompt), follow [AI-SETUP.md](AI-SETUP.md). This page is the reference behind it.
+
 ## Prerequisites and connection
 
-Install Crop Steering in Home Assistant and create the room in **Rooms & setup** first. The integration must expose response-bearing `crop_steering.setup_read`, `setup_save`, `strategy_get`, `strategy_preview`, `strategy_save`, and `runs_get` services, and for the newer tools the API v2 services listed under [Tools](#tools). Setup services, and the services that save, arm or disarm a plan, change run records or save any of the stores below, require an authenticated Home Assistant administrator. Run this package on a computer that can reach that HA instance.
+Install Crop Steering in Home Assistant and create the room in **Equipment › Setup: pumps & valves** first. The integration must expose response-bearing `crop_steering.setup_read`, `setup_save`, `strategy_get`, `strategy_preview`, `strategy_save`, and `runs_get` services, and for the newer tools the API v2 services listed under [Tools](#tools). Setup services, and the services that save, arm or disarm a plan, change run records or save any of the stores below, require an authenticated Home Assistant administrator. Run this package on a computer that can reach that HA instance.
 
 Install Node.js 22 or newer, then build the server:
 
@@ -153,6 +155,10 @@ A refusal is `{api: 2, ok: false, error: {code, message, current_revision?}}`, w
 - `forbidden`
 - `guard_refused`: for example, a Stop all that left something on
 - `unavailable`
+
+Each code comes from the type of the exception, never from its message text: a stale revision is `stale_revision`, a non-administrator is `forbidden`, a guard or a refused intent is `guard_refused`, a store or hub that cannot be loaded is `unavailable`, and any other validation error is `invalid`.
+
+**Revisions.** Each store (timer programs, alert rules, supply, display, dosing, calibration and the others) carries a `revision`. Read it with the store's `*_get` or `*_list` service and send it back as `expected_revision` on the write. A write against a revision that has moved on is refused with `stale_revision` and `current_revision`, and nothing is saved: read again, and preview again.
 
 A caller that does not ask for the answer gets the error raised, as in v1, so a refused write never looks like success. The source of truth is `custom_components/crop_steering/api_v2.py`.
 

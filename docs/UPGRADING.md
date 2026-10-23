@@ -1,8 +1,11 @@
 # Upgrading to 3.18
 
-3.18 is a big upgrade. The update keeps every zone watering and dosing exactly as before, carries your
+3.18 is a big upgrade. The update keeps every zone watering and dosing by the same settings (with one new
+fail-closed hold, see [Upgrading to 3.18](UPGRADING-TO-PARITY.md#what-stays-the-same)), carries your
 settings into the new features where it can do that without guessing, and lists the rest in each room's
-**Upgrade report** (Crop Steering → Settings → System, and one card in Settings → Repairs, code CS-616).
+**Upgrade report**: one card in HA Settings › Repairs (code CS-616) and the `crop_steering.migration_report`
+service. The plan for update day, a first-hour checklist and how to go back are in
+[Upgrading to 3.18](UPGRADING-TO-PARITY.md).
 
 This page has one section per line of that report. Each section says what the update did, what it left
 for you, and how to set it, written so that you, or an AI assistant you give this page to, can do it
@@ -24,7 +27,7 @@ calibration.
 **did not save a supply**. Saving one turns on pump sharing: two rooms on one pump then take turns, and a
 zone that needs more water than its pump can give raises CS-214. Until you save, watering is as before.
 
-To set it: Crop Steering → Equipment → Setup → Supply, or `crop_steering.supply_get` then
+To set it: Crop Steering → Equipment › Setup: pumps & valves › Supply, or `crop_steering.supply_get` then
 `crop_steering.supply_save` with `expected_revision` and `irrigation_pumps`:
 `[{entity_id, max_flow_lph, max_concurrent_zones, flow_meter}]`.
 
@@ -32,10 +35,12 @@ To set it: Crop Steering → Equipment → Setup → Supply, or `crop_steering.s
 - `max_flow_lph`: the pump's real output in litres per hour. Measure it (a timed bucket at the far zone),
   do not take it from the box. Leave it out (null) if unknown: no capacity check runs.
 - `max_concurrent_zones`: how many zones it may feed at once. 1 is the safe default and how it ran before.
-- `flow_meter`: a sensor in L/min or L/h on the pump's line, or null. Never a dosing pump's mL/min sensor.
+- `flow_meter`: a meter on the pump's line whose state is a running **total** volume in `L`, `m³` or
+  `gal`, or null. A rate (L/min) is not read. Never a dosing pump's mL/min sensor.
 
 `zone_meters` (`{"room:<prefix>": {"<zone>": "sensor.x"}}`) and `zone_groups` (zones that must never run
 together) are optional. `supply_save` with `preview: true` shows the capacity check before saving.
+In full: [Water supply, pump queue and flow checks](features/water-supply.md).
 
 ## Irrigation mode
 
@@ -43,7 +48,7 @@ together) are optional. `supply_save` with `preview: true` shows the capacity ch
 `select.crop_steering_<prefix>zone_<n>_irrigation_mode`: `steering` (as before), `timer` (runs the room's
 timer programs only) or `off`. Every zone starts on `steering`. If the report lists a zone with no mode,
 pick `steering` to keep it as it was. Turning a zone off still uses `switch.crop_steering_<prefix>zone_<n>_enabled`,
-as before.
+as before. In full: [Timer programs and irrigation modes](features/timers-and-modes.md).
 
 ## Presets
 
@@ -58,34 +63,40 @@ targets, phase timing, water limits and timer programs, and copy them to other r
 Nothing was applied. To apply one: `crop_steering.preset_list`, then `crop_steering.preset_apply` with
 `preset_id`, `to: [{room_id}]` or `[{room_id, zone}]` and `preview: true` first to see the changes.
 A recipe key listed under `presets.recipe_keys` has no preset section: set it on the room's settings.
+In full: [Presets and copying settings](features/presets-and-copy.md).
 
 ## Alerts
 
-*Report row `alerts.rules`.* Alert rules (Crop Steering → Alerts → Rules) are new and there are none. Your
+*Report row `alerts.rules`.* Alert rules (Crop Steering → Settings › Alert rules) are new and there are none. Your
 irrigation pH and EC limits (`number.crop_steering_<prefix>irrigation_ph_min/max`, `irrigation_ec_min/max`)
 still stop watering as before; a rule is only a notification. To add one: `crop_steering.alert_rule_preview`
 to see how often it would have fired, then `crop_steering.alert_rule_set`. Optional.
+In full: [Alerts](features/alerts.md).
 
 ## Units
 
 *Report rows `units.temperature`, `units.ec`, `units.clock`.* Display only: what the dashboard shows,
 never what is stored or what the controller uses. Temperatures follow Home Assistant (°F where Home
 Assistant uses °F). EC is shown in mS/cm; if you work in ppm, pick the 500 or 700 scale. Set them in
-Crop Steering → Settings → Display, or `crop_steering.display_get` then `crop_steering.display_save`
-with `options: {ec_unit: "ppm500" | "ppm700" | "mS/cm", temp_unit: "C" | "F", clock: 12 | 24}`.
+Crop Steering → Settings › Dashboards & display, or `crop_steering.display_get` then
+`crop_steering.display_save` with `options: {ec_unit: "ppm500" | "ppm700" | "mS/cm", temp_unit: "C" | "F",
+clock: 12 | 24}`. The API and the MCP tools always answer in mS/cm and °C.
 
 ## Quiet hours
 
 *Report rows `notify.recipients`, `notify.quiet_hours`.* Every notification recipient was kept as it was.
-Quiet hours are new and off for everyone: emergencies always come through, other alerts wait until the
-quiet hours end. Set them per phone in Crop Steering → Settings → Notifications. Optional.
+Quiet hours are new and off for everyone: urgent pushes always come through, other known alerts wait
+until the quiet hours end and arrive as one push. The Notifications page does not edit them yet: set them
+per phone with `crop_steering.notify_save` ([Quiet hours](features/alerts.md#quiet-hours)). Optional.
 
 ## Feed calibration
 
 *Report rows `calibration.feed_ph`, `calibration.feed_ec`.* Each feed probe reads raw, as before. The
-2-point calibration is new: Crop Steering → Equipment → Calibration, two buffer solutions, and the
-correction is applied only when you commit it. While a calibration session is open, dosing and pH
-correction wait, and the source-water gate uses the corrected reading once committed. An old calibration
+2-point calibration is new: two buffer solutions, and the correction is applied only when you commit
+it. Its own page (Equipment › Feed pH/EC calibration) shows "Coming in this release"; until it is built,
+feed-probe calibration is on Equipment › Probes & offsets. While a session is open, batches and pH
+auto-correct wait, and a room with a feed band for that probe holds its shots. Once committed, the
+source-water gate uses the corrected reading. In full: [Calibration](features/calibration.md). An old calibration
 check from before 3.18 is kept as a record and never applied. A person does this at the tank: an AI
 assistant can explain it but cannot run it.
 
@@ -93,7 +104,7 @@ assistant can explain it but cannot run it.
 
 *Report rows `dosing.ph_pumps`, `dosing.pump.<id>`.* The dosing setup was not changed. A pH up/down pump
 keeps its pH role. Each other pump is listed: pick its solution (nutrient or additive) in Crop Steering →
-Dosing → Pumps, and run a pump calibration (`pump_calibrate`, then `pump_calibration_commit`) so doses are
+Equipment › Feed & dosing, and run a pump calibration (`pump_calibrate`, then `pump_calibration_commit`) so doses are
 sized from a measured mL/min. Until then the pump doses from its flow sensor, as before.
 
 ## Feed EC fallback
@@ -103,13 +114,14 @@ sized from a measured mL/min. Until then the pump doses from its flow sensor, as
 high EC. 3.18 does not invent a feed EC, so the update keeps the old 3.0 for this room, and the controller
 says so (CS-907). It stops by itself when either of these is done:
 
-- map a feed EC probe (Crop Steering → Equipment → Setup, `hardware.feed_ec_sensor`), or
-- set the EC of the feed recipe in use (Crop Steering → Dosing → Feed).
+- map a feed EC probe (Crop Steering → Equipment › Setup: pumps & valves, `hardware.feed_ec_sensor`), or
+- set the EC of the feed recipe in use (Crop Steering → Equipment › Feed & dosing).
 
 ## New panels
 
 *Report row `panels.new`.* The camera, CO2 and light-level (PPFD, DLI) panels show once their entities are
-mapped in Setup. New dashboards (wall, tablet, dosing) are made from Settings → Dashboards; the ones you
+mapped in Setup. New dashboards (wall, tablet, dosing) are made from Settings › Dashboards & display
+([Dashboards and display](features/dashboards-and-display.md)); the ones you
 made yourself are never changed. Optional.
 
 ## Retired entities
@@ -121,10 +133,9 @@ reads. Settings → Repairs names each one (CS-614). Remove it from the automati
 
 *Report row `history.import`.* Your earlier setting changes, stock moves, calibrations and overlays were
 added to History, beside everything recorded from now on. The controller adds its own dosing history and
-AI records after it updates.
+AI records after it updates. In full: [History](features/history-and-changes.md).
 
 ## Browser recipes
 
-Grow-plan recipes saved "on this browser" before 3.18 stay in that browser. The dashboard offers to export
-them as a backup the first time it opens after the update. They are not presets and are never imported
-without you.
+Grow-plan recipes saved "on this browser" before 3.18 stay in that browser. They are not presets and are
+never imported without you. Export them as a backup from Irrigation › Grow plan & presets.

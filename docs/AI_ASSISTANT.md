@@ -4,7 +4,7 @@ The AI assistant is optional. It judges the decisions of the controller that nee
 
 The AI assistant uses Claude from Anthropic, with your own API key. Anthropic bills you for each question. Without the AI assistant, the controller uses its rules, and the rules are always safe.
 
-This page tells how the AI assistant works, which options control it, and what it can change. The [README](../README.md#the-ai-assistant) gives the short procedure to start it.
+This page tells how the AI assistant works, which options control it, and what it can change. [INSTALL.md](INSTALL.md#optional-ai-assistant) gives the short procedure to start it.
 
 ## How the AI assistant works
 
@@ -238,7 +238,7 @@ The code raises CS-713 (room differs from grow plan) with each brain, also with 
 
 ## What the dashboard and Home Assistant show
 
-The dashboard shows the decisions of the AI assistant in each zone’s **Why / next action** panel, on **Irrigation › Current day**, in **History › Timeline**, and on **Equipment › Probes**. Room-level automation permissions live in **Settings › AI assistant**. A room without the AI assistant shows none of it. The [README](../README.md#daily-use) shows each page.
+The dashboard shows the decisions of the AI assistant in each zone’s **Why / next action** panel, on **Irrigation › Current day**, in **History › Explorer**, and on **Equipment › Probes & offsets**. Room-level automation permissions live in **Settings › AI assistant**. A room without the AI assistant shows none of it. The [user guide](USER_GUIDE.md) shows each page.
 
 - `sensor.crop_steering_<prefix>jev`: the AI assistant panel of the room. It shows the brain, the model, the mode (acting or dry run), the calls, the cost and the budget of today, the last error and the judges. It also shows the stage of today.
 - `sensor.crop_steering_<prefix>zone_N_jev`: the judges that act on the zone, the setpoint range, and the last answers of each judge with what the code did.
