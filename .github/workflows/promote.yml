@@ -34,7 +34,7 @@ jobs:
           DISPATCH_REF: ${{ github.ref }}
         run: test "$DISPATCH_REF" = refs/heads/main
       - name: Checkout trusted main workflow code
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
@@ -57,7 +57,7 @@ jobs:
       actions: write
     steps:
       - name: Checkout the same trusted main workflow code
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
