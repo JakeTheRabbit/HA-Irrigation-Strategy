@@ -463,7 +463,7 @@ function TodayStrip({
     : [];
   // The ticks, less any the "now" label would sit on.
   const ticks = [...hourTicks(start, end, 6, timeZone), end].filter(
-    (time) => !(now >= start && now < end) || Math.abs(time - now) > (end - start) * 0.12,
+    (time) => !(now >= start && now < end) || Math.abs(time - now) > (end - start) * 0.18,
   );
   const at = (time: number) => `${(((time - start) / (end - start)) * 100).toFixed(2)}%`;
   return (
