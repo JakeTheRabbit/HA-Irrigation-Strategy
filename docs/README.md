@@ -7,6 +7,8 @@ Start with the row that matches what you are doing. Updating an existing install
 
 | Document | What it covers |
 | --- | --- |
+| [System map](SYSTEM_MAP.md) | How any device reaches Crop Steering through Home Assistant, what each part does, and the lines that are never crossed. |
+| [Roadmap](../ROADMAP.md) | What comes next, by priority and without dates. |
 | [Install, upgrade and roll back](INSTALL.md) | The integration, the controller app or container, and the checks after install. |
 | [Upgrading to 3.18](UPGRADING-TO-PARITY.md) | The plan for update day: what is carried across, what needs you, a first-hour checklist and how to go back. |
 | [UPGRADING.md](UPGRADING.md) | One section per row of the 3.18 Upgrade report, with services and fields. |
