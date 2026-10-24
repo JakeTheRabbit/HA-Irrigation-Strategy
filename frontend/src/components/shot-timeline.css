@@ -447,3 +447,12 @@
     height: 24px;
   }
 }
+
+/* On a phone a whole grow-day fits in about 250 px, so shots 20 min apart sit 3-4 px apart: an
+   8 px minimum piled them into one blob. There a shot is a thin tick, so each one stays visible. */
+@media (max-width: 720px) {
+  .st-track .st-block {
+    width: max(var(--s), 3px);
+    border-radius: 1.5px;
+  }
+}
