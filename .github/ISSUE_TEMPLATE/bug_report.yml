@@ -1,0 +1,50 @@
+name: Bug report
+description: Report a problem with Crop Steering.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        A notification or a Repairs card ends with a code, for example **CS-101**. Find the code in **Settings › Help** or in [Error codes](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/ERROR_CODES.md). Symptoms and what to check: [Troubleshooting](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/troubleshooting.md).
+  - type: input
+    id: alert_code
+    attributes:
+      label: Alert code
+      description: The alert code, if you have one.
+      placeholder: CS-101
+    validations:
+      required: false
+  - type: input
+    id: integration_version
+    attributes:
+      label: Integration version
+      description: The two version numbers. The Crop Steering sidebar shows them.
+    validations:
+      required: true
+  - type: input
+    id: controller_version
+    attributes:
+      label: Controller version
+      description: The two version numbers. The Crop Steering sidebar shows them.
+    validations:
+      required: true
+  - type: textarea
+    id: controller_log
+    attributes:
+      label: Controller log excerpt
+      description: The log of the controller.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: What happened
+    validations:
+      required: true
