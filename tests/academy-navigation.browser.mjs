@@ -82,6 +82,8 @@ try {
   const nextGroup = page.getByRole('button',{name:'Next video: Pi setup',exact:true});
   await nextGroup.click();
   await page.waitForURL('**/#/watch/setup-pi');
+  // The URL changes before hashchange re-renders; wait for the new group, not the old player.
+  await page.locator('.watch-player h2', {hasText: 'Pi setup'}).waitFor();
   await page.locator('.watch-player video').waitFor();
   await page.waitForFunction(() => document.querySelector('video')?.readyState >= 1);
   const chapter = page.getByRole('combobox',{name:'Choose grouped video section',exact:true});
