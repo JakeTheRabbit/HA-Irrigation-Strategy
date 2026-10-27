@@ -14,7 +14,7 @@ This software operates real pumps and valves on live plants. It operates them wh
 
 ## Examine the installation
 
-Do these checks with the kill switches still off:
+Do these checks with the kill switches (the "Watering" switch of each room) still off:
 
 1. Make sure that each room opens in the sidebar.
 2. Make sure that the controller heartbeat of the room is current.
