@@ -1442,29 +1442,8 @@ select option:disabled {
 .planning-legend .key-draft {
   border-top: 2px dashed var(--primary);
 }
-.planning-legend .key-shot {
-  width: 2px;
-  height: 10px;
-  border: 0;
-  background: var(--muted-foreground);
-}
 .planning-legend .key-earlier {
   opacity: 0.3;
-}
-.planning-legend .key-limit {
-  border-top: 2px dotted var(--muted-foreground);
-}
-.planning-legend .key-reference,
-.planning-legend .key-gap {
-  height: 10px;
-  border: 0;
-  background: color-mix(in srgb, var(--muted-foreground) 25%, transparent);
-}
-.planning-previous {
-  margin: 0;
-  font-size: var(--text-xs);
-  color: var(--muted-foreground);
-  font-variant-numeric: tabular-nums;
 }
 .planning-legend .key-ec {
   border-top: 2px dotted var(--muted-foreground);
@@ -1498,7 +1477,7 @@ select option:disabled {
   margin: 4px 16px 12px;
 }
 .planning-projection {
-  margin: 0 16px 12px;
+  margin: 8px 0 12px;
   overflow-x: auto;
   border: 1px solid var(--border);
   border-radius: 8px;

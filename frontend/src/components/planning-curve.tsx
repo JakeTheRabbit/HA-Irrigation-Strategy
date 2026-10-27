@@ -507,12 +507,6 @@ export function PlanningCurve({
             </QualityChip>
           )}
         </StatusLine>
-        {previous && (
-          <p className="planning-previous" data-planning-previous>
-            Previous grow-day: peak {trim(previous.peak.value)}% at {at(previous.peak.hour)} · low{" "}
-            {trim(previous.low.value)}% at {at(previous.low.hour)}
-          </p>
-        )}
         {gauges.length > 0 && (
           <GaugeRow
             className="planning-recorded"
@@ -536,32 +530,18 @@ export function PlanningCurve({
             Draft
           </span>
         )}
-        <span>
-          <i className="key-shot" aria-hidden="true" />
-          Shot
-        </span>
-        <span>
-          <i className="key-limit" aria-hidden="true" />
-          Re-water, dryback, rescue
-        </span>
-        {referenceBand && (
-          <span>
-            <i className="key-reference" aria-hidden="true" />
-            Reference dryback
-          </span>
-        )}
-        {gaps.length > 0 && (
-          <span>
-            <i className="key-gap" aria-hidden="true" />
-            Probe gap
-          </span>
-        )}
         <span className="planning-legend-toggles">
           {previousDay.length > 1 && (
             <button
               type="button"
               className="planning-toggle"
               aria-pressed={showEarlier}
+              data-planning-previous
+              title={
+                previous
+                  ? `Previous grow-day: peak ${trim(previous.peak.value)}% at ${at(previous.peak.hour)} · low ${trim(previous.low.value)}% at ${at(previous.low.hour)}`
+                  : undefined
+              }
               onClick={() => setShowEarlier(!showEarlier)}
             >
               <i className="key-earlier" aria-hidden="true" />
@@ -795,17 +775,6 @@ export function PlanningCurve({
                   >
                     <title>{`Maintenance shot when below ${trim(parameters.p2_vwc_threshold)}% VWC: one fires whenever the zone reads below here`}</title>
                   </line>
-                  {x(p2.end) - x(p2.start) > 110 && (
-                    <text
-                      x={x(p2.end) - 6}
-                      y={y(parameters.p2_vwc_threshold) + 13}
-                      textAnchor="end"
-                      fill="var(--muted-foreground)"
-                      fontSize="12"
-                    >
-                      Re-water {trim(parameters.p2_vwc_threshold)}%
-                    </text>
-                  )}
                 </g>
               )}
               {referenceBand &&
@@ -1020,50 +989,6 @@ export function PlanningCurve({
           }
         />
       )}
-      {rows.length > 0 && (
-        <div
-          className="planning-projection"
-          role="region"
-          aria-label="Projected day by phase"
-          tabIndex={0}
-        >
-          <table>
-            <caption>
-              {projection ? (
-                <>
-                  <strong>Projected day.</strong> Dryback rate{" "}
-                  {projection.measured.day
-                    ? "measured from this zone"
-                    : "of a typical flowering room, until this zone has history"}
-                  .
-                </>
-              ) : (
-                <strong>Planned phases.</strong>
-              )}
-            </caption>
-            <thead>
-              <tr>
-                <th scope="col">Phase</th>
-                <th scope="col">Starts</th>
-                <th scope="col">Target</th>
-                <th scope="col">Shots</th>
-                <th scope="col">Expected end</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => (
-                <tr key={row.id} data-phase-row={row.id}>
-                  <th scope="row">{row.name}</th>
-                  <td>{row.starts}</td>
-                  <td>{row.target}</td>
-                  <td>{row.shots}</td>
-                  <td>{row.end}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
       {onChange && showEditors && (
         <details className="planning-editors">
           <summary>
@@ -1101,8 +1026,63 @@ export function PlanningCurve({
         </details>
       )}
       <details className="planning-assumptions">
-        <summary>How this is worked out</summary>
+        <summary>
+          {rows.length > 0
+            ? "Phase by phase, and how this is worked out"
+            : "How this is worked out"}
+        </summary>
+        {rows.length > 0 && (
+          <div
+            className="planning-projection"
+            role="region"
+            aria-label="Projected day by phase"
+            tabIndex={0}
+          >
+            <table>
+              <caption>
+                {projection ? (
+                  <>
+                    <strong>Projected day.</strong> Dryback rate{" "}
+                    {projection.measured.day
+                      ? "measured from this zone"
+                      : "of a typical flowering room, until this zone has history"}
+                    .
+                  </>
+                ) : (
+                  <strong>Planned phases.</strong>
+                )}
+              </caption>
+              <thead>
+                <tr>
+                  <th scope="col">Phase</th>
+                  <th scope="col">Starts</th>
+                  <th scope="col">Target</th>
+                  <th scope="col">Shots</th>
+                  <th scope="col">Expected end</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row) => (
+                  <tr key={row.id} data-phase-row={row.id}>
+                    <th scope="row">{row.name}</th>
+                    <td>{row.starts}</td>
+                    <td>{row.target}</td>
+                    <td>{row.shots}</td>
+                    <td>{row.end}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
         <ul>
+          <li>
+            Dotted lines are the re-water point in P2, the dryback target and the rescue floor.
+            Ticks under the clock are shots.
+            {referenceBand ? " The shaded overnight band is the stage's reference dryback." : ""}
+            {gaps.length > 0 ? " Shaded columns are probe gaps." : ""} Point at a line for its
+            value.
+          </li>
           <li>
             VWC is absolute water content (%). Dryback is a relative drop from the reference peak,
             not percentage points.
