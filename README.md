@@ -7,11 +7,11 @@
 
 **Crop Steering waters each zone of a grow room from what its probes read, inside Home Assistant. It refuses to water when something is wrong, and it shows you every watering.**
 
-![All rooms across both demo rooms, grouped by room with current VWC, pore EC, water delivery and feed supply](img/all-zones.png)
-
 [Try the demo](https://jaketherabbit.github.io/HA-Irrigation-Strategy/dashboard.html?demo=1) · [Is it for me?](https://cropsteering.growlabs.nz/is-it-for-me) · [Free Academy](https://jaketherabbit.github.io/HA-Irrigation-Strategy/learn/) · [Website](https://cropsteering.growlabs.nz)
 
 > **Updating from 3.17 or earlier?** Read [Upgrade to 3.18: the plan](docs/UPGRADING-TO-PARITY.md) first: integration first, then the controller, and never in the hour before lights-on.
+
+![All rooms across both demo rooms, grouped by room with current VWC, pore EC, water delivery and feed supply](img/all-zones.png)
 
 ## What it does
 
