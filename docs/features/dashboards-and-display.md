@@ -35,6 +35,32 @@ Nothing on this page waters, opens a valve or changes a setpoint. Units, clock, 
 
 Bookmarks and notification links from before 3.18 open the page that now holds their content. For example, `#/sensors` opens `#/equipment/probes`, `#/history/timeline` opens History › Explorer, and the old `?view=` links of the single-page dashboards open their new pages. The full table is in `frontend/src/lib/routes.ts` (`LEGACY_PAGES`, `LEGACY_VIEWS`).
 
+### Inside Home Assistant
+
+When opened inside a compatible Home Assistant shell, Crop Steering temporarily collapses the HA sidebar. Use **Home Assistant** at the bottom of Crop Steering's navigation, or the house button in its top bar, to open the HA menu over the workspace. The top-bar button stays available on mobile.
+
+Leaving Crop Steering restores the prior kiosk state. This does not change Home Assistant's saved sidebar preference. Standalone demos and unsupported or cross-origin embeddings retain their normal navigation.
+
+#### Verified native panel behavior
+
+Opening the native panel hides the Home Assistant sidebar, and the **Home Assistant** button brings it back. This was checked on a real installation; companion apps and third-party kiosk extensions may behave differently.
+
+The workspace combines the former Manual setpoints and Grow plan entries into **Irrigation › Current day** and **Irrigation › Grow plan & presets**. Those are Crop Steering's own navigation views; they do not replace the Home Assistant menu button. Existing `#/strategy` and `#/grow-plan` bookmarks remain valid. Every page and its address is listed in [Dashboards and display](#the-pages).
+
+Crop Steering can also write wall, tablet and dosing-station dashboards into Home Assistant's own **Settings › Dashboards**, built from Home Assistant's built-in cards only. They are separate from this sidebar panel; see [Wall, tablet and dosing-station dashboards](#wall-tablet-and-dosing-station-dashboards). Shell behavior was verified in the native HA panel on 2.16.1; current navigation is covered by the compiled-demo browser checks.
+
+#### Implementation references
+
+The connector independently uses Home Assistant's temporary kiosk/menu interface, the mechanism used by Music Assistant. It does not copy the Music Assistant application or change HA's parent styles.
+
+- [Music Assistant's HA messaging integration](https://github.com/music-assistant/frontend/blob/362b321da460f8d234c1abbfd007eb19e26d7859/src/plugins/homeassistant.ts): ingress subscription with `kioskMode` and `home-assistant/toggle-menu`.
+- [Home Assistant ingress handler](https://github.com/home-assistant/frontend/blob/c3cc2217bfd3b2ac576da2a147a4679a3af6b1a8/src/panels/app/ha-panel-app.ts): subscription cleanup restores temporary kiosk mode.
+- [Home Assistant sidebar state](https://github.com/home-assistant/frontend/blob/c3cc2217bfd3b2ac576da2a147a4679a3af6b1a8/src/state/sidebar-mixin.ts): temporary `hass-kiosk-mode` is separate from persisted sidebar docking.
+
+Ingress uses the host messaging interface. The standard same-origin iframe panel uses HA's kiosk and menu events directly, because that panel does not implement ingress messages. It checks host capabilities before hiding anything. No cross-origin parent access is attempted beyond guarded capability discovery.
+
+`frontend/scripts/verify-ha-shell.mjs` checks desktop/mobile menu recovery, restoring prior state when leaving, preserving preexisting kiosk mode, and standalone behavior against an isolated host fixture. Compatibility with every HA companion app and third-party kiosk extension is not implied.
+
 ## The pages
 
 Each page's address is shown after its name. `?zone=N` keeps a zone in focus on Current day, Grow plan & presets and Explorer.
@@ -251,5 +277,5 @@ The service answers with `url_path` and `title`. It refuses a call in these case
 ## Related
 
 - [UPGRADING.md](../UPGRADING.md): the 3.18 upgrade and its report, including the units rows.
-- [HA_SIDEBAR.md](../HA_SIDEBAR.md): adding the dashboard itself to Home Assistant's sidebar.
+- [Inside Home Assistant](#inside-home-assistant): adding the dashboard itself to Home Assistant's sidebar.
 - [USER_GUIDE.md](../USER_GUIDE.md): daily use.

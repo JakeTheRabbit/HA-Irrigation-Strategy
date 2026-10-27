@@ -6,6 +6,8 @@ phase changes, hardware lockouts, watering stopped, and so on), and a push goes 
 row ticks that kind of alert. It also adds the events a person can now subscribe to that were never
 alerts: phase changes, the AI assistant's setting changes, and "no watering for a while".
 
+Alert rules, the inbox and quiet hours: [Alerts](features/alerts.md).
+
 This document is the contract between the three layers. Nothing in it names a site's phones or people.
 
 ## Layers

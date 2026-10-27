@@ -1,6 +1,6 @@
 # System audit
 
-Every finding from the five area audits (controller, integration, frontend, website, CI) as one table, ranked by user impact. Audited at 3.17.0 (`81140bd5`). Refreshed 2026-10-23 against the open PRs. The area maps behind it are summarised in [system-map.md](system-map.md).
+Every finding from the five area audits (controller, integration, frontend, website, CI) as one table, ranked by user impact. Audited at 3.17.0 (`81140bd5`). Refreshed 2026-10-23 against the open PRs. The area maps behind it are summarised in [system-map.md](../system-map.md).
 
 ## Summary
 

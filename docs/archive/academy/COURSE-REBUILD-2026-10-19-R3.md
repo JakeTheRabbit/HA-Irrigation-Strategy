@@ -2,7 +2,7 @@
 
 **Edition:** `2026-10-19-r3`. **Status:** published; local and public media checks passed.
 
-The [academy guide](../../ACADEMY.md), [course plan](COURSE-PLAN.md) and [supporting-pack guide](README.md) describe the current route. [Original delivery](DELIVERY-2026-10-19.md), [R2 pilot repair](PILOT-REPAIR-2026-10-19.md), [pilot scripts](PILOT-SCRIPTS.md) and the original storyboard remain historical records. Their narration, voice references, media counts and release status do not override R3 sources.
+The [academy guide](../../ACADEMY.md), [course plan](../../training/crop-steering-from-zero/COURSE-PLAN.md) and [supporting-pack guide](../../training/crop-steering-from-zero/README.md) describe the current route. [Original delivery](DELIVERY-2026-10-19.md), [R2 pilot repair](PILOT-REPAIR-2026-10-19.md), [pilot scripts](PILOT-SCRIPTS.md) and the original storyboard remain historical records. Their narration, voice references, media counts and release status do not override R3 sources.
 
 ## What changed
 

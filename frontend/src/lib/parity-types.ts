@@ -1,5 +1,5 @@
 /** The v2 `crop_steering.*` service shapes, with the backend plan's field names exactly
- * (docs/superpowers/plans/2026-10-22-parity-backend.md). Times are ISO strings with an offset;
+ * (docs/archive/superpowers/plans/2026-10-22-parity-backend.md). Times are ISO strings with an offset;
  * compare them as instants, never as text. Values are canonical: %, mS/cm, °C, litres, seconds. */
 
 export type JournalActor =

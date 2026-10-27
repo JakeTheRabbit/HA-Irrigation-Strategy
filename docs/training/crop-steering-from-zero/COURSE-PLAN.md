@@ -1,6 +1,6 @@
 # Course plan: Crop Steering from Zero
 
-This is the R3 teaching sequence. The [rebuild record](COURSE-REBUILD-2026-10-19-R3.md) records the completed media checks and public deployment. Current narration belongs in the [editable lesson modules](../../../www/learn/course/modules/) and [generated transcript](../../../www/learn/course/all-lesson-transcripts.txt); archived pilot scripts are not a second source of truth.
+This is the R3 teaching sequence. The [rebuild record](../../archive/academy/COURSE-REBUILD-2026-10-19-R3.md) records the completed media checks and public deployment. Current narration belongs in the [editable lesson modules](../../../www/learn/course/modules/) and [generated transcript](../../../www/learn/course/all-lesson-transcripts.txt); archived pilot scripts are not a second source of truth.
 
 ## The promise
 
@@ -127,7 +127,7 @@ These statements are based on the reviewed local [user guide](../../USER_GUIDE.m
 
 ## Historical initial YouTube production proposal
 
-The following proposal predates the R3 web-course rebuild. It records the original intention, not the current delivery status. R3 has authored narration for all 24 lessons and is building a video for each; current gates are in the [rebuild record](COURSE-REBUILD-2026-10-19-R3.md).
+The following proposal predates the R3 web-course rebuild. It records the original intention, not the current delivery status. R3 has authored narration for all 24 lessons and is building a video for each; current gates are in the [rebuild record](../../archive/academy/COURSE-REBUILD-2026-10-19-R3.md).
 
 **Pilot first:** record A1, A2 and A3 using the scripts. Test them with 3–5 people who cannot already explain VWC. Observe their answers without coaching; use the measures in the production guide. Revise confusing explanations before recording the rest. This is a usability pilot, not a statistically representative trial.
 

@@ -2,7 +2,7 @@
 
 Status: design spec, 2026-10-22. Scope: the irrigation and fertigation domain of HA-Irrigation-Strategy (integration, f2_control controller, engine, frontend) and the contract AiGrow consumes. Users/roles, tasks, IPM, compliance and climate *control* stay in AiGrow; climate *readings* are inputs only.
 
-Grounded in: `custom_components/crop_steering/{const,room,setup_api,strategy,strategy_model,run_store,grow_day_store,harvest_store,setpoint_log,overlays,calibration,dosing,dosing_api,stock,stock_api,notify_api,notify_catalog,plumbing}.py`, `services.yaml`, `addons/f2_control/f2_control/{controller,dosing_runner,safety_ops,shot_audit,auto_setpoints,setpoint_supervisor,tank_level,zone_history}.py`, `brain/{ledger,envelope,powers}.py`, `crop-steering-engine/src/crop_steering_engine/core.py`, `docs/{ENTITIES,DOSING,MCP,SYSTEM_OVERVIEW}.md`, and the parity plan `docs/superpowers/plans/2026-10-22-growlink-aroya-parity.md` (G1–G17).
+Grounded in: `custom_components/crop_steering/{const,room,setup_api,strategy,strategy_model,run_store,grow_day_store,harvest_store,setpoint_log,overlays,calibration,dosing,dosing_api,stock,stock_api,notify_api,notify_catalog,plumbing}.py`, `services.yaml`, `addons/f2_control/f2_control/{controller,dosing_runner,safety_ops,shot_audit,auto_setpoints,setpoint_supervisor,tank_level,zone_history}.py`, `brain/{ledger,envelope,powers}.py`, `crop-steering-engine/src/crop_steering_engine/core.py`, `docs/{ENTITIES,DOSING,MCP,SYSTEM_OVERVIEW}.md`, and the parity plan `docs/archive/superpowers/plans/2026-10-22-growlink-aroya-parity.md` (G1–G17).
 
 Names in `code` exist today. Names marked **NEW** do not exist yet.
 
