@@ -179,6 +179,8 @@ try {
     // every phase is drawn the way it runs: all six demo ramp shots, and the P2 top-ups
     assert.equal(await graph.locator('[data-planning-shot="P1"]').count(), 6);
     assert.ok((await graph.locator('[data-planning-shot="P2"]').count()) > 1);
+    // The phase table sits folded under the chart with the workings; open it to read it.
+    await graph.locator(".planning-assumptions summary").click();
     assert.match(
       await graph.locator(".planning-projection").innerText(),
       /Projected day[\s\S]*measured from this zone/,
@@ -198,16 +200,16 @@ try {
     assert.equal(await chip.count(), 1);
     assert.equal(await chip.getAttribute("data-planning-advice"), "p2");
     assert.match(await chip.innerText(), /late in P2\. Raise the re-water point to [\d.]+%\./);
-    // Kept from the earlier card: the previous grow-day's peak and low, one key for the chart, and
-    // the stage's reference dryback as a muted band.
+    // Kept from the earlier card, out of the way: the previous grow-day's peak and low on the
+    // Earlier days toggle, a short key for the chart, and the reference dryback as a muted band.
     assert.match(
-      await graph.locator("[data-planning-previous]").innerText(),
+      await graph.locator("[data-planning-previous]").getAttribute("title"),
       /^Previous grow-day: peak [\d.]+% at \d\d:\d\d · low [\d.]+% at \d\d:\d\d$/,
     );
     assert.equal(await graph.getByRole("group", { name: "Chart key" }).count(), 1);
     assert.match(
       await graph.getByRole("group", { name: "Chart key" }).innerText(),
-      /Recorded[\s\S]*Target[\s\S]*Shot[\s\S]*Re-water[\s\S]*Reference dryback[\s\S]*Probe gap/,
+      /^Recorded[\s\S]*Target[\s\S]*Earlier days[\s\S]*EC$/,
     );
     assert.ok((await graph.locator('[data-planning-line="reference-dryback"]').count()) > 0);
     assert.match(
@@ -256,14 +258,14 @@ try {
       await graph.locator('[data-planning-line="recorded-vwc"]').waitFor();
       const box = await graph.boundingBox();
       assert.ok(box.height <= 900, `The plan card is ${Math.round(box.height)}px tall`);
-      // Status, four gauges with targets, the chart, one chip and the table, in that order.
+      // Status, four gauges with targets, the chart, one chip and the folded workings, in order.
       const order = await graph.evaluate((card) =>
         [
           "[data-hmi-status]",
           ".planning-recorded",
           ".planning-svg-wrap svg",
           ".hmi-check",
-          ".planning-projection",
+          ".planning-assumptions",
         ].map((selector) => card.querySelector(selector)?.getBoundingClientRect().top ?? -1),
       );
       assert.ok(
