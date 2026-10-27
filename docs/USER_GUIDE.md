@@ -292,6 +292,13 @@ Each library is for one site, one browser, one room and one mode (demo or live).
 crosshair, the last run beside it and **Export CSV** of what is charted. Pick a zone in the room list to
 add its probes, its targets and its other grows. **AI assistant decisions** lists what the AI assistant
 did, each with how it turned out. See [History › Explorer](features/history-and-changes.md#history--explorer).
+The result labels mean:
+
+- **Acted**: the controller did what the AI assistant asked.
+- **Refused**: the envelope refused the action.
+- **Advice**: an alert or a suggestion only.
+- **No action** or **Waiting**: nothing changed yet.
+- **Worked** or **Didn’t work**: how an earlier action turned out.
 
 **Changes** lists every setting change by day: who made it and why, the old and new value, and how it
 turned out. An administrator can put one change back. See
