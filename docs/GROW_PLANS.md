@@ -90,7 +90,7 @@ are skipped.
 
 Change a slider, profile value or supported graph handle and the preview updates immediately. Graph handles edit the selected profile's endpoints as explained in the UI; check shared profile references. Editing the graph does not directly write irrigation hardware.
 
-This is a projection from setpoints and a dry-down rate. It does not predict uptake, runoff or salt balance, and the engine fires on the probe, not on these times. **Insights** plots each zone's recorded VWC and EC using HA Recorder data, with independent units/axes and explicit missing-data states.
+This is a projection from setpoints and a dry-down rate. It does not predict uptake, runoff or salt balance, and the engine fires on the probe, not on these times. **History › Explorer** plots each zone's recorded VWC and EC using HA Recorder data, with independent units/axes and explicit missing-data states.
 
 ## See changes while editing manual setpoints
 
@@ -120,7 +120,7 @@ For 42 plants with one 4 L/hour dripper each, 120 seconds is about **133 mL/plan
 
 The P1 maximum-shot budget is conditional. P2 maintenance and P3 emergency shots depend on sensor feedback, so a guaranteed whole-day total cannot be inferred from target values alone. Historical controller totals are preserved; new shot accounting uses effective duration after caps and minimum timing.
 
-**Insights** provides a local catch-test calculator, probe coverage/freshness diagnostics and an equipment map. These tools expose assumptions instead of claiming to tune a crop automatically.
+**Equipment › Setup: pumps & valves** provides a local catch-test calculator, and **Equipment › Probes & offsets** shows probe coverage and freshness. These tools expose assumptions instead of claiming to tune a crop automatically.
 
 ## Recipe library
 

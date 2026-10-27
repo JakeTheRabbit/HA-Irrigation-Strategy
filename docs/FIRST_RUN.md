@@ -18,8 +18,6 @@ Do these checks with the kill switches (the "Watering" switch of each room) stil
 
 1. Make sure that each room opens in the sidebar.
 2. Make sure that the controller heartbeat of the room is current.
-3. Make sure that the mapping shows **Mapping acknowledged**.
-4. Make sure that **Equipment › Probes & offsets** shows the correct entities and units.
 
 ## Set up a room
 
@@ -38,7 +36,7 @@ A Home Assistant administrator does the setup in **Equipment › Setup: pumps & 
 11. Make sure that the kill switch and the equipment of the room are off.
 12. Select **Review configuration**, then **Save configuration**.
 13. Wait for **Mapping acknowledged**. A saved setup and an accepted setup are different states.
-14. Examine the room's Today page and **Equipment › Probes & offsets**.
+14. Examine the room's Today page. Make sure that **Equipment › Probes & offsets** shows the correct entities and units.
 15. Set the lights-on and lights-off hours of the room.
 16. Examine the water limits, the shot sizes and the rescue floor of each zone.
 
