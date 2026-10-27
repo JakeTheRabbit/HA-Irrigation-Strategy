@@ -4,6 +4,9 @@ A notification or Repairs card that ends with a code such as **CS-101**: look th
 [Error codes](ERROR_CODES.md) (the same list is in the dashboard under **Settings › Help**)
 for what it means, what happens to watering meanwhile, the likely causes and what to do.
 
+Start with **Settings › System status**: it lists every mapped device as online, offline or silent, and
+each room's controller heartbeat ([System status](features/system-status.md#troubleshooting-with-this-page)).
+
 | Symptom                                            | Check and action                                                                                                                                                                                                                                                                                                                                                                        |
 | -------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Workspace requests an integration update           | Update the integration including its bundled www/dashboard.html, restart HA and refresh the page.                                                                                                                                                                                                                                                                                       |
@@ -36,15 +39,7 @@ for what it means, what happens to watering meanwhile, the likely causes and wha
 | Hardware fault remains latched                     | All implicated engines and shared hardware must be OFF before recovery; inspect the actual fault first.                                                                                                                                                                                                                                                                                 |
 | Embedded theme does not match                      | Use the integration's same-origin sidebar and Follow Home Assistant. Cross-origin standalone pages cannot read parent theme variables.                                                                                                                                                                                                                                                  |
 | Live connection failed                             | Reauthenticate HA or configure the explicit connection in Settings. The app does not silently switch to demo data.                                                                                                                                                                                                                                                                      |
-
-## New in 3.18
-
-Start with **Settings › System status**: it lists every mapped device as online, offline or silent, and
-each room's controller heartbeat ([System status](features/system-status.md#troubleshooting-with-this-page)).
-
-| Symptom | Check and action |
-| --- | --- |
-| A room holds with *source-water EC band unreadable (…) — holding (fail-closed)* (or the pH equivalent) | One of the room's irrigation pH/EC limit numbers (`number.crop_steering_<prefix>irrigation_{ec,ph}_{min,max}`) reads unavailable, unknown or not a number. Check the integration loaded and the named number has a value. The hold lifts on the first pass where it reads again ([Upgrading to 3.18](UPGRADING-TO-PARITY.md#first-hour-checklist)). |
+| A room holds with *source-water EC band unreadable (…) — holding (fail-closed)* (or the pH equivalent) | One of the room's irrigation pH/EC limit numbers (`number.crop_steering_<prefix>irrigation_{ec,ph}_{min,max}`) reads unavailable, unknown or not a number. Check the integration loaded and the named number has a value. The hold lifts on the first pass where it reads again ([Upgrade to 3.18: the plan](UPGRADING-TO-PARITY.md#first-hour-checklist)). |
 | Shots held with *feed probe calibration in progress* | A feed pH/EC calibration session is open and the room has a feed band for that probe. Finish or abandon the session; everything resumes within 30 minutes of the last capture ([Calibration](features/calibration.md#safety-what-waits-while-a-session-is-open)). |
 | A prime or pump calibration is refused | A run does not start while the kill switch is off, a shot is in flight, a batch or another session holds the room, or CS-301 is latched ([Calibration](features/calibration.md#what-a-timed-run-is-refused-for-or-stopped-by)). |
 | CS-214: a zone waited for the pump, or needs more than it gives | Water continues. Measure and correct the pump's `max_flow_lph`, check the zone's plant count, drippers and dripper flow, or spread the shots ([Water supply](features/water-supply.md#the-pump-queue-cs-214)). |

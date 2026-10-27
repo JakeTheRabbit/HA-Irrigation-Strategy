@@ -1,6 +1,6 @@
 # 3.18.0
 
-**⚠️ THIS IS A MASSIVE UPGRADE. It is fucking huge.** Almost every page of the dashboard is new or
+**⚠️ This is a very large upgrade.** Almost every page of the dashboard is new or
 rebuilt: timer programs, presets, alert rules, a new History section, feed and pump calibration, pump
 supply sharing, quiet hours and an Upgrade report.
 
@@ -95,9 +95,9 @@ the Upgrade report; the 3.18 controller reads what it writes.
 
 **Upgrade guide and AI setup.**
 
-- [Upgrading to 3.18](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/v3.18.0/docs/UPGRADING.md): one section per Upgrade report line, written so an AI can
+- [3.18 upgrade report, line by line](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/v3.18.0/docs/UPGRADING.md): one section per Upgrade report line, written so an AI can
   follow it step by step.
-- [Upgrading to 3.18: update day](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/v3.18.0/docs/UPGRADING-TO-PARITY.md): what stays the same, a first-hour
+- [Upgrade to 3.18: the plan](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/v3.18.0/docs/UPGRADING-TO-PARITY.md): what stays the same, a first-hour
   checklist and how to go back.
 - [Set up an install with an AI assistant](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/v3.18.0/docs/AI-SETUP.md): start read-only and approve each change,
   and [Configure Crop Steering through MCP](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/v3.18.0/docs/MCP.md): connect an assistant to your Home Assistant.

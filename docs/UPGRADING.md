@@ -1,6 +1,6 @@
-# Upgrading to 3.18
+# 3.18 upgrade report, line by line
 
-**⚠️ THIS IS A MASSIVE UPGRADE. It is fucking huge.** Almost every page of the dashboard is new or
+**⚠️ This is a very large upgrade.** Almost every page of the dashboard is new or
 rebuilt: timer programs, presets, alert rules, a new History section, feed and pump calibration, pump
 supply sharing, quiet hours and an Upgrade report.
 
@@ -41,11 +41,11 @@ report with you, one line at a time, asking you before each save:
 A tour of the new pages, with pictures, is in the [changelog](../CHANGELOG.md#3180---2026-10-24).
 
 3.18 is a big upgrade. The update keeps every zone watering and dosing by the same settings (with one new
-fail-closed hold, see [Upgrading to 3.18](UPGRADING-TO-PARITY.md#what-stays-the-same)), carries your
+fail-closed hold, see [Upgrade to 3.18: the plan](UPGRADING-TO-PARITY.md#what-stays-the-same)), carries your
 settings into the new features where it can do that without guessing, and lists the rest in each room's
 **Upgrade report**: Crop Steering → Settings › System status, one card in HA Settings › Repairs (code
 CS-616) and the `crop_steering.migration_report` service. The plan for update day, a first-hour checklist
-and how to go back are in [Upgrading to 3.18](UPGRADING-TO-PARITY.md).
+and how to go back are in [Upgrade to 3.18: the plan](UPGRADING-TO-PARITY.md).
 
 This page has one section per line of that report. Each section says what the update did, what it left
 for you, and how to set it, written so that you, or an AI assistant you give this page to, can do it

@@ -87,7 +87,7 @@ Developers build the dashboard using `npm ci --prefix frontend` then `npm run bu
 
 ## Upgrading an existing installation
 
-> **Updating to 3.18?** It is a big upgrade: read [Upgrading to 3.18](UPGRADING-TO-PARITY.md) first. It has
+> **Updating to 3.18?** It is a big upgrade: read [Upgrade to 3.18: the plan](UPGRADING-TO-PARITY.md) first. It has
 > the order, a first-hour checklist and how to go back.
 
 Update an existing controller in place from this repository. The old `JakeTheRabbit/f2-control` mirror no longer receives releases; a controller installed from it moves once, as described in [Moving a controller installed from f2-control](#moving-a-controller-installed-from-f2-control). A room on the first AI edition (the `HA-Crop-Steering-Jev` repository) also moves once: see [Moving a room from the first AI edition](MOVING_FROM_JEV.md). Never run two controllers against one room: each app has its own identity and runtime data, and both would drive the same pump and valves. A controller that sees another controller's heartbeat on its room holds that room, watering and dosing nothing in it (CS-609), but a controller from before that check never holds, so stopping the other one first stays the rule.
