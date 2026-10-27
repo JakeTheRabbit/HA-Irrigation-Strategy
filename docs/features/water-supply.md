@@ -307,4 +307,4 @@ zone is left with no meter at all, neither its own `zone_meters` entry nor its p
 | CS-319 repeating | A leaking or stuck valve after that meter, or something else drawing water through it. |
 
 Related: [Error codes](../ERROR_CODES.md), [Notifications](../NOTIFICATIONS.md),
-[Upgrading to 3.18](../UPGRADING.md#supply).
+[3.18 upgrade report](../UPGRADING.md#supply).

@@ -7,7 +7,7 @@ it across once, without losing its phase, counters, learned values, dosing recor
 record.
 
 **When.** Move a production room only to a stable release **3.12.0 or later** of this repository (the
-current release is 3.13.0).
+current release is on the [Releases](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/releases) page).
 An older release puts an older controller on top of a 3.11 state file. A staging room can follow `#testing`.
 
 ## Why it is a move and not an update

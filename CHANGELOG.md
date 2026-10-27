@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to the Advanced Automated Crop Steering System will be documented in this file.
+All notable changes to Crop Steering will be documented in this file.
 
 **Two views per release.** Each version leads with **🌱 In plain English** — what changed and why it
 matters, written so anyone can follow it without knowing the internals — followed by **🔧 Technical
@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [3.18.0] - 2026-10-24
 
-**⚠️ THIS IS A MASSIVE UPGRADE. It is fucking huge.** Almost every page of the dashboard is new or
+**⚠️ This is a very large upgrade.** Almost every page of the dashboard is new or
 rebuilt: timer programs, presets, alert rules, a new History section, feed and pump calibration, pump
 supply sharing, quiet hours and an Upgrade report.
 
@@ -106,9 +106,9 @@ the Upgrade report; the 3.18 controller reads what it writes.
 
 **Upgrade guide and AI setup.**
 
-- [Upgrading to 3.18](docs/UPGRADING.md): one section per Upgrade report line, written so an AI can
+- [3.18 upgrade report, line by line](docs/UPGRADING.md): one section per Upgrade report line, written so an AI can
   follow it step by step.
-- [Upgrading to 3.18: update day](docs/UPGRADING-TO-PARITY.md): what stays the same, a first-hour
+- [Upgrade to 3.18: the plan](docs/UPGRADING-TO-PARITY.md): what stays the same, a first-hour
   checklist and how to go back.
 - [Set up an install with an AI assistant](docs/AI-SETUP.md): start read-only and approve each change,
   and [Configure Crop Steering through MCP](docs/MCP.md): connect an assistant to your Home Assistant.

@@ -1,4 +1,4 @@
-# Upgrading to 3.18 (the parity release)
+# Upgrade to 3.18: the plan
 
 **Bottom line.** 3.18 is the biggest update Crop Steering has had. Your zones keep watering and dosing
 by the same targets and limits, with one new safety hold (see [What stays the same](#what-stays-the-same)),

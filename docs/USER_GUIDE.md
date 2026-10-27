@@ -2,7 +2,7 @@
 
 New to VWC, EC or crop steering? Start with the free [Crop Steering Academy](https://jaketherabbit.github.io/HA-Irrigation-Strategy/learn/). It includes narrated lessons, equipment/setup routes and isolated practice. [Course and progress guide](ACADEMY.md).
 
-Updating from 3.17? Read [Upgrading to 3.18](UPGRADING-TO-PARITY.md) first: almost every page is new.
+Updating from 3.17? Read [Upgrade to 3.18: the plan](UPGRADING-TO-PARITY.md) first: almost every page is new.
 [Dashboards and display](features/dashboards-and-display.md) lists every page with its address.
 
 The menu has five sections, and under them a live list of rooms and zones (see [Getting around](#getting-around)):
