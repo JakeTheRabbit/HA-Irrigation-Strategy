@@ -1,5 +1,35 @@
 # Steering and whole-grow planning
 
+## The words you'll see
+
+Container growers can apply small irrigation events called **shots**. Water content, EC, drainage and environmental conditions contribute to steering:
+
+- **Vegetative steering** aims to support vegetative growth through a coordinated set of conditions.
+- **Generative steering** aims to support reproductive development through a different coordinated set of conditions.
+
+These describe an intended direction, not a guaranteed plant response. The slider blends your configured endpoints; pot size and dripper flow alone cannot establish safe targets. Start with the [academy](https://jaketherabbit.github.io/HA-Irrigation-Strategy/learn/) if the terms below are new.
+
+A group of plants on one valve is a **zone**. The probes in the substrate give the numbers that the controller uses:
+
+| Term | Meaning |
+| --- | --- |
+| **VWC** (moisture) | Water volume divided by total measured sample volume, usually expressed as a percentage. It is not percent plant-available water. |
+| **Pore EC** | Conductivity of water in substrate pore spaces, in mS/cm. Identify the measurement type: feed, bulk substrate, pore-water and runoff/extract EC are not interchangeable. |
+| **Dryback** | The decrease of VWC between shots, overnight or in the morning. |
+| **Field capacity** | A configured reference in this program. Establish the appropriate drained container condition with a documented method; an entered value does not prove physical capacity. |
+| **Shot** | One short delivery of water. Its size is a percentage of the substrate volume. |
+
+Each grow-day has four phases:
+
+| Phase | What occurs | Why |
+| --- | --- | --- |
+| **P0: morning dryback** | After lights-on, the controller uses configured timing and dryback conditions before ramp-up. | Sets the conditions for the first shot; it does not guarantee a root-growth response. |
+| **P1: ramp** | The controller gives small shots, some minutes apart, until VWC reaches your peak target. | The ramp fills the substrate slowly. It does not flood the roots. |
+| **P2: maintenance** | The controller gives a maintenance shot when VWC falls to your re-water point. | The maintenance shots keep the roots stable through the day. |
+| **P3: overnight dryback** | The usual shots stop before lights-off. The controller gives only a rescue shot when a zone becomes too dry. | Much of the steering occurs during the overnight dryback. |
+
+Targets can change with the growth stage and local evidence. Build a plan from reviewed endpoint profiles and calendar blocks, then verify the active targets. Library recipes and illustrated reference curves are starting points for review, not universally safe prescriptions or validated crop-response forecasts. The academy's planning lessons cover this in more depth.
+
 ## What the two modes actually do
 
 The legacy controller reads mode-specific morning dryback and P0/P1/P2 EC references. Switching vegetative/generative selects those references; it does not automatically create a complete recipe or calculate suitable targets from your pot size.

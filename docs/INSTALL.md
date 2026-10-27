@@ -1,6 +1,6 @@
 # Installation, upgrade and rollback
 
-[Try the isolated demo](https://jaketherabbit.github.io/HA-Irrigation-Strategy/dashboard.html?demo=1) · [Complete user guide](USER_GUIDE.md) · [Tested features and limits](FEATURE_MATRIX.md)
+[Try the isolated demo](https://jaketherabbit.github.io/HA-Irrigation-Strategy/dashboard.html?demo=1) · [First-run setup](FIRST_RUN.md) · [Complete user guide](USER_GUIDE.md) · [Tested features and limits](FEATURE_MATRIX.md)
 
 First installation? The [free beginner course](https://jaketherabbit.github.io/HA-Irrigation-Strategy/learn/) explains the equipment, alternative host routes, sensor mapping and supervised commissioning before live operation. See the [academy guide](ACADEMY.md) for the sequence.
 
@@ -26,7 +26,7 @@ Install the integration and the controller app at the same version: from 2.21.0 
 
 ## Guided installation
 
-1. [Open this repository in HACS](https://my.home-assistant.io/redirect/hacs_repository/?owner=JakeTheRabbit&repository=HA-Irrigation-Strategy&category=integration). Download the integration and restart HA. If HACS is absent, install HACS first or use the manual path below.
+1. [Open this repository in HACS](https://my.home-assistant.io/redirect/hacs_repository/?owner=JakeTheRabbit&repository=HA-Irrigation-Strategy&category=integration). Download the integration and restart HA. If HACS is absent, install HACS first or use the manual path below. To add the repository manually, go to HACS → ⋮ → Custom repositories. Add `https://github.com/JakeTheRabbit/HA-Irrigation-Strategy` with the type Integration.
 2. [Start the Crop Steering config flow](https://my.home-assistant.io/redirect/config_flow_start/?domain=crop_steering). Select manual setup for a new installation. Enter a room name and initial zone count. Existing environment-import installations remain supported.
 3. [Add the app repository](https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2FJakeTheRabbit%2FHA-Irrigation-Strategy). In the app store, install **Crop Steering Controller**. Keep the affected engine enable flags OFF, review the app options, then start the app so it can publish its heartbeat and discover configuration. From then on it starts with the host (**Start on boot** is on unless you turn it off); turn on **Watchdog** as well, so Supervisor restarts it if it stops. Supervisor supplies the internal HA token; do not paste a token into a repository file.
 4. Open **Crop Steering** in the HA sidebar. The integration serves its bundled dashboard automatically; no manual dashboard YAML or custom Lovelace card installation is required. The controller's ingress can also serve the same dashboard. In supported HA shells, use the workspace's **Home Assistant** or house button to reopen the temporarily collapsed HA sidebar; see [sidebar behavior](HA_SIDEBAR.md).
@@ -88,7 +88,10 @@ Developers build the dashboard using `npm ci --prefix frontend` then `npm run bu
 ## Upgrading an existing installation
 
 > **Updating to 3.18?** It is a big upgrade: read [Upgrade to 3.18: the plan](UPGRADING-TO-PARITY.md) first. It has
-> the order, a first-hour checklist and how to go back.
+> the order, a first-hour checklist and how to go back. Update the integration first and restart Home Assistant,
+> then update the controller: the controller sends its journal history to the new integration.
+
+HACS offers the update of the integration. The app store offers the update of the controller. Your rooms, settings and entity IDs stay.
 
 Update an existing controller in place from this repository. The old `JakeTheRabbit/f2-control` mirror no longer receives releases; a controller installed from it moves once, as described in [Moving a controller installed from f2-control](#moving-a-controller-installed-from-f2-control). A room on the first AI edition (the `HA-Crop-Steering-Jev` repository) also moves once: see [Moving a room from the first AI edition](MOVING_FROM_JEV.md). Never run two controllers against one room: each app has its own identity and runtime data, and both would drive the same pump and valves. A controller that sees another controller's heartbeat on its room holds that room, watering and dosing nothing in it (CS-609), but a controller from before that check never holds, so stopping the other one first stays the rule.
 

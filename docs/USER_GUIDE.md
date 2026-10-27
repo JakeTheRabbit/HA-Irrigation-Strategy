@@ -111,7 +111,9 @@ Next to the chips, the top bar shows these items:
 
 **All rooms** is organised room → zones → sensors. Each room carries its run, water drunk today (per plant and total), climate, feed tank and stock tanks. Each zone card shows its phase and automation state (Automated, Watering now, Paused, Watering off, Offline, Room off), water per plant, VWC, dryback, pore EC and root-zone temperature, and lists each of its sensors with its readings. Problems show in place: on the room, zone, sensor or tank. A zone being watered glows; one out of the automation is greyed. The header switches act only on the room named beside them.
 
-**Today** is one room's summary. It has no menu entry: click the room in the room list. Choose **Settings › Dashboards & display › Where the app opens** to change this browser’s landing page. Bookmarks and notification links take precedence.
+**All rooms** is the default landing page. Paused rooms remain visible. Each room shows its run day and stage, water drunk today (per plant and in total), air temperature, humidity and VPD, with its feed tank (level, usable litres, pH, EC, pump, and a held-shots warning) and its stock tanks side by side at the top right. Each zone card has its slab drawing (water = moisture, dashed line = today's peak, specks = pore EC); a reading outside its band shows ▲▼. Select a zone to open its room and detail page.
+
+**Today** is one room's summary. It answers one question: is the room correct, and does a zone need you? It has no menu entry: click the room in the room list. Choose **Settings › Dashboards & display › Where the app opens** to change this browser’s landing page. Bookmarks and notification links take precedence.
 
 - **The room line** shows the **Watering** switch, the stage and the day of flower, and the steering mode. The stage shows only when the controller publishes the stage arc.
 - The room line also shows the pore EC band of the stage, the lights, the phases of the zones and the open alerts.
@@ -161,6 +163,20 @@ The chart shows the grow-day, from lights-on to the next lights-on:
 - A dashed line shows the expected rest of the day.
 - The pore EC uses the scale at the right, with the band of the stage next to it.
 
+![The day chart of a zone: VWC, pore EC, each shot and the decisions of the AI assistant, from lights-on to the next lights-on](../img/jev-zone-day.png)
+
+| Part of the chart | Meaning |
+| --- | --- |
+| The bar at the top | Lights on (yellow) and lights off (dark). |
+| The diamonds | The decisions of the AI assistant. A filled diamond is an action. An outline is advice, no action or a refusal. |
+| The blue line | VWC. A dot is a shot. A ring is a shot that the controller held back. |
+| The green line | Pore EC, on the scale at the right. The green bar is the EC range of the stage. |
+| The blue band | The maintenance band, from the re-water point to the peak target. |
+| The red dashed line | Field capacity. The runoff zone is above it. |
+| The dashed blue line | The expected rest of the day, from the rate at which the zone dries. |
+| The grey line | Yesterday. **Compare with** changes it to a typical day. |
+| P0 to P3 | The start time of each phase. |
+
 The VWC scale fits the readings of today and the targets of the zone. **Compare with** adds the line of yesterday, or the typical day of the last seven days. The browser keeps this choice. Point at the chart, or tap it, to see the details of a shot, a decision, a phase or a time.
 
 **Why / next action**
@@ -207,6 +223,10 @@ saved value is read back. See [Timer programs and irrigation modes](features/tim
 > covers gets only the safety shots.
 
 ## Irrigation › Current day
+
+Current-day targets and future schedules share one workspace, one zone selector and one continuous VWC/EC planning canvas. Switch between **Current day** and **Calendar** without discarding drafts. Planned curves, recorded evidence and previous-run comparisons stay labelled separately.
+
+![The consolidated Irrigation workspace and combined VWC/EC planning canvas](../img/irrigation-workspace.png)
 
 When no grow plan controls the room, **Targets** changes the current targets. An armed grow plan shows its own targets, and you cannot change them here. When the plan has no current snapshot, the targets show as unavailable. They do not go back to the manual values.
 
@@ -338,6 +358,10 @@ calibration is on this page too. See [Calibration](features/calibration.md).
 A stock tank can have a link to a dosing pump in **Equipment › Feed & dosing › Dosing setup**. That tank shows **Drawn by** that pump **as it doses**, with its recent draws. The integration takes from the tank the volume that the pump ran: the run time of the motor multiplied by the calibrated flow. This applies to each dose of the pump, from the controller, from an automation or from a person at the doser. A fill of the batch tank does not take from a linked tank. The batches left of a linked tank use the dose of its pump in the recipe.
 
 **Record a batch** takes the doses of one batch from the stock tanks. The recent draws are one tap down. **Edit stock tanks** adds, renames and removes tanks.
+
+When a stock tank is low, a Repairs card tells you ([CS-608](ERROR_CODES.md#cs-608)). Select **Refilled** when you fill it.
+
+> **WARNING:** Wear the correct protective equipment when you fill a stock tank or touch a dosing pump. Nutrient concentrates and pH adjusters can injure skin and eyes.
 
 ### Feed & dosing
 
