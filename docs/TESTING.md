@@ -20,7 +20,7 @@ From the repo root:
 bash tests/run_ci.sh
 ```
 
-That runs every Validate job that can run on a developer machine: lint, format, YAML, vendored engine identity, repository hygiene, the doctrine check, all three Python suites, the real-Home-Assistant tier (when installed), the dashboard unit tests, build, committed-bundle check and browser scripts (when Node and `frontend/node_modules` are there), and the MCP server tests. It prints each check it did not run, with the reason, and ends `PARTIAL` (exit 1) rather than `ALL LOCAL CHECKS PASSED` if there are any; `--allow-skip` accepts that. Two switches: `--containers` also builds the controller image and runs `tests_container` (about 25 minutes, so off by default), and `--no-browser` leaves out the dashboard browser scripts.
+That runs every Validate job that can run on a developer machine: lint, format, YAML, vendored engine identity, repository hygiene, the doctrine check, all three Python suites, the real-Home-Assistant tier (when installed), the dashboard unit tests, build, committed-bundle check and browser scripts (when Node and `frontend/node_modules` are there), and the MCP server tests. It prints each check it did not run, with the reason, and ends `PARTIAL` (exit 1) rather than `ALL LOCAL CHECKS PASSED` if there are any; `--allow-skip` accepts that. Two switches: `--containers` also builds the controller image and runs `tests/container` (about 25 minutes, so off by default), and `--no-browser` leaves out the dashboard browser scripts.
 
 It ends with the list of what it cannot run at all, which only CI checks: hassfest and the HACS action, the oldest-supported-Home-Assistant leg (a local Docker route is below), the aarch64 and armv7 add-on images (they need QEMU), dependency review, the doctrine check's private word list (a CI secret), and the academy browser suites, which no workflow runs. A green local run is therefore necessary and not sufficient: the pull request's checks are the gate.
 
@@ -215,14 +215,14 @@ live install, the path is `/data/state.json`.
 
 ### Both install modes, in the real image
 
-`tests_container/test_container.py` runs the built controller image against
-`tests_container/fake_ha_server.py`, as a standalone container and as the Supervisor runs the app.
+`tests/container/test_container.py` runs the built controller image against
+`tests/container/fake_ha_server.py`, as a standalone container and as the Supervisor runs the app.
 It needs Docker and `CONTROLLER_IMAGE`, and skips without them. CI's *Controller container smoke
 (both modes)* job builds the amd64 image once and runs it on that image on every Validate run; the
 *Promote* preflight requires that job to have passed. Locally:
 
     docker build -t crop-steering-controller:test addons/f2_control
-    CONTROLLER_IMAGE=crop-steering-controller:test python -m pytest tests_container -q
+    CONTROLLER_IMAGE=crop-steering-controller:test python -m pytest tests/container -q
 
 `bash tests/run_ci.sh --containers` does both. The tests do not share a host port, network, volume
 or container name (each makes its own, named from a random id), so they can run side by side:
@@ -232,9 +232,9 @@ job's comment in `ci-validate.yml` for the worker count and the timing it was ch
 
 ### Stopping mid-shot, in the real image
 
-`tests_container/stop_mid_shot.sh <image>` needs Docker and is run by hand. It starts the built
+`tests/container/stop_mid_shot.sh <image>` needs Docker and is run by hand. It starts the built
 controller image the way the Supervisor does (its own init, then `/run.sh`) against
-`tests_container/fake_ha_server.py`, lets the first pass fire a real shot, makes every answer from
+`tests/container/fake_ha_server.py`, lets the first pass fire a real shot, makes every answer from
 Home Assistant late, and stops the container in the middle of the shot with `docker stop -t 30`.
 It passes when the valve is switched off after the stop and the container exits 0 inside the 30 s.
 Run it after any change to the Dockerfile, `run.sh` or the controller's stop path.
@@ -336,7 +336,7 @@ repository, and every Home Assistant redirect they use is one my.home-assistant.
 ### 5. Lint / format / YAML: ruff, black (scoped to `custom_components/` + `tests/`), yamllint
 Plus, on GitHub only: **hassfest** and **HACS validation** of the integration.
 
-**What the format gate covers, and why it stops there.** `black --check` runs on `custom_components/` and `tests/` only. Code outside them is not format-gated: `addons/f2_control` (the 425 KB controller and the rest of the add-on), `crop-steering-engine`, `tests_ha`, `tests_container`, `scripts`. Checked with the CI pin (black 24.4.2) on 2026-10-22, 201, 20, 107, 2 and 2 files in those directories would be reformatted. Reformatting them is a decision, not an oversight: it would rewrite most lines of files that many open pull requests are editing (the controller above all), so each of those would conflict for no change in behaviour, and the add-on is deployed file-for-file to installs, where a whole-file diff hides the change that matters. `ruff check .` does cover everything, and `yamllint` covers all YAML. To put a directory under `black --check`, reformat it in one pull request that contains nothing else, at a moment with no open pull requests touching it, and add it to the Black step in `ci-validate.yml`, to `tests/run_ci.sh`, and to this paragraph. `mcp-server` has no Python.
+**What the format gate covers, and why it stops there.** `black --check` runs on `custom_components/` and `tests/` (except `tests/container`) only. Code outside them is not format-gated: `addons/f2_control` (the 425 KB controller and the rest of the add-on), `crop-steering-engine`, `tests_ha`, `tests/container`, `scripts`. Checked with the CI pin (black 24.4.2) on 2026-10-22, 201, 20, 107, 2 and 2 files in those directories would be reformatted. Reformatting them is a decision, not an oversight: it would rewrite most lines of files that many open pull requests are editing (the controller above all), so each of those would conflict for no change in behaviour, and the add-on is deployed file-for-file to installs, where a whole-file diff hides the change that matters. `ruff check .` does cover everything, and `yamllint` covers all YAML. To put a directory under `black --check`, reformat it in one pull request that contains nothing else, at a moment with no open pull requests touching it, and add it to the Black step in `ci-validate.yml`, to `tests/run_ci.sh`, and to this paragraph. `mcp-server` has no Python.
 
 `yamllint` extends the `relaxed` profile (`.yamllint`): it catches syntax errors and duplicate keys, not style.
 
@@ -407,5 +407,5 @@ pull request - is in [CONTRIBUTING.md](../CONTRIBUTING.md).
 
 The relevant automated tests pass **and** any change to persisted state, add-on options, or
 integration entities has a test proving an **older install still loads** (see §4). New
-behavior gets a new test. See `CLAUDE.md` → *Compatibility & data* for the rules these tests
+behavior gets a new test. See `.claude/CLAUDE.md` → *Compatibility & data* for the rules these tests
 enforce.

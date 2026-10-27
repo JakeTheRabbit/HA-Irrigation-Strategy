@@ -4,7 +4,7 @@ name: Controller container
 # The Home Assistant app keeps building on the box from addons/f2_control; it does not use this.
 #
 # - A pre-release (a candidate) builds the image once per architecture, runs both modes' smoke
-#   (tests_container) on that exact image, and pushes it by digest as :<version> and :testing.
+#   (tests/container) on that exact image, and pushes it by digest as :<version> and :testing.
 #   A version is never pushed twice with different bytes.
 # - Promote dispatches channel=stable after a promotion: :latest and :<major.minor> are re-tagged
 #   to the digest :<version> already has. Nothing is rebuilt, so what ships is what soaked.
@@ -124,7 +124,7 @@ jobs:
           CONTROLLER_IMAGE: ${{ steps.build.outputs.imageid }}
         run: |
           docker image inspect "$CONTROLLER_IMAGE" > /dev/null
-          python -m pytest tests_container -q -rs
+          python -m pytest tests/container -q -rs
       - name: Log in to GHCR
         if: ${{ !inputs.dry_run }}
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0

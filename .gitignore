@@ -22,7 +22,8 @@ Thumbs.db
 # IDE / editor / local agent config (local-only, never shipped)
 .vscode/
 .idea/
-.claude/
+.claude/*
+!.claude/CLAUDE.md
 *.swp
 *.swo
 

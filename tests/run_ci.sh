@@ -4,7 +4,7 @@
 #
 #   bash tests/run_ci.sh                 # everything that can run here; a skipped CI check fails the run
 #   bash tests/run_ci.sh --allow-skip    # accept a run with skips; still reported as PARTIAL
-#   bash tests/run_ci.sh --containers    # also build the controller image and run tests_container (~25 min)
+#   bash tests/run_ci.sh --containers    # also build the controller image and run tests/container (~25 min)
 #   bash tests/run_ci.sh --no-browser    # skip the dashboard browser scripts (they need Chrome or Chromium)
 #
 # Prereqs (one-off):  pip install ruff==0.5.5 black==24.4.2 yamllint==1.35.1 pytest requests pyyaml
@@ -64,7 +64,7 @@ doctrine_check() {
 }
 
 run "ruff (lint)"             ruff check .
-run "black (format check)"    black --check custom_components/ tests/
+run "black (format check)"    black --check custom_components/ tests/ --extend-exclude 'tests/container/'
 run "yamllint"                yamllint .
 run "engine vendored-copy in sync" engine_in_sync
 run "repo hygiene (no ignored shipped paths / tracked caches)" repo_hygiene
@@ -152,14 +152,14 @@ fi
 controller_container() {
   local image=crop-steering-controller:test
   docker build -t "$image" addons/f2_control || return 1
-  CONTROLLER_IMAGE="$image" python -m pytest tests_container -q -rs
+  CONTROLLER_IMAGE="$image" python -m pytest tests/container -q -rs
 }
 if [ "$containers" -eq 0 ]; then
-  skip "controller image build and container smoke (tests_container)" "takes about 25 minutes; pass --containers to run it."
+  skip "controller image build and container smoke (tests/container)" "takes about 25 minutes; pass --containers to run it."
 elif command -v docker >/dev/null 2>&1; then
-  run "controller image build and container smoke (tests_container)" controller_container
+  run "controller image build and container smoke (tests/container)" controller_container
 else
-  skip "controller image build and container smoke (tests_container)" "Docker is not installed."
+  skip "controller image build and container smoke (tests/container)" "Docker is not installed."
 fi
 
 # A run with a skipped CI check has not checked everything, so it never ends "ALL LOCAL CHECKS PASSED".
