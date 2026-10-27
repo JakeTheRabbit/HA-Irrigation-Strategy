@@ -1,3 +1,7 @@
+# 3.18.1
+
+Pair with integration 3.18.1. **C1.** Documentation, plus two dashboard display fixes in the bundled dashboard (a readable Today strip on phones and a decluttered daily plan card). Controller code, engine, state, options and physical safeguards are unchanged; only path comments in `guards.py` and `zone_history.py` moved with the docs.
+
 # 3.18.0
 
 **⚠️ This is a very large upgrade.** Almost every page of the dashboard is new or
