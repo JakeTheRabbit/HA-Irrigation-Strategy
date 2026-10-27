@@ -48,7 +48,7 @@ def test_the_local_ci_script_runs_the_doctrine_and_node_jobs_and_names_what_it_c
         "vitest",
         "verify-",
         "mcp-server",
-        "tests_container",
+        "tests/container",
     ):
         assert ran in script, f"run_ci.sh no longer runs {ran}"
     assert "mirrors" not in script

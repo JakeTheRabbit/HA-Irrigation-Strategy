@@ -2,7 +2,7 @@
 C8) and as the Supervisor runs the app (C5). One image, both modes.
 
     docker build -t crop-steering-controller:test addons/f2_control
-    CONTROLLER_IMAGE=crop-steering-controller:test python -m pytest tests_container -q
+    CONTROLLER_IMAGE=crop-steering-controller:test python -m pytest tests/container -q
 
 Skipped without Docker or CONTROLLER_IMAGE. C2 watches a parked container for C2_WATCH_S seconds (120 by
 default) and its record case refuses for RECORD_REFUSE_S (150).
@@ -21,7 +21,7 @@ import pytest
 
 IMAGE = os.environ.get("CONTROLLER_IMAGE")
 HERE = pathlib.Path(__file__).parent
-ROOT = HERE.parent
+ROOT = HERE.parent.parent
 WATCH_S = float(os.environ.get("C2_WATCH_S", "120"))
 RECORD_REFUSE_S = float(os.environ.get("RECORD_REFUSE_S", "150"))
 pytestmark = pytest.mark.skipif(not IMAGE or not shutil.which("docker"),

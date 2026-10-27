@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Stopping the controller app in the middle of a real shot must close what the shot opened.
 #
-#   bash tests_container/stop_mid_shot.sh <controller image> [seconds each answer waits, default 1]
+#   bash tests/container/stop_mid_shot.sh <controller image> [seconds each answer waits, default 1]
 #
 # The image runs as Supervisor runs it (its own init, `/run.sh`, then the controller) against
 # fake_ha_server.py. Its first pass fires a P2 top-up of about 87 s on zone 1 (pump, main line and

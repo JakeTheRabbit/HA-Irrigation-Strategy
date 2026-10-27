@@ -52,11 +52,11 @@ jobs:
           ruff check .
 
       - name: Black (format check)
-        # Scoped to the integration + tests. The add-on, the engine, tests_ha, tests_container and
+        # Scoped to the integration + tests. The add-on, the engine, tests_ha, tests/container and
         # scripts are not format-gated, on purpose: docs/TESTING.md, "What the format gate covers".
         run: |
           black --version
-          black --check custom_components/ tests/
+          black --check custom_components/ tests/ --extend-exclude 'tests/container/'
 
       - name: Yamllint
         run: |
@@ -151,7 +151,7 @@ jobs:
             BUILD_FROM=ghcr.io/home-assistant/amd64-base-python:3.12-alpine3.20
 
   container-smoke:
-    # One image, both install modes: the same amd64 image runs tests_container as a standalone
+    # One image, both install modes: the same amd64 image runs tests/container as a standalone
     # container and as the Supervisor runs the app, against a fake Home Assistant. Runs on every
     # Validate run with no path or `if` filter, so a required check never waits on a job that did
     # not run. Nothing is pushed.
@@ -187,7 +187,7 @@ jobs:
             BUILD_FROM=ghcr.io/home-assistant/amd64-base-python:3.12-alpine3.20
 
       - name: Container smoke, both modes, on that image
-        # tests_container skips without an image; inspecting it first keeps a skip from passing.
+        # tests/container skips without an image; inspecting it first keeps a skip from passing.
         env:
           CONTROLLER_IMAGE: ${{ steps.build.outputs.imageid }}
         run: |
@@ -197,7 +197,7 @@ jobs:
           # container names, so they do not share anything. Run one after another they took 22.9 minutes
           # of this job's 30 (run 39553259477); 28 tests on four workers took 12.5 minutes on a developer
           # machine, the longest single test (6 minutes) being the floor. --durations names the slow ones.
-          python -m pytest tests_container -q -rs -n 4 --durations=5
+          python -m pytest tests/container -q -rs -n 4 --durations=5
 
   addon-image-per-arch:
     # The image's Python packages come from pinned, hashed files: requirements.txt, and the
