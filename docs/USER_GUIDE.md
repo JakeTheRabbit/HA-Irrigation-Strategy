@@ -83,7 +83,7 @@ The demo is a software demonstration only. Its readings, history, plans and run 
 
 The demo sends nothing to your Home Assistant server and no push to a phone. To see the Notifications page as a grower who is not an administrator, add `&notify-user=grower` to the address.
 
-A production recipe library starts empty. The demo recipes are examples, and the dashboard keeps them apart from production libraries. It does not change the demo libraries that exist, also when they are empty or corrupt.
+A production recipe library starts empty. The demo recipes are examples, and the dashboard keeps them apart from production libraries. It does not change the demo libraries that exist, even if they are empty or corrupt.
 
 To restore the sample rooms, readings, run records and planner drafts, use **Settings › Dashboards & display › More display options › Reset demo session…** and confirm. The reset discards the demo work that you did not save. It keeps all saved recipe libraries and the live connection data. It does not restore a recipe that you removed. Export the session work that you want to keep before the reset.
 
