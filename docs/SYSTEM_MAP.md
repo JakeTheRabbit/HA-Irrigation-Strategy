@@ -1,6 +1,6 @@
 # How Crop Steering connects: the system map
 
-A plain-English map of how any device reaches Crop Steering, what Crop Steering does with it, and who sees the result. It is written against release 3.18.0. For the developer view, with file paths and every service, see the [developer system map](system-map.md) and the [system overview](SYSTEM_OVERVIEW.md).
+A plain-English map of how any device reaches Crop Steering, what Crop Steering does with it, and who sees the result. It is written against release 3.18.0. For the developer view, with file paths and every service, see the [developer system map](dev/system-map.md) and the [system overview](SYSTEM_OVERVIEW.md).
 
 ## The short version
 

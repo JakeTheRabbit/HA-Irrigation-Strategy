@@ -1,6 +1,6 @@
 # System map
 
-One map of the whole Crop Steering product at 3.17.0 (`81140bd5`): what the parts are, how they connect, and where to look. Findings against these parts are in [system-audit.md](system-audit.md). Line numbers are approximate and drift; file paths are stable.
+One map of the whole Crop Steering product at 3.17.0 (`81140bd5`): what the parts are, how they connect, and where to look. Findings against these parts are in [system-audit.md](audits/system-audit.md). Line numbers are approximate and drift; file paths are stable.
 
 ## 1. Components
 
@@ -306,7 +306,7 @@ Local suites at the audit: integration `tests/` 1064 pass; add-on 2116 pass, 3 W
 
 ## 15. In flight
 
-Open PRs into `testing` (all by JakeTheRabbit, none merged yet, 2026-10-23). Merge order and the decisions waiting on Ben are in [system-audit.md](system-audit.md#merge-order).
+Open PRs into `testing` (all by JakeTheRabbit, none merged yet, 2026-10-23). Merge order and the decisions waiting on Ben are in [system-audit.md](audits/system-audit.md#merge-order).
 
 | PR | Branch | Subject | Audit |
 |---|---|---|---|
@@ -345,4 +345,4 @@ Open PRs into `testing` (all by JakeTheRabbit, none merged yet, 2026-10-23). Mer
 
 Website (`cropsteering-site`, into `main`): cropsteering-site#4 builds and describes 3.17.0 (WEB-001, 003 to 008, 010, 012 to 014, 016); cropsteering-site#5 tells the features page as one story. Both wait on Ben's approval to merge and deploy.
 
-Parity plans live on `feat/parity-system` (frontend) and `feat/parity-backend` (backend) in `docs/superpowers/plans/2026-10-22-parity-*.md`: a Journal store, GuardChain refactor, pump queue, timer programs, feed calibration, API v2 envelope, MCP read/preview tools, tree menu and eight new pages. They rebase onto the fixes above.
+Parity plans live on `feat/parity-system` (frontend) and `feat/parity-backend` (backend) in `docs/archive/superpowers/plans/2026-10-22-parity-*.md`: a Journal store, GuardChain refactor, pump queue, timer programs, feed calibration, API v2 envelope, MCP read/preview tools, tree menu and eight new pages. They rebase onto the fixes above.

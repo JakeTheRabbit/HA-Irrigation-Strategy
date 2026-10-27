@@ -284,7 +284,7 @@ node tests/academy-video.browser.mjs
 node tests/academy-media.browser.mjs
 ```
 
-`tests/academy-scene-sync.browser.mjs` is the one browser check CI does not run: it needs the private production masters (`ACADEMY_PRODUCTION`, see [ACADEMY.md](ACADEMY.md)).
+`tests/academy-scene-sync.browser.mjs` is the one browser check CI does not run: it needs the private production masters (`ACADEMY_PRODUCTION`, see [the Academy developer notes](dev/academy.md#verify-a-completed-video-edition)).
 
 Some scripts also render the screenshots used in the README. By default those go to the untracked `output/playwright/readme/`, so running the tests leaves the tree clean. To refresh the committed `img/` files, set `UPDATE_README_IMAGES=1` when running a script, or run `node frontend/scripts/capture-readme.mjs` (see [SCREENSHOTS.md](SCREENSHOTS.md)).
 

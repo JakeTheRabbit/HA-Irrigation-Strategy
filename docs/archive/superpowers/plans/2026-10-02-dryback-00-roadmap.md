@@ -6,7 +6,7 @@ The spec is delivered as seven steps. Steps 1 and 2 have full implementation pla
 
 ## Delivery
 
-One change, one branch, one pull request, into `testing`. Classes and soaks follow [docs/RELEASING.md](../../RELEASING.md): a C3 candidate soaks 7 days on staging with every fault drill and a seeded upgrade fixture, and a candidate carries at most one C2 or C3 change.
+One change, one branch, one pull request, into `testing`. Classes and soaks follow [docs/RELEASING.md](../../../RELEASING.md): a C3 candidate soaks 7 days on staging with every fault drill and a seeded upgrade fixture, and a candidate carries at most one C2 or C3 change.
 
 | # | Plan | Class | Needs | What goes live |
 | --- | --- | --- | --- | --- |

@@ -1,5 +1,5 @@
 """Each zone's own record of its plateaus and its nights, for the dryback planner
-(docs/superpowers/specs/2026-10-02-dryback-planner-jev-steering-design.md). Pure: it reads and writes the zone's
+(docs/archive/superpowers/specs/2026-10-02-dryback-planner-jev-steering-design.md). Pure: it reads and writes the zone's
 state dict and nothing else.
 
 - plateau_hist: one entry per grow day whose P1 handed over to P2: the VWC it reached, how P1 ended, and after how

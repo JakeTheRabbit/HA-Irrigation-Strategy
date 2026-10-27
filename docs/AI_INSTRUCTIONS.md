@@ -13,3 +13,15 @@ Cache preferences control breakpoints, not isolated provider entries. Each break
 Rebuild local prompt requests regeneration on the next controller pass. It makes no paid AI request and does not purge the provider cache. Cache hit ratio, read tokens and AI spend come from the controller's reported usage. Estimated net cache savings compare the same input without caching against charged input, including cache writes, at the controller's model tariff; conservative timeout charges also count, so the figure is explicitly an estimate. Negative savings mean caching cost more. Old usage files show no estimate until the next window reset. Token counts in the editor are character-based estimates; the page does not claim guaranteed monetary savings.
 
 The prompt snapshot is persisted separately from Recorder. The configuration sensor excludes its text attribute from Recorder to avoid duplicating notes in every state record. The controller publishes changed text/settings once and retries a refused publication. Saved configuration can be newer than the controller snapshot; this discrepancy is shown explicitly.
+
+## Restored options in the AI prompt
+
+The controller brief is generated from the engine and controller shipped together. Its default phase and gate descriptions stay intact. An additional section appears only for restoration capabilities that exist in that image, and labels their opt-in behavior explicitly.
+
+The section distinguishes the minimum P0 wait from the low-moisture bypass, stalled dryback from suspect probes, plain timed P2 from guarded timed P2, and budgeted floor top-ups from cap-exempt safety shots. A configured timer end replaces predictive P3; an EC flush target continues only through the existing correction, drainage, feed and budget checks.
+
+The rescue-only dead-feed-probe option does not bypass other interlocks or accept an out-of-band reading. Waste preclosing is off by default, verifies closure before priming, and a transient unreadable policy holds. Rescue-miss and estimated-tank alerts do not withhold water.
+
+Sump water-balance output is explicitly modeled evidence at room or shared-sump scope. It is not a measured per-zone runoff catch or measured transpiration. Learning/unresolvable output remains unknown. Only the estimator's AI mode adds that hint to AI evidence; it grants no new action authority.
+
+After restoring packs are integrated, regenerate with `PYTHONPATH=addons/f2_control/f2_control python -m brain.controller_brief --write`. The generated copy and prompt regression tests must then match the combined runtime. Regeneration changes the shared instruction hash once; it does not change any live setting or cached request policy.

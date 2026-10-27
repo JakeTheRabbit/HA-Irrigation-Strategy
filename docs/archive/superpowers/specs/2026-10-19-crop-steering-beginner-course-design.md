@@ -2,7 +2,7 @@
 
 **Historical initial brief.** Later user instructions authorized media production and website publication. The current implementation is governed by [the academy delivery specification](2026-10-19-crop-steering-academy.md); this file preserves the earlier design scope.
 
-The design and review pack is [Crop Steering from Zero](../../training/crop-steering-from-zero/README.md).
+The design and review pack is [Crop Steering from Zero](../../../training/crop-steering-from-zero/README.md).
 
 User brief: teach absolute beginners what crop steering means, including VWC and field capacity; plan a layered initial YouTube series using sound teaching methods; include the required equipment and setup.
 

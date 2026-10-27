@@ -427,7 +427,7 @@ jobs:
         run: npx playwright install --with-deps chrome
       - name: Academy browser suites
         # academy-scene-sync.browser.mjs is not run: it compares the videos with private production
-        # masters (ACADEMY_PRODUCTION) that are kept outside Git. See docs/ACADEMY.md.
+        # masters (ACADEMY_PRODUCTION) that are kept outside Git. See docs/dev/academy.md.
         env:
           BROWSER_CHANNEL: chrome
         run: |

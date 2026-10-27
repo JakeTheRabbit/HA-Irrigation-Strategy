@@ -122,8 +122,18 @@ The P1 maximum-shot budget is conditional. P2 maintenance and P3 emergency shots
 
 **Insights** provides a local catch-test calculator, probe coverage/freshness diagnostics and an equipment map. These tools expose assumptions instead of claiming to tune a crop automatically.
 
+## Recipe library
+
+The library stores copies of plans you author. Live room libraries start empty and do not contain publisher-endorsed or guide-derived numerical recipes. The isolated demo seeds clearly labelled synthetic examples only when a demo room has no stored library; existing libraries are preserved.
+
+Open **Irrigation › Grow plan & presets › Advanced › Recipes** to save a named copy of the current plan, inspect stored copies, or load one into the local draft. Loading a recipe retains the current zone start dates and requires compatible zone assignments. Existing unsaved work requires an explicit replacement review. Active plans remain protected by the normal draft/arm workflow.
+
+Library storage belongs to this browser and this site, separated by room and demo/live mode. It is not an HA backup or shared multi-user database. Export important plans using the existing JSON export; use Import to bring an exported plan into the reviewed workflow. Clearing browser storage can remove local library entries. An unavailable or malformed library must be recovered explicitly rather than silently overwritten.
+
+Loading or saving a local library item never calls an irrigation service. The normal **Review & save** action persists the draft in HA, and arming remains a separate action. Inspect the graph, assignments, dates and parameter validation before using a loaded draft.
+
 ## Current boundaries
 
-For reusable copies of your own schedules, use **Recipe library**. It stores named plans in the current browser and room, supports export/import and loads only into the local draft while retaining current zone start dates. See the [library guide and reference sources](RECIPE_LIBRARY.md).
+For reusable copies of your own schedules, use **Recipe library**. It stores named plans in the current browser and room, supports export/import and loads only into the local draft while retaining current zone start dates. See [Recipe library](#recipe-library) and its [reference sources](REFERENCES.md#plan-library-reference-sources).
 
 Plans steer irrigation targets, not tank dosing or environmental equipment. Closed-loop crop-response learning, measured flow reconciliation and automatic recipe optimisation remain future work. See the [feature matrix](FEATURE_MATRIX.md).

@@ -1,4 +1,4 @@
-"""Every check a shot passes, as one ordered chain per stage (docs/superpowers/specs/2026-10-22-unified-schema.md
+"""Every check a shot passes, as one ordered chain per stage (docs/dev/architecture/2026-10-22-unified-schema.md
 section 2.7). The first check that holds wins, as it always did.
 
   PASS     Controller._blocked: the act loop's checks of a zone that is to fire. gate_report.report() reads the same

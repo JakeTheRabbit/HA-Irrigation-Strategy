@@ -7,6 +7,8 @@ from your rules and from the controller, appear in one inbox, and any signed-in 
 them. Each phone can have quiet hours. During quiet hours, pushes that are not critical wait and arrive
 as one digest when the quiet hours end. Urgent pushes, including rules routed to `emergency`, always come through.
 
+Who gets which alert on which phone: [Notifications](../NOTIFICATIONS.md).
+
 What still protects the crop is unchanged. Your irrigation pH and EC limits
 (`number.crop_steering_<prefix>irrigation_ph_min/max`, `irrigation_ec_min/max`), the kill switch and the
 controller's holds stop watering exactly as before. An alert rule adds a message and nothing else.

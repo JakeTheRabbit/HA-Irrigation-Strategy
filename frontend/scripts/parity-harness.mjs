@@ -13,7 +13,7 @@ const VIEWPORTS = [
 ];
 const BACKENDS = ["3.18", "3.17"];
 const outDir = new URL("../../output/playwright/parity/", import.meta.url);
-const mockupDir = new URL("../../docs/superpowers/mockups/", import.meta.url);
+const mockupDir = new URL("../../docs/archive/superpowers/mockups/", import.meta.url);
 const toPath = (url) => url.pathname.replace(/^\/([A-Za-z]:)/, "$1");
 
 async function launch() {
@@ -98,7 +98,7 @@ export async function runParity({ id, route, mockup, phoneMockup, check }) {
 const shotHeight = (page) => page.evaluate(() => innerHeight * 2);
 
 function compareHtml(id, mockup, phoneMockup, shots) {
-  const rel = "../../../docs/superpowers/mockups/";
+  const rel = "../../../docs/archive/superpowers/mockups/";
   const rows = shots
     .map((s) => {
       const m = s.width <= 720 ? phoneMockup : mockup;
