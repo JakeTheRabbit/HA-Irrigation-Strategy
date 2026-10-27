@@ -108,7 +108,7 @@ A notification or a Repairs card ends with a code, for example **CS-101**. Find 
 
 ## Support
 
-Report a problem or ask a question in [GitHub issues](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/issues). Include these items:
+Report a problem or ask a question in [GitHub issues](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/issues). The [bug report form](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/issues/new?template=bug_report.yml) asks for these items:
 
 - The alert code, if you have one.
 - The two version numbers. The Crop Steering sidebar shows them.

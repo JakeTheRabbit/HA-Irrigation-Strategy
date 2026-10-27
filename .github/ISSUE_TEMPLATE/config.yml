@@ -1,0 +1,11 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Documentation
+    url: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/README.md
+    about: Install, setup and how it works.
+  - name: Troubleshooting
+    url: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/troubleshooting.md
+    about: Symptoms and what to check.
+  - name: Error codes
+    url: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/ERROR_CODES.md
+    about: Find the code from a notification or a Repairs card.
