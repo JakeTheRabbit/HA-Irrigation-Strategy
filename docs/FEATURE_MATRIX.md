@@ -50,6 +50,14 @@ The rows follow the order of the project story: what it watches, how it decides,
 | Interactive demo                                         | Unit and compiled browser tests pass                                                      | Synthetic rooms/readings, two sample recipes for untouched demo libraries, and current/previous/archived run examples. Reset restores in-memory examples while retaining browser recipes/live connection data. Production libraries remain unseeded. The compiled browser checks verify initial current/prior curves across day/week/month/run ranges, reset confirmation, and recipe/live-storage preservation.                                                                                                                                                                                                                                                                                                                                                                                                      |
 | Yield/potency prediction or autonomous crop optimisation | Not implemented                                                                           | Removed misleading claims from the active UI. Neither setpoints nor a schematic establish expected yield.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 
+## Some facts to know
+
+- The answers of the AI assistant are judgements, not guarantees. The log records each answer with its confidence and the action of the code.
+- The controller calculates the water totals from the settings and the valve time. They are not a measurement.
+- The dashed lines of the rest of the day are projections. The controller always waters by the probe.
+- The controller waters by VWC and EC. It does not control the climate.
+- An update keeps your rooms, settings, counters, plans and the history of the AI assistant.
+
 ## Improvements that are now practical
 
 - Plan every zone across the grow without rewriting daily setpoints by hand.

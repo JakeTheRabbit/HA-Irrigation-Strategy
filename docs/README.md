@@ -10,6 +10,7 @@ Start with the row that matches what you are doing. Updating an existing install
 | [System map](SYSTEM_MAP.md) | How any device reaches Crop Steering through Home Assistant, what each part does, and the lines that are never crossed. |
 | [Roadmap](../ROADMAP.md) | What comes next, by priority and without dates. |
 | [Install, upgrade and roll back](INSTALL.md) | The integration, the controller app or container, and the checks after install. |
+| [First-run setup](FIRST_RUN.md) | Examine the install, set up a room, and the checks before the first watering. |
 | [Upgrade to 3.18: the plan](UPGRADING-TO-PARITY.md) | The plan for update day: what is carried across, what needs you, a first-hour checklist and how to go back. |
 | [3.18 upgrade report, line by line](UPGRADING.md) | One section per row of the 3.18 Upgrade report, with services and fields. |
 | [Set up an install with an AI assistant](AI-SETUP.md) | Connect the MCP server, start read-only, and let an assistant prepare changes you approve. |
