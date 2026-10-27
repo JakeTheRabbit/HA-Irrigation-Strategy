@@ -19,6 +19,12 @@ for the people who build the system:
 `tests/test_whats_new.py` checks the shape and the plain words, and that the newest section is the
 version being released.
 
+## 3.18.1 - 2026-10-28
+
+- On a phone, the Today strip shows each watering as a thin tick, so they no longer pile up.
+- The daily plan card is tidier: the chart key keeps Recorded, Target and Draft, and the rest is in the workings.
+- Bug fixes and improvements.
+
 ## 3.18.0 - 2026-10-24
 
 - This is a massive upgrade: almost every page is new. Your zones keep watering and dosing exactly as before.

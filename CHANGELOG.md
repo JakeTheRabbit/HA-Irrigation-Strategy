@@ -9,6 +9,27 @@ notes**, the entity- and code-level detail for developers and AI agents working 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.18.1] - 2026-10-28
+
+3.18.1 — simpler README and first-run guide, one docs index, internal notes archived, bug report form; dashboard: readable Today strip on phones (#236), decluttered daily plan card (#239).
+
+Pair: **controller 3.18.1**. **C1: documentation and two dashboard display fixes.** The controller, engine, integration runtime, entities, add-on options and persisted state are unchanged; the dashboard bundle changes only how two screens are drawn. **Approved rehearsal, no staging soak:** the owner approved releasing and promoting this candidate on 2026-10-27, and on 2026-10-28 approved including the two dashboard display fixes (docs/RELEASING.md step 5, `approved-rehearsal`). No staging photoperiod and no visual check on a staging room is claimed.
+
+### 🌱 In plain English
+
+- **Readable Today strip on a phone.** Each watering (the dashboard calls it a shot) is a thin tick on a phone instead of a pile of pills, and the hour labels no longer overlap the "now" marker.
+- **A tidier daily plan card.** The chart key keeps Recorded, Target and Draft; the rest is explained in the workings, and the phase table folds in with them.
+- **Simpler documentation.** A shorter README and first-run guide, one documentation index, internal notes moved to an archive, and a bug report form on GitHub.
+- **Nothing else changes on your box.** Updating changes no setting and no watering behaviour.
+
+### 🔧 Technical notes
+
+- #236 `fix(dashboard)`: below 720 px a shot on the Today strip is a 3 px tick (was an 8 px minimum block); the axis drops an hour label within 18% of the span of the "now" chip (`frontend/src/components/shot-timeline.css`, `frontend/src/pages/today.tsx`).
+- #239 `fix(dashboard)`: the plan card's previous grow-day peak and low move to the Earlier days toggle's tooltip; the chart key keeps Recorded, Target and Draft; the on-chart "Re-water" label is removed; the phase table folds into "Phase by phase, and how this is worked out"; gauge footers wrap (`frontend/src/components/planning-curve.tsx`, `frontend/src/styles.css`, `frontend/src/components/hmi.css`, `frontend/scripts/verify-steering-visuals.mjs`). The three committed `dashboard.html` bundles are rebuilt from `frontend/src`.
+- Docs (#234, #237, #238, #240, #241, #242, #243): short README, `docs/FIRST_RUN.md`, `docs/README.md` as the one index, internal notes under `docs/archive/` and `docs/dev/` (moved pages keep a "This page moved" stub), 2.x changelog sections in `docs/archive/CHANGELOG-2.x.md`, `.github/ISSUE_TEMPLATE/bug_report.yml`, `ROADMAP.md` and `docs/SYSTEM_MAP.md`. #240 changed only path comments in `addons/f2_control/f2_control/guards.py`, `zone_history.py` and `frontend/src/lib/parity-types.ts`.
+- CI (#233, #235, #244): GitHub Actions bumped, Dependabot targets `testing`, the Academy browser test waits for the new video group before seeking.
+- No change to controller, engine or integration code, entity ids, add-on options or `/data/state.json`.
+
 ## [3.18.0] - 2026-10-24
 
 **⚠️ This is a very large upgrade.** Almost every page of the dashboard is new or
