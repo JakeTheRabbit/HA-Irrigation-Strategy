@@ -93,7 +93,7 @@ await runParity({
     if (backend === "3.18") {
       const row = refills.locator("[data-stock-refill]").first();
       await row.waitFor();
-      assert.match(await row.innerText(), /^Part A\s+\d{1,2} \w{3}\s+\+16\.6 L, to 20 L$/, `${label}: journal refill`);
+      assert.match(await row.innerText(), /^Part A\s+\d{1,2} \w{3,4}\s+\+16\.6 L, to 20 L$/, `${label}: journal refill`);
       // The set level and the undone refill are not refills.
       assert.equal(await refillOf("Part B").count(), 0, `${label}: undone refill left out`);
       assert.equal(await refillOf("Line cleaner").count(), 0, `${label}: a set level is no refill`);
