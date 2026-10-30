@@ -365,10 +365,10 @@ describe("the minimum and refill reminder lines", () => {
     expect(levelLines(states, "", "sensor.demo_tank_level")).toEqual([
       expect.objectContaining({ key: "minimum", value: 8, label: "Minimum 8 %" }),
     ]);
-    // With no minimum published, the controller's own 8 %.
+    // With no minimum published, no line: the dashboard keeps no copy of the controller's 8 %.
     const bare = structuredClone(states);
     delete bare[tankLevelId("")].attributes.minimum_pct;
-    expect(levelLines(bare, "", null).map((line) => line.value)).toEqual([8]);
+    expect(levelLines(bare, "", null)).toEqual([]);
   });
   it("draws the refill reminder where the dosing setup reads it on the level charted", () => {
     // Room B: no level for the controller's minimum, a person reminded to refill at 20 %.

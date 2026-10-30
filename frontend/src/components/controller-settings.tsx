@@ -1,10 +1,11 @@
-import { useLayoutEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
 import { ArrowRight, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { UiTip } from "@/components/info-tip";
 import { ReviewDialog, number, type ReviewItem } from "@/components/dashboard";
 import { useSensorContext } from "@/components/sensor-context";
 import { SettingRow } from "@/components/setting-row";
+import { featureOf, roomOnlyFeature, useHashFeature } from "@/lib/feature-focus";
 import { validateSetpoint } from "@/lib/setpoint-preview";
 import { setpointParam } from "@/lib/sensor-context";
 import { GROUP_HELP, settingWords } from "@/lib/setting-words";
@@ -25,7 +26,21 @@ export function ControllerSettings({
   onDirtyChange: (dirty: boolean) => void;
 }) {
   const { room, states } = controller;
-  const [zoneId, setZoneId] = useState(String(room.zones[0]?.id ?? "room"));
+  const [zoneId, setZoneId] = useState(() =>
+    roomOnlyFeature(featureOf(window.location.hash)) ? "room" : String(room.zones[0]?.id ?? "room"),
+  );
+  // A `?feature=` link opens the room for a room-only feature, a zone for any other.
+  const feature = useHashFeature();
+  useEffect(() => {
+    if (!feature) return;
+    setZoneId((current) =>
+      roomOnlyFeature(feature)
+        ? "room"
+        : current === "room"
+          ? String(room.zones[0]?.id ?? "room")
+          : current,
+    );
+  }, [feature]);
   const [drafts, setDrafts] = useState<Drafts>({});
   const [review, setReview] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -92,6 +107,7 @@ export function ControllerSettings({
         sensor={zone ? sensor : null}
         learnedPeak={zone?.auto?.learnedPeak}
         disabled={!connected}
+        controller={controller}
         onEdit={edit}
       />
     ));

@@ -5,9 +5,9 @@ import type { HTMLAttributes, ReactNode } from "react";
 import { CircleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { gaugeSpeech, type GaugeModel } from "@/lib/hmi";
+import { trimNumber as fix } from "@/lib/utils";
 import "./hmi.css";
 
-const fix = (value: number, digits: number) => String(Number(value.toFixed(digits)));
 
 /** "Zone 1 · P2 · Maintenance [on plan]": what the reader must see first. */
 export function StatusLine({

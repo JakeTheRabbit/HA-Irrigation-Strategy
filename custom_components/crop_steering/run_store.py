@@ -10,6 +10,7 @@ import re
 from uuid import uuid4
 from zoneinfo import ZoneInfo
 
+from .api_v2 import StaleRevision, Unavailable
 from .const import DOMAIN, MAX_ZONES
 from .room import room_prefix
 from .strategy_model import MODE_KEYS, PARAMETERS as STRATEGY_PARAMETERS
@@ -229,6 +230,22 @@ class RunStore:
             raise ValueError("Duplicate run IDs")
         return records
 
+    def _mapped_sensors(self):
+        """Every sensor the room's zones and hardware map now (the config entry, no registry)."""
+        cfg = {
+            **getattr(self.entry, "data", {}),
+            **getattr(self.entry, "options", {}),
+        }
+        found = set()
+        for zone in cfg.get("zones", {}).values():
+            for key, value in zone.items():
+                if isinstance(value, str):
+                    found.add(value)
+                elif isinstance(value, list):
+                    found.update(v for v in value if isinstance(v, str))
+        found.update(v for v in cfg.get("hardware", {}).values() if isinstance(v, str))
+        return {v for v in found if v.startswith("sensor.")}
+
     def response(self):
         return {
             "schema_version": 1,
@@ -244,7 +261,7 @@ class RunStore:
             self.hass.data.get(DOMAIN, {}).get("_strategy", {}).get(self.entry.entry_id)
         )
         if manager is None:
-            raise ValueError(
+            raise Unavailable(
                 "Room strategy metadata is unavailable; reload the integration"
             )
         response = manager.response()
@@ -454,12 +471,15 @@ class RunStore:
     async def mutate(self, action, data):
         async with self._lock:
             if self.error:
-                raise ValueError(self.error)
+                raise Unavailable(self.error)
             if (
                 type(data.get("expected_revision")) is not int
                 or data["expected_revision"] != self.document["revision"]
             ):
-                raise ValueError("Runs changed elsewhere. Reload before saving.")
+                raise StaleRevision(
+                    "Runs changed elsewhere. Reload before saving.",
+                    self.document["revision"],
+                )
             values = deepcopy(self.document["runs"])
             if action == "runs_save":
                 raw = data.get("record")
@@ -506,6 +526,18 @@ class RunStore:
                     for key in ("vwc_sensor", "ec_sensor")
                     if z[key]
                 }
+                # Probe rows are what history_long trusts, so an import may carry only probes this
+                # room already has: its mapped sensors and those of the runs it holds.
+                known = (
+                    {
+                        p["entity_id"]
+                        for r in values
+                        for z in r["zones"]
+                        for p in z.get("probes", [])
+                    }
+                    | allowed
+                    | self._mapped_sensors()
+                )
                 for record in incoming:
                     first, last = dates(record["start_date"], record["end_date"])
                     if (
@@ -527,6 +559,10 @@ class RunStore:
                                 raise ValueError(
                                     "Imported sensor is not registered to this room"
                                 )
+                        if "probes" in zone:
+                            zone["probes"] = [
+                                p for p in zone["probes"] if p["entity_id"] in known
+                            ]
                     values = [r for r in values if r["id"] != record["id"]] + [record]
             else:
                 raise ValueError("Unsupported run operation")

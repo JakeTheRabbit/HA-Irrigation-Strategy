@@ -1,0 +1,93 @@
+/* The desktop menu tree: a section row with its icon and a chevron, its pages indented beneath on
+   a hairline. */
+.nav-tree ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.nav-tree > ul {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.nav-tree .nav-tree-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 44px;
+  padding: 9px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted-foreground);
+  font: inherit;
+  font-weight: 500;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+.nav-tree .nav-tree-head:hover,
+.nav-tree-items a:hover {
+  background: var(--muted);
+  color: var(--foreground);
+}
+.nav-tree .nav-tree-head[data-active] {
+  color: var(--foreground);
+  font-weight: 600;
+}
+.nav-tree .nav-tree-head[data-active] > svg:first-child {
+  color: var(--ha-native-sidebar-selected, var(--primary));
+}
+.nav-tree-head .nav-draft-count {
+  margin-left: auto;
+}
+.nav-tree-chevron {
+  margin-left: auto;
+  flex-shrink: 0;
+  transition: transform 120ms ease;
+}
+.nav-tree-head .nav-draft-count + .nav-tree-chevron {
+  margin-left: 6px;
+}
+.nav-tree-head[aria-expanded="true"] .nav-tree-chevron {
+  transform: rotate(90deg);
+}
+.nav-tree .nav-tree-items {
+  margin: 2px 0 6px 21px;
+  padding-left: 8px;
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.nav-tree .nav-tree-items[hidden] {
+  display: none;
+}
+.nav-tree-items a {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+  text-decoration: none;
+}
+.nav-tree-items a[aria-current="page"] {
+  background: var(--muted);
+  box-shadow: inset 2px 0 0 var(--primary);
+  color: var(--primary-strong, var(--primary));
+  font-weight: 600;
+}
+.nav-tree a:focus-visible,
+.nav-tree button:focus-visible {
+  outline: 2px solid var(--ring, var(--primary));
+  outline-offset: -2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .nav-tree-chevron {
+    transition: none;
+  }
+}

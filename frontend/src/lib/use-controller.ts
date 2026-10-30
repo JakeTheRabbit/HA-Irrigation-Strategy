@@ -3,9 +3,16 @@ import { demoDisplay } from "./display";
 import type { DailyRanges, HistoryRequest, HistoryWindow, RunsDocument } from "./comparison-types";
 import { demoHistoryWindow } from "./comparison-demo";
 import type { TimelineRequest } from "./day-timeline";
-import { explorerSensors } from "./history-explorer";
+import { allowedHistoryIds } from "./history-allow";
+import { setClockTimeZone } from "./clock";
+
 import type { OperatorAction } from "./operator-types";
 import { OperatorDemo } from "./operator-demo";
+import { demoJournalVwc } from "./parity-demo/journal";
+import { demoParityStatus, demoShotTable } from "./parity-demo/status";
+import { JournalMissing, mergeEvents, startEventFeed } from "./events";
+import { isParityAction, pagedQuery } from "./parity-api";
+import type { CsEvent } from "./parity-types";
 import { useEffect, useRef, useSyncExternalStore } from "react";
 import type { Change, Controller, EntityState, States, WriteResult } from "./types";
 import {
@@ -19,14 +26,16 @@ import {
 } from "./client";
 import {
   buildRoom,
-  descriptor,
   discoverRooms,
   emptyRoom,
+  numeric,
   resolveRequestedRoom,
   validateChange,
+  waterLitres,
 } from "./model";
 import {
   createDemo,
+  demoBackend,
   demoBeat,
   demoClock,
   demoDay,
@@ -48,9 +57,55 @@ import {
 } from "./live";
 import { roomProbeIds } from "./probes";
 import { TANK_KEYS } from "./tank-level";
-import { historySamples, type WaterRecord, type WaterRecordRequest } from "./water-use";
+import {
+  historySamples,
+  type CounterSample,
+  type WaterRecord,
+  type WaterRecordRequest,
+} from "./water-use";
 
 type Listener = () => void;
+/** v2 services that take one `room_id` (backend plan); the others are site-wide, all-rooms or
+ * keyed by a session or event id. */
+const PARITY_ROOM_DEFAULT = new Set<string>([
+  "journal_query",
+  "pump_precheck",
+  "pump_prime",
+  "pump_stop",
+  "pump_calibrate",
+  "pump_calibration_commit",
+  "calibration_start",
+  "calibration_revert",
+  "probe_offset_set",
+  "alert_ack",
+  "timer_program_set",
+  "timer_program_delete",
+  "timer_program_preview",
+  "timer_skip",
+]);
+/** v2 services whose `preview: true` dry run writes nothing (backend Tasks 11, 21, 22). No other
+ * service's `preview` key skips the write lock. */
+const PREVIEWABLE = new Set<string>(["preset_apply", "copy_config", "probe_offset_set", "supply_save"]);
+/** v2 services that change nothing: kept out of the one-write-at-a-time lock. `pump_stop` is
+ * here too: it ends a while-held prime and must never be refused behind another write. */
+const PARITY_READS = new Set<string>([
+  "journal_query",
+  "timeline_get",
+  "timeline_summary",
+  "history_changes",
+  "supply_get",
+  "timer_program_list",
+  "timer_program_preview",
+  "alert_rule_list",
+  "alert_rule_preview",
+  "pump_precheck",
+  "calibration_status",
+  "preset_list",
+  "dashboard_list",
+  "system_status_get",
+  "migration_report",
+  "pump_stop",
+]);
 const SESSION_KEY = "crop-steering-connection-tab";
 /** Whether Home Assistant's signed-in user is an administrator; null when this page cannot tell
  * (a standalone tab with a token). */
@@ -86,15 +141,28 @@ export class ControllerStore {
   private operatorDemo?: OperatorDemo;
   private runDocuments = new Map<string, { generation: number; document: RunsDocument }>();
   private historyAborters = new Set<AbortController>();
-  constructor(demo = typeof window !== "undefined" && isDemoLocation(window.location)) {
+  /** The live event feed (Controller.recentEvents), over the rooms in `feedRooms`; `feedSince`
+   * keeps each room's last event time when the room set changes. */
+  private stopFeed?: () => void;
+  private feedRooms = "";
+  private feedSince = new Map<string, string>();
+  private recentEvents: readonly CsEvent[] = [];
+  constructor(
+    demo = typeof window !== "undefined" && isDemoLocation(window.location),
+    /** The page's query (tests pass their own). */
+    query: string | null = typeof window !== "undefined" ? window.location.search : null,
+  ) {
     this.demo = demo;
     this.admin = demo ? true : null;
     this.states = demo ? demoClock(createDemo()) : {};
     this.connection = demo ? "demo" : "connecting";
-    const search =
-      typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
+    const search = query === null ? null : new URLSearchParams(query);
     // ?display=show_climate,today_tank_readout (or all): those display options on in the demo.
     if (demo) this.states = demoDisplay(this.states, search?.get("display") ?? null);
+    // The 3.18 room entities (grow day, pump queue, open alerts...); an older integration has none.
+    if (demo && demoBackend(query ?? "") === "3.18") this.states = demoParityStatus(this.states, Date.now());
+    // An older integration has no Journal: its shot table instead.
+    else if (demo) this.states = demoShotTable(this.states, Date.now());
     if (demo)
       this.operatorDemo = new OperatorDemo(
         () => this.states,
@@ -109,9 +177,11 @@ export class ControllerStore {
         // ?whats-new=2.22.0: the demo as an installation updated from 2.22.0, ?whats-new=unknown
         // from one running before What's new existed. Otherwise it has nothing new to show.
         search?.get("whats-new") ?? null,
-        // ?notify-user=grower: Settings & help › Notifications as that phone's owner, who is not an
+        // ?notify-user=grower: Settings › Notifications as that phone's owner, who is not an
         // administrator.
         search?.get("notify-user") ?? null,
+        // ?backend=3.17: an integration without the parity (v2) services.
+        demoBackend(query ?? ""),
       );
     const requested = search?.get("room") ?? null;
     const rooms = discoverRooms(this.states);
@@ -130,6 +200,7 @@ export class ControllerStore {
   };
   getSnapshot = () => this.snapshot;
   private publish() {
+    setClockTimeZone(this.timeZone);
     const rooms = discoverRooms(this.states);
     const room = rooms.find((r) => r.id === this.roomId) || emptyRoom;
     this.snapshot = {
@@ -155,6 +226,7 @@ export class ControllerStore {
       timeline: this.timeline,
       waterRecord: this.waterRecord,
       operator: this.operator,
+      recentEvents: this.recentEvents,
     };
     this.listeners.forEach((listener) => listener());
   }
@@ -184,6 +256,7 @@ export class ControllerStore {
       }
     }
     this.stopTimer ??= whileVisible(this.tick, 30_000);
+    this.startFeed();
     if (typeof window !== "undefined") window.addEventListener?.("pagehide", this.unsubscribe);
     return this.stop;
   };
@@ -192,6 +265,7 @@ export class ControllerStore {
     this.stopTimer = undefined;
     if (typeof window !== "undefined") window.removeEventListener?.("pagehide", this.unsubscribe);
     this.unsubscribe();
+    this.endFeed();
     clearTimeout(this.publishTimer);
     this.publishTimer = undefined;
     this.historyAborters.forEach((abort) => abort.abort());
@@ -219,6 +293,7 @@ export class ControllerStore {
       this.states = states;
       this.settle();
       if (this.live) this.subscribeLive(this.live);
+      this.startFeed();
       if (this.zoneOf !== client) void this.readTimeZone(client);
     } catch (error) {
       if (generation !== this.generation || request !== this.requestId) return;
@@ -320,6 +395,38 @@ export class ControllerStore {
         },
       );
   }
+  /** Every room's live Journal events into `recentEvents`: one feed per connection and set of
+   * rooms. A feed that stopped itself (an older integration) stays stopped until they change. */
+  private startFeed() {
+    const rooms = discoverRooms(this.states).map((room) => room.id).sort();
+    if (!rooms.length || (this.stopFeed && rooms.join() === this.feedRooms)) return;
+    this.endFeed();
+    this.feedRooms = rooms.join();
+    this.stopFeed = startEventFeed({
+      connection: this.demo ? null : this.live,
+      rooms,
+      poll: async (room_id, since) => {
+        const page = await pagedQuery(this, { room_id, since });
+        if (page.kind === "missing") throw new JournalMissing();
+        if (page.kind === "error") throw new Error(page.message);
+        return page.data.events;
+      },
+      onEvents: (events) => {
+        const ring = mergeEvents(this.recentEvents, events);
+        if (ring === this.recentEvents) return;
+        this.recentEvents = ring;
+        this.publish();
+      },
+      visible: () => typeof document === "undefined" || !document.hidden,
+      since: this.feedSince,
+      // The demo's Journal is generated up to now: show it from the start.
+      ...(this.demo ? { start: new Date(0).toISOString() } : {}),
+    });
+  }
+  private endFeed() {
+    this.stopFeed?.();
+    this.stopFeed = undefined;
+  }
   private unsubscribe = () => {
     this.liveToken++;
     this.dropLive?.();
@@ -375,6 +482,9 @@ export class ControllerStore {
     this.client?.dispose();
     this.client = client;
     this.unsubscribe();
+    this.endFeed();
+    this.recentEvents = [];
+    this.feedSince.clear();
     this.watched.clear();
     this.live = liveConnection(session);
     this.states = {};
@@ -401,6 +511,7 @@ export class ControllerStore {
     this.client?.dispose();
     this.client = null;
     this.unsubscribe();
+    this.endFeed();
     this.live = null;
     this.connection = "offline";
     this.error = "Disconnected. Displayed data is the last successful snapshot.";
@@ -430,15 +541,23 @@ export class ControllerStore {
           const reason = validateChange(this.snapshot.room, this.states, change);
           if (reason) result.failed.push({ entityId: change.entityId, reason });
           else {
+            const state =
+              typeof change.value === "boolean" ? (change.value ? "on" : "off") : String(change.value);
+            const stamp = new Date().toISOString();
+            if (typeof change.value === "number" && change.entityId.startsWith("number."))
+              this.operatorDemo?.journalTarget(
+                roomId,
+                this.snapshot.room.room.prefix,
+                change.entityId,
+                numeric(next[change.entityId]) ?? null,
+                change.value,
+              );
             next[change.entityId] = {
               ...next[change.entityId],
-              state:
-                typeof change.value === "boolean"
-                  ? change.value
-                    ? "on"
-                    : "off"
-                  : String(change.value),
-              last_updated: new Date().toISOString(),
+              state,
+              last_updated: stamp,
+              // As Home Assistant does: a new state is a change.
+              ...(next[change.entityId]?.state !== state ? { last_changed: stamp } : {}),
             };
             next = demoReact(next, change.entityId, change.value);
             result.applied.push(change.entityId);
@@ -490,9 +609,13 @@ export class ControllerStore {
   operator = async <T>(action: OperatorAction, data: Record<string, unknown> = {}): Promise<T> => {
     const generation = this.generation;
     const roomId = this.roomId;
-    // Notifications are the whole site's, never a room's.
+    const parity = isParityAction(action);
+    // Notifications are the whole site's, never a room's. A v2 service that names one room gets the
+    // selected room unless the caller names another (the live feed polls every room); site-wide and
+    // all-rooms reads (supply, presets, timeline_get's `rooms`, history_changes without a room) and
+    // session-keyed steps get none.
     const scoped =
-      action.startsWith("strategy_") ||
+      !parity && (action.startsWith("strategy_") ||
       action.startsWith("runs_") ||
       action.startsWith("setpoint_log_") ||
       action.startsWith("overlay_") ||
@@ -503,13 +626,21 @@ export class ControllerStore {
       action.startsWith("grow_days_") ||
       action.startsWith("harvests_") ||
       action.startsWith("display_") ||
-      action.startsWith("history_");
-    const payload = scoped ? { ...data, room_id: roomId } : data;
-    if (scoped && !roomId) throw new Error("Select an available room.");
+      action.startsWith("history_"));
+    const defaulted = parity && PARITY_ROOM_DEFAULT.has(action) && data.room_id === undefined;
+    const payload = scoped || defaulted ? { ...data, room_id: roomId } : data;
+    if ((scoped || defaulted) && !roomId) throw new Error("Select an available room.");
     // What's new's record and a test push change nothing a refresh would show, and must neither
-    // wait on nor hold up a change being applied.
+    // wait on nor hold up a change being applied. Nor do v2 reads and previews. Stopping a pump
+    // must never wait behind anything.
     const mutation =
       !action.startsWith("whats_new_") &&
+      !(
+        parity &&
+        (PARITY_READS.has(action) ||
+          (PREVIEWABLE.has(action) && data.preview === true) ||
+          (action === "alert_rule_test" && data.send !== true))
+      ) &&
       ![
         "strategy_get",
         "strategy_preview",
@@ -557,13 +688,13 @@ export class ControllerStore {
       if (mutation) this.writing = false;
     }
   };
-  /** Throws unless every id is a sensor of the selected room or one of its registered runs. A
-   * promise only when it has to read the room's run records first. */
+  /** Throws unless every id is the selected room's (allowedHistoryIds) or a sensor of one of its
+   * registered runs. A promise only when it has to read the room's run records first. */
   private checkRunSensors(entityIds: string[]): Promise<void> | void {
     const generation = this.generation,
       roomId = this.roomId;
     if (!roomId) throw new Error("Select an available room.");
-    const allowed = new Set(this.snapshot.room.entities.map((entity) => entity.entity_id));
+    const allowed = allowedHistoryIds(this.snapshot.room, this.states);
     const check = () => {
       const registered = this.runDocuments.get(roomId);
       if (registered?.generation === generation)
@@ -662,19 +793,11 @@ export class ControllerStore {
   history = async (entityIds: string[], hours: number, signal?: AbortSignal) => {
     if (!Number.isFinite(hours) || hours <= 0 || hours > 720)
       throw new Error("History range must be between 0 and 720 hours.");
-    // The room's own entities, the probes its zones' readings combine, and the tank probes its
-    // descriptor maps for display.
-    const mapped = descriptor(this.states, this.snapshot.room.room)?.attributes;
-    const allowed = new Set([
-      ...this.snapshot.room.entities.map((e) => e.entity_id),
-      ...roomProbeIds(this.snapshot.room.zones, this.states),
-      ...[mapped?.tank_ec_sensor, mapped?.tank_ph_sensor].filter(
-        (id): id is string => typeof id === "string" && !!id,
-      ),
-    ]);
+    const allowed = allowedHistoryIds(this.snapshot.room, this.states);
     if (entityIds.some((id) => !allowed.has(id)))
       throw new Error("History is limited to entities in the selected room.");
-    if (this.demo) return demoHistory(this.states, entityIds, hours);
+    // Zone VWC follows the demo Journal's shots, so each shot's "after" agrees with its "before".
+    if (this.demo) return demoJournalVwc(demoHistory(this.states, entityIds, hours), Date.now());
     if (!this.client || this.connection !== "live")
       throw new Error("Connect to Home Assistant to load recorded history.");
     const generation = this.generation;
@@ -697,24 +820,8 @@ export class ControllerStore {
   /** The selected room's grow-day, once: over Home Assistant's websocket inside Home Assistant,
    * over REST standalone. Live updates extend it from there (day-timeline.ts appendLive). */
   timeline = async (request: TimelineRequest) => {
-    const room = this.snapshot.room;
-    const mapped = descriptor(this.states, room.room)?.attributes;
-    const allowed = new Set([
-      ...room.entities.map((entity) => entity.entity_id),
-      ...room.zones.flatMap((zone) => (zone.valveEntity ? [zone.valveEntity] : [])),
-      // The tank and pump its descriptor maps, charted on Equipment › Tank & feed.
-      ...Object.values(TANK_KEYS).flatMap((key) => {
-        const id = mapped?.[key];
-        return typeof id === "string" && id ? [id] : [];
-      }),
-      // The main line and the lights: History › Timeline's equipment lanes (Settings › Display).
-      ...(["mainline", "light_entity"] as const).flatMap((key) => {
-        const id = mapped?.[key];
-        return typeof id === "string" && id ? [id] : [];
-      }),
-      // Every sensor the zone page's history explorer offers: probes, climate, feed and tank.
-      ...explorerSensors(room, this.states).map((sensor) => sensor.entityId),
-    ]);
+    const allowed = allowedHistoryIds(this.snapshot.room, this.states);
+
     const ids = [...request.entityIds, ...request.attributeIds];
     if (!ids.length || ids.some((id) => !allowed.has(id)))
       throw new Error("History is limited to entities in the selected room.");
@@ -735,7 +842,7 @@ export class ControllerStore {
    * its websocket inside Home Assistant; standalone, its recorded history over REST, which reaches
    * back only as far as the recorder keeps it. */
   waterRecord = async (request: WaterRecordRequest): Promise<WaterRecord> => {
-    const allowed = new Set(this.snapshot.room.entities.map((entity) => entity.entity_id));
+    const allowed = allowedHistoryIds(this.snapshot.room, this.states);
     if (!request.entityIds.length || request.entityIds.some((id) => !allowed.has(id)))
       throw new Error("Water records are limited to the selected room's sensors.");
     if (!(request.end > request.start))
@@ -748,12 +855,29 @@ export class ControllerStore {
       ? { source: "statistics", samples: await liveStatistics(this.live, request) }
       : {
           source: "history",
-          samples: historySamples(await this.client.timeline({ ...request, attributeIds: [] })),
+          samples: inLitres(
+            historySamples(await this.client.timeline({ ...request, attributeIds: [] })),
+            this.states,
+          ),
         };
     if (generation !== this.generation)
       throw new Error("Room or connection changed; water request cancelled.");
     return result;
   };
+}
+/** Recorded water counters in litres, by the unit each entity reports now (history carries none);
+ * a counter in a unit that cannot be converted is dropped, never shown as litres. */
+export function inLitres(
+  samples: Record<string, CounterSample[]>,
+  states: States,
+): Record<string, CounterSample[]> {
+  return Object.fromEntries(
+    Object.entries(samples).map(([id, list]) => {
+      if (!/_daily_water_/.test(id)) return [id, list];
+      const factor = waterLitres({ ...states[id], state: "1" });
+      return [id, factor === null ? [] : list.map((s) => ({ ...s, value: s.value * factor }))];
+    }),
+  );
 }
 function message(error: unknown): string {
   return error instanceof Error ? error.message : "Home Assistant request failed.";

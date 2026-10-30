@@ -1,8 +1,10 @@
 import { asCode, errorCodes } from "./error-codes";
+import { clock, dayKey, dayLabel, startOfDay, wallText } from "./time";
 import type { Room, States } from "./types";
+import { errorText } from "./utils";
 
 /** Who gets a phone push for which alerts (docs/NOTIFICATIONS.md): the site's notification setup as
- * `notify_get` returns it, and what Settings & help › Notifications works out from it. Nothing here
+ * `notify_get` returns it, and what Settings › Notifications works out from it. Nothing here
  * sends anything: a test push is `notify_test`, a save is `notify_save`, and the integration decides
  * who each push goes to. */
 
@@ -22,13 +24,25 @@ export interface NotifyRecipient {
   kinds: string[];
   /** Room prefixes ("" is the default room); empty is every room. */
   rooms: string[];
-  /** Emergencies go out as high-priority, time-sensitive pushes. */
+  /** Emergencies go out as high-priority, time-sensitive pushes: "Emergencies loud". */
   urgent_high_priority: boolean;
+  /** "HH:MM" on Home Assistant's clock, maybe across midnight: inside them only what is critical
+   * reaches the phone, the rest waits for one push when they end. Null: none (and on 3.17). */
+  quiet_hours: QuietHours | null;
+  /** Read only (the integration keeps it when a save leaves it out): what is not an emergency goes
+   * to this phone as one push every few hours. Only set when it takes one. */
+  digest?: true;
+}
+export interface QuietHours {
+  from: string;
+  to: string;
 }
 export interface NotifyConfig {
   revision: number;
   idle_hours: number;
   recipients: NotifyRecipient[];
+  /** Room prefix -> when its mute ends (ms): until then only emergencies are pushed for it. */
+  mutes: Record<string, number>;
 }
 /** A checkbox column: the codes and events a kind of alert covers. */
 export interface NotifyKind {
@@ -56,6 +70,8 @@ export interface NotifyDocument {
   /** The signed-in user; anyone else changes only the rows that are theirs. */
   user_id: string | null;
   error: string | null;
+  /** The integration keeps quiet hours and room mutes (3.18): its answer carries `mutes`. */
+  quietAndMutes: boolean;
 }
 /** What `notify_test` answers. */
 export interface NotifyTestResult {
@@ -79,7 +95,10 @@ const whole = (value: unknown): number | null => {
   return Number.isInteger(parsed) && parsed >= 0 ? parsed : null;
 };
 const SERVICE = /^notify\.[^\s.]+$/;
+const CLOCK = /^(?:[01][0-9]|2[0-3]):[0-5][0-9]$/;
 const PREFIX = /^(?:[a-z0-9_]+_)?$/;
+/** A complete wall time, "HH:MM". */
+export const isClock = (value: string) => CLOCK.test(value);
 export const isService = (value: unknown): value is string =>
   typeof value === "string" && SERVICE.test(value);
 
@@ -98,7 +117,24 @@ function parseRecipient(value: unknown): NotifyRecipient | null {
       ),
     ),
     urgent_high_priority: raw.urgent_high_priority === true,
+    quiet_hours: parseQuiet(raw.quiet_hours),
+    ...(raw.digest === true ? { digest: true as const } : {}),
   };
+}
+/** Quiet hours as the integration keeps them: two different "HH:MM"; anything else is none. */
+function parseQuiet(value: unknown): QuietHours | null {
+  const raw = record(value);
+  const from = typeof raw.from === "string" && CLOCK.test(raw.from) ? raw.from : null;
+  const to = typeof raw.to === "string" && CLOCK.test(raw.to) ? raw.to : null;
+  return from && to && from !== to ? { from, to } : null;
+}
+function parseMutes(value: unknown): Record<string, number> {
+  return Object.fromEntries(
+    Object.entries(record(value)).flatMap(([room, until]) => {
+      const at = typeof until === "string" ? Date.parse(until) : Number.NaN;
+      return PREFIX.test(room) && Number.isFinite(at) ? [[room, at]] : [];
+    }),
+  );
 }
 /** The saved setup; every phone listed once. */
 export function parseNotifyConfig(value: unknown): NotifyConfig {
@@ -116,6 +152,7 @@ export function parseNotifyConfig(value: unknown): NotifyConfig {
       seen.add(recipient.service);
       return [recipient];
     }),
+    mutes: parseMutes(raw.mutes),
   };
 }
 function parseKind(value: unknown): NotifyKind | null {
@@ -169,6 +206,7 @@ export function parseNotifyDocument(value: unknown): NotifyDocument {
     can_edit_all: raw.can_edit_all === true,
     user_id: text(raw.user_id),
     error: text(raw.error),
+    quietAndMutes: "mutes" in record(raw.config),
   };
 }
 /** Whether an answer carries the setup at all: an error alone does not. */
@@ -177,6 +215,58 @@ export const hasNotifyConfig = (value: unknown) =>
 export function parseTestResult(value: unknown): NotifyTestResult {
   const raw = record(value);
   return { sent: raw.sent === true, error: text(raw.error) };
+}
+/** What `notify_test {services}` answers, phone by phone; null for an answer without `results`
+ * (an integration that tests one phone a call). */
+export function parseTestResults(value: unknown): Record<string, NotifyTestResult> | null {
+  const results = record(value).results;
+  if (!Array.isArray(results)) return null;
+  return Object.fromEntries(
+    results.flatMap((item) => {
+      const raw = record(item);
+      return isService(raw.service) ? [[raw.service, parseTestResult(raw)]] : [];
+    }),
+  );
+}
+/** Test pushes to `services`: one `notify_test {services}` call when the integration takes it
+ * (`many`, 3.18), else one call a phone (3.17, or an integration that refuses `services`). A failed
+ * call is that error on each phone: the pushes may have gone, so none is sent twice. */
+export async function testPhones(
+  services: readonly string[],
+  many: boolean,
+  call: (data: Record<string, unknown>) => Promise<unknown>,
+): Promise<Record<string, NotifyTestResult>> {
+  const failed = (err: unknown): NotifyTestResult => ({
+    sent: false,
+    error: err instanceof Error ? err.message : String(err),
+  });
+  if (many) {
+    try {
+      const results = parseTestResults(await call({ services: [...services] })) ?? {};
+      return Object.fromEntries(
+        services.map((service) => [service, results[service] ?? { sent: false, error: "No answer for this phone." }]),
+      );
+    } catch (err) {
+      if (!/extra keys not allowed/i.test(failed(err).error ?? ""))
+        return Object.fromEntries(services.map((service) => [service, failed(err)]));
+    }
+  }
+  const results: Record<string, NotifyTestResult> = {};
+  for (const service of services) {
+    try {
+      results[service] = parseTestResult(await call({ service }));
+    } catch (err) {
+      results[service] = failed(err);
+    }
+  }
+  return results;
+}
+/** A test push's answer beside its button: "Accepted 13:58" (Home Assistant took the push, which
+ * is not proof the phone showed it), or "Failed 13:40 · " and the integration's words. */
+export function testLine(r: { sent: boolean; error: string | null }, at: number, tz: string): string {
+  return r.sent
+    ? `Accepted ${clock(at, tz)}`
+    : `Failed ${clock(at, tz)} · ${r.error ?? "no reason given"}`;
 }
 /** The revision the integration's sensor reports; null when there is none. */
 export function liveRevision(states: States): number | null {
@@ -261,6 +351,7 @@ const rowKey = (row: NotifyRecipient) =>
     sorted(row.kinds),
     sorted(row.rooms),
     row.urgent_high_priority,
+    row.quiet_hours,
   ]);
 /** The same setup, whatever order the ticks were made and the rows listed in. */
 export const sameDraft = (a: NotifyDraft, b: NotifyDraft) =>
@@ -282,12 +373,15 @@ export const toggleKind = (kinds: readonly string[], id: string, on: boolean): s
   on ? unique([...kinds, id]) : kinds.filter((kind) => kind !== id);
 /** A room chip pressed: All (null) is every room; a room is added or taken out, and taking out the
  * last one is every room again, since a row covers at least one. */
-export const toggleRoom = (rooms: readonly string[], prefix: string | null): string[] =>
-  prefix === null
-    ? []
-    : rooms.includes(prefix)
-      ? rooms.filter((room) => room !== prefix)
-      : [...rooms, prefix];
+/** A room chip pressed where every room shows each chip on (`all`, the site's prefixes): the room
+ * goes out or in; every room, or none left, is every room again, since a row covers at least one. */
+export function pressRoom(rooms: readonly string[], prefix: string, all: readonly string[]): string[] {
+  const current = rooms.length ? rooms : all;
+  const next = current.includes(prefix)
+    ? current.filter((room) => room !== prefix)
+    : [...current, prefix];
+  return !next.length || all.every((room) => next.includes(room)) ? [] : next;
+}
 /** A new row: Emergencies for every room, sent as high priority. */
 export function newRecipient(service: string, phones: readonly NotifyPhone[]): NotifyRecipient {
   const phone = phones.find((item) => item.service === service);
@@ -298,6 +392,7 @@ export function newRecipient(service: string, phones: readonly NotifyPhone[]): N
     kinds: [EMERGENCY],
     rooms: [],
     urgent_high_priority: true,
+    quiet_hours: null,
   };
 }
 /** A notify service typed by name, "notify.x" or just "x"; null when it cannot be one. */
@@ -322,15 +417,71 @@ export const roomsWithoutEmergencies = (draft: NotifyDraft, rooms: readonly Room
 /** The checks the integration makes on a save that the page can make first. */
 export function draftErrors(draft: NotifyDraft): string[] {
   const hours = draft.idle_hours;
-  return Number.isInteger(hours) && hours >= IDLE_HOURS.min && hours <= IDLE_HOURS.max
-    ? []
-    : [`Shots stopped needs ${IDLE_HOURS.min} to ${IDLE_HOURS.max} whole hours.`];
+  return [
+    ...(Number.isInteger(hours) && hours >= IDLE_HOURS.min && hours <= IDLE_HOURS.max
+      ? []
+      : [`Shots stopped needs ${IDLE_HOURS.min} to ${IDLE_HOURS.max} whole hours.`]),
+    ...(draft.recipients.some(
+      (row) => row.quiet_hours && !(isClock(row.quiet_hours.from) && isClock(row.quiet_hours.to)),
+    )
+      ? ["Quiet hours need a start and an end as HH:MM."]
+      : draft.recipients.some((row) => row.quiet_hours && row.quiet_hours.from === row.quiet_hours.to)
+        ? ["Quiet hours need a start and an end that differ."]
+        : []),
+  ];
 }
+/** Each field's own problem, shown under it. */
+export function fieldErrors(draft: NotifyDraft): { idle: string | null; quiet: string | null } {
+  const errors = draftErrors(draft);
+  return {
+    idle: errors.find((error) => error.startsWith("Shots stopped")) ?? null,
+    quiet: errors.find((error) => error.startsWith("Quiet hours")) ?? null,
+  };
+}
+export const NO_PHONES_WARNING =
+  "With no phones listed, every push goes back to the controller app's notify_service option.";
+/** The bar's checks: each problem blocks Apply; a draft with no phones applies, with a warning. */
+export const applyChecks = (draft: NotifyDraft): { ok: boolean | "warn"; text: string }[] => [
+  ...draftErrors(draft).map((text) => ({ ok: false, text })),
+  ...(draft.recipients.length ? [] : [{ ok: "warn" as const, text: NO_PHONES_WARNING }]),
+];
+/** What quiet hours hold back, as notify_api.py routes a push; `digest` names the phones that take
+ * a digest, which get no Keep and Undo pushes (a digest has no buttons). */
+export const quietNote = (digest: readonly string[]) =>
+  `During quiet hours emergencies still come through, and so do the AI's setpoint changes with Keep and Undo${digest.length ? ` (not to ${digest.join(", ")}, which ${digest.length > 1 ? "take" : "takes"} a digest)` : ""} and alerts this integration does not know yet. Other alerts wait and arrive as one summary when that phone's quiet hours end. A Home Assistant restart drops what is waiting.`;
+export const IDLE_NOTE =
+  "Sent as CS-209 to the phones that tick Shots stopped, again each time that many hours pass while it lasts, and over at the next shot. A room counts only while a zone is in P1 or P2: the morning dryback (P0) and the night (P3) do not start the clock.";
+
+/** `notify_save` answered with an error: the setup was not changed. */
+export class NotifyRefusal extends Error {}
+/** A save that threw, as Review & apply shows it: the integration's own refusal, or Home Assistant's
+ * refusal of the call. Anything else (a closed socket, a timeout) may have landed: null. */
+export function saveRefusal(
+  error: unknown,
+): { kind: "error"; code: "stale_revision" | "forbidden" | "guard_refused"; message: string } | null {
+  const code = error && typeof error === "object" ? (error as { code?: unknown }).code : undefined;
+  const message = errorText(error);
+  if (!(error instanceof NotifyRefusal) && !["invalid_format", "service_validation_error", "unauthorized"].includes(code as string))
+    return null;
+  if (message === "revision") return { kind: "error", code: "stale_revision", message: notifyError(message) };
+  if (code === "unauthorized" || /^not allowed\b/i.test(message))
+    return { kind: "error", code: "forbidden", message: notifyError(message) };
+  return { kind: "error", code: "guard_refused", message };
+}
+/** A mute or unmute that threw: read the setup again unless the integration refused it (then it
+ * did not change), so the room never shows a state the write may have changed. */
+export const muteRereads = (error: unknown) => {
+  const refusal = saveRefusal(error);
+  return !refusal || refusal.code === "stale_revision";
+};
+/** What Undo of a mute writes back: the earlier end, or no mute once that end has passed (the
+ * integration drops a mute already over). */
+export const muteUndoTarget = (was: number | null, now: number) => (was !== null && was > now ? was : null);
 
 /** What `notify_save` is sent. The threshold is the site's, an administrator's to change: anyone
  * else sends the rows alone. Each row's kinds in the order the page shows them. */
 export function savePayload(
-  doc: Pick<NotifyDocument, "config" | "kinds" | "can_edit_all">,
+  doc: Pick<NotifyDocument, "config" | "kinds" | "can_edit_all" | "quietAndMutes">,
   draft: NotifyDraft,
 ): Record<string, unknown> {
   const order = new Map(doc.kinds.map((kind, index) => [kind.id, index]));
@@ -344,8 +495,22 @@ export function savePayload(
       kinds: [...row.kinds].sort((a, b) => rank(a) - rank(b)),
       rooms: [...row.rooms],
       urgent_high_priority: row.urgent_high_priority,
+      ...(doc.quietAndMutes ? { quiet_hours: row.quiet_hours } : {}),
     })),
     ...(doc.can_edit_all ? { idle_hours: draft.idle_hours } : {}),
+  };
+}
+/** A mute or unmute, applied at once: the saved rows as they are, and the rooms' new mute ends. */
+export function mutePayload(
+  doc: Pick<NotifyDocument, "config" | "kinds" | "can_edit_all" | "quietAndMutes">,
+  mutes: Record<string, number>,
+): Record<string, unknown> {
+  return {
+    expected_revision: doc.config.revision,
+    recipients: savePayload(doc, toDraft(doc.config)).recipients,
+    mutes: Object.fromEntries(
+      Object.entries(mutes).map(([room, until]) => [room, new Date(until).toISOString()]),
+    ),
   };
 }
 
@@ -370,7 +535,14 @@ export function rebaseDraft(
     if (!now) return was ? [] : [row];
     if (!was) return [now];
     const merged = { ...row };
-    for (const field of ["name", "user_id", "kinds", "rooms", "urgent_high_priority"] as const)
+    for (const field of [
+      "name",
+      "user_id",
+      "kinds",
+      "rooms",
+      "urgent_high_priority",
+      "quiet_hours",
+    ] as const)
       if (!same(now[field], was[field])) Object.assign(merged, { [field]: now[field] });
     return [merged];
   });
@@ -385,33 +557,21 @@ export function rebaseDraft(
   };
 }
 
-/** The page's state: the last setup read, and the draft on it (null: nothing changed). */
-export interface NotifyState {
-  doc: NotifyDocument | null;
-  draft: NotifyDraft | null;
+/** A draft as this tab keeps it: with the setup it was made on, so it can be placed again. */
+export interface StoredDraft extends NotifyDraft {
+  base?: NotifyConfig;
 }
-export type NotifyAction =
-  | { type: "loaded"; doc: NotifyDocument }
-  | { type: "edit"; edit: (draft: NotifyDraft) => NotifyDraft }
-  | { type: "discard" }
-  | { type: "saved"; doc: NotifyDocument };
-/** A setup read again keeps the draft on top of it; a draft back to what is saved is no draft. */
-export function notifyReducer(state: NotifyState, action: NotifyAction): NotifyState {
-  const settle = (doc: NotifyDocument, draft: NotifyDraft | null): NotifyState => ({
-    doc,
-    draft: draft && !sameDraft(draft, toDraft(doc.config)) ? draft : null,
-  });
-  if (action.type === "loaded")
-    return settle(
-      action.doc,
-      state.doc && state.draft
-        ? rebaseDraft(state.doc.config, state.draft, action.doc.config)
-        : null,
-    );
-  if (action.type === "saved") return { doc: action.doc, draft: null };
-  if (!state.doc) return state;
-  if (action.type === "discard") return { ...state, draft: null };
-  return settle(state.doc, action.edit(state.draft ?? toDraft(state.doc.config)));
+/** A kept draft met by a setup read: on the same revision it stands; on a newer one (saved
+ * elsewhere since) it is carried onto that one field by field, so it never puts back what someone
+ * else saved. Null: nothing of it is left, or (no base) it cannot be placed. */
+export function restoreDraft(kept: StoredDraft, fresh: NotifyConfig): StoredDraft | null {
+  if (!kept.base) return null;
+  const draft =
+    kept.base.revision === fresh.revision
+      ? { idle_hours: kept.idle_hours, recipients: kept.recipients }
+      : rebaseDraft(kept.base, kept, fresh);
+  if (sameDraft(draft, toDraft(fresh))) return null;
+  return kept.base.revision === fresh.revision ? kept : { ...draft, base: fresh };
 }
 
 /** A room's name for a prefix, or the prefix of one that is not a room of the site now. */
@@ -419,6 +579,11 @@ const roomName = (prefix: string, rooms: readonly Room[]) =>
   rooms.find((room) => room.prefix === prefix)?.name ?? (prefix || "the default room");
 export const roomWords = (prefixes: readonly string[], rooms: readonly Room[]) =>
   prefixes.length ? prefixes.map((prefix) => roomName(prefix, rooms)).join(", ") : "All rooms";
+/** Under a row's room chips: "every room", or "F2 only". */
+export const roomChipWords = (prefixes: readonly string[], rooms: readonly Room[]) =>
+  prefixes.length ? `${roomWords(prefixes, rooms)} only` : "every room";
+export const quietWords = (quiet: QuietHours | null) =>
+  quiet ? `${wallText(quiet.from)}–${wallText(quiet.to)}` : "None";
 
 export interface ChangeLine {
   label: string;
@@ -465,11 +630,10 @@ export function draftChanges(
         lines: [
           { label: "Gets", before: null, after: names(row.kinds) || "nothing yet" },
           { label: "Rooms", before: null, after: roomWords(row.rooms, rooms) },
-          {
-            label: "High priority for emergencies",
-            before: null,
-            after: onOff(row.urgent_high_priority),
-          },
+          { label: "Emergencies loud", before: null, after: onOff(row.urgent_high_priority) },
+          ...(row.quiet_hours
+            ? [{ label: "Quiet hours", before: null, after: quietWords(row.quiet_hours) }]
+            : []),
         ],
       });
       continue;
@@ -490,9 +654,15 @@ export function draftChanges(
       });
     if (row.urgent_high_priority !== was.urgent_high_priority)
       lines.push({
-        label: "High priority for emergencies",
+        label: "Emergencies loud",
         before: onOff(was.urgent_high_priority),
         after: onOff(row.urgent_high_priority),
+      });
+    if (JSON.stringify(row.quiet_hours) !== JSON.stringify(was.quiet_hours))
+      lines.push({
+        label: "Quiet hours",
+        before: quietWords(was.quiet_hours),
+        after: quietWords(row.quiet_hours),
       });
     if (row.name !== was.name) lines.push({ label: "Name", before: was.name, after: row.name });
     if (lines.length) result.push({ service: row.service, title, change: "changed", lines });
@@ -510,4 +680,172 @@ export function draftChanges(
       ? { before: base.idle_hours, after: draft.idle_hours }
       : null;
   return { phones: result, idle, count: result.length + (idle ? 1 : 0) };
+}
+
+/** The bottom bar's sentence: "2 changes not applied yet: Sam's phone gets Dosing · Office tablet:
+ * F2 only", one part a change, in the rows' order, then the rows taken out, then the threshold;
+ * "" with nothing changed. */
+export function draftSummary(
+  draft: NotifyDraft,
+  saved: NotifyConfig,
+  context: { kinds: readonly NotifyKind[]; phones: readonly NotifyPhone[]; rooms: readonly Room[] },
+): string {
+  const { kinds, phones, rooms } = context;
+  const names = (ids: readonly string[]) =>
+    kinds
+      .filter((kind) => ids.includes(kind.id))
+      .map((kind) => kind.name)
+      .concat(ids.filter((id) => !kinds.some((kind) => kind.id === id)))
+      .join(", ");
+  const old = new Map(saved.recipients.map((row) => [row.service, row]));
+  const listed = new Set(draft.recipients.map((row) => row.service));
+  const parts: string[] = [];
+  for (const row of draft.recipients) {
+    const title = rowLabel(row, phones).title;
+    const was = old.get(row.service);
+    if (!was) {
+      parts.push(`${title} added`);
+      continue;
+    }
+    const started = row.kinds.filter((id) => !was.kinds.includes(id));
+    const stopped = was.kinds.filter((id) => !row.kinds.includes(id));
+    if (started.length) parts.push(`${title} gets ${names(started)}`);
+    if (stopped.length) parts.push(`${title} stops getting ${names(stopped)}`);
+    if (JSON.stringify(sorted(row.rooms)) !== JSON.stringify(sorted(was.rooms)))
+      parts.push(`${title}: ${roomChipWords(row.rooms, rooms)}`);
+    if (row.urgent_high_priority !== was.urgent_high_priority)
+      parts.push(`${title}: emergencies ${row.urgent_high_priority ? "loud" : "not loud"}`);
+    if (JSON.stringify(row.quiet_hours) !== JSON.stringify(was.quiet_hours))
+      parts.push(
+        `${title}: ${row.quiet_hours ? `quiet ${quietWords(row.quiet_hours)}` : "no quiet hours"}`,
+      );
+    if (row.name !== was.name) parts.push(`${title} renamed ${row.name}`);
+  }
+  for (const row of saved.recipients)
+    if (!listed.has(row.service)) parts.push(`${rowLabel(row, phones).title} removed`);
+  if (draft.idle_hours !== saved.idle_hours)
+    parts.push(`Shots stopped after ${draft.idle_hours} h`);
+  if (!parts.length) return "";
+  const n = parts.length;
+  return `${n} ${n === 1 ? "change" : "changes"} not applied yet: ${parts.join(" · ")}`;
+}
+
+/** Minutes of the day [start, end) on the 24-hour strip, the day's end as 1440. */
+export type Span = [number, number];
+const minuteOf = (hhmm: string) => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3, 5));
+/** A window on one day's strip, split at midnight when it crosses it. */
+const daySpans = (start: number, end: number): Span[] =>
+  start < end
+    ? [[start, end]]
+    : ([
+        [0, end],
+        [start, 1440],
+      ] as Span[]).filter(([a, b]) => b > a);
+function merge(spans: Span[]): Span[] {
+  const out: Span[] = [];
+  for (const [a, b] of [...spans].sort((x, y) => x[0] - y[0])) {
+    const last = out.at(-1);
+    if (last && a <= last[1]) last[1] = Math.max(last[1], b);
+    else out.push([a, b]);
+  }
+  return out;
+}
+/** Every phone's quiet hours on one day's strip, as one union. */
+export const quietSpans = (windows: readonly (QuietHours | null)[]): Span[] =>
+  merge(windows.flatMap((w) => (w ? daySpans(minuteOf(w.from), minuteOf(w.to)) : [])));
+export const spanMinutes = (spans: readonly Span[]) =>
+  spans.reduce((sum, [a, b]) => sum + b - a, 0);
+/** A room's lights on the strip, from its lights-on and lights-off hours (its number entities). */
+export function lightSpans(onHour: number, offHour: number): Span[] {
+  if (!Number.isFinite(onHour) || !Number.isFinite(offHour) || onHour === offHour) return [];
+  return daySpans(Math.round(onHour * 60), Math.round(offHour * 60));
+}
+
+/** When a room's mute ends, from now: "08:00", "08:00 tomorrow", or "08:00 Sat 25 Oct". */
+export function muteEndWords(at: number, now: number, tz: string): string {
+  const day = dayKey(at, tz);
+  if (day === dayKey(now, tz)) return clock(at, tz);
+  if (day === dayKey(startOfDay(now, tz) + 36 * 3_600_000, tz)) return `${clock(at, tz)} tomorrow`;
+  return `${clock(at, tz)} ${dayLabel(at, tz)}`;
+}
+/** The mute read back is the one written: the integration keeps whole seconds. */
+export const sameMuteEnd = (read: number | undefined, wanted: number | null) =>
+  wanted === null ? read === undefined : read !== undefined && Math.abs(read - wanted) < 1000;
+
+/** One line of the review: a phone's change (`key` its service) or the threshold (`key` "idle"). */
+export interface NotifyReviewRow {
+  id: string;
+  key: string;
+  label: string;
+  before: string;
+  after: string;
+}
+export function reviewRows(changes: DraftChanges): NotifyReviewRow[] {
+  return [
+    ...changes.phones.flatMap((phone) =>
+      phone.lines.map((line) => ({
+        id: `${phone.service}|${line.label}`,
+        key: phone.service,
+        label: `${phone.title}: ${line.label}`,
+        before: line.before ?? (phone.change === "added" ? "Not listed" : "—"),
+        after: line.after,
+      })),
+    ),
+    ...(changes.idle
+      ? [
+          {
+            id: "idle",
+            key: "idle",
+            label: "Shots stopped after",
+            before: `${changes.idle.before} h`,
+            after: `${changes.idle.after} h`,
+          },
+        ]
+      : []),
+  ];
+}
+/** What a save did, row by row, from the setup `notify_save` answered with (the integration's
+ * stored setup, read after writing): a row is written and read back only when its phone (or the
+ * threshold) reads back exactly as sent; any other is named as not confirmed, never as taken. */
+export function saveReceipt(
+  rows: readonly NotifyReviewRow[],
+  sent: NotifyDraft,
+  read: NotifyConfig,
+  at: number,
+): {
+  at: number;
+  ok: boolean;
+  failed: [];
+  notConfirmed?: string[];
+  summary: string;
+  eventIds: [];
+} {
+  const back = new Map(read.recipients.map((row) => [row.service, row]));
+  // As the integration stores a row: its name trimmed and cut to 40, its user filled in when unsent.
+  const stored = (row: NotifyRecipient) => {
+    const was = back.get(row.service);
+    return rowKey({
+      ...row,
+      name: row.name.trim().slice(0, 40) || (was?.name ?? row.service),
+      user_id: row.user_id ?? was?.user_id ?? null,
+    });
+  };
+  const mine = new Map(sent.recipients.map((row) => [row.service, stored(row)]));
+  const confirmed = (key: string) => {
+    if (key === "idle") return read.idle_hours === sent.idle_hours;
+    const was = back.get(key);
+    return mine.get(key) === (was ? rowKey(was) : undefined);
+  };
+  const unsure = rows.filter((row) => !confirmed(row.key)).map((row) => row.id);
+  return {
+    at,
+    ok: !unsure.length,
+    failed: [],
+    ...(unsure.length ? { notConfirmed: unsure } : {}),
+    summary: rows
+      .filter((row) => !unsure.includes(row.id))
+      .map((row) => `${row.label} ${row.before} → ${row.after}`)
+      .join(" · "),
+    eventIds: [],
+  };
 }

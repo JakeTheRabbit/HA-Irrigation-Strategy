@@ -26,11 +26,11 @@ def test_p0_waits_for_the_first_of_its_time_the_trigger_and_its_dryback():
     items = waiting_for(s, p)
     assert rules(items) == ["p0_timeout", "p0_bypass", "p0_dryback"]
     assert by_rule(items, "p0_timeout") == {"rule": "p0_timeout", "shot": False, "to": "P1", "in_min": 15.0}
-    assert by_rule(items, "p0_bypass")["value"] == p.p2_threshold
+    assert by_rule(items, "p0_bypass")["value"] == p.p3_emergency_floor
     assert by_rule(items, "p0_dryback")["value"] == round(62 * 0.8, 2)
     # decide() agrees: none holds, so P0 stays; each one alone moves it to P1.
     assert decide(s, p)[0] == "P0"
-    assert decide(S(phase="P0", vwc=45, peak_vwc=62, phase_minutes=30), p)[0] == "P1"
+    assert decide(S(phase="P0", vwc=40, peak_vwc=62, phase_minutes=30), p)[0] == "P1"
     assert decide(S(phase="P0", vwc=58, peak_vwc=62, phase_minutes=45), p)[0] == "P1"
 
 

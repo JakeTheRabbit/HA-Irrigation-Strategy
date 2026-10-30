@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import type { Controller } from "@/lib/types";
 import { tankTelemetry, type TankReading } from "@/lib/tank-telemetry";
 import { TankHistory, TankSparkline, useTankHistory, useTankLines } from "./tank-history";
+import { formatDateTime } from "@/lib/clock";
 import "./tank-status.css";
 
 export function TankStatus({
@@ -121,7 +122,7 @@ export function TankStatus({
             <dd>
               {tank.lastFill.timestamp ? (
                 <time dateTime={tank.lastFill.timestamp}>
-                  {new Date(tank.lastFill.timestamp).toLocaleString([], {
+                  {formatDateTime(tank.lastFill.timestamp, {
                     dateStyle: "short",
                     timeStyle: "short",
                   })}

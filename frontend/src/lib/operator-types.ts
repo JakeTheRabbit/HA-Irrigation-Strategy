@@ -1,4 +1,7 @@
+import type { ParityAction } from "./parity-api";
+
 export type OperatorAction =
+  | ParityAction
   | "history_connection_get"
   | "history_connection_save"
   | "history_long"

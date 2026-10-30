@@ -20,8 +20,11 @@ From the repo root:
 bash tests/run_ci.sh
 ```
 
-That runs the backend checks: lint, format, YAML, vendored engine identity, repository hygiene and all three Python suites. Run the pieces individually
-if you prefer:
+That runs every Validate job that can run on a developer machine: lint, format, YAML, vendored engine identity, repository hygiene, the doctrine check, all three Python suites, the real-Home-Assistant tier (when installed), the dashboard unit tests, build, committed-bundle check and browser scripts (when Node and `frontend/node_modules` are there), and the MCP server tests. It prints each check it did not run, with the reason, and ends `PARTIAL` (exit 1) rather than `ALL LOCAL CHECKS PASSED` if there are any; `--allow-skip` accepts that. Two switches: `--containers` also builds the controller image and runs `tests/container` (about 25 minutes, so off by default), and `--no-browser` leaves out the dashboard browser scripts.
+
+It ends with the list of what it cannot run at all, which only CI checks: hassfest and the HACS action, the oldest-supported-Home-Assistant leg (a local Docker route is below), the aarch64 and armv7 add-on images (they need QEMU), dependency review, the doctrine check's private word list (a CI secret), and the academy browser suites, which no workflow runs. A green local run is therefore necessary and not sufficient: the pull request's checks are the gate.
+
+Run the pieces individually if you prefer:
 
 ```bash
 # Pure decision engine — the active control core
@@ -82,8 +85,17 @@ git ls-files -co --exclude-standard -z | tar --null -T - -cf - | docker run --rm
 
 The same commands work in Git Bash, macOS Terminal and PowerShell 7 (Windows' own `tar` reads the
 list). The tree goes in as a `tar` stream rather than a bind mount: each run starts clean, sees
-exactly the files git would commit, and leaves nothing behind in the checkout. The image covers the
-production leg only; the oldest-supported leg below stays in CI.
+exactly the files git would commit, and leaves nothing behind in the checkout. The image above is
+the production leg. The oldest-supported leg is the same Dockerfile built with that leg's own Python
+and plugin pins (the second matrix entry of the Real Home Assistant job; `tests/test_requirements_stated.py`
+fails if this command and that entry drift apart):
+
+```bash
+docker build -f tests_ha/Dockerfile --build-arg PYTHON=3.12 --build-arg PLUGIN="pytest-homeassistant-custom-component==0.13.171 josepy==1.14.0" -t crop-steering-tests-ha-oldest .
+git ls-files -co --exclude-standard -z | tar --null -T - -cf - | docker run --rm -i crop-steering-tests-ha-oldest
+```
+
+The build prints `Home Assistant 2024.10.0`; CI fails the leg if it does not.
 
 | File | Scenario |
 | --- | --- |
@@ -189,8 +201,9 @@ cd ha-core && python -m script.hassfest --action validate \
 The translation rules most easily broken by a new form field or message are also pinned, with
 hassfest's own patterns, in `tests/test_translations.py`, where a failure takes seconds: keys
 (including a dropdown's option *values*) must be lowercase slugs; no placeholder inside single
-quotes, because ICU MessageFormat treats `'{unit}'` as an escape and shows the literal text; and
-a tooltip needs a label.
+quotes, because ICU MessageFormat treats `'{unit}'` as an escape and shows the literal text;
+every placeholder is an identifier (`{from, to}` is not); nothing looks like an HTML tag
+(`<entry id>` does); and a tooltip needs a label.
 
 ### Hermetic controller state
 
@@ -202,20 +215,26 @@ live install, the path is `/data/state.json`.
 
 ### Both install modes, in the real image
 
-`tests_container/test_container.py` runs the built controller image against
-`tests_container/fake_ha_server.py`, as a standalone container and as the Supervisor runs the app.
+`tests/container/test_container.py` runs the built controller image against
+`tests/container/fake_ha_server.py`, as a standalone container and as the Supervisor runs the app.
 It needs Docker and `CONTROLLER_IMAGE`, and skips without them. CI's *Controller container smoke
 (both modes)* job builds the amd64 image once and runs it on that image on every Validate run; the
 *Promote* preflight requires that job to have passed. Locally:
 
     docker build -t crop-steering-controller:test addons/f2_control
-    CONTROLLER_IMAGE=crop-steering-controller:test python -m pytest tests_container -q
+    CONTROLLER_IMAGE=crop-steering-controller:test python -m pytest tests/container -q
+
+`bash tests/run_ci.sh --containers` does both. The tests do not share a host port, network, volume
+or container name (each makes its own, named from a random id), so they can run side by side:
+CI runs them with `pytest-xdist`. The suite is mostly waiting (watch periods, a controller loop of
+a few seconds, restarts), so it is not CPU-bound and parallel workers shorten it. See the
+job's comment in `ci-validate.yml` for the worker count and the timing it was chosen from.
 
 ### Stopping mid-shot, in the real image
 
-`tests_container/stop_mid_shot.sh <image>` needs Docker and is run by hand. It starts the built
+`tests/container/stop_mid_shot.sh <image>` needs Docker and is run by hand. It starts the built
 controller image the way the Supervisor does (its own init, then `/run.sh`) against
-`tests_container/fake_ha_server.py`, lets the first pass fire a real shot, makes every answer from
+`tests/container/fake_ha_server.py`, lets the first pass fire a real shot, makes every answer from
 Home Assistant late, and stops the container in the middle of the shot with `docker stop -t 30`.
 It passes when the valve is switched off after the stop and the container exits 0 inside the 30 s.
 Run it after any change to the Dockerfile, `run.sh` or the controller's stop path.
@@ -244,8 +263,30 @@ node frontend/scripts/verify-workspace.mjs
 node frontend/scripts/verify-steering-visuals.mjs
 node frontend/scripts/verify-recipe-library.mjs
 node frontend/scripts/verify-tank-status.mjs
+node frontend/scripts/verify-calibration.mjs
 node frontend/scripts/verify-ha-shell.mjs
+node frontend/scripts/verify-navigation.mjs
+node frontend/scripts/verify-ai-instructions.mjs
+node frontend/scripts/verify-irrigation-workspace.mjs
 ```
+
+The Academy has its own browser suites. They need the compiled catalogue, the pinned lesson media (about 660 MB, checksum-verified) and a static server on port 8794; `BROWSER_CHANNEL=chrome` is needed because the lesson videos are H.264, which Playwright's bundled Chromium cannot decode (CI uses Chrome too):
+
+```sh
+python scripts/build_course.py
+python scripts/install_course_media.py
+python scripts/build_course.py --verify-media
+node frontend/node_modules/vite/bin/vite.js preview --outDir www --host 127.0.0.1 --port 8794 &
+export BROWSER_CHANNEL=chrome
+node tests/academy.browser.mjs
+node tests/academy-navigation.browser.mjs
+node tests/academy-video.browser.mjs
+node tests/academy-media.browser.mjs
+```
+
+`tests/academy-scene-sync.browser.mjs` is the one browser check CI does not run: it needs the private production masters (`ACADEMY_PRODUCTION`, see [the Academy developer notes](dev/academy.md#verify-a-completed-video-edition)).
+
+Some scripts also render the screenshots used in the README. By default those go to the untracked `output/playwright/readme/`, so running the tests leaves the tree clean. To refresh the committed `img/` files, set `UPDATE_README_IMAGES=1` when running a script, or run `node frontend/scripts/capture-readme.mjs` (see [SCREENSHOTS.md](SCREENSHOTS.md)).
 
 The browser scripts start loopback servers. Demo workflows reject API/external traffic; mocked-HA workflows intercept all API calls. The checks cover all eleven pages, desktop/mobile navigation, accessibility, drafts, partial failures, readback, room identity, stale probes, and legacy route compatibility. Screenshots and JSON results are written to `output/playwright/`. This frontend job also runs in GitHub CI. The Python packaging tests verify that the HA and add-on artifacts match and retain room/demo navigation.
 
@@ -294,6 +335,10 @@ repository, and every Home Assistant redirect they use is one my.home-assistant.
 
 ### 5. Lint / format / YAML: ruff, black (scoped to `custom_components/` + `tests/`), yamllint
 Plus, on GitHub only: **hassfest** and **HACS validation** of the integration.
+
+**What the format gate covers, and why it stops there.** `black --check` runs on `custom_components/` and `tests/` (except `tests/container`) only. Code outside them is not format-gated: `addons/f2_control` (the 425 KB controller and the rest of the add-on), `crop-steering-engine`, `tests_ha`, `tests/container`, `scripts`. Checked with the CI pin (black 24.4.2) on 2026-10-22, 201, 20, 107, 2 and 2 files in those directories would be reformatted. Reformatting them is a decision, not an oversight: it would rewrite most lines of files that many open pull requests are editing (the controller above all), so each of those would conflict for no change in behaviour, and the add-on is deployed file-for-file to installs, where a whole-file diff hides the change that matters. `ruff check .` does cover everything, and `yamllint` covers all YAML. To put a directory under `black --check`, reformat it in one pull request that contains nothing else, at a moment with no open pull requests touching it, and add it to the Black step in `ci-validate.yml`, to `tests/run_ci.sh`, and to this paragraph. `mcp-server` has no Python.
+
+`yamllint` extends the `relaxed` profile (`.yamllint`): it catches syntax errors and duplicate keys, not style.
 
 ### 5a. Doctrine pack: `tests/test_doctrine_build.py`
 Runs `doctrine/tools/build_doctrine.py --check`: the pack's rules are valid, every rule of the brain's
@@ -362,5 +407,5 @@ pull request - is in [CONTRIBUTING.md](../CONTRIBUTING.md).
 
 The relevant automated tests pass **and** any change to persisted state, add-on options, or
 integration entities has a test proving an **older install still loads** (see §4). New
-behavior gets a new test. See `CLAUDE.md` → *Compatibility & data* for the rules these tests
+behavior gets a new test. See `.claude/CLAUDE.md` → *Compatibility & data* for the rules these tests
 enforce.

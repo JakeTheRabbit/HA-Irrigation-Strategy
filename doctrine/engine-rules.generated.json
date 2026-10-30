@@ -179,7 +179,7 @@
     },
     {
       "id": "PH-4",
-      "text": "P0 ends on VWC at or below re-water, the drop since lights-on at p0_additional_dryback when positive (otherwise dryback_target), or its maximum wait. A positive additional setting replaces the target; it is not summed.",
+      "text": "P0 ends on VWC at or below the rescue floor (p3_emergency_floor), the drop since lights-on at p0_additional_dryback when positive (otherwise dryback_target), or its maximum wait. Under the re-water threshold alone it keeps waiting. A positive additional setting replaces the target; it is not summed.",
       "verified": true
     },
     {
@@ -306,7 +306,7 @@
     },
     {
       "id": "CT-5",
-      "text": "Dead or set-aside probe: after a 15 min grace the zone copies the healthiest sibling's shot (closest p1_target) or, with no sibling, waters every blind_fallback_min (default 90) within its own budget; VWC-driven phase changes wait; the lights' edges, the P0 maximum wait (p0_max_wait_min) and the P1 maximum shots still move it.",
+      "text": "Dead or set-aside probe: after a 15 min grace the zone copies the healthiest sibling's shot (closest p1_target) or, with no sibling, waters every blind_fallback_min (default 90) in P1 and P2 with the lights on, within its own budget; the minimum daily floor (CT-9) needs no probe and waters it too, with the lights on and past P0, when no other shot fires; VWC-driven phase changes wait; the lights' edges, the P0 maximum wait (p0_max_wait_min) and the P1 maximum shots still move it.",
       "verified": true
     },
     {
@@ -321,7 +321,7 @@
     },
     {
       "id": "CT-8",
-      "text": "With no live feed EC reading (no feed EC sensor, or its last good reading older than feed_grace_min) the controller uses declared recipe EC when available, otherwise hands decide() an assumed feed EC of 3.0 mS/cm, not a measurement, for the dilution comparison. Recipe EC and fallback EC are not measurements.",
+      "text": "With no live feed EC reading (no feed EC sensor, or its last good reading older than feed_grace_min) the controller uses declared recipe EC when available, otherwise hands decide() no feed EC: the feed is unknown, so decide() takes no EC flush or dilute and no feed-not-dilutive hold (CS-206) and waters the zone on its moisture. Recipe EC is not a measurement.",
       "verified": true
     },
     {

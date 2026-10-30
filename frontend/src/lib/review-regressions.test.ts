@@ -97,6 +97,8 @@ describe("adapter review regressions", () => {
     states["sensor.crop_steering_vwc_zone_1"].last_updated = new Date(
       Date.now() - 25 * 60_000,
     ).toISOString();
+    // The descriptor's, while the controller's heartbeat publishes none...
+    delete states["sensor.crop_steering_ai_heartbeat"].attributes.max_sensor_age_s;
     states["sensor.crop_steering_engine_config"].attributes.max_sensor_age_s = 3600;
     const room = discoverRooms(states)[0];
     expect(buildRoom(states, room).zones[0].vwc.value).toBe(56);

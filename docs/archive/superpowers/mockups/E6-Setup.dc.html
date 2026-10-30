@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Setup: pumps & valves</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#4fc3f7;text-decoration:none}a:hover{color:#b3e5fc}
+</style>
+</helmet>
+<!-- SHELL: 1440x1000 frame. Tokens: canvas #111111, surface #1c1c1c, raised #232323, border #2e2e2e, text #e1e1e1, muted #a4a4a4, faint #8a8a8a, primary #03a9f4, link #4fc3f7, success #81c995, warning #ffca5b, danger #f28b82. Phase P0 #6b7580, P1 #2f6fb5, P2 #6450b0, P3 #34405a. Font Roboto; sizes 12/14/15/17/20/24. Radius 12. -->
+<div style="width: 1440px; height: 1000px; box-sizing: border-box; background: #111111; color: #e1e1e1; font-family: Roboto, Arial, sans-serif; display: flex; overflow: hidden">
+
+<!-- SHELL: menu (sections + live room tree) -->
+<aside style="width: 248px; flex-shrink: 0; background: #1c1c1c; border-right: 1px solid #2e2e2e; padding: 22px 12px 16px; box-sizing: border-box; display: flex; flex-direction: column; gap: 4px">
+<div style="display: flex; align-items: center; gap: 10px; padding: 0 8px 18px">
+<span style="width: 36px; height: 36px; border-radius: 10px; background: #03a9f4; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0b1d27" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.7l5.7 5.7a8 8 0 1 1-11.3 0z"></path></svg></span>
+<span style="display: flex; flex-direction: column"><b style="font-size: 16px; font-weight: 600">Crop Steering</b><span style="font-size: 12px; color: #a4a4a4">Irrigation control</span></span>
+</div>
+<nav aria-label="Main navigation" style="display: flex; flex-direction: column; gap: 1px">
+<a href="S1-AllRooms.dc.html" style="display: flex; align-items: center; gap: 12px; min-height: 38px; padding: 0 12px; border-radius: 8px; color: #b8b8b8; font-weight: 500; font-size: 15px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>Status</a>
+<button type="button" aria-expanded="false" style="display: flex; align-items: center; gap: 12px; min-height: 38px; padding: 0 12px; border: 0; border-radius: 8px; background: transparent; color: #b8b8b8; font: inherit; font-size: 15px; font-weight: 500; text-align: left; cursor: pointer"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.7l5.7 5.7a8 8 0 1 1-11.3 0z"></path></svg>Irrigation<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="margin-left: auto"><polyline points="9 6 15 12 9 18"></polyline></svg></button>
+<button type="button" aria-expanded="false" style="display: flex; align-items: center; gap: 12px; min-height: 38px; padding: 0 12px; border: 0; border-radius: 8px; background: transparent; color: #b8b8b8; font: inherit; font-size: 15px; font-weight: 500; text-align: left; cursor: pointer"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><polyline points="12 7 12 12 15 14"></polyline></svg>History<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="margin-left: auto"><polyline points="9 6 15 12 9 18"></polyline></svg></button>
+<button type="button" aria-expanded="true" style="display: flex; align-items: center; gap: 12px; min-height: 38px; padding: 0 12px; border: 0; border-radius: 8px; background: transparent; color: #e1e1e1; font: inherit; font-size: 15px; font-weight: 600; text-align: left; cursor: pointer"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"></path></svg>Equipment<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="margin-left: auto"><polyline points="6 9 12 15 18 9"></polyline></svg></button>
+<div style="display: flex; flex-direction: column; gap: 1px; margin: 0 0 4px 21px; padding-left: 10px; border-left: 1px solid #333">
+<a href="E1-Probes.dc.html" style="display: flex; align-items: center; min-height: 32px; padding: 0 10px; border-radius: 6px; color: #b8b8b8; font-size: 14px">Probes &amp; offsets</a>
+<a href="E2-Dosing.dc.html" style="display: flex; align-items: center; min-height: 32px; padding: 0 10px; border-radius: 6px; color: #b8b8b8; font-size: 14px">Feed &amp; dosing</a>
+<a href="E5-Stock.dc.html" style="display: flex; align-items: center; min-height: 32px; padding: 0 10px; border-radius: 6px; color: #b8b8b8; font-size: 14px">Stock</a>
+<a href="E3-PumpWizard.dc.html" style="display: flex; align-items: center; min-height: 32px; padding: 0 10px; border-radius: 6px; color: #b8b8b8; font-size: 14px">Pump calibration</a>
+<a href="E4-FeedCal.dc.html" style="display: flex; align-items: center; min-height: 32px; padding: 0 10px; border-radius: 6px; color: #b8b8b8; font-size: 14px">Feed pH/EC calibration</a>
+<a href="E6-Setup.dc.html" aria-current="page" style="display: flex; align-items: center; min-height: 32px; padding: 0 10px; border-radius: 6px; background: #2a2a2a; box-shadow: inset 2px 0 0 #03a9f4; color: #4fc3f7; font-size: 14px; font-weight: 600">Pumps &amp; valves</a>
+</div>
+<button type="button" aria-expanded="false" style="display: flex; align-items: center; gap: 12px; min-height: 38px; padding: 0 12px; margin-top: 10px; border: 0; border-radius: 8px; background: transparent; color: #b8b8b8; font: inherit; font-size: 15px; font-weight: 500; text-align: left; cursor: pointer"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="4" y1="7" x2="20" y2="7"></line><line x1="4" y1="17" x2="20" y2="17"></line><circle cx="9" cy="7" r="2.5"></circle><circle cx="15" cy="17" r="2.5"></circle></svg>Settings<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="margin-left: auto"><polyline points="9 6 15 12 9 18"></polyline></svg></button>
+</nav>
+<nav aria-label="Rooms" style="display: flex; flex-direction: column; gap: 1px; margin-top: 16px">
+<span style="padding: 0 12px 6px; font-size: 12px; font-weight: 600; letter-spacing: .06em; color: #a4a4a4">ROOMS</span>
+<sc-for list="{{rooms}}" as="r" hint-placeholder-count="3">
+<a href="S2-Room.dc.html" style="display: flex; align-items: center; gap: 8px; min-height: 36px; padding: 0 10px; margin-top: 6px; border-radius: 8px; background: {{r.bg}}; color: #e1e1e1; font-size: 14px; font-weight: 500"><span style="width: 8px; height: 8px; border-radius: 4px; background: {{r.dot}}"></span>{{r.name}}<span style="margin-left: auto; font-size: 12px; color: #a4a4a4; font-weight: 400">{{r.state}}</span></a>
+<sc-for list="{{r.zones}}" as="z" hint-placeholder-count="3">
+<a href="S3-Zone.dc.html" style="display: flex; align-items: center; gap: 8px; min-height: 30px; padding: 0 10px 0 24px; border-radius: 8px; color: #b8b8b8; font-size: 13px"><span style="min-width: 22px; padding: 0 4px; border-radius: 4px; background: {{z.phColor}}; color: #fff; font-size: 11px; font-weight: 700; text-align: center">{{z.ph}}</span>{{z.name}}<span style="margin-left: auto; font-size: 12px; color: #a4a4a4">{{z.vwc}}</span></a>
+</sc-for>
+</sc-for>
+</nav>
+<div style="margin-top: auto; padding: 0 8px; font-size: 12px; color: #8a8a8a">Integration 3.17.1 · Controller 3.17.1</div>
+</aside>
+
+<div style="flex: 1; min-width: 0; display: flex; flex-direction: column">
+<!-- SHELL: top bar (no room chips on desktop: the tree is the picker) -->
+<header style="height: 56px; flex-shrink: 0; border-bottom: 1px solid #2e2e2e; display: flex; align-items: center; justify-content: flex-end; gap: 12px; padding: 0 24px">
+<span style="font-size: 13px; color: #a4a4a4">Updated 12 s ago</span>
+<span style="display: flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border: 1px solid #2e2e2e; border-radius: 15px; font-size: 13px; font-weight: 600"><span style="width: 7px; height: 7px; border-radius: 4px; background: #81c995"></span>AI acting</span>
+<button type="button" aria-label="Search, Ctrl K" style="display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 12px; border: 1px solid #2e2e2e; border-radius: 8px; background: #1c1c1c; color: #a4a4a4; font: inherit; font-size: 13px">Jump to… <span style="border: 1px solid #3a3a3a; border-radius: 4px; padding: 0 5px; font-size: 11px">Ctrl K</span></button>
+<span style="font-size: 13px; color: #a4a4a4">F2</span>
+<button type="button" style="display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 14px; border: 1px solid #2e2e2e; border-radius: 8px; background: #1c1c1c; color: #e1e1e1; font: inherit; font-size: 14px; font-weight: 600"><span style="width: 8px; height: 8px; border-radius: 4px; background: #81c995"></span>Watering on</button>
+<button type="button" style="height: 34px; padding: 0 14px; border: 1px solid #f28b82; border-radius: 8px; background: transparent; color: #f28b82; font: inherit; font-size: 14px; font-weight: 600">Stop all</button>
+</header>
+
+<main style="flex: 1; min-height: 0; overflow: hidden; padding: 22px 28px; display: flex; flex-direction: column; gap: 14px">
+<div style="display: flex; align-items: center; gap: 16px; height: 40px; flex-shrink: 0">
+<h1 style="margin: 0; font-size: 24px; font-weight: 600">Setup: pumps &amp; valves · F2</h1>
+<span style="font-size: 14px; color: #a4a4a4">1 feed pump, 3 zone valves</span>
+
+</div>
+<div style="flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 18px">
+<div style="display: flex; flex-direction: column; gap: 14px; min-width: 0">
+
+<section aria-label="Feed pump" style="background: #1c1c1c; border: 1px solid #2e2e2e; border-radius: 12px; padding: 14px 18px; display: flex; flex-direction: column; gap: 12px">
+<div style="display: flex; align-items: baseline; gap: 10px"><h2 style="margin: 0; font-size: 17px; font-weight: 600">F2 feed pump</h2><span style="font-size: 13px; color: #a4a4a4">feeds from the F2 batch tank · switch.f2_feed_pump</span></div>
+<div style="display: flex; align-items: flex-start; gap: 28px">
+<label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: #b8b8b8">Max flow
+<span style="display: flex; align-items: center; gap: 8px"><input type="text" inputmode="decimal" value="{{maxFlow}}" onChange="{{onMax}}" style="width: 96px; height: 40px; box-sizing: border-box; padding: 0 10px; border: 1px solid {{maxEdge}}; border-radius: 8px; background: #111111; color: #e1e1e1; font: inherit; font-size: 17px; font-weight: 600"><span style="font-size: 14px; color: #e1e1e1">L/h</span><sc-if value="{{maxChanged}}" hint-placeholder-val="{{true}}"><span style="font-size: 12px; color: #4fc3f7">was {{savedMax}}</span></sc-if></span>
+<sc-if value="{{hasMaxErr}}" hint-placeholder-val="{{false}}"><span style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: #f28b82"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f28b82" stroke-width="3" stroke-linecap="round" aria-hidden="true" style="flex: none"><line x1="5" y1="5" x2="19" y2="19"></line><line x1="19" y1="5" x2="5" y2="19"></line></svg>{{maxErr}}</span></sc-if>
+</label>
+<div style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: #b8b8b8"><span id="maxz">Max zones at once</span>
+<span role="radiogroup" aria-labelledby="maxz" style="display: flex; border: 1px solid #3a3a3a; border-radius: 8px; overflow: hidden"><sc-for list="{{maxZ}}" as="m" hint-placeholder-count="3"><button type="button" role="radio" aria-checked="{{m.on}}" onClick="{{m.pick}}" style="{{m.style}}">{{m.n}}</button></sc-for></span>
+</div>
+<div style="flex: 1; display: flex; flex-direction: column; gap: 6px; min-width: 0">
+<span style="font-size: 13px; color: #b8b8b8">Worst pair allowed to start together</span>
+<span style="position: relative; height: 22px; border-radius: 6px; background: #2a2a2a; overflow: hidden; display: flex"><sc-for list="{{worst.segs}}" as="g" hint-placeholder-count="2"><span style="height: 100%; width: {{g.w}}; background: {{g.color}}; box-shadow: inset -1px 0 0 #111111"></span></sc-for><span style="position: absolute; top: 0; bottom: 0; left: 66.6%; width: 2px; background: #e1e1e1"></span><span style="position: absolute; top: 0; bottom: 0; left: 66.8%; right: 0; background: repeating-linear-gradient(-45deg, rgba(242,139,130,.0), rgba(242,139,130,.0) 5px, rgba(17,17,17,.55) 5px, rgba(17,17,17,.55) 9px)"></span></span>
+<span style="font-size: 14px; font-weight: 600; color: {{worst.ink}}">{{worst.txt}}</span>
+</div>
+</div>
+</section>
+
+<section aria-label="Zones" style="background: #1c1c1c; border: 1px solid #2e2e2e; border-radius: 12px; padding: 14px 18px; display: flex; flex-direction: column; gap: 6px">
+<h2 style="margin: 0 0 4px; font-size: 17px; font-weight: 600">Zone valves and drippers</h2>
+<div style="display: grid; grid-template-columns: 70px 84px 124px 76px minmax(0, 1fr) 132px; gap: 12px; font-size: 12px; font-weight: 600; letter-spacing: .04em; color: #a4a4a4"><span>ZONE</span><span>DRIPPERS</span><span>DRIPPER FLOW</span><span style="text-align: right">ZONE FLOW</span><span>SHARE OF PUMP</span><span>EXCLUSIVE GROUP</span></div>
+<sc-for list="{{zones}}" as="z" hint-placeholder-count="3">
+<div style="display: grid; grid-template-columns: 70px 84px 124px 76px minmax(0, 1fr) 132px; gap: 12px; align-items: center; min-height: 52px; border-top: 1px solid #262626; font-size: 14px">
+<span style="display: flex; align-items: center; gap: 8px"><span style="width: 10px; height: 10px; border-radius: 3px; background: {{z.color}}"></span><b style="font-weight: 600">{{z.name}}</b></span>
+<span style="display: flex; flex-direction: column"><span>{{z.drippers}}</span><span style="font-size: 11px; color: #a4a4a4">{{z.plants}} plants × {{z.per}}</span></span>
+<span style="display: flex; flex-direction: column; gap: 3px"><span style="display: flex; align-items: center; gap: 6px"><input type="text" inputmode="decimal" aria-label="{{z.name}} dripper flow, litres per hour" value="{{z.flow}}" onChange="{{z.onFlow}}" style="width: 64px; height: 36px; box-sizing: border-box; padding: 0 8px; border: 1px solid {{z.edge}}; border-radius: 8px; background: #111111; color: #e1e1e1; font: inherit; font-size: 15px; font-weight: 600"><span style="color: #b8b8b8">L/h</span></span><sc-if value="{{z.hasNote}}" hint-placeholder-val="{{false}}"><span style="font-size: 11px; color: {{z.noteInk}}">{{z.note}}</span></sc-if></span>
+<b style="text-align: right; font-weight: 600">{{z.zoneFlow}}</b>
+<span style="display: flex; align-items: center; gap: 8px"><span style="position: relative; flex: 1; height: 10px; border-radius: 5px; background: #2a2a2a"><span style="position: absolute; left: 0; top: 0; bottom: 0; width: {{z.shareW}}; border-radius: 5px; background: {{z.color}}"></span><span style="position: absolute; top: -4px; bottom: -4px; left: 66.6%; width: 2px; background: #8a8a8a"></span></span><span style="width: 44px; text-align: right; color: {{z.shareInk}}">{{z.share}}</span></span>
+<span role="radiogroup" aria-label="{{z.name}} exclusive group" style="display: flex; border: 1px solid #3a3a3a; border-radius: 8px; overflow: hidden"><sc-for list="{{z.groups}}" as="gr" hint-placeholder-count="3"><button type="button" role="radio" aria-checked="{{gr.on}}" onClick="{{gr.pick}}" style="{{gr.style}}">{{gr.name}}</button></sc-for></span>
+</div>
+</sc-for>
+<span style="font-size: 12px; color: #a4a4a4">Zones in the same exclusive group never water at the same time, e.g. two zones on one submain. Line at 2/3 of each bar = 100% of the pump.</span>
+</section>
+
+<section aria-label="What can run together" style="flex: 1; min-height: 0; background: #1c1c1c; border: 1px solid #2e2e2e; border-radius: 12px; padding: 14px 18px; display: flex; flex-direction: column; gap: 10px">
+<h2 style="margin: 0; font-size: 17px; font-weight: 600">What can run together</h2>
+<sc-for list="{{combos}}" as="c" hint-placeholder-count="4">
+<div style="display: grid; grid-template-columns: 110px minmax(0, 1fr) 340px; gap: 14px; align-items: center; min-height: 34px; font-size: 14px">
+<b style="font-weight: 600">{{c.name}}</b>
+<span style="position: relative; height: 18px; border-radius: 5px; background: #2a2a2a; overflow: hidden; display: flex; opacity: {{c.op}}"><sc-for list="{{c.segs}}" as="g" hint-placeholder-count="2"><span style="height: 100%; width: {{g.w}}; background: {{g.color}}; box-shadow: inset -1px 0 0 #111111"></span></sc-for><span style="position: absolute; top: 0; bottom: 0; left: 66.6%; width: 2px; background: #e1e1e1"></span></span>
+<span style="display: flex; align-items: center; gap: 8px; color: {{c.ink}}"><b style="font-weight: 600; width: 48px; text-align: right">{{c.pct}}</b>{{c.txt}}</span>
+</div>
+</sc-for>
+</section>
+</div>
+
+<section aria-label="Review and apply" style="background: #1c1c1c; border: 1px solid {{reviewEdge}}; border-radius: 12px; padding: 16px 18px; display: flex; flex-direction: column; gap: 12px; min-height: 0">
+<h2 style="margin: 0; font-size: 17px; font-weight: 600">Review &amp; apply</h2>
+<sc-if value="{{hasChanges}}" hint-placeholder-val="{{true}}">
+<span style="font-size: 13px; color: #a4a4a4">{{changeCount}}</span>
+<div style="display: flex; flex-direction: column; gap: 6px">
+<sc-for list="{{changes}}" as="ch" hint-placeholder-count="2"><span style="display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; border-radius: 8px; background: #111111; font-size: 14px"><b style="font-weight: 600">{{ch.what}}</b><span style="color: #b8b8b8">{{ch.from}} → <b style="color: #4fc3f7">{{ch.to}}</b></span></span></sc-for>
+</div>
+</sc-if>
+<sc-if value="{{noChanges}}" hint-placeholder-val="{{false}}"><span style="font-size: 14px; color: #b8b8b8">No unsaved changes. Edit a value on the left to see its effect here first.</span></sc-if>
+<div style="display: flex; flex-direction: column; gap: 6px">
+<span style="font-size: 12px; font-weight: 600; letter-spacing: .04em; color: #a4a4a4">CHECKS</span>
+<sc-for list="{{checks}}" as="k" hint-placeholder-count="4"><span style="display: flex; gap: 8px; font-size: 13px; line-height: 1.4; color: {{k.ink}}"><sc-if value="{{k.ok}}" hint-placeholder-val="{{true}}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#81c995" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: none"><polyline points="4 12 10 18 20 6"></polyline></svg></sc-if><sc-if value="{{k.warn}}" hint-placeholder-val="{{false}}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ffca5b" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: none"><path d="M12 3l10 18H2z"></path><line x1="12" y1="10" x2="12" y2="14"></line><line x1="12" y1="17.5" x2="12" y2="17.6"></line></svg></sc-if><sc-if value="{{k.bad}}" hint-placeholder-val="{{false}}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f28b82" stroke-width="3" stroke-linecap="round" aria-hidden="true" style="flex: none"><line x1="5" y1="5" x2="19" y2="19"></line><line x1="19" y1="5" x2="5" y2="19"></line></svg></sc-if><span>{{k.txt}}</span></span></sc-for>
+</div>
+<sc-if value="{{canApply}}" hint-placeholder-val="{{true}}"><button type="button" onClick="{{apply}}" style="height: 44px; border: 0; border-radius: 8px; background: #03a9f4; color: #0b1d27; font: inherit; font-size: 15px; font-weight: 600">{{applyLabel}}</button><button type="button" onClick="{{discard}}" style="height: 36px; border: 1px solid #3a3a3a; border-radius: 8px; background: transparent; color: #e1e1e1; font: inherit; font-size: 14px">Discard changes</button></sc-if>
+<sc-if value="{{blocked}}" hint-placeholder-val="{{false}}"><span style="display: flex; align-items: center; justify-content: center; height: 44px; border: 1px dashed #f28b82; border-radius: 8px; font-size: 14px; color: #f28b82">Fix the red check to apply</span></sc-if>
+<sc-if value="{{applying}}" hint-placeholder-val="{{false}}"><span style="font-size: 14px; color: #4fc3f7">Writing and reading back…</span></sc-if>
+<sc-if value="{{applied}}" hint-placeholder-val="{{false}}"><div role="status" style="display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border: 1px solid rgba(129,201,149,.5); border-radius: 8px; background: rgba(129,201,149,.08); font-size: 14px"><span style="display: flex; align-items: center; gap: 8px; font-weight: 600"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#81c995" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: none"><polyline points="4 12 10 18 20 6"></polyline></svg>Written and read back 14:02</span><span style="color: #b8b8b8">{{appliedTxt}}</span><button type="button" onClick="{{undo}}" style="align-self: flex-start; height: 32px; padding: 0 12px; border: 1px solid #3a3a3a; border-radius: 8px; background: transparent; color: #4fc3f7; font: inherit; font-size: 13px; font-weight: 600">Undo</button></div></sc-if>
+<span style="margin-top: auto; font-size: 12px; line-height: 1.5; color: #a4a4a4">A shot that has to wait shows as queued on the Timeline. If it waits more than 3 min you get a "Shot delayed: pump capacity" alert.</span>
+</section>
+</div>
+</main>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1000}}'>
+var PH = { P0: '#6b7580', P1: '#2f6fb5', P2: '#6450b0', P3: '#34405a' };
+function tz(name, ph, vwc) { return { name: name, ph: ph, phColor: PH[ph], vwc: vwc + '%' }; }
+function treeRooms(sel, f2state, f2dot) {
+  return [
+    { name: 'F2', dot: f2dot || '#03a9f4', state: f2state || 'Watering', bg: sel === 'F2' ? '#2a2a2a' : 'transparent', zones: [tz('Zone 1', 'P2', 59.4), tz('Zone 2', 'P2', 58.1), tz('Zone 3', 'P2', 60.2)] },
+    { name: 'F1', dot: '#81c995', state: 'Holding', bg: sel === 'F1' ? '#2a2a2a' : 'transparent', zones: [tz('Zone 1', 'P1', 63.8), tz('Zone 2', 'P1', 62.9), tz('Zone 3', 'P1', 64.4)] }
+  ];
+}
+var ZDEF = [
+  { name: 'Zone 1', plants: 66, per: 2, color: '#3b82c4' },
+  { name: 'Zone 2', plants: 67, per: 2, color: '#9b7fe0' },
+  { name: 'Zone 3', plants: 39, per: 2, color: '#c58a3a' }
+];
+var SAVED0 = { maxFlow: '1000', maxZones: 2, flows: ['4.0', '4.0', '3.0'], groups: ['None', 'A', 'A'] };
+function seg(on) { return 'flex: 1; min-width: 40px; height: 36px; border: 0; background: ' + (on ? '#03a9f4' : 'transparent') + '; color: ' + (on ? '#0b1d27' : '#b8b8b8') + '; font: inherit; font-size: 14px; font-weight: ' + (on ? 600 : 500); }
+function num(v) { var n = parseFloat(v); return isNaN(n) ? null : n; }
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { saved: SAVED0, maxFlow: '900', maxZones: 2, flows: ['4.0', '4.0', '4.0'], groups: ['None', 'A', 'A'], applying: false, applied: false, before: null };
+  }
+  renderVals() {
+    var self = this, st = this.state, sv = st.saved;
+    function set(p) { self.setState(Object.assign({ applied: false }, p)); }
+    var max = num(st.maxFlow), maxErr = max === null ? 'Enter a number.' : max < 100 || max > 5000 ? 'Between 100 and 5000 L/h.' : '';
+    var M = maxErr ? 1 : max;
+    var flows = st.flows.map(function (f, i) { var d = num(f); return d === null ? 0 : ZDEF[i].plants * ZDEF[i].per * d; });
+    var zones = ZDEF.map(function (z, i) {
+      var d = num(st.flows[i]), bad = d === null || d < 0.5 || d > 20, share = flows[i] / M * 100, alone = share > 100;
+      return { name: z.name, plants: z.plants, per: z.per, drippers: z.plants * z.per, color: z.color, flow: st.flows[i], edge: bad || alone ? '#f28b82' : st.flows[i] !== sv.flows[i] ? '#03a9f4' : '#3a3a3a',
+        hasNote: bad || alone || st.flows[i] !== sv.flows[i], noteInk: bad || alone ? '#f28b82' : '#4fc3f7', note: bad ? '0.5 to 20 L/h' : alone ? 'More than the pump alone' : 'was ' + sv.flows[i],
+        zoneFlow: Math.round(flows[i]) + ' L/h', shareW: Math.min(100, share / 1.5).toFixed(1) + '%', share: Math.round(share) + '%', shareInk: alone ? '#f28b82' : '#b8b8b8',
+        onFlow: function (e) { var f = st.flows.slice(); f[i] = e.target.value; set({ flows: f }); },
+        groups: ['None', 'A', 'B'].map(function (g) { var on = st.groups[i] === g; return { name: g, on: on ? 'true' : 'false', style: seg(on), pick: function () { var gg = st.groups.slice(); gg[i] = g; set({ groups: gg }); } }; }),
+        bad: bad, alone: alone };
+    });
+    function segs(idx) { return idx.map(function (i) { return { w: Math.min(100, flows[i] / M * 100 / 1.5).toFixed(1) + '%', color: ZDEF[i].color }; }); }
+    var combos = [[0, 1], [0, 2], [1, 2], [0, 1, 2]].map(function (idx) {
+      var sum = idx.reduce(function (a, i) { return a + flows[i]; }, 0), pct = Math.round(sum / M * 100);
+      var grp = null;
+      idx.forEach(function (i) { idx.forEach(function (j) { if (i < j && st.groups[i] !== 'None' && st.groups[i] === st.groups[j]) grp = st.groups[i]; }); });
+      var tooMany = idx.length > st.maxZones;
+      var name = 'Zones ' + idx.map(function (i) { return i + 1; }).join(' + ');
+      var kind = grp ? 'excl' : tooMany ? 'many' : pct > 100 ? 'over' : 'ok';
+      return { name: name, segs: segs(idx), pct: pct + '%', op: kind === 'excl' || kind === 'many' ? 0.35 : 1, kind: kind, sum: pct,
+        ink: kind === 'over' ? '#ffca5b' : kind === 'ok' ? '#81c995' : '#a4a4a4',
+        txt: kind === 'excl' ? 'never together: exclusive group ' + grp : kind === 'many' ? 'never all ' + idx.length + ': max ' + st.maxZones + ' at once' : kind === 'over' ? 'over the pump: will run one after another' : 'fits: can run together' };
+    });
+    var startable = combos.filter(function (c) { return c.kind === 'ok' || c.kind === 'over'; });
+    var worstC = startable.length ? startable.reduce(function (a, b) { return b.sum > a.sum ? b : a; }) : null;
+    var worst = worstC ? { segs: worstC.segs, ink: worstC.kind === 'over' ? '#ffca5b' : '#81c995', txt: worstC.name + ' together = ' + worstC.pct + ' of pump: ' + (worstC.kind === 'over' ? 'will run one after another' : 'can run together') }
+      : { segs: [], ink: '#a4a4a4', txt: 'No two zones can start together' };
+    var changes = [];
+    if (st.maxFlow !== sv.maxFlow) changes.push({ what: 'Pump max flow', from: sv.maxFlow + ' L/h', to: st.maxFlow + ' L/h' });
+    if (st.maxZones !== sv.maxZones) changes.push({ what: 'Max zones at once', from: String(sv.maxZones), to: String(st.maxZones) });
+    st.flows.forEach(function (f, i) { if (f !== sv.flows[i]) changes.push({ what: ZDEF[i].name + ' dripper flow', from: sv.flows[i] + ' L/h', to: f + ' L/h' }); });
+    st.groups.forEach(function (g, i) { if (g !== sv.groups[i]) changes.push({ what: ZDEF[i].name + ' exclusive group', from: sv.groups[i], to: g }); });
+    var badZone = zones.filter(function (z) { return z.bad; })[0], aloneZone = zones.filter(function (z) { return z.alone; })[0];
+    var checks = [];
+    checks.push(maxErr ? { k: 'bad', txt: 'Pump max flow: ' + maxErr } : { k: 'ok', txt: 'Pump max flow ' + max + ' L/h is in range' });
+    if (badZone) checks.push({ k: 'bad', txt: badZone.name + ' dripper flow must be 0.5 to 20 L/h.' });
+    else if (aloneZone) checks.push({ k: 'bad', txt: aloneZone.name + ' alone needs ' + aloneZone.share + ' of the pump and could never water. Lower its dripper flow or raise max flow.' });
+    else checks.push({ k: 'ok', txt: 'Every zone fits the pump on its own' });
+    combos.filter(function (c) { return c.kind === 'over'; }).forEach(function (c) { checks.push({ k: 'warn', txt: c.name + ' need ' + c.pct + ': shots queue, one after another, about 4 min apart' }); });
+    var nGroups = st.groups.filter(function (g) { return g !== 'None'; }).length;
+    checks.push({ k: 'ok', txt: nGroups ? 'Exclusive groups respected by the shot queue' : 'No exclusive groups set' });
+    var blocked = checks.some(function (c) { return c.k === 'bad'; });
+    var has = changes.length > 0;
+    return {
+      rooms: treeRooms('F2'),
+      maxFlow: st.maxFlow, onMax: function (e) { set({ maxFlow: e.target.value }); }, maxEdge: maxErr ? '#f28b82' : st.maxFlow !== sv.maxFlow ? '#03a9f4' : '#3a3a3a',
+      maxChanged: st.maxFlow !== sv.maxFlow && !maxErr, savedMax: sv.maxFlow, hasMaxErr: !!maxErr, maxErr: maxErr,
+      maxZ: [1, 2, 3].map(function (n) { var on = st.maxZones === n; return { n: n, on: on ? 'true' : 'false', style: seg(on), pick: function () { set({ maxZones: n }); } }; }),
+      worst: worst, zones: zones, combos: combos,
+      hasChanges: has, noChanges: !has && !st.applied, changes: changes, changeCount: changes.length + ' unsaved change' + (changes.length === 1 ? '' : 's') + ', not active until applied',
+      checks: checks.map(function (c) { return { ok: c.k === 'ok', warn: c.k === 'warn', bad: c.k === 'bad', txt: c.txt, ink: c.k === 'bad' ? '#f28b82' : '#e1e1e1' }; }),
+      canApply: has && !blocked && !st.applying, blocked: has && blocked, applying: st.applying, applied: st.applied,
+      applyLabel: 'Apply ' + changes.length + ' change' + (changes.length === 1 ? '' : 's'), reviewEdge: has ? '#03a9f4' : '#2e2e2e',
+      appliedTxt: st.before ? 'All values match what the controller reports. The shot queue uses them from the next shot.' : '',
+      apply: function () {
+        var snap = { maxFlow: st.maxFlow, maxZones: st.maxZones, flows: st.flows.slice(), groups: st.groups.slice() };
+        self.setState({ applying: true });
+        setTimeout(function () { self.setState({ applying: false, applied: true, before: sv, saved: snap }); }, 900);
+      },
+      discard: function () { set({ maxFlow: sv.maxFlow, maxZones: sv.maxZones, flows: sv.flows.slice(), groups: sv.groups.slice() }); },
+      undo: function () { var b = st.before; set({ saved: b, maxFlow: b.maxFlow, maxZones: b.maxZones, flows: b.flows.slice(), groups: b.groups.slice(), before: null }); }
+    };
+  }
+}
+</script>
+</body>
+</html>

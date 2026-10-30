@@ -4,6 +4,7 @@ import {
   LEGACY_PAGES,
   PAGES,
   parseRoute,
+  zoneOnPage,
   routeHash,
   sameRoute,
   sectionOf,
@@ -17,7 +18,9 @@ describe("the old menu's addresses land on each page's new home", () => {
     ["#/grow-plan", "plan/schedule"],
     ["#/compare", "history/compare"],
     ["#/insights", "equipment/probes"],
-    ["#/activity", "history/timeline"],
+    ["#/activity", "history/explorer"],
+    ["#/log", "history/explorer"],
+    ["#/logs", "history/explorer"],
     ["#/sensors", "equipment/probes"],
     ["#/stock", "equipment/stock"],
     ["#/setup", "equipment/setup"],
@@ -45,10 +48,10 @@ describe("the new addresses", () => {
       expect(parseRoute(`#/${page}`)).toEqual({ route: { page }, canonical: true });
   });
   it("open a menu entry's first page", () => {
-    expect(parseRoute("#/plan").route.page).toBe("plan/targets");
-    expect(parseRoute("#/history").route.page).toBe("history/timeline");
+    expect(parseRoute("#/plan").route.page).toBe("plan/watering");
+    expect(parseRoute("#/history").route.page).toBe("history/explorer");
     expect(parseRoute("#/equipment").route.page).toBe("equipment/probes");
-    expect(canonicalHash("#/plan")).toBe("#/plan/targets");
+    expect(canonicalHash("#/plan")).toBe("#/plan/watering");
   });
   it("open a zone by its number, or the room's first zone", () => {
     expect(parseRoute("#/zone/2")).toEqual({ route: { page: "zone", zone: 2 }, canonical: true });
@@ -74,7 +77,7 @@ describe("the retired single-page dashboards' ?view= links", () => {
     ["?view=tune", "plan/targets"],
     ["?view=timeline", "plan/schedule"],
     ["?view=recipes", "plan/schedule"],
-    ["?view=logs", "history/timeline"],
+    ["?view=logs", "history/explorer"],
     ["?view=climate", "equipment/probes"],
     ["?view=substrate", "equipment/probes"],
     ["?view=floorplan", "equipment/setup"],
@@ -97,19 +100,18 @@ describe("the menu", () => {
     );
     expect(sectionOf("zone")).toBe("today");
     expect(sectionOf("help")).toBe("settings");
-    expect(sectionOf("equipment/feed")).toBe("equipment");
+    expect(sectionOf("equipment/pump-calibration")).toBe("equipment");
+    expect(sectionOf("settings/alerts")).toBe("settings");
     expect(sectionOf("equipment/dosing")).toBe("equipment");
   });
-  it("opens the tank and its feed under Equipment, the old tank address included", () => {
-    expect(parseRoute("#/equipment/feed")).toEqual({
-      route: { page: "equipment/feed" },
-      canonical: true,
-    });
+  it("old addresses land on their new homes", () => {
+    expect(canonicalHash("#/history/timeline?zone=2")).toBe("#/history/explorer?zone=2");
+    expect(parseRoute("#/equipment/feed").route.page).toBe("equipment/dosing");
+    expect(parseRoute("#/plan").route.page).toBe("plan/watering");
     expect(parseRoute("#/equipment/tank")).toEqual({
-      route: { page: "equipment/feed" },
+      route: { page: "equipment/dosing" },
       canonical: false,
     });
-    expect(canonicalHash("#/equipment/tank")).toBe("#/equipment/feed");
   });
   it("opens each room's batch-tank dosing under Equipment", () => {
     expect(parseRoute("#/equipment/dosing")).toEqual({
@@ -119,7 +121,7 @@ describe("the menu", () => {
     expect(routeHash({ page: "equipment/dosing" })).toBe("#/equipment/dosing");
     expect(canonicalHash("#/equipment/dosing")).toBeNull();
   });
-  it("opens the site's notifications under Settings & help", () => {
+  it("opens the site's notifications under Settings", () => {
     expect(parseRoute("#/settings/notifications")).toEqual({
       route: { page: "settings/notifications" },
       canonical: true,
@@ -138,7 +140,7 @@ describe("the menu", () => {
 });
 
 describe("zone context survives reload", () => {
-  it.each(["plan/targets", "plan/schedule", "history/timeline"] as const)(
+  it.each(["plan/targets", "plan/schedule", "history/explorer"] as const)(
     "keeps selected zone on %s",
     (page) => {
       const route = { page, zone: 2 };
@@ -146,4 +148,15 @@ describe("zone context survives reload", () => {
       expect(sameRoute(route, { page, zone: 1 })).toBe(false);
     },
   );
+});
+
+describe("zoneOnPage", () => {
+  const zones = [{ id: 1 }, { id: 2 }];
+  it("shows the addressed zone, or the room's first for a bare #/zone", () => {
+    expect(zoneOnPage(zones, 2)).toEqual({ id: 2 });
+    expect(zoneOnPage(zones, null)).toEqual({ id: 1 });
+  });
+  it("shows no zone for a zone the room does not have, never its first", () => {
+    expect(zoneOnPage(zones, 99)).toBeUndefined();
+  });
 });

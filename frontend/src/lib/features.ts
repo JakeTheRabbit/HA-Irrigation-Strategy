@@ -11,6 +11,7 @@ import registry from "./features.json";
 import restored from "./features-restore.json";
 import type { Page } from "./routes";
 import type { EntityState, States } from "./types";
+import { unreadableState } from "./utils";
 
 export type Domain = "switch" | "select" | "number";
 export type Scope = "room" | "zone" | "room+zone";
@@ -93,7 +94,7 @@ export function registeredControl(
 
 /** The value an entity holds, in the control's type; null when it has none. */
 export function valueOf(control: Control, entity?: EntityState): Value | null {
-  if (!entity || ["unavailable", "unknown", ""].includes(entity.state)) return null;
+  if (!entity || unreadableState(entity.state)) return null;
   if (control.domain === "switch") return entity.state === "on";
   if (control.domain === "number") {
     const n = Number(entity.state);
@@ -230,14 +231,14 @@ const PLACEMENT_PAGES: Record<string, { group: string; page: Page; location: str
   "LF-54": { group: "equipment", page: "equipment/setup", location: "Equipment > Setup" },
   "NEW-03": {
     group: "history",
-    page: "history/timeline",
-    location: "History > Timeline > Sensor history",
+    page: "history/explorer",
+    location: "History > Explorer > Sensor history",
   },
   "LF-87": { group: "history", page: "equipment/setup", location: "Equipment > Setup" },
   "LF-86": {
     group: "history",
-    page: "history/timeline",
-    location: "History > Timeline > Overlays",
+    page: "history/explorer",
+    location: "History > Explorer > Overlays",
   },
   "LF-165": {
     group: "feed",
@@ -248,6 +249,8 @@ const PLACEMENT_PAGES: Record<string, { group: string; page: Page; location: str
 export const PLACEMENTS: Placement[] = restored.flatMap((row) => {
   // Entity controls are in the main registry. App options already have their own section below it.
   if (/^(switch|number|select)\.crop_steering_/.test(row.entity) || row.scope === "app") return [];
+  // "Zones as" stays stored, but the room page has no zone table to lay out: nothing to link to.
+  if (row.entity.includes("(attribute today_zone_layout)")) return [];
   const target = row.entity.includes("display (attribute ")
     ? { group: "display", page: "settings" as Page, location: "Settings > Display" }
     : PLACEMENT_PAGES[row.id];

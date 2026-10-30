@@ -5,16 +5,23 @@ import { addDays, dateInZone, daysBetween, midnight, wallTime } from "./comparis
 import type { RunRecord } from "./comparison-types";
 import { growDay, type TimelineRow } from "./day-timeline";
 import { descriptor } from "./model";
+import { drybackId } from "./published";
+import { getDisplayUnits } from "./display-units";
+import { pagedQuery, type V2Outcome } from "./parity-api";
+import type { CsEvent } from "./parity-types";
 import type { SteCopy } from "./ste-copy";
-import type { RoomView, States } from "./types";
+import type { ProjectionIntent } from "./strategy-review";
+import { clock, dayKey, dayLabel, startOfDay, wallHhmm } from "./time";
+import type { Controller, RoomView, States } from "./types";
 
 const DAY = 86_400_000;
 const HOUR = 3_600_000;
+const MIN = 60_000;
 /** The longest range the explorer reads: one request per day, two at a time. */
 export const MAX_RANGE_DAYS = 180;
 
-export type Unit = "%" | "mS/cm" | "°C" | "°F" | "kPa" | "pH" | "ppm" | "µmol/m²/s";
-export type SensorKind = "vwc" | "ec" | "climate" | "feed";
+export type Unit = "%" | "% of peak" | "mS/cm" | "°C" | "°F" | "kPa" | "pH" | "ppm" | "µmol/m²/s";
+export type SensorKind = "vwc" | "ec" | "dryback" | "climate" | "feed";
 export interface ExplorerSensor {
   /** Stable for the URL: the entity id. */
   key: string;
@@ -108,6 +115,16 @@ export function explorerSensors(room: RoomView, states: States): ExplorerSensor[
           unit: kind === "vwc" ? "%" : "mS/cm",
         });
     }
+  // Each zone's dryback as the controller published it, recorded: the figure its decisions used.
+  for (const zone of room.zones)
+    add({
+      entityId: drybackId(room.room.prefix, zone.id),
+      label: `${zone.name} dryback`,
+      group: zone.name,
+      kind: "dryback",
+      zone: zone.id,
+      unit: "% of peak",
+    });
   const mapped = descriptor(states, room.room)?.attributes ?? {};
   // Each zone's root-zone temperature probe (Equipment › Setup), in the zone's own group.
   const roots = mapped.substrate_temperature_sensors;
@@ -165,8 +182,6 @@ export interface Choice {
   compareRun: string | null;
   shots: boolean;
   phases: boolean;
-  /** Each grow day's peak and the low after it, on the zone's VWC (ranges of 14 d at most). */
-  dryback: boolean;
 }
 export const DEFAULT_CHOICE: Choice = {
   preset: "growday",
@@ -177,15 +192,18 @@ export const DEFAULT_CHOICE: Choice = {
   compareRun: null,
   shots: true,
   phases: true,
-  dryback: false,
 };
 
-/** The explorer's choice from the query of the page's hash (`#/zone/1?range=7d&s=...`). */
+/** The zone explorer's choice from the query of the page's hash (`#/history/explorer?zone=1&zr=7d&s=...`).
+ * Its range keys are its own (`zr`, `zfrom`, `zto`): History › Explorer's room charts use `range`,
+ * `from` and `to`. An address from before that has only `range` (one of these presets) is read once. */
 export function readChoice(hash: string): Choice {
   const query = new URLSearchParams(hash.includes("?") ? hash.slice(hash.indexOf("?") + 1) : "");
-  const range = query.get("range") ?? "";
-  const from = Date.parse(query.get("from") ?? ""),
-    to = Date.parse(query.get("to") ?? "");
+  const old = query.get("range") ?? "";
+  const legacy = !query.has("zr") && (PRESETS.some((item) => item.id === old) || old === "custom");
+  const range = query.get("zr") ?? (legacy ? old : "");
+  const from = Date.parse(query.get("zfrom") ?? (legacy ? query.get("from") : null) ?? ""),
+    to = Date.parse(query.get("zto") ?? (legacy ? query.get("to") : null) ?? "");
   const custom = range === "custom" && Number.isFinite(from) && Number.isFinite(to) && to > from;
   const preset = PRESETS.some((item) => item.id === range)
     ? (range as Preset)
@@ -205,20 +223,21 @@ export function readChoice(hash: string): Choice {
     compareRun: /^[a-zA-Z0-9_-]{1,64}$/.test(query.get("vs") ?? "") ? query.get("vs") : null,
     shots: query.get("shots") !== "0",
     phases: query.get("phases") !== "0",
-    dryback: query.get("dryback") === "1",
   };
 }
 
-/** The hash with the explorer's choice in its query; other query keys stay. */
+/** The hash with the zone explorer's choice in its query; other query keys (the room explorer's
+ * among them) stay. */
 export function writeChoice(hash: string, choice: Choice): string {
   const [path, rest = ""] = hash.split("?");
   const query = new URLSearchParams(rest);
-  for (const key of ["range", "from", "to", "s", "compare", "vs", "shots", "phases", "dryback", "pc", "pm"])
+  // "dryback": an old link's dryback markers, which the explorer no longer draws.
+  for (const key of ["zr", "zfrom", "zto", "s", "compare", "vs", "shots", "phases", "dryback", "pc", "pm"])
     query.delete(key);
-  query.set("range", choice.preset);
+  query.set("zr", choice.preset);
   if (choice.preset === "custom" && choice.from !== null && choice.to !== null) {
-    query.set("from", new Date(choice.from).toISOString());
-    query.set("to", new Date(choice.to).toISOString());
+    query.set("zfrom", new Date(choice.from).toISOString());
+    query.set("zto", new Date(choice.to).toISOString());
   }
   if (choice.sensors) query.set("s", choice.sensors.join(","));
   if (Object.keys(choice.probeCompare ?? {}).length) query.set("pc", JSON.stringify(choice.probeCompare));
@@ -227,7 +246,6 @@ export function writeChoice(hash: string, choice: Choice): string {
   if (choice.compare && choice.compareRun) query.set("vs", choice.compareRun);
   if (!choice.shots) query.set("shots", "0");
   if (!choice.phases) query.set("phases", "0");
-  if (choice.dryback) query.set("dryback", "1");
   return `${path}?${query.toString().replaceAll("%2C", ",")}`;
 }
 
@@ -468,6 +486,7 @@ export function alignGrid(
 /** The decimals a value of each unit is shown with. */
 export const UNIT_DIGITS: Record<Unit, number> = {
   "%": 1,
+  "% of peak": 1,
   "mS/cm": 2,
   "°C": 1,
   "°F": 1,
@@ -505,15 +524,6 @@ export const EXPLORER_COPY = {
         "The chart shows day N of the previous run at the same position as day N of this run.",
     } satisfies SteCopy,
   },
-  dryback: {
-    label: "Dryback markers",
-    copy: {
-      tooltip:
-        "This marks the peak VWC of each grow day and the lowest VWC after it, on the VWC of this zone. The label is the dryback as the controller calculates it: the drop as a percent of the peak.",
-      impact: "The chart shows the markers only for a range of 14 days or less.",
-      guidance: "Select the VWC of this zone to see the markers.",
-    } satisfies SteCopy,
-  },
   sensors: {
     label: "Sensors",
     copy: {
@@ -523,49 +533,6 @@ export const EXPLORER_COPY = {
   },
 } as const;
 
-/** The longest range the dryback markers are drawn on: past it they are noise. */
-export const DRYBACK_MARKER_DAYS = 14;
-export interface DrybackMarker {
-  /** The grow day's highest reading, and the lowest after it before the next lights-on. */
-  peak: { t: number; value: number };
-  low: { t: number; value: number };
-  /** As the controller measures dryback: (peak − low) / peak × 100, percent of the peak. */
-  percent: number;
-}
-/** Per grow day (from each lights-on, `starts`), the zone's peak VWC and the low after it, from the
- * explorer's grid of values (`times[i]` the time of `values[i]`). A day with under two readings, or
- * whose low is not under its peak, has none. */
-export function drybackMarkers(
-  times: readonly number[],
-  values: readonly (number | null)[],
-  starts: readonly number[],
-): DrybackMarker[] {
-  const markers: DrybackMarker[] = [];
-  starts.forEach((start, index) => {
-    const end = starts[index + 1] ?? Infinity;
-    let peak: { t: number; value: number } | null = null;
-    let at = -1;
-    for (let i = 0; i < times.length; i++) {
-      const value = values[i];
-      if (times[i] < start || times[i] >= end || value === null) continue;
-      if (!peak || value > peak.value) {
-        peak = { t: times[i], value };
-        at = i;
-      }
-    }
-    if (!peak || peak.value <= 0) return;
-    let low: { t: number; value: number } | null = null;
-    for (let i = at + 1; i < times.length && times[i] < end; i++) {
-      const value = values[i];
-      // A reading of 0 or less is a probe gap, not a dry slab.
-      if (value !== null && value > 0 && (!low || value < low.value)) low = { t: times[i], value };
-    }
-    if (!low || low.value >= peak.value) return;
-    markers.push({ peak, low, percent: ((peak.value - low.value) / peak.value) * 100 });
-  });
-  return markers;
-}
-
 
 function readProbeChoice(text: string | null): Record<string, string> {
   try {
@@ -574,4 +541,439 @@ function readProbeChoice(text: string | null): Record<string, string> {
     return Object.fromEntries(Object.entries(value).slice(0, 32).filter(([key, val]) =>
       /^sensor\.[a-z0-9_]+$/.test(key) && typeof val === "string" && val.length <= 200)) as Record<string, string>;
   } catch { return {}; }
+}
+
+// ---------------------------------------------------------------------------------------------
+// History › Explorer (H1, mockup 09): the room's readings on stacked charts under a PHASE and a
+// SHOTS lane, notes in place, one crosshair across them all.
+
+/** The Journal kinds the explorer's lanes and notes read. */
+export const EXPLORER_KINDS = ["phase.changed", "shot.completed", "alert.raised"] as const;
+/** The most events one range reads; past it, only the newest whole days are shown. */
+export const MAX_EXPLORER_EVENTS = 5000;
+/** The explorer's own ranges: the four the mockup offers. */
+export type ExplorerRange = "today" | "7d" | "run" | "custom";
+export const EXPLORER_RANGES: { id: ExplorerRange; label: string }[] = [
+  { id: "today", label: "Today" },
+  { id: "7d", label: "7 d" },
+  { id: "run", label: "This run" },
+  { id: "custom", label: "Custom" },
+];
+
+export interface ExplorerChoice {
+  range: ExplorerRange;
+  from: number | null;
+  to: number | null;
+  /** The ticked series' entity ids; null: the defaults. */
+  series: string[] | null;
+  /** Compare with the last run, at the same grow day. */
+  last: boolean;
+}
+/** The explorer's choice from its page's hash (`#/history/explorer?range=7d&series=…&last=1`). */
+export function readExplorerChoice(hash: string): ExplorerChoice {
+  const query = new URLSearchParams(hash.includes("?") ? hash.slice(hash.indexOf("?") + 1) : "");
+  const from = Date.parse(query.get("from") ?? ""),
+    to = Date.parse(query.get("to") ?? "");
+  const custom = Number.isFinite(from) && Number.isFinite(to) && to > from;
+  const asked = query.get("range");
+  const known = EXPLORER_RANGES.find((r) => r.id === asked && r.id !== "custom")?.id;
+  const range: ExplorerRange = asked === "custom" && custom ? "custom" : (known ?? "today");
+  const series = query.get("series");
+  return {
+    range,
+    from: range === "custom" ? from : null,
+    to: range === "custom" ? to : null,
+    series: series === null ? null : series.split(",").filter((id) => /^[a-z_]+\.[a-z0-9_]+$/.test(id)),
+    last: query.get("last") === "1",
+  };
+}
+/** The hash with the explorer's choice; other keys (the zone) stay. */
+export function writeExplorerChoice(hash: string, choice: ExplorerChoice): string {
+  const [path, rest = ""] = hash.split("?");
+  const query = new URLSearchParams(rest);
+  for (const key of ["range", "from", "to", "series", "last"]) query.delete(key);
+  query.set("range", choice.range);
+  if (choice.range === "custom" && choice.from !== null && choice.to !== null) {
+    query.set("from", new Date(choice.from).toISOString());
+    query.set("to", new Date(choice.to).toISOString());
+  }
+  if (choice.series) query.set("series", choice.series.join(","));
+  if (choice.last) query.set("last", "1");
+  return `${path}?${query.toString().replaceAll("%2C", ",")}`;
+}
+
+/** The span a choice reads (ending now, or a custom end), and the axis it is drawn on: Today's axis
+ * runs to the next midnight so the rest of the day shows ahead. Null for an unusable custom range. */
+export function explorerSpan(
+  choice: ExplorerChoice,
+  context: { now: number; timeZone: string; run: RunRecord | null },
+): { data: Span; axis: Span } | null {
+  const { now, timeZone } = context;
+  if (choice.range === "today") {
+    const start = startOfDay(now, timeZone);
+    return { data: { start, end: now }, axis: { start, end: startOfDay(start + 36 * HOUR, timeZone) } };
+  }
+  const preset: Preset = choice.range;
+  const data = resolveRange(
+    { ...DEFAULT_CHOICE, preset, from: choice.from, to: choice.to },
+    { now, timeZone, lightsOn: null, lightsOff: null, run: context.run },
+  );
+  return data ? { data, axis: data } : null;
+}
+
+/** "Thu 22 Oct, 00:00 to now", or a custom range's two ends. */
+export function explorerRangeText(span: Span, now: number, timeZone: string): string {
+  const end = span.end >= now - 60_000 ? "now" : `${dayLabel(span.end, timeZone)}, ${clock(span.end, timeZone)}`;
+  return `${dayLabel(span.start, timeZone)}, ${clock(span.start, timeZone)} to ${end}`;
+}
+
+type EventRead = (
+  controller: Pick<Controller, "operator">,
+  q: { room_id: string; since: string; until?: string; kinds?: string[] },
+  max?: number,
+) => Promise<V2Outcome<{ events: CsEvent[] }>>;
+export type ExplorerEvents =
+  | { kind: "ok"; events: CsEvent[]; truncated: boolean }
+  | { kind: "missing" }
+  | { kind: "error"; message: string };
+/** How many days are read at once. */
+const DAYS_AT_ONCE = 4;
+/** The room's phase changes, completed shots and alerts over `span`, oldest first (pagedQuery with
+ * `kinds`; journal_query answers oldest first). Days are read four at a time from the newest back,
+ * until `max` events: past it, only the newest `max` are kept (`truncated`), the day that overflows
+ * read again in halves, newest half first, to find them. `missing` on 3.17. */
+export async function loadExplorerEvents(
+  controller: Pick<Controller, "operator">,
+  roomId: string,
+  span: Span,
+  query: EventRead = pagedQuery,
+  max = MAX_EXPLORER_EVENTS,
+): Promise<ExplorerEvents> {
+  const read = (window: Span, limit: number) =>
+    query(
+      controller,
+      {
+        room_id: roomId,
+        since: new Date(window.start).toISOString(),
+        until: new Date(window.end).toISOString(),
+        kinds: [...EXPLORER_KINDS],
+      },
+      limit,
+    );
+  type Read = { events: CsEvent[] } | { kind: "missing" } | { kind: "error"; message: string };
+  /** The newest `need` events of `window`, oldest first. */
+  const newest = async (window: Span, need: number): Promise<Read> => {
+    const short = window.end - window.start <= HOUR;
+    const first = await read(window, short ? Number.MAX_SAFE_INTEGER : need + 1);
+    if (first.kind !== "ok") return first.kind === "missing" ? first : { kind: "error", message: first.message };
+    if (first.data.events.length <= need) return { events: first.data.events };
+    if (short) return { events: first.data.events.slice(-need) };
+    const middle = window.start + Math.floor((window.end - window.start) / 2);
+    const later = await newest({ start: middle, end: window.end }, need);
+    if (!("events" in later) || later.events.length >= need) return later;
+    const earlier = await newest({ start: window.start, end: middle }, need - later.events.length);
+    return "events" in earlier ? { events: [...earlier.events, ...later.events] } : earlier;
+  };
+  const days: Span[] = [];
+  for (let end = span.end; end > span.start; end -= DAY) days.push({ start: Math.max(span.start, end - DAY), end });
+  const kept: CsEvent[][] = [];
+  let total = 0;
+  for (let i = 0; i < days.length; i += DAYS_AT_ONCE) {
+    const batch = days.slice(i, i + DAYS_AT_ONCE);
+    const reads = await Promise.all(batch.map((day) => read(day, max + 1)));
+    for (const [j, answer] of reads.entries()) {
+      if (answer.kind === "missing") return { kind: "missing" };
+      if (answer.kind === "error") return { kind: "error", message: answer.message };
+      const need = max - total;
+      if (answer.data.events.length <= need) {
+        kept.push(answer.data.events);
+        total += answer.data.events.length;
+        continue;
+      }
+      const last = await newest(batch[j], need);
+      if (!("events" in last)) return last.kind === "missing" ? last : { kind: "error", message: last.message };
+      kept.push(last.events);
+      return { kind: "ok", events: kept.reverse().flat(), truncated: true };
+    }
+  }
+  return { kind: "ok", events: kept.reverse().flat(), truncated: false };
+}
+
+export interface PhaseSegment {
+  from: number;
+  to: number;
+  phase: string;
+  planned: boolean;
+}
+const PHASE = /^P[0-3]$/;
+/** One zone's phases over `span`, from the Journal's `phase.changed` (a room-wide one counts for every
+ * zone): the phase held at the span's start is the first change's `from`. Recorded segments end now.
+ * Planned: only from projected shots that carry their phase, each phase to the end of its shot. The
+ * controller's projection does not carry one yet, so today there is no planned segment: none is
+ * guessed. */
+export function phaseLane(
+  events: readonly CsEvent[],
+  span: Span,
+  projection: readonly (ProjectionIntent & { phase?: unknown })[] | null,
+  options: { now: number; zone?: number | null },
+): PhaseSegment[] {
+  const { now } = options;
+  const changes = events
+    .filter(
+      (e) =>
+        e.kind === "phase.changed" &&
+        (e.zone === null || options.zone == null || e.zone === options.zone) &&
+        Number.isFinite(Date.parse(e.ts)),
+    )
+    .map((e) => ({ t: Date.parse(e.ts), from: String(e.data.from ?? ""), to: String(e.data.to ?? "") }))
+    .sort((a, b) => a.t - b.t);
+  const before = changes.filter((c) => c.t <= span.start).at(-1);
+  let phase: string | null = before?.to ?? changes.find((c) => c.t > span.start)?.from ?? null;
+  let cursor = span.start;
+  const end = Math.min(now, span.end);
+  const lane: PhaseSegment[] = [];
+  const push = (to: number) => {
+    const from = cursor;
+    cursor = Math.max(cursor, to);
+    if (!phase || !PHASE.test(phase) || to <= from) return;
+    const last = lane.at(-1);
+    if (last && last.phase === phase && last.to === from) last.to = to;
+    else lane.push({ from, to, phase, planned: false });
+  };
+  for (const change of changes) {
+    if (change.t <= span.start || change.t >= end) continue;
+    push(change.t);
+    phase = change.to;
+  }
+  push(end);
+  const ahead = (projection ?? [])
+    .filter((i) => (options.zone == null || i.zone === options.zone) && typeof i.phase === "string" && PHASE.test(i.phase))
+    .map((i) => ({ end: Date.parse(i.at) + (Number(i.duration_s) || 0) * 1000, phase: i.phase as string }))
+    .filter((i) => Number.isFinite(i.end) && i.end > end)
+    .sort((a, b) => a.end - b.end);
+  for (const intent of ahead) {
+    const last = lane.at(-1);
+    const from = last?.planned ? last.to : end;
+    const to = Math.min(span.end, intent.end);
+    if (to <= from) continue;
+    if (last?.planned && last.phase === intent.phase) last.to = to;
+    else lane.push({ from, to, phase: intent.phase, planned: true });
+  }
+  return lane;
+}
+
+/** A series a note can be about: its readings and, where one is saved, its band. A `level` series
+ * (a tank) also says when it was refilled. */
+export interface NoteReading {
+  key: string;
+  label: string;
+  entityId: string;
+  points: { t: number; v: number }[];
+  band: readonly [number, number] | null;
+  kind: "value" | "level";
+}
+export interface ChartNote {
+  at: number;
+  series: string;
+  text: string;
+}
+const trimmed = (value: number) => String(Number(value.toFixed(1)));
+/** The notes the explorer writes on its charts, only from what was recorded: a selected series that
+ * left its saved band (once, where it left: "Zone 2 over the band since 09:40"), a tank level that
+ * rose 10 points or more and held for two readings, from its first higher reading ("Refilled 06:10 ·
+ * 40% to 74%"; a reading of 0 or less is a dropout, not a level), and an alert
+ * raised on a selected series' sensor, unless a band note within 30 min already says it. */
+export function chartNotes(
+  events: readonly CsEvent[],
+  series: readonly string[],
+  readings: readonly NoteReading[],
+  timeZone = "UTC",
+): ChartNote[] {
+  const notes: ChartNote[] = [];
+  const time = (t: number) => clock(t, timeZone);
+  for (const reading of readings) {
+    if (!series.includes(reading.key)) continue;
+    const points = reading.points.filter((p) => Number.isFinite(p.v));
+    const band = reading.band;
+    if (band)
+      for (let i = 0; i < points.length; i++) {
+        const sideOf = (v: number) => (v > band[1] ? "over" : v < band[0] ? "under" : null);
+        const side = sideOf(points[i].v);
+        if (!side) continue;
+        let j = i;
+        while (j + 1 < points.length && sideOf(points[j + 1].v) === side) j++;
+        const back = points[j + 1];
+        // Out of the band from the first reading: it left before the range, so say only when it came back.
+        const when =
+          i === 0
+            ? back
+              ? `until ${time(back.t)}`
+              : "all through this range"
+            : back
+              ? `${time(points[i].t)} to ${time(back.t)}`
+              : `since ${time(points[i].t)}`;
+        notes.push({ at: points[i].t, series: reading.key, text: `${reading.label} ${side} the band ${when}` });
+        i = j;
+      }
+    if (reading.kind === "level") {
+      // A level of 0 or less is a probe dropout: a gap, so its recovery is not a refill.
+      const points = reading.points.filter((p) => Number.isFinite(p.v) && p.v > 0);
+      const rises = (k: number) =>
+        points[k + 1].v - points[k].v > 1 && points[k + 1].t - points[k].t <= 15 * MIN;
+      for (let i = 0; i + 1 < points.length; i++) {
+        if (!rises(i)) continue;
+        // The rise goes on while the level holds or climbs, up to 15 min after its last gain.
+        let j = i + 1,
+          top = j;
+        while (j + 1 < points.length && points[j + 1].v >= points[j].v && points[j + 1].t - points[top].t <= 15 * MIN) {
+          j++;
+          if (points[j].v > points[top].v) top = j;
+        }
+        // It holds: the two readings after the top stay at least 10 points over the start.
+        const held = [points[top + 1], points[top + 2]].every((p) => p && p.v - points[i].v >= 10);
+        if (points[top].v - points[i].v >= 10 && held)
+          notes.push({
+            at: points[i + 1].t,
+            series: reading.key,
+            text: `Refilled ${time(points[i + 1].t)} · ${trimmed(points[i].v)}% to ${trimmed(points[top].v)}%`,
+          });
+        i = top - 1;
+      }
+    }
+  }
+  const banded = (key: string, t: number) =>
+    notes.some((n) => n.series === key && n.text.includes(" the band ") && Math.abs(n.at - t) <= 30 * MIN);
+  for (const e of events) {
+    if (e.kind !== "alert.raised") continue;
+    const reading = readings.find((r) => r.entityId === e.data.entity_id && series.includes(r.key));
+    const t = Date.parse(e.ts);
+    const title = typeof e.data.title === "string" ? e.data.title : "";
+    if (reading && title && Number.isFinite(t) && !banded(reading.key, t))
+      notes.push({ at: t, series: reading.key, text: title });
+  }
+  return notes.sort((a, b) => a.at - b.at);
+}
+
+/** Values in the units the legend shows them in (Settings › Display): EC in ppm when chosen, °C as
+ * °F; storage stays mS/cm and °C. Values are not rounded past the conversion's own float noise. */
+export function inDisplayUnits(
+  unit: Unit,
+  values: readonly (number | null)[],
+): { unit: string; values: (number | null)[] } {
+  const { ec, temp } = getDisplayUnits();
+  const map = (convert: (v: number) => number) =>
+    values.map((v) => (v === null ? null : Number(convert(v).toPrecision(12))));
+  if (unit === "mS/cm" && ec !== "mS/cm") return { unit: "ppm", values: map((v) => v * (ec === "ppm500" ? 500 : 700)) };
+  if (unit === "°C" && temp === "F") return { unit: "°F", values: map((v) => (v * 9) / 5 + 32) };
+  return { unit, values: [...values] };
+}
+
+const csvField = (text: string) => (/[",\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text);
+/** The selected series as a table: one row per grid step on the room's clock, one column per series
+ * ("Zone 1 VWC (%)"), values as recorded (no rounding), blank where there is no reading. */
+export function explorerCsv(
+  times: readonly number[],
+  columns: readonly { label: string; unit: string; values: readonly (number | null)[] }[],
+  timeZone: string,
+): string {
+  const head = ["Time", ...columns.map((c) => `${c.label} (${c.unit})`)].map(csvField).join(",");
+  const rows = times.map((t, i) =>
+    [
+      `${dayKey(t, timeZone)} ${wallHhmm(t, timeZone)}`,
+      ...columns.map((c) => (c.values[i] == null ? "" : String(c.values[i]))),
+    ]
+      .map(csvField)
+      .join(","),
+  );
+  return [head, ...rows].join("\n") + "\n";
+}
+
+/** One series the explorer can chart: a chip in its group (a zone, Feed, Tank, Room) and a line on
+ * the chart of its measure. */
+export interface ExplorerSeries {
+  key: string;
+  entityId: string;
+  /** The chip group: "zone:1", "feed", "tank", "room". */
+  group: string;
+  /** The group's name, which is also the line's name on its chart: "Zone 1", "Feed". */
+  groupLabel: string;
+  chip: string;
+  /** The chart it is drawn on, and that chart's title. */
+  chart: string;
+  chartTitle: string;
+  unit: Unit;
+  color: string;
+  zone: number | null;
+  kind: SensorKind;
+}
+/** Zones keep one colour on every chart; Feed, Tank and the room have their own. */
+const ZONE_COLORS = ["#1e88e5", "#d84f7a", "#5c8f3a", "#8e5cd9", "#e08a00", "#00897b"];
+const GROUP_COLORS: Record<string, string> = { feed: "#3a9aa5", tank: "#3f7fbf", room: "#c0763a" };
+const OTHER: Record<string, { group: "feed" | "tank" | "room"; chip: string }> = {
+  "Feed EC": { group: "feed", chip: "EC" },
+  "Feed pH": { group: "feed", chip: "pH" },
+  "Tank level": { group: "tank", chip: "Level" },
+  "Tank EC": { group: "tank", chip: "EC" },
+  "Tank pH": { group: "tank", chip: "pH" },
+  "Tank temperature": { group: "tank", chip: "Temp" },
+  "Air temperature": { group: "room", chip: "Air temp" },
+  Humidity: { group: "room", chip: "Humidity" },
+  VPD: { group: "room", chip: "VPD" },
+  CO2: { group: "room", chip: "CO2" },
+  PPFD: { group: "room", chip: "PPFD" },
+};
+const GROUP_NAMES = { feed: "Feed", tank: "Tank", room: "Room" } as const;
+/** The room's series in chip order: each zone's combined VWC, EC and root temperature, then the
+ * feed, the tank and the room's climate. A probe of its own is left to the zone's probe detail. */
+export function explorerSeries(room: RoomView, sensors: readonly ExplorerSensor[]): ExplorerSeries[] {
+  const list: ExplorerSeries[] = [];
+  room.zones.forEach((zone, index) => {
+    const color = ZONE_COLORS[index % ZONE_COLORS.length];
+    for (const sensor of sensors.filter((s) => s.zone === zone.id)) {
+      const fused = sensor.entityId === zone.vwc.entityId || sensor.entityId === zone.ec.entityId;
+      const root = sensor.kind === "climate";
+      if (!fused && !root) continue;
+      const ec = sensor.kind === "ec" ? (sensor.label.includes("bulk EC") ? "Bulk EC" : "Pore EC") : null;
+      const chip = root ? "Root temp" : ec ?? "VWC";
+      list.push({
+        key: sensor.entityId,
+        entityId: sensor.entityId,
+        group: `zone:${zone.id}`,
+        groupLabel: zone.name,
+        chip,
+        chart: root ? "root" : sensor.kind,
+        chartTitle: root ? "Root temp" : chip,
+        unit: sensor.unit,
+        color,
+        zone: zone.id,
+        kind: sensor.kind,
+      });
+    }
+  });
+  for (const [label, { group, chip }] of Object.entries(OTHER))
+    for (const sensor of sensors)
+      if (sensor.zone === null && sensor.label === label)
+        list.push({
+          key: sensor.entityId,
+          entityId: sensor.entityId,
+          group,
+          groupLabel: GROUP_NAMES[group],
+          chip,
+          chart: sensor.label,
+          chartTitle: sensor.label,
+          unit: sensor.unit,
+          color: GROUP_COLORS[group],
+          zone: null,
+          kind: sensor.kind,
+        });
+  // A room whose zones mix pore and bulk EC titles that chart plainly "EC".
+  const ecTitles = new Set(list.filter((s) => s.chart === "ec").map((s) => s.chartTitle));
+  if (ecTitles.size > 1) for (const s of list) if (s.chart === "ec") s.chartTitle = "EC";
+  return list;
+}
+/** What the explorer opens with: every zone's VWC and EC, the feed EC and the tank level. */
+export function defaultExplorerSeries(series: readonly ExplorerSeries[]): string[] {
+  return series
+    .filter((s) => s.chart === "vwc" || s.chart === "ec" || s.chart === "Feed EC" || s.chart === "Tank level")
+    .map((s) => s.key);
 }

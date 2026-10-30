@@ -10,6 +10,7 @@ import {
   rememberedUnitSystem,
   reviewValue,
   sizingError,
+  volumeToLitres,
   sizingLabel,
   toMetric,
   unitSystemFromHass,
@@ -141,5 +142,24 @@ describe("default unit system", () => {
     expect(initialUnitSystem(null, "us")).toBe("us");
     expect(initialUnitSystem(null, "nonsense")).toBe("metric");
     expect(initialUnitSystem(null, null)).toBe("metric");
+  });
+});
+
+describe("volumeToLitres", () => {
+  it("reads a Home Assistant volume in the unit the entity reports", () => {
+    expect(volumeToLitres(12, "L")).toBe(12);
+    expect(volumeToLitres(12, "l")).toBe(12);
+    expect(volumeToLitres(1500, "mL")).toBe(1.5);
+    expect(volumeToLitres(2, "gal")).toBeCloseTo(2 * LITRES_PER_US_GALLON, 9);
+    expect(volumeToLitres(0.25, "m³")).toBe(250);
+    expect(volumeToLitres(0.25, "m3")).toBe(250);
+    expect(volumeToLitres(1, "ft³")).toBeCloseTo(28.316846592, 6);
+    expect(volumeToLitres(10, "fl. oz.")).toBeCloseTo(0.295735295625, 9);
+  });
+  it("assumes litres only when the entity names no unit, and refuses any other", () => {
+    expect(volumeToLitres(7, "")).toBe(7);
+    expect(volumeToLitres(7, "bushels")).toBeNull();
+    expect(volumeToLitres(Number.NaN, "L")).toBeNull();
+    expect(volumeToLitres(null, "gal")).toBeNull();
   });
 });

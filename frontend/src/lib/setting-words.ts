@@ -16,6 +16,8 @@ export interface SettingWords {
   short: string;
   /** One line under the field. */
   help: string;
+  /** What a change to it does, in a few words: the note on a reviewed change. */
+  effect?: string;
   tag?: SettingTag;
   /** The "?" beside the field. */
   detail?: SettingDetail;
@@ -66,18 +68,19 @@ const WORDS: Record<string, SettingWords> = {
     label: "Latest first shot",
     short: "Latest first shot",
     tag: "time",
-    help: "The ramp starts this long after lights-on at the latest; sooner if moisture falls to the re-water point.",
+    help: "The ramp starts this long after lights-on at the latest; sooner if moisture falls to the rescue floor.",
   },
   p0_additional_dryback: {
     label: "Extra dryback",
     short: "Extra dryback",
     tag: "dries",
-    help: "The ramp starts once moisture is this far below the highest reading since lights-on. 0 is off: P0 waits for the P3 dryback target.",
+    help: "The ramp starts once moisture is this far below the highest reading since lights-on. 0 is off: P0 waits for the whole dryback target, so in practice for the latest first shot.",
   },
   p1_target_vwc: {
     label: "Peak VWC target",
     short: "Peak target",
     tag: "fills",
+    effect: "P1 stops ramping at this level",
     help: "The morning ramp waters up to this: the top of the day. It is capped at full saturation.",
   },
   p1_initial_shot_size: {
@@ -104,6 +107,7 @@ const WORDS: Record<string, SettingWords> = {
     label: "Maintenance shot when below",
     short: "Re-water point",
     tag: "waters",
+    effect: "P2 waters when VWC falls to this",
     help: "Through the day, a maintenance shot fires whenever moisture reads below this. The peak VWC target down to here is the daytime dryback.",
   },
   p2_shot_size: {
@@ -115,6 +119,7 @@ const WORDS: Record<string, SettingWords> = {
     label: "Rescue shot when below",
     short: "Rescue floor",
     tag: "rescues",
+    effect: "P3 fires a rescue shot below this",
     help: "In P3, a rescue shot fires whenever moisture reads below this. Keep it above the wilting point.",
   },
   p3_emergency_shot_size: {
@@ -237,6 +242,7 @@ const DRYBACK_WORDS: SettingWords = {
   label: "P3 dryback target",
   short: "P3 dryback target",
   tag: "dries",
+  effect: "How far P3 dries back from the day’s peak",
   help: "How far to dry back overnight, relative to the day’s peak: a 30% dryback from a 60% peak ends at 42%.",
 };
 
@@ -248,13 +254,13 @@ const EC_STAGES =
 const DETAILS: Record<string, SettingDetail> = {
   p0_maximum_wait_time: {
     what: "How long after lights-on the first shot can wait: the plants start drinking before the day’s watering does.",
-    when: "P0 ends and the ramp starts at the first of: this long after lights-on; moisture at or below the re-water point; moisture down by the additional dryback (or, while that is 0, the P3 dryback target) from its highest reading since lights-on. The ramp’s first shot then fires straight away, unless moisture is still at the peak VWC target.",
+    when: "P0 ends and the ramp starts at the first of: this long after lights-on; moisture at or below the rescue floor; moisture down by the additional dryback (or, while that is 0, the whole dryback target, which in practice the latest first shot reaches first) from its highest reading since lights-on. The ramp’s first shot then fires straight away, unless moisture is still at the peak VWC target.",
     practice:
       "The first shot commonly comes 30 minutes to 2 hours after lights-on. The extra fall before it, the additional dryback, is commonly 1 to 5% and is planned, not a missed shot.",
   },
   p0_additional_dryback: {
     what: "How far moisture dries below its highest reading since lights-on before the first shot of the day, as a percentage of that reading: 3% of a 60% reading is 1.8 points.",
-    when: "In P0. The ramp starts once moisture is down by this much, or earlier at the latest first shot or the re-water point. 0 turns it off, and P0 then waits for the P3 dryback target instead.",
+    when: "In P0. The ramp starts once moisture is down by this much, or earlier at the latest first shot or the rescue floor. 0 turns it off, and P0 then waits for the whole dryback target (the overnight percentage, here measured from the highest reading since lights-on), so in practice it ends at the maximum wait.",
     practice: "Commonly 1 to 5% after lights-on, before the first shot.",
   },
   p1_target_vwc: {

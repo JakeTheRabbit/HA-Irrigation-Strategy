@@ -1,0 +1,14 @@
+# Every action in .github/workflows is pinned to a commit SHA (tests/test_workflow_pins.py).
+# Dependabot opens a pull request when a newer release exists and updates the SHA and the
+# release named in its trailing comment.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    # main takes no pull requests (release_guards.py); updates soak on testing like any change.
+    target-branch: testing
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]

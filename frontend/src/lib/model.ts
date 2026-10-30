@@ -17,8 +17,10 @@ import { readWaiting } from "./waiting-for";
 import { PHASE_GROUPS, settingWords } from "./setting-words";
 import { growerWords } from "./words";
 import { roomDisplay } from "./display";
+import { volumeToLitres } from "./units";
 import { numberLimits, registeredControl } from "./features";
 import { ageText, controllerZoneLabel, readHeartbeat, RESTING } from "./controller-health";
+import { unreadableState } from "./utils";
 
 const ROOT = "crop_steering_";
 export const ZONE_PARAMETERS = new Set([
@@ -74,13 +76,12 @@ export function roomDurationCapEntityId(
     .find((id) => !!states[id] || settings.some((field) => field.entityId === id));
 }
 export function numeric(entity?: EntityState): number | null {
-  if (!entity || !entity.state.trim() || ["unknown", "unavailable"].includes(entity.state))
-    return null;
+  if (!entity || unreadableState(entity.state)) return null;
   const value = Number(entity.state);
   return Number.isFinite(value) ? value : null;
 }
 export function readable(entity?: EntityState): boolean {
-  return !!entity && !!entity.state.trim() && !["unknown", "unavailable"].includes(entity.state);
+  return !!entity && !unreadableState(entity.state);
 }
 function boolean(entity?: EntityState): boolean | null {
   return entity?.state === "on" ? true : entity?.state === "off" ? false : null;
@@ -281,6 +282,15 @@ function metric(entity: EntityState | undefined, label: string, unit: string): M
     value: numeric(entity),
   };
 }
+/** A zone's water today in litres, from whatever volume unit the entity reports (Home Assistant can
+ * display the integration's sensor in gallons); a unit it cannot convert reads as unavailable. */
+function waterToday(entity: EntityState | undefined): Metric {
+  return { ...metric(entity, "Water today", ""), unit: "L", value: waterLitres(entity) };
+}
+/** A water counter's reading in litres, whatever unit its entity reports; null when unreadable. */
+export function waterLitres(entity: EntityState | undefined): number | null {
+  return volumeToLitres(numeric(entity), String(entity?.attributes?.unit_of_measurement ?? ""));
+}
 function telemetryIssue(
   entity: EntityState | undefined,
   maxAgeS: number,
@@ -419,23 +429,29 @@ export function leadingNotices(alerts: Notice[], limit = 3): Notice[] {
 
 /** The zone whose valve a running shot holds open, or null. A shot holds the controller's loop, so
  * a controller that does not report during one goes quiet until it ends. Only a valve that opened
- * no longer ago than the room's maximum shot length counts: a valve open longer is not a shot, and
- * a controller that stopped mid-shot must never read as watering. */
+ * no longer ago than the maximum shot length counts: the one the controller last sized a shot with
+ * (its heartbeat's `max_shot_s`), else the room's setting. A valve open longer is not a shot, and
+ * with neither known nothing reads as watering: a controller that stopped mid-shot never must. */
 export function shotRunning(states: States, room: Room, now: number): string | null {
   const valves = descriptor(states, room)?.attributes.valves;
-  const cap = Number(
-    resolve(states, room, "number", "max_shot_duration", "maximum_shot_duration")?.state,
-  );
-  // The controller's own fallback when the room has no cap entity.
-  const longest = (Number.isFinite(cap) && cap >= 5 ? cap : 900) * 1000;
+  const longest =
+    [
+      resolve(states, room, "sensor", "ai_heartbeat")?.attributes.max_shot_s,
+      Number(resolve(states, room, "number", "max_shot_duration", "maximum_shot_duration")?.state),
+    ].find((cap): cap is number => typeof cap === "number" && Number.isFinite(cap) && cap >= 5) ??
+    null;
+  if (longest === null) return null;
   if (!valves || typeof valves !== "object" || Array.isArray(valves)) return null;
   for (const [zone, id] of Object.entries(valves as Record<string, unknown>)) {
     const valve = typeof id === "string" ? states[id] : undefined;
     if (valve?.state !== "on") continue;
-    if (now - Date.parse(valve.last_changed ?? valve.last_updated ?? "") <= longest) return zone;
+    if (now - Date.parse(valve.last_changed ?? valve.last_updated ?? "") <= longest * 1000)
+      return zone;
   }
   return null;
 }
+
+const OLDER_CONTROLLER_MAX_AGE_S = 20 * 60;
 
 export function buildRoom(states: States, room: Room): RoomView {
   const config = descriptor(states, room);
@@ -470,10 +486,12 @@ export function buildRoom(states: States, room: Room): RoomView {
     ];
   });
   const heartbeat = resolve(states, room, "sensor", "ai_heartbeat");
+  // The controller's heartbeat says how old a reading it uses may be. A controller from before it
+  // did (3.17 and older) read with 20 minutes, fixed.
   const maxAgeS =
     [heartbeat?.attributes.max_sensor_age_s, config?.attributes.max_sensor_age_s].find(
       (value): value is number => typeof value === "number" && Number.isFinite(value) && value > 0,
-    ) ?? 20 * 60;
+    ) ?? OLDER_CONTROLLER_MAX_AGE_S;
   const strategyEntity = resolve(states, room, "sensor", "strategy_plan");
   const strategyAttrs = strategyEntity?.attributes || {};
   const strategyEngaged =
@@ -493,7 +511,7 @@ export function buildRoom(states: States, room: Room): RoomView {
     strategyValidUntil > Date.now();
   const now = Date.now();
   const beat = readHeartbeat(heartbeat, now);
-  const live = beat.health === "fresh";
+  const live = beat.health === "fresh" && !beat.error; // CS-212: its last pass of this room failed
   const decision = resolve(states, room, "sensor", "current_decision");
   const flag = heartbeat?.attributes.enable_flag ?? config?.attributes.enable_flag;
   const engineEntity =
@@ -557,12 +575,13 @@ export function buildRoom(states: States, room: Room): RoomView {
     const target = targetKey
       ? resolve(states, room, "number", `${z}${targetKey}`, targetKey)
       : undefined;
-    const mode = resolve(states, room, "select", `${z}steering_mode`, "steering_mode");
-    const family = mode?.state.toLowerCase().startsWith("gen")
-      ? "gen"
-      : mode?.state.toLowerCase().startsWith("veg")
-        ? "veg"
-        : null;
+    // The controller's order (_veg): the zone's own steering mode, else the room's growth stage,
+    // else Generative. The room's steering_mode select is not read by the controller.
+    const mode = [
+      resolve(states, room, "select", `${z}steering_mode`),
+      resolve(states, room, "select", "growth_stage"),
+    ].find(readable);
+    const family = mode?.state.toLowerCase().startsWith("veg") ? "veg" : "gen";
     const p = /^P[012]$/.test(phase?.state || "") ? phase!.state.toLowerCase() : null;
     // The controller posts this status with a reason; the integration's fixed-threshold sensor
     // writes the same entity without one. While the controller is live, show the controller's.
@@ -630,10 +649,8 @@ export function buildRoom(states: States, room: Room): RoomView {
           "mS/cm",
         ),
       ),
-      water: metric(
+      water: waterToday(
         resolve(states, room, "sensor", `${z}daily_water_app`, `${z}daily_water_usage`),
-        "Water today",
-        "L",
       ),
       shots: metric(
         resolve(states, room, "sensor", `${z}irrigation_count_app`, `${z}irrigations_today`),
@@ -758,6 +775,13 @@ export function buildRoom(states: States, room: Room): RoomView {
       title: "Controller stopped",
       detail: `${stoppedText(beat, now)} After an update or a restart it starts again by itself, which can take a few minutes; if it doesn't, start the controller app and check its log. Zone phases and statuses are its last report, not live.`,
     });
+  else if (config && beat.error)
+    alerts.push({
+      id: `${room.id}-controller`,
+      severity: "critical",
+      title: "Controller error in this room",
+      detail: `${beat.error}. The controller gives this room no shots until the error stops, and tries it again each minute (CS-212). Read the controller log. Zone phases and statuses are its last report, not live.`,
+    });
   else if (config && !live)
     alerts.push({
       id: `${room.id}-controller`,
@@ -864,7 +888,7 @@ export function staleBanner(states: States, room: Room, now = Date.now()): strin
   if (status.tone === "stale")
     return `The controller has not reported for ${ageText(now - status.reportedAt!)}. Moisture and phases below are its last report, not live. Watering is held by the controller's own safety rules.`;
   const beat = readHeartbeat(resolve(states, room, "sensor", "ai_heartbeat"), now);
-  return status.tone === "stopped" && beat.health !== "fresh"
+  return status.tone === "stopped" && (beat.health !== "fresh" || beat.error)
     ? `${status.detail} Moisture and phases below are its last report, not live.`
     : null;
 }
@@ -920,6 +944,13 @@ export function roomStatus(states: States, room: Room, now = Date.now()): RoomSt
       "stale",
       `Data ${ageText(now - beat.at!)} old`,
       "The controller stopped reporting. Check the controller app and its log.",
+    );
+  // CS-212: the last pass of this room ended in an error; nothing it reported before is live.
+  if (beat.error)
+    return say(
+      "stopped",
+      "Not watering",
+      `Controller error in this room: ${beat.error}. The controller tries the room again each minute, and the other rooms continue. Read the controller log.`,
     );
   const pending = note("setup_pending");
   if (pending)
@@ -999,6 +1030,8 @@ export function roomStatus(states: States, room: Room, now = Date.now()): RoomSt
   );
 }
 
+/** Whether the zone has a moisture probe to steer by: its VWC reading's entity exists. */
+export const zoneHasProbe = (zone: Zone, states: States) => !!zone.vwc.entityId && !!states[zone.vwc.entityId];
 export function validateChange(room: RoomView, states: States, change: Change): string | null {
   if (!room.room.id || !readable(descriptor(states, room.room)))
     return "No current readable room descriptor.";
@@ -1008,6 +1041,16 @@ export function validateChange(room: RoomView, states: States, change: Change): 
     return Array.isArray(options) && options.includes(change.value)
       ? null
       : "Choose Zone total or Per plant.";
+  }
+  // What waters a zone (Timer programs): one of the select's own options, Steering only where the
+  // zone has a probe to steer by. It is checked before the plan-engaged refusal below on purpose: a
+  // grow plan owns a zone's targets, not whether the zone steers, runs on timers or is off (timers
+  // are how a zone without probes is watered at all).
+  const moded = room.zones.find((z) => change.entityId === `select.${ROOT}${room.room.prefix}zone_${z.id}_irrigation_mode`);
+  if (moded) {
+    const options = states[change.entityId]?.attributes.options;
+    if (!Array.isArray(options) || !options.includes(change.value)) return "Choose Steering, Timer or Off.";
+    return change.value === "steering" && !zoneHasProbe(moded, states) ? `Zone ${moded.id} has no probe, so it can't steer.` : null;
   }
   if (room.strategy.engaged && /^(number|select)[.]/.test(change.entityId))
     return "An active grow plan owns these targets. Disarm the plan before editing manual setpoints.";
@@ -1080,10 +1123,11 @@ export function validateChange(room: RoomView, states: States, change: Change): 
       ? null
       : "Select one of the available options.";
   }
-  // What the AI assistant may do in the room (brain.ts AI_POWERS): one switch per power. Any other
-  // switch registered in features.json is a configuration control too.
+  // What the AI assistant may do in a room (brain.ts AI_POWERS): one switch per power, in any room,
+  // since Settings › AI assistant shows every room's judges side by side. Any other switch
+  // registered in features.json is a configuration control too.
   const registeredSwitch =
-    change.entityId.startsWith(`switch.${ROOT}${room.room.prefix}ai_power_`) ||
+    discoverRooms(states).some((r) => change.entityId.startsWith(`switch.${ROOT}${r.prefix}ai_power_`)) ||
     registered?.control.domain === "switch";
   if (
     (safeSwitches.has(change.entityId) || registeredSwitch) &&

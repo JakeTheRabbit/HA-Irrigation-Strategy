@@ -32,6 +32,7 @@ import time
 import uuid
 from datetime import date, datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
+from types import SimpleNamespace
 
 import requests
 import auto_setpoints
@@ -40,6 +41,8 @@ import dosing_runner
 import dry_dim
 import brain_bridge
 import gate_report
+import guards
+import journal_out
 import log_words
 import phase_options
 import plan_adherence
@@ -72,12 +75,18 @@ from crop_steering_engine import (
     zone_status_label,
     settled_reading,
 )
-from crop_steering_engine.core import SETTLED_VWC_MIN, ec_flush_goal, p1_stall, p1_stall_rewater
+from crop_steering_engine.ids import derived_id, new_id
+from crop_steering_engine.timers import _window as timer_window, project as project_timer_program
+from crop_steering_engine.core import SETTLED_VWC_MIN, ec_flush_goal, floor_share, p1_stall, p1_stall_rewater
 # What _zone_num falls back to when neither the zone's nor the room's setting can be read: the
 # controller column of the one defaults table, pinned to the values installed controllers use.
 from crop_steering_engine.defaults import CONTROLLER_FALLBACKS as FALLBACK
 # Every number read from a device goes through the one device-unit table (_device).
 from crop_steering_engine.defaults import UNITS, to_canonical
+# How long a shot runs, the one rule the integration's shot-duration sensors show too.
+from crop_steering_engine.shot_length import DEFAULT_MAX_SHOT_S, MIN_SHOT_S, valid_cap
+from crop_steering_engine.guards import order as supply_order
+from crop_steering_engine.flow import reconcile as reconcile_flow, to_litres
 # What depends on what a room grows in (its substrate select): "generic" is what every room ran on before.
 from crop_steering_engine.defaults import SUBSTRATE_PROFILES
 
@@ -189,13 +198,15 @@ _GATE = _AuthGate()
 class HAState(tuple):
     """What ha_get returns: (state, attributes, last_updated), unpacked exactly as it always was, plus
     `last_changed`: when the state VALUE last changed, as Home Assistant reports it (None if unknown).
+    `last_reported`: when the entity last reported, changed or not (Home Assistant 2024.3+; None if unknown).
     `served_at` (ha_get_status only): Home Assistant's own time of the answer, from its Date header."""
 
     served_at = None
 
-    def __new__(cls, state=None, attributes=None, last_updated=None, last_changed=None):
+    def __new__(cls, state=None, attributes=None, last_updated=None, last_changed=None, last_reported=None):
         obj = super().__new__(cls, (state, {} if attributes is None else attributes, last_updated))
         obj.last_changed = last_changed
+        obj.last_reported = last_reported
         return obj
 
 
@@ -209,7 +220,8 @@ def ha_get(entity, timeout=8):
         if r.status_code != 200:
             return HAState()
         d = r.json()
-        return HAState(d.get("state"), d.get("attributes", {}), d.get("last_updated"), d.get("last_changed"))
+        return HAState(d.get("state"), d.get("attributes", {}), d.get("last_updated"), d.get("last_changed"),
+                       d.get("last_reported"))
     except Exception:
         return HAState()
 
@@ -225,7 +237,8 @@ def ha_get_status(entity, timeout=8):
         if r.status_code != 200:
             return r.status_code, HAState()
         d = r.json()
-        found = HAState(d.get("state"), d.get("attributes", {}), d.get("last_updated"), d.get("last_changed"))
+        found = HAState(d.get("state"), d.get("attributes", {}), d.get("last_updated"), d.get("last_changed"),
+                       d.get("last_reported"))
         try:
             found.served_at = parsedate_to_datetime(r.headers.get("Date"))
         except (TypeError, ValueError):
@@ -362,7 +375,8 @@ def ha_fire(event, data, timeout=4):
 
 
 def ha_set(entity, state, attributes=None, timeout=8):
-    """Write a state -> Home Assistant's HTTP status, or None when it was not sent or not answered."""
+    """Write a state -> Home Assistant's HTTP status, or None when it was not sent or not answered. A write
+    sent that failed is counted (the heartbeat's `write_failures`) and logged once an hour per entity."""
     if not _GATE.allows("write"):
         return None
     try:
@@ -372,10 +386,26 @@ def ha_set(entity, state, attributes=None, timeout=8):
             json={"state": state, "attributes": attributes or {}},
             timeout=timeout,
         )
-    except Exception:
+    except Exception as e:
+        _set_failed(entity, e)
         return None
     _GATE.saw("write", r.status_code, f"POST {SHOWN_BASE}/states/{entity}")
+    if r.status_code >= 300:
+        _set_failed(entity, f"HTTP {r.status_code}")
     return r.status_code
+
+
+# State writes that failed since the start, and when each entity's last failure was logged (time.monotonic()).
+_SET_FAILED = {"count": 0, "logged": {}}
+SET_FAILED_LOG_S = 3600.0
+
+
+def _set_failed(entity, why):
+    _SET_FAILED["count"] += 1
+    now, last = time.monotonic(), _SET_FAILED["logged"].get(entity)
+    if last is None or now - last >= SET_FAILED_LOG_S:
+        _SET_FAILED["logged"][entity] = now
+        log(f"state write failed: {entity} ({why}); {_SET_FAILED['count']} failed since the controller started")
 
 
 # ---------------------------------------------------------------- config (defaults; override via options.json or F2_OPT_*)
@@ -408,6 +438,17 @@ CONTROLLER_VERSION = read_controller_version()
 # legacy room may rely on it; on a wizard-made room it is a value nobody chose.
 SHIPPED_LIGHTS = (10.0, 22.0)
 
+
+def usable_lights(on, off):
+    """(on, off) as floats when they are two different hours from 0 to under 24, else None: the same
+    hour gives no lights-off and reads as lights never on (CTL-030)."""
+    try:
+        on, off = float(on), float(off)
+    except (TypeError, ValueError):
+        return None
+    return (on, off) if 0 <= on < 24 and 0 <= off < 24 and on != off else None
+
+
 # A zone with no usable moisture reading, by why: title and the advice that fits. The codes and
 # their full entries live in docs/error-codes.json with every other code.
 _PROBE_ALERTS = {
@@ -437,24 +478,47 @@ _PROBE_ALERTS = {
     ),
 }
 
-# What follows a shot cancelled before its water started (CS-302, CS-303, CS-304): _execute_shot's
+# What follows a shot cancelled because a switch did not switch on (CS-302, CS-303, CS-304): _execute_shot's
 # error cleanup switches off everything the shot may have opened and latches a hardware hold unless
 # it all reads back OFF, which it can't while Home Assistant is unreachable.
 _CANCELLED_SHOT_CLEANUP = (
     "The controller sets the pump, the main-line valve and the zone valve to off, and checks that "
     "they read off. If it cannot confirm this (Home Assistant cannot be reached, or a switch is "
     "offline), it latches a hardware hold (CS-301). Then no shot starts on this hardware until the "
-    "hold clears. If the check passes, the controller tries the next shot as usual."
+    "hold clears. If the check passes, the controller tries the next shot as usual: after 3 such "
+    "shots of a zone in a row, at most once every 30 min (rescue shots too, a Test Shot not)."
 )
 
 # Switch read-back after a close: see Controller._confirm_switches.
 CONFIRM_FIRST_READ_S, CONFIRM_POLL_S, CONFIRM_TIMEOUT_S = 1.0, 0.5, 6.0
 CONFIRM_RETRY_S = 10.0  # a second read-back, after OFF is sent again to what still reads on
+# The whole read-back, ON or OFF (CLOSE_FAILURES words it). A pump, main line or zone valve that took its
+# turn_on and does not read ON within it never started (CS-302 to CS-304; a zone valve within its shot, when
+# shorter). After this many such shots in a row a zone is tried at most once every SWITCH_ON_BACKOFF_MIN,
+# until its switches read on again.
+SWITCH_ON_S = CONFIRM_TIMEOUT_S + CONFIRM_RETRY_S
+SWITCH_ON_BACKOFF_AFTER, SWITCH_ON_BACKOFF_MIN = 3, 30
+
+
+def _switch_on_retry_at(st):
+    """When a zone backed off for switches that did not switch on may be tried again, or None: not backed off."""
+    record = st.get("on_failures")
+    if not record or record["count"] < SWITCH_ON_BACKOFF_AFTER:
+        return None
+    return datetime.fromisoformat(record["last"]) + timedelta(minutes=SWITCH_ON_BACKOFF_MIN)
 
 # The safe-off on SIGTERM (Controller._safe_exit) runs inside runtime_env.stop_budget(). Dosing keeps
 # STOP_DOSING_S of it (a fifth at most) for its own offs while a dose or batch has anything recorded.
 # Each room with a shot recorded gets an equal share of the rest (see _Stop).
 STOP_DOSING_S = 5.0
+
+
+class _ShotStopped(Exception):
+    """The operator stopped a shot while it was still opening (Controller._operator_stop's answer, `by`)."""
+
+    def __init__(self, by):
+        super().__init__(by)
+        self.by = by
 
 
 class _Stop:
@@ -532,15 +596,12 @@ def _pause(seconds, deadline=None):
 # hardware fault (CS-301) names it with: in its notification, its log line and the zone's status.
 CLOSE_FAILURES = {
     "refused": "was not switched off: Home Assistant returned an error",
-    "on": f"still read ON {CONFIRM_TIMEOUT_S + CONFIRM_RETRY_S:g} s after it was switched off",
+    "on": f"still read ON {SWITCH_ON_S:g} s after it was switched off",
     "unavailable": "read unavailable: Home Assistant could not reach it",
     "unknown": "read unknown instead of OFF",
     "unreadable": "could not be read from Home Assistant",
-    "late": f"reported OFF only after the {CONFIRM_TIMEOUT_S + CONFIRM_RETRY_S:g} s check",
+    "late": f"reported OFF only after the {SWITCH_ON_S:g} s check",
 }
-
-# The shortest shot the controller runs, in seconds (a shot sized shorter is lengthened to this).
-MIN_SHOT_S = 5
 
 # The minimum daily water stops once moisture is this many VWC points above field capacity.
 MIN_FLOOR_FC_MARGIN = 5.0
@@ -671,9 +732,39 @@ def _on_since_shot(history, started):
 # its copy of a sibling's rescue, and a test shot a person asked for (its zone's Test Shot button). Every
 # other gate (kill switch, faults, zone switches, source water, the daily budget) still applies to them.
 PLAN_HOLD_EXEMPT = frozenset(
-    {"p3_emergency", "watchdog", "min_daily", "blind_fallback", "blind_copy_rescue", "test_shot"}
+    {"p3_emergency", "watchdog", "min_daily", "blind_fallback", "blind_copy_rescue", "test_shot", "timer"}
 )
+# A zone's Watering by (the integration's select zone_N_irrigation_mode): steering (the engine, as always), timer (its
+# timer program's slots) or off. Anything else reads as unreadable (R2: the integration shows `unknown`).
+IRRIGATION_MODES = ("steering", "timer", "off")
+# The engine shots a timer zone still gets (R3, spec 6.1): the P3 emergency and the watchdog, the minimum-daily floor
+# and a blind zone's copy of a sibling's rescue. Not the blind fallback: a steering estimate. A skip never drops one.
+TIMER_KEEPS = safety_ops.RESCUE_KINDS | {"min_daily", "blind_copy_rescue"}
+TIMERS_SENSOR = "sensor.crop_steering_{}timers_config"  # the integration's timer programs and skips (timers_api.py)
+PROJECTION_SENSOR = "sensor.crop_steering_{}projection_app"  # what the room is planned to do (the timeline reads it)
+PROJECTION_H = 24
+TIMER_OWED_MIN = 15  # a timer slot a rescue went before is still given this long after its time, inside its window
+# The integration's feed pH / EC corrected by the probe's applied calibration (calibration.py, Task 17): read only while
+# engine_config's feed_calibration applies one (Controller._feed_read, ruling R4).
+FEED_CORRECTED = "sensor.crop_steering_{}feed_{}_corrected"
+# The source-water gate's holds while a feed probe may sit in its calibration buffer (Controller._feed_calibration_hold,
+# read from dosing_config's `calibrating` by the gate itself): an open session, in the dosing runner's words
+# (guards.CALIBRATING_PROBE), and a dosing_config that can't be read while a calibration is applied.
+FEED_CALIBRATING = "feed probe calibration in progress"
+FEED_CALIBRATION_UNREAD = "source-water {name} calibration state unreadable ({entity}) — holding (fail-closed)"
+DOSING_CONFIG = "sensor.crop_steering_{}dosing_config"
+CALIBRATING_CACHE_S = 30.0  # inside a pass, the gate's read of `calibrating` is reused this long for every zone
 TEST_SHOT_S = 10  # how long a zone's Test Shot waters it
+# The site's supply (the integration's site store, G1): the pumps, their output and the zones' demand. With one saved,
+# the zones that fire in a pass take turns at their pump, rescues first (_pump_line); none saved, as before.
+SUPPLY_SENSOR = "sensor.crop_steering_supply_config"
+QUEUE_ALERT_S = 600  # CS-214 once a zone has waited this long for its turn at the pump (it still waters)
+LINE_SET_TIMEOUT_S = 2  # the queue and pump load are written between shots: a slow Home Assistant waits this long
+# G4, flow reconciliation (_flow_meter): a zone's flow meter in the supply, read before its pump opens and after its
+# close reads back; one that does not answer in this long reconciles nothing, and the shot runs as before.
+METER_READ_TIMEOUT_S = 2
+FLOW_LATE_S = 300  # a meter that has not reported this long after a shot's close: the shot is not reconciled (M1)
+METER_IDLE_L = 0.5  # CS-319: a meter that rises more than this between shots, with no shot in flight
 GROW_DAY_PROBE_S = 600  # how often the probes behind each zone are read for its grow-day summary (day_summary)
 # A Test Shot press older than this when the controller sees it is not acted on: the person testing is
 # watching the drippers, and a shot long after they asked for it tests nothing for them.
@@ -697,11 +788,22 @@ NOTIFY_CONFIG_S = 60.0
 NOTIFY_TIMEOUT_S = 12
 # The most one loop spends sending its phase changes and the AI assistant's moves: they are only news, and the loop is not.
 EVENTS_BUDGET_S = 10.0
+# The journal (journal_out.py, ruling R5): after a flush that failed, this many passes send nothing; a hold
+# standing on one reason is journaled again (intent.held) after this many seconds.
+JOURNAL_BACKOFF_PASSES = 5
+HELD_REEMIT_S = 1800
+JOURNAL_FLUSH_BUDGET_S = 1.5  # no flush batch starts later than this into the flush
+# The backfill (_journal_backfill) queues at most this many events a pass, and only into the first half of the
+# outbox's cap, so it never pushes a live event out and never holds one up for long.
+JOURNAL_BACKFILL_CHUNK = 200
+JOURNAL_BACKFILL_SHARE = 0.5
+BACKFILL_LEDGER_TRIES = 3  # failed runs on a damaged ledger before its readable lines are taken without the rest
+_HELD_NUMBERS = re.compile(r"\d{1,2}:\d{2}|[-+]?\d+(?:\.\d+)?")  # a hold's times and numbers (_journal_held)
 # The codes whose severity is critical in docs/error-codes.json (tests/test_error_codes.py keeps the two equal):
 # their push is urgent, a high-priority one on a phone whose row asks for that.
-CRITICAL_CODES = frozenset({"CS-201", "CS-202", "CS-203", "CS-204", "CS-207", "CS-211", "CS-301", "CS-308",
-                            "CS-310", "CS-311", "CS-315", "CS-402", "CS-601", "CS-606", "CS-801", "CS-809",
-                            "CS-811", "CS-901", "CS-902"})
+CRITICAL_CODES = frozenset({"CS-201", "CS-202", "CS-203", "CS-204", "CS-207", "CS-211", "CS-212", "CS-301",
+                            "CS-308", "CS-310", "CS-311", "CS-315", "CS-402", "CS-601", "CS-606", "CS-801",
+                            "CS-809", "CS-811", "CS-901", "CS-902"})
 # How often a standing alert pushes again, by its severity in docs/error-codes.json (tests/test_error_codes.py
 # keeps INFO_CODES equal to the info codes): a critical code, or a warning that means a zone is not being watered,
 # every 30 minutes for as long as it lasts; any other warning after 15 minutes, then 1, 2 and 4 hours, then every
@@ -721,6 +823,8 @@ BACKUP_RISE_PTS, BACKUP_WINDOW_MIN, BACKUP_GRACE_MIN, BACKUP_CLEAR_MIN = 3.0, 60
 # re-water threshold moves with it; a smaller move is field capacity only. The rescue (P3 emergency) floor never moves.
 # The room's substrate profile sets it (fc_shift_min); this is the generic profile's.
 FC_SHIFT_MIN = SUBSTRATE_PROFILES["generic"]["fc_shift_min"]
+# A probe reading older than this many minutes is not used (_read_sensor). The heartbeat publishes it for the dashboard.
+SENSOR_MAX_AGE_MIN = 20
 # The most the follower moves any one setpoint in a grow-day, in points: a drifting probe or a flood can only drag the
 # ladder this far a day. The fallback of the room's Max setpoint move per day (_step_limit).
 FC_STEP_MAX = 1.0
@@ -797,6 +901,13 @@ SUBSTRATES = tuple(SUBSTRATE_PROFILES)
 def _profile(room):
     """The room's substrate profile (defaults.SUBSTRATE_PROFILES): generic unless the room chose another."""
     return SUBSTRATE_PROFILES.get(getattr(room, "substrate", "generic"), SUBSTRATE_PROFILES["generic"])
+
+
+def _pore_ec_neutral(room):
+    """The pore EC to target ratios a shot's size is left alone within (ec_adjust): over the highest 'under' row
+    and up to the lowest 'over' row of the room's substrate profile. The dashboard's EC band around a target."""
+    prof = _profile(room)
+    return [max(r for r, _ in prof["ec_adjust_down"]), min(r for r, _ in prof["ec_adjust_up"])]
 
 
 _SIGN = {"<": "<", "<=": "≤", ">": ">", ">=": "≥"}
@@ -1014,7 +1125,7 @@ class Room:
         # when this room was seen switched off (see _room_switched_on); durable, None when not known
         self._off_since = None
         # what the room last reported, repeated while a shot holds the loop (Controller._keep_alive)
-        self._beat = None  # (hardware_fault, room_active) of its last heartbeat
+        self._beat = None  # (hardware_fault, room_active, loop_error) of its last heartbeat
         self._beat_at = None  # and when, by time.monotonic()
         self._statuses = {}  # z -> (label, reason) of its zones' last status
         self._safety_shown = {}  # z -> (label, since) of its zones' safety status (the hysteresis)
@@ -1038,6 +1149,113 @@ def room_gate(room):
     option on a room with no revisioned setup, or through a new setup revision on one that has one.
     The heartbeat reports it, so the integration and the dashboard name the same switch."""
     return room.enable_flag
+
+
+def shot_priority(reason):
+    """A firing zone's priority at its pump (crop_steering_engine.guards.PRIORITY): every shot a plan hold never stops
+    (PLAN_HOLD_EXEMPT: the rescues, the minimum-daily floor, the blind fallback and copy) first, an operator's test
+    shot last, every other shot steering."""
+    kind = getattr(reason, "kind", None)
+    if kind == "timer":
+        return "timer"
+    if kind in PLAN_HOLD_EXEMPT and kind != "test_shot":
+        return "rescue"
+    return "manual" if kind == "test_shot" else "steering"
+
+
+def shot_actor(reason):
+    """Who a shot is journaled as: a test shot the operator's, a timer program's slot the timer's, else the engine's."""
+    kind = getattr(reason, "kind", None)
+    return "manual" if kind == "test_shot" else "timer" if kind == "timer" else "engine"
+
+
+def _timer_reason(program, seconds):
+    """The decision's reason for a timer program's slot: it runs `seconds` (guards._max_shot), for its program."""
+    reason = Reason(f"TIMER {program.get('name') or program.get('id')}: {seconds:g} s", "timer")
+    reason.seconds, reason.program_id = seconds, str(program.get("id") or "") or None
+    return reason
+
+
+def _finite_number(state):
+    """A state's finite number, or None."""
+    try:
+        number = float(state)
+    except (TypeError, ValueError):
+        return None
+    return number if math.isfinite(number) else None
+
+
+def _feed_fixes(value):
+    """engine_config's `feed_calibration` (or a state block's) as {"ph"|"ec": {"gain", "bias"}}, or None when it can't
+    be read: not a dict, or an entry without a finite bias and a finite gain above 0."""
+    if not isinstance(value, dict):
+        return None
+    fixes = {}
+    for quantity, fix in value.items():
+        if quantity not in ("ph", "ec"):
+            continue
+        if not isinstance(fix, dict):
+            return None
+        gain, bias = fix.get("gain"), fix.get("bias")
+        if any(isinstance(v, bool) or not isinstance(v, (int, float)) or not math.isfinite(v) for v in (gain, bias)):
+            return None
+        if gain <= 0:
+            return None
+        fixes[quantity] = {"gain": float(gain), "bias": float(bias)}
+    return fixes
+
+
+def _wall_clock(now):
+    """`now` on the controller's own wall clock, aware: in its zone (TZ, as the Supervisor sets the container's) when
+    zoneinfo knows it, so the timer slots after a DST change get that day's offset; else in now's fixed offset."""
+    try:
+        from zoneinfo import ZoneInfo
+
+        zone = ZoneInfo(os.environ["TZ"])
+    except Exception:
+        return now.astimezone()
+    return now.astimezone(zone) if now.tzinfo is not None else now.replace(tzinfo=zone)
+
+
+def _phase_at(clock, minutes):
+    """The phase the engine expects a zone in `minutes` after its pass, by its clock rules only (decide()): lights
+    off is P3, the timed P2 end (P1 or P2 that long before lights-off) is P3, a lights-on starts P0 for its full wait,
+    and the phase it is in holds until one of those moves it. None where only moisture can say which phase it is
+    (after a P0 wait runs out, P1 -> P2). Not every moisture exit is foreseen: P0 is shown to its maximum wait though
+    the bypass, its dryback or a stall may end it sooner, and P2 is shown to lights-off with no timed P2 end though a
+    predictive P3 (core.decide, the last 3 h) may start sooner. It is a display lane only, never acted on. `clock` (_publish_waiting_for): {phase, lights_on, to_on_h, to_off_h, p2_end_h,
+    p0_left_min, p0_wait_min}, or None when the zone had no snapshot."""
+    if clock is None:
+        return None
+    t = minutes / 60.0
+
+    def last(first):  # the latest of first, first + 24 h, ... at or before t
+        return None if t < first else first + 24.0 * math.floor((t - first) / 24.0)
+
+    on, off = last(clock["to_on_h"]), last(clock["to_off_h"])
+    lit = clock["lights_on"] if on is None and off is None else (off is None or (on is not None and on > off))
+    if not lit:
+        return "P3"
+    next_off = clock["to_off_h"] + 24.0 * max(0, math.ceil((t - clock["to_off_h"]) / 24.0))
+    ending = clock["p2_end_h"] > 0 and next_off - t <= clock["p2_end_h"]
+    if on is None:  # the lights-on span the zone is in now
+        phase = clock["phase"]
+        if phase == "P0" and minutes < clock["p0_left_min"]:
+            return "P0"
+        if phase == "P3" or ending:  # P3 waits for the next lights-on; a P0 run out is P1 or P2 by now
+            return "P3"
+        return "P2" if phase == "P2" else ("P1" if phase == "P1" and minutes <= 0 else None)
+    if (t - on) * 60.0 < clock["p0_wait_min"]:
+        return "P0"
+    return "P3" if ending else None
+
+
+def _skipped_by(skip):
+    """intent.refused's words for a skip (timer_skip): who asked for it, when the integration says."""
+    by = skip.get("by")
+    if isinstance(by, dict):
+        by = by.get("user_id") or by.get("actor")
+    return f"skipped by {by or 'timer_skip'}"
 
 
 class Controller:
@@ -1098,6 +1316,12 @@ class Controller:
         # Who this controller is, in its heartbeat, so the duplicate-controller guard can tell another one
         # apart (duplicate_hold). Beside state.json, as dosing_state.json is: one data folder, one identity.
         self.instance_id = _instance_id(os.path.join(os.path.dirname(self._state_path) or ".", "instance_id"))
+        # The journal's outbox, beside state.json: shots, phases, holds and alerts, for the integration's event
+        # journal. Only ever a local append in the pass; sent after it (_flush_journal).
+        self.journal = journal_out.Outbox(os.path.join(os.path.dirname(self._state_path), "journal_outbox.jsonl"))
+        self.journal.client = f"f2_control/{CONTROLLER_VERSION}"
+        self._journal_skip = 0  # passes the flush still skips after a failure
+        brain_bridge.journal_ledger(self)  # the AI assistant's verdicts and their outcomes, into the same outbox
         self._guard = {}  # room slug -> {"answered", "seen", "until"} (_guard_read)
         self._guard_lock = threading.Lock()
         # Dosing runs in steps on the main loop, which wakes whenever one is due (run, _sleep_for). Like
@@ -1437,6 +1661,8 @@ class Controller:
             "vmax_wetup": [],  # this grow-day's P1 wet-up VWC readings, for the Vmax advisory (resets each P0)
             "rescue_misses": 0,  # CS-315: rescue shots in a row that did not raise the moisture (safety_ops)
             "rescue_check": None,  # ...and the last rescue waiting to be judged: {"before", "at"}
+            # CS-302 to CS-304: shots in a row whose switches did not switch on, {"count", "last"} (_switch_on_retry_at)
+            "on_failures": None,
             **zone_history.fresh(),
             **sensing.fresh(),  # the water-and-VPD record (sensing.py), kept only while its switch is on
             **day_summary.fresh(),  # the grow-day summary being measured, and those not yet sent (day_summary)
@@ -1560,6 +1786,14 @@ class Controller:
             s["vmax_wetup"] = [float(v) for v in series
                                if isinstance(v, (int, float)) and not isinstance(v, bool)
                                and math.isfinite(v) and 0.0 <= v <= 100.0][-VMAX_SERIES_MAX:]
+        failures = d.get("on_failures")  # absent before the switch-on backoff: None
+        try:
+            if isinstance(failures, dict) and type(failures.get("count")) is int and failures["count"] > 0:
+                if datetime.fromisoformat(failures["last"]).tzinfo is not None:
+                    raise ValueError("an aware time: _switch_on_retry_at compares with a naive now")
+                s["on_failures"] = {"count": failures["count"], "last": failures["last"]}
+        except (KeyError, TypeError, ValueError):
+            pass
         s.update(zone_history.restore(d))
         s.update(safety_ops.restore_zone(d))
         s.update(sensing.restore(d))
@@ -1590,6 +1824,7 @@ class Controller:
         room.hardware_fault = None
         room.shot_inflight = None
         room.strategy_required = False
+        room.journal_backfill = False  # its dosing history and ledger rows sent to the journal (_journal_backfill)
         room._strategy_persisted = True
         room._off_since = None
         block = per_room.get(room.slug)
@@ -1603,8 +1838,16 @@ class Controller:
         # A dim the controller did not finish (dry_dim.py): absent on an older file. Restored on the first pass.
         room._dim = dry_dim.load(block.get("_dim") if isinstance(block, dict) else None)
         room._dimmer = dry_dim.Dimmer(restarted=room._dim is not None)
+        # Each zone's last-known Watering by (R2), {"3": "off"}: absent on an older file, and for a zone never seen.
+        modes = block.get("_irrigation_mode") if isinstance(block, dict) else None
+        room._irrigation_mode = ({str(z): m for z, m in modes.items() if m in IRRIGATION_MODES}
+                                 if isinstance(modes, dict) else {})
+        # The feed probes' last calibration in force (R4): absent on an older file, and while none is applied.
+        fixes = block.get("_feed_calibration", {}) if isinstance(block, dict) else {}
+        room._feed_calibration = _feed_fixes(fixes) or {}
         if isinstance(block, dict):
             room.strategy_required = bool(block.get("_strategy_required", False))
+            room.journal_backfill = block.get("_journal_backfill") == 1
             try:
                 room._off_since = datetime.fromisoformat(block["_room_off_since"])
             except (KeyError, TypeError, ValueError):
@@ -1790,6 +2033,7 @@ class Controller:
             room.zone_cultivars = self._zone_cultivars(attrs)  # a label, read like the names: never decides anything
             room.room_name = self._room_name(attrs)
             room.substrate = self._substrate(attrs)  # read like the names: needs no adoption
+            room.legacy_feed_ec = self._legacy_feed_ec(attrs)  # the upgrade's kept 3.0 feed EC: needs no adoption
             room.light_entity = str(attrs.get("light_entity") or "").strip()  # checked, never actuated
             room.tank = tank_level.mapping(attrs)  # read only, never actuated: needs no adoption
             # Only ever switched OFF, and only under the room's waste-valve rule; setup changes need it off.
@@ -1800,6 +2044,7 @@ class Controller:
             # the room's climate sensors, read only for the water-and-VPD record (sensing.py)
             room.climate = {k: str(attrs.get(k) or "").strip() for k in ("vpd_sensor", "temperature_sensor",
                                                                          "humidity_sensor")}
+            self._adopt_feed_calibration(room, attrs)  # the feed probes' calibration (R4): needs no adoption
             saved = (getattr(self, "_saved_room_blocks", {}).get(room.slug) or {}).get("_setup")
             another_room = self._is_another_room(room, attrs, saved)
             revision = attrs.get("setup_revision", 0)
@@ -1959,6 +2204,7 @@ class Controller:
             "vmax_wetup": list(s.get("vmax_wetup") or []),
             "rescue_misses": int(s.get("rescue_misses") or 0),
             "rescue_check": s.get("rescue_check"),
+            "on_failures": s.get("on_failures"),
             "water_vpd": s.get("water_vpd"),
             "day_hist": s.get("day_hist") or [],
             "day_acc": s.get("day_acc"),
@@ -1969,59 +2215,78 @@ class Controller:
         # Preserve undiscovered rooms and unknown metadata/zones. A descriptor going
         # missing must never delete counters or erase a latched shared-hardware hold.
         out = dict(getattr(self, "_saved_room_blocks", {}))
+        self._unsaved_rooms = {}  # slug -> the error: what this save could not write (see _loop_room)
         for room in self.rooms:
-            prior = out.get(room.slug)
-            block = dict(prior) if isinstance(prior, dict) else {}
-            block.update(
-                {str(z): self._serialize_zone(s) for z, s in room.state.items()}
-            )
-            if getattr(room, "strategy_required", False):
-                block["_strategy_required"] = True
-            else:
-                block.pop("_strategy_required", None)
-            if room.hardware_fault:
-                block["_hardware_fault"] = room.hardware_fault
-            else:
-                block.pop("_hardware_fault", None)
-            if getattr(room, "shot_inflight", None):
-                block["_shot_inflight"] = room.shot_inflight
-            else:
-                block.pop("_shot_inflight", None)
-            if hasattr(room, "_room_active_known"):
-                block["_room_active"] = room._room_active_known
-            waste_rule = getattr(room, "_waste_rule_known", None)
-            if waste_rule in ("Off", WASTE_CHECK, WASTE_CLOSE):
-                block["_waste_rule"] = waste_rule
-            if room.tank_drawdown["base_pct"] is not None:  # only once a level has been read
-                block["_tank"] = room.tank_drawdown
-            estimate = getattr(room, "tank_estimate", None) or {}
-            if estimate.get("filled_at"):  # only once the tank has been marked filled
-                block["_tank_estimate"] = estimate
-            runoff = getattr(room, "_runoff", None)
-            if runoff and runoff_balance.has_data(runoff):  # only once the estimator has recorded something
-                block["_runoff"] = runoff
-            else:
-                block.pop("_runoff", None)
-            if getattr(room, "_dim", None):
-                block["_dim"] = room._dim
-            else:
-                block.pop("_dim", None)
-            if getattr(room, "_off_since", None):
-                block["_room_off_since"] = room._off_since.isoformat()
-            else:
-                block.pop("_room_off_since", None)
-            adherence = plan_adherence.dump(getattr(room, "_adherence", None) or plan_adherence.fresh(), datetime.now().date())
-            if adherence:
-                block["_adherence"] = adherence
-            else:
-                block.pop("_adherence", None)
-            if getattr(room, "_setup_fingerprint_adopted", None):  # else keep whatever was saved
-                block["_setup"] = {
-                    "revision": room.setup_revision,
-                    "fingerprint": room._setup_fingerprint_adopted,
-                }
-                if getattr(room, "_setup_entry_id", None):  # which room it was (see _is_another_room)
-                    block["_setup"]["entry_id"] = room._setup_entry_id
+            try:  # one room's state that cannot be saved must not stop every room's save
+                prior = out.get(room.slug)
+                block = dict(prior) if isinstance(prior, dict) else {}
+                block.update(
+                    {str(z): self._serialize_zone(s) for z, s in room.state.items()}
+                )
+                if getattr(room, "strategy_required", False):
+                    block["_strategy_required"] = True
+                else:
+                    block.pop("_strategy_required", None)
+                if getattr(room, "journal_backfill", False):  # inside the room's block: a top-level key reads as a room
+                    block["_journal_backfill"] = 1
+                else:  # sent again after the outbox dropped some of it (_journal_backfill)
+                    block.pop("_journal_backfill", None)
+                if room.hardware_fault:
+                    block["_hardware_fault"] = room.hardware_fault
+                else:
+                    block.pop("_hardware_fault", None)
+                if getattr(room, "shot_inflight", None):
+                    block["_shot_inflight"] = room.shot_inflight
+                else:
+                    block.pop("_shot_inflight", None)
+                if hasattr(room, "_room_active_known"):
+                    block["_room_active"] = room._room_active_known
+                if getattr(room, "_lights_last_read", None):
+                    block["_lights"] = list(room._lights_last_read)
+                waste_rule = getattr(room, "_waste_rule_known", None)
+                if waste_rule in ("Off", WASTE_CHECK, WASTE_CLOSE):
+                    block["_waste_rule"] = waste_rule
+                if room.tank_drawdown["base_pct"] is not None:  # only once a level has been read
+                    block["_tank"] = room.tank_drawdown
+                estimate = getattr(room, "tank_estimate", None) or {}
+                if estimate.get("filled_at"):  # only once the tank has been marked filled
+                    block["_tank_estimate"] = estimate
+                runoff = getattr(room, "_runoff", None)
+                if runoff and runoff_balance.has_data(runoff):  # only once the estimator has recorded something
+                    block["_runoff"] = runoff
+                else:
+                    block.pop("_runoff", None)
+                if getattr(room, "_dim", None):
+                    block["_dim"] = room._dim
+                else:
+                    block.pop("_dim", None)
+                if getattr(room, "_irrigation_mode", None):  # only once a zone's select has been read
+                    block["_irrigation_mode"] = dict(room._irrigation_mode)
+                if getattr(room, "_feed_calibration", None):
+                    block["_feed_calibration"] = {q: dict(f) for q, f in room._feed_calibration.items()}
+                else:
+                    block.pop("_feed_calibration", None)
+                if getattr(room, "_off_since", None):
+                    block["_room_off_since"] = room._off_since.isoformat()
+                else:
+                    block.pop("_room_off_since", None)
+                adherence = plan_adherence.dump(getattr(room, "_adherence", None) or plan_adherence.fresh(), datetime.now().date())
+                if adherence:
+                    block["_adherence"] = adherence
+                else:
+                    block.pop("_adherence", None)
+                if getattr(room, "_setup_fingerprint_adopted", None):  # else keep whatever was saved
+                    block["_setup"] = {
+                        "revision": room.setup_revision,
+                        "fingerprint": room._setup_fingerprint_adopted,
+                    }
+                    if getattr(room, "_setup_entry_id", None):  # which room it was (see _is_another_room)
+                        block["_setup"]["entry_id"] = room._setup_entry_id
+                json.dumps(block)  # what json.dump below would refuse, refused here, for this room only
+            except Exception as e:
+                log("state save failed", room.slug, e, "- its last saved state is kept")
+                self._unsaved_rooms[room.slug] = f"{type(e).__name__}: {e}"
+                continue
             out[room.slug] = block
         try:
             tmp = self._state_path + ".tmp"
@@ -2052,23 +2317,52 @@ class Controller:
         )
         if override is not None:
             return float(override)
-        per = f"number.crop_steering_{room.prefix}zone_{zone}_{suffix}"
-        v, _, _ = ha_get(per)
         seen = self.__dict__.setdefault("_settings_seen", {})  # entity -> the last value read since start
-        if v not in (None, "unknown", "unavailable", ""):
-            seen[per] = self._num(per, default)
-            return seen[per]
+        per = f"number.crop_steering_{room.prefix}zone_{zone}_{suffix}"
         glob = f"number.crop_steering_{room.prefix}{suffix}"
-        gv, _, _ = ha_get(glob)
-        if gv not in (None, "unknown", "unavailable", ""):
-            seen[glob] = self._num(glob, default)
-            return seen[glob]
+
+        def number(state):
+            try:
+                return float(state)
+            except (TypeError, ValueError):
+                return None  # missing, unknown, unavailable or not a number: not read
+
+        # One read each, its own state parsed: a second read that failed gave the built-in value as read.
+        sizing = suffix in WATER_SIZING
+        if sizing:  # whether Home Assistant has the zone's number at all: only a 404 means it has none
+            status, (v, attributes, _) = ha_get_status(per)
+        else:
+            v, attributes, _ = ha_get(per)
+        value = number(v)
+        if value is not None:
+            self._note_setting(per, value, attributes)
+            seen[per] = value
+            return value
+        # The zone has its own number and it reads no number: not the room's value unseen. A setting that sizes
+        # the zone's water is unread unless Home Assistant answers it has no such number (the settings wait, then
+        # CS-402); any other, answering unavailable or unknown or read earlier in this run, takes the room's
+        # value, and CS-402 names the zone's number.
+        unread = status != 404 if sizing else v is not None or per in seen
+        if unread:
+            self._defaulted_this_loop.add(per)
+        if not (unread and sizing):
+            v, attributes, _ = ha_get(glob)
+            value = number(v)
+            if value is not None:
+                self._note_setting(glob, value, attributes)
+                seen[glob] = value
+                return value
         # Neither the per-zone NOR the global setpoint entity exists → the engine is silently
         # running its built-in default. On a healthy install the integration creates the global,
         # so this only trips on a real misconfig (renamed/removed entity). Record it so
         # _check_defaulted_setpoints can surface it — EXCEPT engine-only knobs the integration
         # deliberately doesn't create (optional=True): those default by design, never alert.
-        if not optional:
+        if unread and sizing:
+            room.__dict__.setdefault("_settings_missing", set()).add(per)
+            last = seen.get(per)
+            if last is not None:  # the zone's own value, read earlier in this run
+                return last
+        elif not optional:
             self._defaulted_this_loop.add(glob)
             room.__dict__.setdefault("_settings_missing", set()).add(glob)
             last = seen.get(per, seen.get(glob))
@@ -2077,18 +2371,44 @@ class Controller:
         return None if default is None else float(default)
 
     def _room_duration_cap(self, room):
-        """Read the canonical room cap, or its same-room legacy entity if absent."""
+        """Read the canonical room cap, or its same-room legacy entity if absent. The heartbeat publishes the
+        last one read (`max_shot_s`): a valve open longer than that is not a shot."""
+        room._max_shot_s = cap = self._read_duration_cap(room)
+        return cap
+
+    def _read_duration_cap(self, room):
+        """The room cap as Home Assistant has it: the canonical entity, or its same-room legacy one if
+        absent. A read that fails (no answer, an HA error) is not "absent": it keeps the cap read earlier
+        this run, or holds.
+        `room._cap_seen` is only ever the value the last answered read gave (None after an invalid
+        value or a missing entity). Accepted by design: a cap lowered since that read loses to the
+        old value if the very next read fails; the read after it applies the new one."""
         for suffix in ("max_shot_duration", "maximum_shot_duration"):
             entity = f"number.crop_steering_{room.prefix}{suffix}"
-            raw, attributes, updated = ha_get(entity)
-            if raw is None and not attributes and updated is None:
+            status, (raw, _attributes, _updated) = ha_get_status(entity)
+            if status == 404:
+                room._cap_seen = None
                 continue
-            try:
-                value = float(raw)
-            except (TypeError, ValueError):
-                value = None
-            if value is not None and math.isfinite(value) and value >= 5:
+            if status != 200:
+                last = room.__dict__.get("_cap_seen")
+                if last is not None:
+                    return last
+                self._alert(
+                    f"duration_config_{room.slug}",
+                    "CS-203",
+                    "maximum shot length not valid, no shots",
+                    "The controller could not read the maximum shot length of the room from Home Assistant, "
+                    "and it has read no value since it started, so it starts no shot. The controller does "
+                    f"not replace the value with a default.\n\nSetting: {entity}",
+                    room=room,
+                )
+                return None
+            value = valid_cap(raw)
+            if value is not None:
+                room._cap_seen = value
+                self._dismiss(f"duration_config_{room.slug}")
                 return value
+            room._cap_seen = None
             self._alert(
                 f"duration_config_{room.slug}",
                 "CS-203",
@@ -2100,7 +2420,7 @@ class Controller:
             )
             return None
         # Keep the existing installation fallback only when neither room entity exists.
-        return 900.0
+        return DEFAULT_MAX_SHOT_S
 
     def _num_or_none(self, entity):
         """Read a number entity as float, or None if it doesn't exist / isn't a number."""
@@ -2112,6 +2432,22 @@ class Controller:
         if value is not None:
             self._note_setting(entity, value, attributes)
         return value
+
+    def _feed_band(self, room, quantity):
+        """The room's feed `quantity` ("ec" or "ph") band as (low, high, unreadable): a bound of 0 or less is no
+        bound, and so is a setting Home Assistant does not have (404), as before. `unreadable` names a setting
+        that can't be read (unavailable, unknown, not a number, no answer): the band can't be known, so the
+        source-water gate holds and the mix check waits. The gate, the gate list and dosing all read it here."""
+        band = []
+        for end in ("min", "max"):
+            entity = f"number.crop_steering_{room.prefix}irrigation_{quantity}_{end}"
+            value = self._num_or_none(entity)
+            if value is None or not math.isfinite(value):
+                if value is not None or ha_get_status(entity)[0] != 404:
+                    return 0.0, 0.0, entity
+                value = 0.0
+            band.append(value)
+        return band[0], band[1], None
 
     def _note_setting(self, entity, value, attributes):
         """A setting read with another value than at its last read: the log says who changed it and
@@ -2166,14 +2502,11 @@ class Controller:
         consecutive fused VWC sensors that exist under EITHER naming convention —
         sensor.crop_steering_<prefix>vwc_zone_N (current) or the registry-sticky legacy
         sensor.crop_steering_<prefix>zone_N_vwc — or `fallback` if none do (e.g. HA not
-        reachable yet at startup)."""
+        reachable yet at startup). One read of every state: a read that failed part-way counted too few."""
+        have = {s.get("entity_id") for s in ha_get_all() if isinstance(s, dict)}
         n = 0
-        for z in range(1, 25):
-            new, _, _ = ha_get(f"sensor.crop_steering_{prefix}vwc_zone_{z}")
-            if new is None:
-                old, _, _ = ha_get(f"sensor.crop_steering_{prefix}zone_{z}_vwc")
-                if old is None:
-                    break
+        while n < 24 and {f"sensor.crop_steering_{prefix}vwc_zone_{n + 1}",
+                          f"sensor.crop_steering_{prefix}zone_{n + 1}_vwc"} & have:
             n += 1
         return n or fallback
 
@@ -2208,13 +2541,15 @@ class Controller:
             return default
         return str(v).lower() in ON_STATES
 
-    def _device(self, entity, quantity, keep_refused=False):
+    def _device(self, entity, quantity, keep_refused=False, pick=None):
         """One read of a mapped device (a moisture or EC probe, a feed probe, a power plug) through the device-unit
         table (crop_steering_engine.defaults.UNITS) -> (value in the quantity's canonical unit or None, state,
         unit, last_updated, how the unit was taken or None when there is no number, attributes). Every numeric
         device read goes through here or _device_history, so none can skip the table (tests/test_device_units.py).
-        The unit of an entity that is unavailable now is the one it last reported this run."""
-        v, attrs, lu = ha_get(entity)
+        The unit of an entity that is unavailable now is the one it last reported this run. `pick(read)`: the read
+        to use instead of `entity`'s own (a calibrated feed probe, _feed_value)."""
+        read = ha_get(entity)
+        v, attrs, lu = (read if pick is None else pick(read))[:3]
         seen = self.__dict__.setdefault("_device_units", {})
         unit = (attrs or {}).get("unit_of_measurement")
         if v in (None, "unknown", "unavailable", ""):
@@ -2279,11 +2614,11 @@ class Controller:
             out.append((value, changed))
         return out
 
-    def _read_sensor(self, entity, quantity, max_age_min=20, keep_refused=False):
+    def _read_sensor(self, entity, quantity, max_age_min=SENSOR_MAX_AGE_MIN, keep_refused=False, pick=None):
         """A device's live reading in its quantity's canonical unit, or None: no number, set aside for its unit,
-        outside the quantity's sane range, stale, or stamped in the future."""
+        outside the quantity's sane range, stale, or stamped in the future. `pick`: as _device's."""
         lo, hi = UNITS[quantity]["plausible"]
-        f, _v, _unit, lu, _taken, _attrs = self._device(entity, quantity, keep_refused)
+        f, _v, _unit, lu, _taken, _attrs = self._device(entity, quantity, keep_refused, pick)
         if f is None or f < lo or f > hi:
             return None
         try:
@@ -2299,15 +2634,121 @@ class Controller:
             return None
         return f
 
-    def _read_feed_ec(self, room):
+    def _feed_read(self, room, quantity, raw, read, get):
+        """Ruling R4: which reading of the room's feed `quantity` ("ph" or "ec") probe `raw` to use, given `raw`'s own
+        `read` (made by the caller's device read), as (the entity read, (state, attributes, last_updated)). The
+        corrected sensor is read with `get` (ha_get, or the dosing runner's read), and only while a calibration applies.
+        - No calibration applied for `quantity` (room._feed_calibration): `raw`'s own read, as before.
+        - Applied, and FEED_CORRECTED is a number for `raw` itself, applied and live (not a value restored after a
+          restart): its number.
+        - Applied, but the corrected sensor for `raw` reads `applied: false` (a revert the cached descriptor has not
+          followed yet): `raw`'s own read, as the integration says.
+        - Applied otherwise (the corrected sensor unavailable, missing, restored or for another probe): raw x gain + bias.
+        A raw probe with no number is read as it is, whatever the corrected sensor shows: a dead probe stays dead. The
+        number is in `raw`'s unit, so `raw`'s attributes (its unit) and its last_updated (the reading's age) go with
+        it. A calibration in force is never read past: the raw number is never used uncorrected."""
+        fix = (getattr(room, "_feed_calibration", None) or {}).get(quantity)
+        if not fix:
+            return raw, read
+        corrected = FEED_CORRECTED.format(room.prefix, quantity)
+        state, attrs = get(corrected)[:2]
+        attrs = attrs if isinstance(attrs, dict) else {}
+        number = _finite_number(read[0])
+        if number is None:
+            return raw, read
+        if attrs.get("applied") is False and attrs.get("source") == raw and state != "unavailable":
+            return raw, read  # the integration says none applies (a revert): before the descriptor follows
+        live = _finite_number(state)
+        if (live is not None and attrs.get("applied") is True and attrs.get("source") == raw
+                and not attrs.get("restored")):
+            return corrected, (state, *read[1:3])
+        return raw, (repr(number * fix["gain"] + fix["bias"]), *read[1:3])
+
+    def _read_calibrating(self, room):
+        """dosing_config as (state, attributes): the integration's sensor the dosing runner reads too."""
+        return ha_get(DOSING_CONFIG.format(room.prefix))[:2]
+
+    def _calibrating_entry(self, room):
+        """(readable, dosing_config's `calibrating`): read by the gate itself, never through the dosing runner.
+        Inside a pass (loop_once opens _calibrating_pass) one read serves every zone for CALIBRATING_CACHE_S."""
+        cache = getattr(self, "_calibrating_pass", None)
+        if cache is not None and room.prefix in cache:
+            at, answer = cache[room.prefix]
+            if 0 <= time.monotonic() - at < CALIBRATING_CACHE_S:
+                return answer
+        state, attrs = self._read_calibrating(room)
+        readable = state not in (None, "", "unknown", "unavailable") and isinstance(attrs, dict)
+        answer = (readable, attrs.get("calibrating") if readable else None)
+        if cache is not None:
+            cache[room.prefix] = (time.monotonic(), answer)
+        return answer
+
+    def _feed_calibration_hold(self, room, quantity):
+        """Why the room's feed `quantity` ("ph" or "ec") probe can't be read as the feed, or None: a calibration
+        session is open for it (_calibrating_entry): it sits in a buffer. The integration publishes every open session
+        together (calibration.merge_holds): an entry naming a feed probe holds that probe's quantity, whatever pump
+        is with it; a pump's alone holds nothing here; any other entry counts for both probes. A dosing_config that
+        can't be read holds only a quantity with a calibration applied (fail-closed); without one it is as before."""
+        readable, entry = self._calibrating_entry(room)
+        if not readable:
+            if quantity in (getattr(room, "_feed_calibration", None) or {}):
+                entity = DOSING_CONFIG.format(room.prefix)
+                return FEED_CALIBRATION_UNREAD.format(name={"ph": "pH", "ec": "EC"}[quantity], entity=entity)
+            return None
+        if not entry:
+            return None
+        if isinstance(entry, dict):
+            probe = entry.get("probe")
+            if probe in ("feed_ph", "feed_ec"):
+                return FEED_CALIBRATING if probe == f"feed_{quantity}" else None
+            if probe is None and entry.get("pump"):
+                return None
+        return FEED_CALIBRATING
+
+    def _feed_value(self, room, quantity):
+        """The room's feed `quantity` ("ph" or "ec") now, in its canonical unit, and the entity it was read from
+        (_feed_read: the corrected sensor, or the raw probe, corrected or not): (value or None, entity). None: no
+        number, set aside for its unit, implausible, stale, or stamped in the future (_read_sensor). A feed EC probe in
+        ppm or ppt is read as before (keep_refused): never a new dead-feed hold."""
+        raw = getattr(room, f"feed_{quantity}_sensor")
+        chosen = [raw]
+
+        def pick(read):
+            chosen[0], read = self._feed_read(room, quantity, raw, read, ha_get)
+            return read
+
+        return self._read_sensor(raw, quantity, keep_refused=quantity == "ec", pick=pick), chosen[0]
+
+    def _adopt_feed_calibration(self, room, attrs):
+        """engine_config's `feed_calibration` ({q: {gain, bias, ...}}) into room._feed_calibration, saved in the room's
+        state block (_feed_calibration) so a restart with Home Assistant down still corrects. `attrs` is a readable
+        descriptor: without the key it clears the calibration; a key that can't be read keeps the last one."""
+        fixes = _feed_fixes(attrs.get("feed_calibration", {}))
+        unread = self.__dict__.setdefault("_feed_calibration_unread", set())
+        if fixes is None:
+            if room.slug not in unread:
+                unread.add(room.slug)
+                log(f"[{room.slug}] engine_config feed_calibration can't be read "
+                    f"({attrs.get('feed_calibration')!r}): the last one stays in force")
+            return
+        unread.discard(room.slug)
+        if fixes == getattr(room, "_feed_calibration", {}):
+            return
+        room._feed_calibration = fixes
+        log(f"[{room.slug}] feed probe calibration in force: "
+            + (", ".join(f"{q} x{f['gain']:g} {f['bias']:+g}" for q, f in sorted(fixes.items())) or "none"))
+        self._save_state()
+
+    def _read_feed_ec(self, room, held=False):
+        """`held`: _feed_calibration_hold's answer when the caller has it (False: read it here)."""
         if not room.feed_ec_sensor:
             return None
-        # A feed probe in ppm or ppt is read as before (keep_refused): never a new dead-feed hold.
-        feed = self._read_sensor(room.feed_ec_sensor, "ec", keep_refused=True)
+        if (self._feed_calibration_hold(room, "ec") if held is False else held):  # a buffer is no feed reading
+            return None
+        feed = self._feed_value(room, "ec")[0]
         if feed is not None:
-            lo = self._num(f"number.crop_steering_{room.prefix}irrigation_ec_min", 0)
-            hi = self._num(f"number.crop_steering_{room.prefix}irrigation_ec_max", 0)
-            if (lo <= 0 or feed >= lo) and (hi <= 0 or feed <= hi):
+            lo, hi, unread = self._feed_band(room, "ec")  # a band that can't be read proves no reading good
+            if not unread and (lo <= 0 or feed >= lo) and (hi <= 0 or feed <= hi):
                 room._feed_last_good_value, room._feed_last_good_time = (
                     feed,
                     datetime.now(),
@@ -2326,14 +2767,46 @@ class Controller:
             return None
         return ec if 0.1 <= ec <= 10 else None
 
-    def _read_feed_ph(self, room):
+    def _watch_feed_known(self, room):
+        """CS-907, raised once: a room with no feed EC probe and no recipe feed EC has an unknown feed, and decide()
+        takes no EC flush on a feed it never measured. The card comes down when either appears."""
+        key = f"feed_unknown_{room.slug}"
+        if not room.zones or room.feed_ec_sensor or self._recipe_feed_ec(room) is not None:
+            self._dismiss(key)
+        elif key not in self._alerted and getattr(room, "legacy_feed_ec", None) is not None:
+            self._alert(
+                key,
+                "CS-907",
+                "The feed EC is unknown: the old 3.0 mS/cm is assumed",
+                "The room has no feed EC probe and its feed recipe declares no EC. As before the update to "
+                f"3.18, the controller assumes a feed EC of {room.legacy_feed_ec:g} mS/cm for EC flushes and "
+                "holds for a high EC. Set a recipe feed EC or map a feed EC probe: the assumption then stops.",
+                room=room,
+                quiet=False,
+            )
+        elif key not in self._alerted:
+            self._alert(
+                key,
+                "CS-907",
+                "EC flushing is off: the feed EC is unknown",
+                "EC flushing is off in this room: set a recipe feed EC or map a feed EC probe. The room has no "
+                "feed EC probe and its feed recipe declares no EC, so the controller cannot tell whether the feed "
+                "can lower the pore EC. Zones are watered on their moisture only, with no EC flush and no hold "
+                "for a high EC.",
+                room=room,
+                quiet=False,
+            )
+
+    def _read_feed_ph(self, room, held=False):
+        """`held`: as _read_feed_ec's."""
         if not room.feed_ph_sensor:
             return None
-        ph = self._read_sensor(room.feed_ph_sensor, "ph")
+        if (self._feed_calibration_hold(room, "ph") if held is False else held):  # a buffer is no feed reading
+            return None
+        ph = self._feed_value(room, "ph")[0]
         if ph is not None:
-            lo = self._num(f"number.crop_steering_{room.prefix}irrigation_ph_min", 0)
-            hi = self._num(f"number.crop_steering_{room.prefix}irrigation_ph_max", 0)
-            if (lo <= 0 or ph >= lo) and (hi <= 0 or ph <= hi):
+            lo, hi, unread = self._feed_band(room, "ph")  # a band that can't be read proves no reading good
+            if not unread and (lo <= 0 or ph >= lo) and (hi <= 0 or ph <= hi):
                 room._feed_ph_last_good, room._feed_ph_last_good_time = (
                     ph,
                     datetime.now(),
@@ -2366,27 +2839,75 @@ class Controller:
     def _refresh_lights(self, room):
         """Lights are configured once in the integration, per room. Read them live from
         number.crop_steering_<prefix>lights_on_hour / _off_hour each loop, keeping the hours last
-        read through a loop that can't read them, and falling back to the add-on option only when
-        none have been read since start (an older integration without the entities). Log the
-        source once per room, and alert once if the integration value disagrees with the
-        (now-legacy) add-on option."""
+        read (saved in state.json, so a restart keeps them too) through a loop that can't read them
+        or reads them at the same hour (CS-401), and falling back to the add-on option only when
+        none have ever been read (an older integration without the entities), and to the shipped
+        hours when the option's are the same hour or out of range (CS-401). Log the source once per
+        room, and alert once if the integration value disagrees with the (now-legacy) add-on option."""
         lon = self._num_or_none(f"number.crop_steering_{room.prefix}lights_on_hour")
         loff = self._num_or_none(f"number.crop_steering_{room.prefix}lights_off_hour")
+        same = lon if lon is not None and lon == loff else None
+        if same is not None:
+            # Equal hours have no lights-off and read as lights never on: every zone held overnight all day
+            # (CTL-030). Setup refuses them, but each entity takes any hour, so they count as unreadable.
+            lon = loff = None
+        if not hasattr(room, "_lights_last_read"):
+            saved = (getattr(self, "_saved_room_blocks", {}).get(room.slug) or {}).get("_lights")
+            room._lights_last_read = usable_lights(*saved) if isinstance(saved, list) and len(saved) == 2 else None
+        option = None
         if lon is not None and loff is not None:
             src = "integration"
-            room._lights_last_read = (lon, loff)
-        elif getattr(room, "_lights_last_read", None):
+            if room._lights_last_read != (lon, loff):
+                room._lights_last_read = (lon, loff)
+                self._save_state()
+        elif room._lights_last_read:
             # One unreadable loop (Home Assistant restarting, an integration reload, a timed-out
             # read) must not swap in the option: with the integration on 7-20 and the option on
             # 10-22, 08:30 read as lights-off, the zone was forced to P3, and the next loop's
             # lights-on edge restarted its day, daily volume and shot count included.
             (lon, loff), src = room._lights_last_read, "integration (last reading)"
-        else:
+        elif usable_lights(room.opt_lon, room.opt_loff):
             lon, loff, src = (
                 room.opt_lon,
                 room.opt_loff,
-                "add-on option (integration entity missing)",
+                "add-on option (integration entity missing)" if same is None
+                else "add-on option (integration hours the same)",
             )
+        else:
+            option = "the same hour" if room.opt_lon == room.opt_loff else "out of range"
+            (lon, loff), src = SHIPPED_LIGHTS, (
+                "shipped default (option hours the same)" if room.opt_lon == room.opt_loff
+                else "shipped default (option hours out of range)"
+            )
+        if same is not None:
+            self._alert(
+                f"lights_same_hour_{room.slug}",
+                "CS-401",
+                "lights-on and lights-off at the same hour",
+                f"Lights on hour and Lights off hour are both {int(same)}:00, the same hour. The controller cannot "
+                "use the same hour for the two: it gives no time for lights-off. The controller continues on "
+                f"{int(lon)}:00-{int(loff)}:00 ({src}). A room lit around the clock is not supported yet. Set the "
+                "hours the lights switch on and off."
+                f"\n\nSettings: number.crop_steering_{room.prefix}lights_on_hour, "
+                f"number.crop_steering_{room.prefix}lights_off_hour",
+                room=room,
+            )
+        elif src == "integration":
+            self._dismiss(f"lights_same_hour_{room.slug}")
+        if option:
+            self._alert(
+                f"lights_option_{room.slug}",
+                "CS-401",
+                "lights hours of the option not usable",
+                f"The controller has no lights hours from the integration, and the lights_on_hour and "
+                f"lights_off_hour options of the controller ({room.opt_lon:g} and {room.opt_loff:g}) are {option}: "
+                "the controller cannot use them. It uses the shipped hours "
+                f"{int(lon)}:00-{int(loff)}:00. Set Lights on hour and Lights off hour in the integration, and set "
+                "the options to the same hours, from 0 to 23 and not the same hour.",
+                room=room,
+            )
+        else:
+            self._dismiss(f"lights_option_{room.slug}")
         if not room._lights_logged:
             tag = "" if room.prefix == "" else f"[{room.slug}] "
             log(f"config: {tag}lights {int(lon)}:00-{int(loff)}:00 (source: {src})")
@@ -2588,6 +3109,7 @@ class Controller:
                         "reports again. Check the pore EC probes in the list below."
                         f"\n\nSensor: {looking}\nLeft out: {left_out}",
                         room=room,
+                        entity_id=looking,
                         zone=zone,
                     )
                 if attrs:
@@ -2606,6 +3128,7 @@ class Controller:
                     "a probe out of its cube or in a puddle. Alternatively, set the zone to Median."
                     f"\n\nSensor: {looking}\nLeft out: {left_out}",
                     room=room,
+                    entity_id=looking,
                     zone=zone,
                 )
 
@@ -2635,6 +3158,7 @@ class Controller:
             f"Probes for the zone. This alert comes once. It clears when the probe reports again.\n\nSensor: {looking}\n"
             f"Primary: {primary}",
             room=room,
+            entity_id=looking,
             zone=zone,
             quiet=False,
         )
@@ -2674,8 +3198,10 @@ class Controller:
             feed_ec = room._feed_last_good_value
         else:
             feed_ec = None
-        if feed_ec is None:  # measured first, then the feed recipe's declared EC, then 3.0
+        if feed_ec is None:  # measured first, then the feed recipe's declared EC, else unknown (None)
             feed_ec = self._recipe_feed_ec(room)
+        if feed_ec is None and not room.feed_ec_sensor:  # ...unless the upgrade kept 3.17.0's 3.0 for a probe-less room
+            feed_ec = getattr(room, "legacy_feed_ec", None)
         new_grow_day = self._new_grow_day(room, st, now, lights_on)
         snap = ZoneSnapshot(
             vwc=vwc,
@@ -2702,7 +3228,7 @@ class Controller:
             # the min-daily floor's clock: it is paced from lights-on (core.floor_share)
             hours_since_lights_on=(24.0 - self._hours_to(now, room.lights_on_hour)) % 24.0,
             uptime_min=(now - self._start).total_seconds() / 60.0,
-            feed_ec=(feed_ec if feed_ec is not None else 3.0),
+            feed_ec=feed_ec,
             new_grow_day=new_grow_day,
             # the P1 rule (core.decide): reached the target, the peak before the last shot, shots since reaching it
             p1_reached=bool(st.get("p1_reached")),
@@ -3220,10 +3746,12 @@ class Controller:
             pass
         return float(lo), float(hi)
 
-    def _auto_write(self, room, zone, suffix, old, value, learn, now, by="auto", reason=None, expected=None):
+    def _auto_write(self, room, zone, suffix, old, value, learn, now, by="auto", reason=None, expected=None,
+                    ledger_id=None):
         """Write one per-zone number -> False when it was not written (no such number, or Home Assistant refused).
         `reason` and `expected`: why, and the result expected, for the room's setpoint change log (an AI assistant
-        power's write names both)."""
+        power's write names both). `ledger_id`: the AI assistant's ledger row the write carries out, named in the
+        claim so the integration's target.changed carries it (its ai.outcome finds the change by it)."""
         entity = f"number.crop_steering_{room.prefix}zone_{zone}_{suffix}"
         if ha_get(entity)[0] in (None, "unknown", "unavailable", ""):
             return False  # no per-zone number on this install: room-level values are the operator's, never ours
@@ -3235,11 +3763,13 @@ class Controller:
         # change log (the integration's setpoint_log.py). The brain's put-back is the safety writer.
         who = ("safety" if by.endswith("(put back)") else "brain" if by.startswith(("Jev", "AI "))
                else "learner")
-        claim = {"entity_id": entity, "value": value, "who": who}
+        claim = {"entity_id": entity, "value": value, "who": who, "claim_id": uuid.uuid4().hex}
         if reason:
             claim["reason"] = str(reason)[:200]
         if expected:
             claim["expected"] = str(expected)[:200]
+        if ledger_id:
+            claim["ledger_id"] = str(ledger_id)
         if by.startswith(("Jev", "AI setpoints judge")) and who == "brain":
             # An AI change is an overlay that goes back by itself (the integration's overlays.py): at the
             # lights-on that ends the grow-day it is for. A night move (P3) is for the next grow-day.
@@ -3249,6 +3779,8 @@ class Controller:
             claim["expires"] = on.astimezone().isoformat(timespec="seconds")
         ha_fire("crop_steering_setpoint_write", claim)
         if not ha_call("number", "set_value", entity_id=entity, value=value):
+            # Not written: take the claim back, or the operator writing this value next is taken for us.
+            ha_fire("crop_steering_setpoint_claim_cancel", {k: claim[k] for k in ("entity_id", "value", "who", "claim_id")})
             return False
         written[(zone, suffix)] = (value, now)
         self.__dict__.setdefault("_settings_noted", {})[entity] = (value, now)  # said here, not again
@@ -3324,12 +3856,13 @@ class Controller:
     # hold one round for 50 s, the kill switch unread and the valve open.
     KEEP_ALIVE_WRITES = 2
 
-    def _heartbeat(self, room, now, hardware_fault, room_active=True, timeout=None):
-        room._beat, room._beat_at = (hardware_fault, room_active), time.monotonic()
+    def _heartbeat(self, room, now, hardware_fault, room_active=True, loop_error=None, timeout=None):
+        room._beat, room._beat_at = (hardware_fault, room_active, loop_error), time.monotonic()
         ha_set(
             f"sensor.crop_steering_{room.prefix}ai_heartbeat",
-            "healthy",
+            "error" if loop_error else "healthy",
             {
+                **({"loop_error": loop_error} if loop_error else {}),  # the room's pass raised (_room_error)
                 "engine": PRODUCT,
                 # which controller is actually RUNNING, for the dashboard's sidebar
                 "controller_version": CONTROLLER_VERSION,
@@ -3353,6 +3886,12 @@ class Controller:
                 "setup_pending": getattr(room, "_setup_pending", None),
                 "room_active": room_active,
                 "max_run": self._max_run_report(room),
+                "write_failures": _SET_FAILED["count"],  # state writes that failed since the start (ha_set)
+                # what the dashboard judges with, the controller's own: a reading older than this is not used,
+                # a valve open longer than the last shot's cap is not a shot, and the pore-EC band of a target
+                "max_sensor_age_s": SENSOR_MAX_AGE_MIN * 60,
+                "max_shot_s": getattr(room, "_max_shot_s", None),
+                "pore_ec_neutral": _pore_ec_neutral(room),
             },
             **({"timeout": timeout} if timeout else {}),
         )
@@ -3434,6 +3973,13 @@ class Controller:
         if getattr(room, "_waiting", None) is None:
             room._waiting = {}
         room._waiting[zone] = (conditions, now)
+        # And the clock the projection's expected phases follow (_phase_at).
+        clocks = room.__dict__.setdefault("_phase_clock", {})
+        clocks[zone] = None if snap is None or p is None else ({
+            "phase": snap.phase, "lights_on": snap.lights_on, "to_on_h": snap.hours_to_lights_on,
+            "to_off_h": snap.hours_to_lights_off, "p2_end_h": p.p2_end_h_before_off,
+            "p0_wait_min": max(p.p0_max_wait_min, p.p0_min_wait_min),
+            "p0_left_min": max(p.p0_max_wait_min, p.p0_min_wait_min) - snap.phase_minutes}, now)
         ha_set(
             f"sensor.crop_steering_{room.prefix}zone_{zone}_waiting_for_app",
             snap.phase if snap is not None else "none",
@@ -3470,33 +4016,18 @@ class Controller:
 
     # ---------- gates ----------
     def _blocked(self, room, zone, reason=None):
-        if getattr(room, "_setup_pending", None):
-            return room._setup_pending
-        if getattr(room, "setup_active", True) is False:
-            return "Room archived in integration setup"
-        if not self._room_active(room):
-            return "Room off (nothing growing)"
-        making = self._dosing_hold(room)  # every shot, the rescues a plan hold lets through included
-        if making:
-            return making
-        planned_hold = strategy_block(getattr(room, "strategy_snapshot", None), zone)
-        if planned_hold:
-            if getattr(reason, "kind", None) not in PLAN_HOLD_EXEMPT:
-                return planned_hold
-            log(f"[{room.slug}] Z{zone} {planned_hold}: not holding a {reason.kind} shot")
-        fault = self._hardware_fault_block(room)
-        if fault:
-            return fault
-        latched = self._max_run_hold(room, zone)
-        if latched:
-            return latched
-        hw = room.hw
-        if not hw["valves"].get(zone):
-            return (
-                "no hardware mapped — set this zone's valve (and the pump and mainline, if the room "
-                "has them) in the Crop Steering integration (or the add-on `hardware` option)"
-            )
-        plumbing = plumbing_hold(hw)
+        """Why the zone may not be watered this pass, else None: the first check of guards.PASS that holds, with its
+        alerts and releases. `reason` is the zone's decision (a held plan lets its rescues through)."""
+        held = self._blocked_by(room, zone, reason)
+        return held[1] if held else None
+
+    def _blocked_by(self, room, zone, reason=None):
+        """_blocked's (guard, why, code), or None: what the act loop journals of the hold."""
+        return guards.first(self, guards.PASS, room, zone, {"reason": reason})
+
+    def _plumbing_gate(self, room):
+        """guards.PASS "plumbing": why the room's plumbing and its switches disagree (CS-202), else None."""
+        plumbing = plumbing_hold(room.hw)
         if plumbing:
             self._alert(
                 f"plumbing_{room.slug}",
@@ -3509,6 +4040,10 @@ class Controller:
                 room=room,
             )
             return plumbing
+        return None
+
+    def _switchable_gate(self, room, zone):
+        """guards.PASS "switchable": the zone's valve, pump or main line the controller cannot switch (CS-313)."""
         undrivable = self._undrivable(room, zone)
         if undrivable:
             names = ", ".join(undrivable)
@@ -3524,56 +4059,21 @@ class Controller:
                 zone=zone,
             )
             return f"{names} can't be switched (a zone valve, main line or pump must be a switch, input_boolean or valve)"
-        if not self._on(room_gate(room), False):
-            return f"{PRODUCT} disabled (kill switch off)"
-        retired = getattr(room, "_retired_off", None)
-        if retired:  # switched off in their place this pass; the switch may not read OFF yet
-            return f"{' and '.join(retired)} off: engine switch switched off in its place"
-        # A zone switch that can't be read holds the zone, as the kill switch does: whether the zone
-        # is paused can't be known, and when every one reads unavailable the integration itself is
-        # not running (not loaded, disabled, Home Assistant in safe mode), so its overrides can't be
-        # read either. A shot already running still ends only on a definite OFF (_wait_shot).
-        zone_switch = f"switch.crop_steering_{room.prefix}zone_{zone}_enabled"
-        state = ha_get(zone_switch)[0]
-        if state in (None, "unknown", "unavailable", ""):
-            return f"{zone_switch} unreadable (reads neither on nor off)"
-        if str(state).lower() not in ON_STATES:
-            return "zone disabled"
-        if self._on(
-            f"switch.crop_steering_{room.prefix}zone_{zone}_manual_override", False
-        ):
-            return "manual override"
-        # External operator holds (tank dosing / manual fill / flush) are configurable
-        # (self.hold_entities, empty by default) — an install without them never holds here.
-        # One that can't be read (missing, unknown, unavailable) holds too, as an unreadable zone
-        # switch does: whether its tank is being dosed or filled can't be known. A shot already
-        # running still ends only on a definite ON (_wait_shot). One Home Assistant answers it does
-        # not have (404, a typo or a deleted helper) says so: no wait makes that one readable.
-        for f in self.hold_entities:
-            state = ha_get(f)[0]
-            if state is None and ha_get_status(f)[0] == 404:
-                return hold_missing(f)
-            if state in (None, "unknown", "unavailable", ""):
-                return f"external hold {f} unreadable (reads neither on nor off)"
-            if str(state).lower() in ON_STATES:
-                return f"external hold ({f.split('.')[-1]})"
-        waste = self._waste_hold(room)
-        if waste:
-            return waste
-        settings = self._settings_hold(room, zone)
-        if settings:
-            return settings
-        tank = self._tank_hold(room)  # only with a tank level mapped: never on an upgraded room until then
-        if tank:
-            return tank
-        # Source-water EC gate — only when a feed-EC sensor is configured. With no feed sensor
-        # the gate is disabled (the dosing/fill holds above still apply) so the add-on is safe
-        # out of the box on installs without a reservoir probe.
+        return None
+
+    def _feed_ec_gate(self, room, zone, reason):
+        """guards.PASS "feed_ec": the source-water EC gate. Only when a feed-EC sensor is configured. With no feed
+        sensor the gate is disabled (the dosing/fill holds still apply) so the add-on is safe out of the box on
+        installs without a reservoir probe."""
         if room.feed_ec_sensor:
-            feed = self._read_feed_ec(room)
-            lo = self._num(f"number.crop_steering_{room.prefix}irrigation_ec_min", 0)
-            hi = self._num(f"number.crop_steering_{room.prefix}irrigation_ec_max", 0)
+            held = self._feed_calibration_hold(room, "ec")
+            feed = self._read_feed_ec(room, held)
+            lo, hi, unread = self._feed_band(room, "ec")
+            if unread:
+                return f"source-water EC band unreadable ({unread}) — holding (fail-closed)"
             if lo > 0 or hi > 0:
+                if held:  # unreadable: held at once, no grace, no rescue
+                    return held
                 if feed is None:
                     if not feed_grace_ok(
                         datetime.now().timestamp(),
@@ -3585,18 +4085,24 @@ class Controller:
                         self.feed_grace_min,
                     ) and not self._rescue_past_dead_probe(room, zone, reason, "EC"):
                         return f"source-water EC dead >{self.feed_grace_min:.0f}min — holding (fail-closed)"
-                    # Inside the grace window we skip the EC band check only — fall through
-                    # so the pH gate below still runs. Returning None here would report the
-                    # zone as unblocked and silently bypass pH entirely.
+                    # Inside the grace window only the EC band check is skipped: the pH gate after it
+                    # (guards.PASS "feed_ph") still runs.
                 elif (lo > 0 and feed < lo) or (hi > 0 and feed > hi):
                     return f"source-water EC {feed:.1f} out of [{lo:g},{hi:g}]"
-        # pH half of the source-water gate — bad-pH feed locks out nutrients / burns roots, so
-        # gate it too, but only when a feed-pH sensor is configured.
+        return None
+
+    def _feed_ph_gate(self, room, zone, reason):
+        """guards.PASS "feed_ph": the pH half of the source-water gate. Bad-pH feed locks out nutrients / burns roots,
+        so it is gated too, but only when a feed-pH sensor is configured."""
         if room.feed_ph_sensor:
-            ph_lo = self._num(f"number.crop_steering_{room.prefix}irrigation_ph_min", 0)
-            ph_hi = self._num(f"number.crop_steering_{room.prefix}irrigation_ph_max", 0)
+            ph_lo, ph_hi, unread = self._feed_band(room, "ph")
+            if unread:
+                return f"source-water pH band unreadable ({unread}) — holding (fail-closed)"
             if ph_lo > 0 or ph_hi > 0:
-                ph = self._read_feed_ph(room)
+                held = self._feed_calibration_hold(room, "ph")
+                if held:  # unreadable: held at once, no grace, no rescue
+                    return held
+                ph = self._read_feed_ph(room, held)
                 if ph is None:
                     if not feed_grace_ok(
                         datetime.now().timestamp(),
@@ -3610,15 +4116,6 @@ class Controller:
                         return f"source-water pH probe dead >{self.feed_grace_min:.0f}min — holding (fail-closed)"
                 elif (ph_lo > 0 and ph < ph_lo) or (ph_hi > 0 and ph > ph_hi):
                     return f"source-water pH {ph:.2f} out of [{ph_lo:g},{ph_hi:g}]"
-        # Last, once nothing else holds the zone: a switch that reads neither on nor off (its device
-        # offline, Home Assistant still starting) accepts a command without switching and cannot be read
-        # back after the shot. On 25 Sep 2026 a shot opened onto an offline pump, could not be confirmed
-        # closed, and latched a hold that stopped the room for 7 hours. Nothing is opened until the
-        # whole feed path reads again, and nothing latches.
-        offline = [e for e in (hw.get("pump"), hw.get("mainline"), hw["valves"].get(zone))
-                   if e and str(hw_get(e)[0]).lower() not in ("on", "off")]
-        if offline:
-            return f"{', '.join(offline)} offline (reads neither on nor off)"
         return None
 
     def _rescue_past_dead_probe(self, room, zone, reason, half):
@@ -3749,6 +4246,16 @@ class Controller:
         return value if value in SUBSTRATES else "generic"
 
     @staticmethod
+    def _legacy_feed_ec(attrs):
+        """The feed EC (mS/cm) controller 3.17.0 assumed when nothing measured or declared one, which the
+        integration's upgrade keeps for a room with no feed EC probe (`legacy_feed_ec_fallback`), or None:
+        absent, or not a number in 0.1-10."""
+        value = (attrs or {}).get("legacy_feed_ec_fallback")
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            return None
+        return float(value) if 0.1 <= value <= 10 else None
+
+    @staticmethod
     def _room_name(attrs):
         """The name the operator gave the room, from its descriptor. "" when it has none: an older
         integration publishes none, and the wizard's own default is not a name anyone chose."""
@@ -3840,12 +4347,15 @@ class Controller:
             )
         return off
 
-    def _alert(self, key, code, title, message, room=None, zone=None, quiet=True):
+    def _alert(self, key, code, title, message, room=None, zone=None, quiet=True, entity_id=None):
         """Raise notification `f2_{key}` with its error code (docs/error-codes.json; the dashboard's
         Help & tools lists the same catalog). The key, and so the notification id, never changes
         with the wording: an update replaces an old notification instead of adding a second one.
         True once Home Assistant has it; False while it is inside its quiet period (`quiet`: for a
-        condition re-checked every loop) or could not be created."""
+        condition re-checked every loop) or could not be created. The first raise of an episode Home Assistant
+        took is journaled (alert.raised), with `entity_id`: the sensor or switch it is about, when it is about one;
+        a standing alert's repeats are not (a new code, a raise after it cleared, or one after over
+        ALERT_EPISODE_GAP_S is a new episode, as for the push)."""
         if room is not None and zone is not None and zone in getattr(room, "state", {}):
             day_summary.alert(room.state[zone], code)  # the code, for the zone's grow-day summary
         if quiet and not self._alert_due(key, code):
@@ -3869,9 +4379,19 @@ class Controller:
             notification_id=f"f2_{key}",
         ):
             return False
+        last = self._alerted.get(key)
+        new_episode = (last is None or self._alert_codes.get(key) != code
+                       or (now - last).total_seconds() > ALERT_EPISODE_GAP_S)
         push = self._push_due(key, code, now)
         self._alerted[key] = now
         self._alert_codes[key] = code
+        prefix = getattr(room, "prefix", "") or ""
+        self.__dict__.setdefault("_alert_rooms", {})[key] = prefix  # alert.cleared goes to the same room
+        data = {"key": key, "title": title}
+        if entity_id:
+            data["entity_id"] = entity_id
+        if new_episode:
+            self._journal(prefix, "alert.raised", zone=zone, code=code, data=data)
         if push and self._muted(room, code):
             log("ALERT push held:", key, "its room is muted in Crop Steering")
             push = False
@@ -4111,6 +4631,7 @@ class Controller:
             "Check the sump pump now: its power, its float switch and that it pumps the water out. If the reading "
             f"is unavailable, check its power plug.\n\nSensor: {entity}",
             room=room,
+            entity_id=entity,
         )
 
     def _watch_runoff(self, room, now):
@@ -4280,6 +4801,9 @@ class Controller:
                 "below_minimum": drawdown["low"],
                 "over_full": drawdown["over"],
                 "minimum_pct": tank_level.LOW_HOLD_PCT,
+                "release_pct": tank_level.LOW_RELEASE_PCT,
+                "over_pct": tank_level.OVER_HOLD_PCT,
+                "over_release_pct": tank_level.OVER_RELEASE_PCT,
                 "engine": PRODUCT,
             },
         )
@@ -4293,6 +4817,7 @@ class Controller:
             ha_call("persistent_notification", "dismiss", notification_id=f"f2_{key}")
             self._alerted.pop(key, None)
             self._alert_codes.pop(key, None)
+            self._journal(self.__dict__.get("_alert_rooms", {}).pop(key, ""), "alert.cleared", data={"key": key})
 
     def _tank_marks(self, room, pct):
         """Move the minimum and overfill latches (tank_level.below_minimum, over_full) by a level read now; saved
@@ -4315,6 +4840,7 @@ class Controller:
                     "valve closes. Check the full and empty distances of the tank in Rooms & setup."
                     f"\n\nSensor: {room.tank['distance']}",
                     room=room,
+                    entity_id=room.tank["distance"],
                     quiet=False,
                 )
             else:
@@ -4324,7 +4850,8 @@ class Controller:
             self._save_state()
 
     def _tank_hold(self, room):
-        """Why the reservoir minimum holds the room's shots (docs/USER_GUIDE.md, "Reservoir minimum"), else None.
+        """(why, its code) the reservoir minimum holds the room's shots (docs/USER_GUIDE.md, "Reservoir minimum"), else
+        None.
         Armed only by a tank level mapped in Rooms & setup (tank_level.mapping): a batch tank's full float is not a
         level, so a room without one, as every room is until its operator maps one, is never held here. A level
         that reads nothing, or that the drawdown check says is stuck, holds (CS-902): a pump run dry is what the
@@ -4346,7 +4873,7 @@ class Controller:
                 f"again when the level reads again. Check the sensor, its power and its position.\n\nSensor: {names}",
                 room=room,
             )
-            return f"tank level unknown ({names})"
+            return f"tank level unknown ({names})", "CS-902"
         self._dismiss(f"tank_unknown_{room.slug}")
         self._tank_marks(room, pct)
         if (pct is not None and room.tank_drawdown["low"]) or low:
@@ -4361,7 +4888,7 @@ class Controller:
                 "float switch, if it has one, does not read low. Refill the tank.",
                 room=room,
             )
-            return f"tank at its minimum ({level})"
+            return f"tank at its minimum ({level})", "CS-901"
         self._dismiss(f"tank_low_{room.slug}")
         return None
 
@@ -4787,7 +5314,7 @@ class Controller:
         """One entity's state for the AI assistant's context (the room's flower start date)."""
         return ha_get(entity)[0]
 
-    def _unreadable(self, entity, max_age_min=20):
+    def _unreadable(self, entity, max_age_min=SENSOR_MAX_AGE_MIN):
         """Why `_read_sensor` found no usable moisture reading at `entity`, as (code, sentence).
         The same tests in the same order, on one more read of the entity."""
         lo, hi = UNITS["vwc"]["plausible"]
@@ -4884,9 +5411,11 @@ class Controller:
         }
         return round(sum(item["litres"] for item in history), 2), attrs
 
-    def _advance_shot_counters(self, room, zone, size_pct, *, delivered_l=None, steering=True):
+    def _advance_shot_counters(self, room, zone, size_pct, *, delivered_l=None, steering=True, learn=True):
         """A delivered shot's water, counted. A test shot (steering False) is water like any other, but
-        not one of the day's shots: it is not a ramp shot, and nothing learns from it."""
+        not one of the day's shots: it is not a ramp shot, and nothing learns from it. A timer shot (learn False) is
+        one of the day's shots, but the Auto setpoints learner never reads it: a timer's water must not steer the
+        engine's setpoints. An engine shot still settling is settled on the reading before the timer water."""
         st = room.state[zone]
         now = datetime.now()
         self._water_usage(room, zone, now)
@@ -4900,7 +5429,10 @@ class Controller:
         if steering:
             if not isinstance(st.get("learn"), dict):
                 st["learn"] = auto_setpoints.fresh()
-            auto_setpoints.shot(st["learn"], st.get("phase"), size_pct, st.get("last_vwc"), now.timestamp())
+            if learn:
+                auto_setpoints.shot(st["learn"], st.get("phase"), size_pct, st.get("last_vwc"), now.timestamp())
+            else:
+                auto_setpoints.settle(st["learn"], st.get("last_vwc"))
             first = st.get("phase") == "P1" and st["shots"] == 0
             try:  # the day's first shot closes the night: the VWC it started from is what the zone landed on
                 record = zone_history.shot(st, vwc_before=st.get("last_vwc"), now=now, day=day, first=first)
@@ -4964,6 +5496,8 @@ class Controller:
             log(f"[{room.slug}] Z{zone} {words}")
             tag = "" if room.prefix == "" else f"{room.slug} "
             self._activity.insert(0, f"{now.strftime('%H:%M')} {tag}Z{zone} {words}"[:120])
+        self._journal(room.prefix, "phase.changed", zone=zone, actor="manual" if how == "set by hand" else "engine",
+                      data={"from": was, "to": new, "how": how})
         try:
             entry = zone_history.phase_changed(st, was, new, day=self._grow_day_start(room, now).isoformat(), how=how)
             if entry is not None:
@@ -5376,6 +5910,44 @@ class Controller:
         if self._alerted.pop(f"inflight_{room.slug}", None):
             ha_call("persistent_notification", "dismiss", notification_id=f"f2_inflight_{room.slug}")
 
+    def _operator_stop(self, room, zone, step, until=None, holds=False):
+        """The operator's own switches for a shot, read in turn, each read bounded by `step` and by what
+        is left to the monotonic `until` (none starts once it has passed): ("refused", None) when Home
+        Assistant refuses this controller's token, ("abort", entity) for a definitive kill OFF / room
+        OFF / zone OFF / override ON, else None. With `holds` (a shot still opening; _wait_shot reads
+        them itself, with the valve) also ("external", entity) for a hold, or under a waste-valve rule
+        the waste valve, that reads ON, as in _wait_shot."""
+        for entity, stop_state in (
+            (room_gate(room), "off"),
+            (f"switch.crop_steering_{room.prefix}room_active", "off"),
+            (f"switch.crop_steering_{room.prefix}zone_{zone}_enabled", "off"),
+            (
+                f"switch.crop_steering_{room.prefix}zone_{zone}_manual_override",
+                "on",
+            ),
+        ):
+            remaining = step if until is None else until - time.monotonic()
+            if remaining <= 0:
+                return None
+            if _GATE.state == "all":
+                return ("refused", None)
+            # Account for network time, and never start a read longer than what remains.
+            # HTTP/socket scheduling can still overshoot; the caller measures time rather
+            # than pretending sleep time was delivery.
+            state = ha_get(entity, timeout=min(step, remaining))[0]
+            if state == stop_state:
+                return ("abort", entity)
+        waste = (room.waste,) if holds and self._waste_rule(room) != "Off" else ()
+        for entity in [e for e in (*(self.hold_entities if holds else ()), *waste) if e]:
+            remaining = step if until is None else until - time.monotonic()
+            if remaining <= 0:
+                return None
+            if _GATE.state == "all":
+                return ("refused", None)
+            if str(hw_get(entity, timeout=min(step, remaining))[0]).lower() in ON_STATES:
+                return ("external", entity)
+        return None
+
     def _wait_shot(self, room, zone, duration_s, started=None):
         """Wait to a monotonic deadline, including HA latency and valve-open command time.
 
@@ -5399,26 +5971,9 @@ class Controller:
         # The waste valve, under a waste-valve rule: opened during the shot, it ends it (CS-307).
         waste = (room.waste,) if self._waste_rule(room) != "Off" else ()
         while time.monotonic() < deadline:
-            for entity, stop_state in (
-                (room_gate(room), "off"),
-                (f"switch.crop_steering_{room.prefix}room_active", "off"),
-                (f"switch.crop_steering_{room.prefix}zone_{zone}_enabled", "off"),
-                (
-                    f"switch.crop_steering_{room.prefix}zone_{zone}_manual_override",
-                    "on",
-                ),
-            ):
-                remaining = deadline - time.monotonic()
-                if remaining <= 0:
-                    break
-                if _GATE.state == "all":
-                    return time.monotonic() - started, ("refused", None)
-                # Account for network time, and never start an eight-second read when
-                # less than that remains. HTTP/socket scheduling can still overshoot;
-                # return measured time rather than pretending sleep time was delivery.
-                state = ha_get(entity, timeout=min(step, remaining))[0]
-                if state == stop_state:
-                    return time.monotonic() - started, ("abort", entity)
+            stop = self._operator_stop(room, zone, step, deadline)
+            if stop:
+                return time.monotonic() - started, stop
             for entity in [e for e in (*self.hold_entities, *waste, valve) if e]:
                 remaining = deadline - time.monotonic()
                 if remaining <= 0:
@@ -5447,7 +6002,7 @@ class Controller:
                     time.sleep(min(step, remaining))
         return time.monotonic() - started, None
 
-    def _close_cut_short(self, room, zone, by, elapsed, duration_s, valve_opened):
+    def _close_cut_short(self, room, zone, by, elapsed, duration_s, valve_opened, unconfirmed=None):
         """Close a shot that something else cut short (see _wait_shot) -> seconds its valve was open.
 
         The shot's valve and main line are its own: each is switched off unless it already reads OFF
@@ -5461,12 +6016,15 @@ class Controller:
         change falls between this shot opening it and the interruption being seen: it closed before
         the controller looked. Otherwise (still open, or no usable change time) they run to when the
         interruption was seen.
+
+        `unconfirmed` (a shot cut short while it opened): the switch it had sent ON and not yet read back
+        ON. Its OFF may only be its old state, the ON still to land, so it is switched off whatever it reads.
         """
         valve, mainline, pump = room.hw["valves"].get(zone), room.hw.get("mainline"), room.hw.get("pump")
         reads = {e: hw_get(e) for e in (valve, mainline, pump) if e}
-        close = [e for e in (valve, mainline) if e and reads[e][0] != "off"]
+        close = [e for e in (valve, mainline) if e and (e == unconfirmed or reads[e][0] != "off")]
         left = []
-        if pump and reads[pump][0] != "off":
+        if pump and (pump == unconfirmed or reads[pump][0] != "off"):
             (left if any(self._on(f, False) for f in self.hold_entities) else close).append(pump)
         failures = self._switch_off_failures(close) if close else []
         if failures:
@@ -5496,8 +6054,14 @@ class Controller:
         return open_s
 
     @staticmethod
-    def _confirm_switches(entities, want, deadline=None):
-        """True only when every switch reads back `want`.
+    def _confirm_switches(entities, want, deadline=None, reads=None, stop=None, until=None,
+                          first=CONFIRM_FIRST_READ_S):
+        """True only when every switch reads back `want`. Each state read is added to `reads` when given.
+
+        With `stop` (a shot opening: _operator_stop for it), `stop(end of this stage)` is asked at most every
+        2 s before a pause, and an answer raises _ShotStopped; each read is then also bounded by what is left of the
+        read-back, so a hanging Home Assistant cannot stretch it while the shot's switches are on. With
+        `until` (the monotonic clock) the read-back gives up then, whatever is left of its 16 s.
 
         Zigbee/MQTT plugs accept a command at once but report the new state later
         (a pump's OFF report: usually under 1 s; 1.6 s on 15 Sep and about 10 s on 28 Sep 2026 on a
@@ -5506,155 +6070,293 @@ class Controller:
         On the way out (SIGTERM) it gives up when the stop's `deadline` (a _Stop) runs out.
         """
 
+        asked = [None]  # when stop() was last asked
+
+        def check(end):
+            if stop is not None and (asked[0] is None or time.monotonic() - asked[0] >= 2.0):
+                asked[0] = time.monotonic()
+                by = stop(end)
+                if by:
+                    raise _ShotStopped(by)
+
+        def read(ent, end):
+            if stop is not None:
+                state = hw_get(ent, timeout=min(8.0, max(CONFIRM_POLL_S, end - time.monotonic())))[0]
+            else:
+                state = _read(ent, deadline)[0]
+            if reads is not None:
+                reads.append(state)
+            return state
+
         def settled(window, first):
             end = time.monotonic() + window
             if deadline is not None:
                 end = min(end, deadline.until)
+            if until is not None:
+                end = min(end, until)
+            check(end)
             _pause(first, deadline)
             while True:
                 if deadline is not None and deadline.timeout(8) is None:
                     return False  # no read-back fits in what is left of the stop
-                if all(_read(ent, deadline)[0] == want for ent in entities):
+                if all(read(ent, end) == want for ent in entities):
                     return True
                 if time.monotonic() >= end:
                     return False
+                check(end)
                 _pause(CONFIRM_POLL_S, deadline)
 
-        # First read at 1 s, exactly as before, so a plug that reports promptly costs nothing extra.
-        # A late report is then re-read every 0.5 s up to 6 s. The pump has already been commanded
-        # OFF by the time this runs.
-        if settled(CONFIRM_TIMEOUT_S, CONFIRM_FIRST_READ_S):
+        # First read at 1 s (`first`: sooner inside a shorter prime or lead), exactly as before, so a plug
+        # that reports promptly costs nothing extra. A late report is then re-read every 0.5 s up to 6 s.
+        # The pump has already been commanded OFF by the time this runs.
+        if settled(CONFIRM_TIMEOUT_S, first):
             return True
-        if want != "off" or (deadline is not None and deadline.timeout(8) is None):
+        if deadline is not None and deadline.timeout(8) is None:
             return False
-        # Whatever still does not read OFF is sent OFF again (a plug may have missed the first) and
-        # read back for 10 s more: 16 s in all, still inside the minute's loop for a genuinely
-        # stuck-open valve.
-        for ent in entities:
-            if _read(ent, deadline)[0] != "off":
-                _switch_off(ent, deadline)
+        if until is not None and time.monotonic() >= until:
+            return False
+        # Then 10 s more: 16 s in all (a report about 10 s late was seen on a live install), still inside
+        # the minute's loop for a genuinely stuck switch. Whatever still does not read OFF is first sent
+        # OFF again (a plug may have missed the first); an ON is not sent again.
+        if want == "off":
+            for ent in entities:
+                if _read(ent, deadline)[0] != "off":
+                    _switch_off(ent, deadline)
         return settled(CONFIRM_RETRY_S, CONFIRM_POLL_S)
 
-    def _execute_shot(self, room, zone, duration_s, size_pct, *, flow_lps=None, plan_exempt=False, steering=True):
-        if self._hardware_fault_block(room):
+    def _execute_shot(self, room, zone, duration_s, size_pct, *, flow_lps=None, plan_exempt=False, steering=True,
+                      actor="engine", program_id=None, reason_text=None, requested_at=None):
+        # What _act_zone kept of the decision for shot.started (its snapshot and the shot's kind), taken now so
+        # it never outlives this call.
+        intent = room.__dict__.get("_shot_intent", {}).pop(zone, None) or {}
+        learn = intent.get("kind") != "timer"  # a timer's water is never the Auto setpoints learner's input
+        turn = room.__dict__.get("_turn", {}).pop(zone, None)  # its turn at the pump (_take_turn), likewise
+
+        # Before anything opens: guards.PREOPEN, in order. Passing its last check marks the shot in flight (_busy).
+        ctx = {"duration_s": duration_s, "size_pct": size_pct, "flow_lps": flow_lps, "plan_exempt": plan_exempt,
+               "steering": steering}
+        hit = guards.first(self, guards.PREOPEN, room, zone, ctx)
+        if hit:
+            g, why, code = hit
+            if not g.quiet:  # a hardware fault returns without a word, as it always has
+                log(f"[{room.slug}] Z{zone} shot held: {why}")
+                self._journal_held(room, zone, why, guard=g.guard, code=code, now=datetime.now(),
+                                   would=reason_text, actor=actor, program_id=program_id)
             return
-        if _GATE.state is not None:
-            log(f"[{room.slug}] Z{zone} shot held: Home Assistant refuses this controller's token")
-            return
-        if getattr(room, "shot_inflight", None):
-            log(f"[{room.slug}] Z{zone} shot held: an interrupted shot's hardware is not accounted for yet")
-            return
-        plumbing = plumbing_hold(room.hw)
-        if plumbing:  # never open a valve on a room whose declared pump is not there to run
-            log(f"[{room.slug}] Z{zone} shot held: {plumbing}")
-            return
-        undrivable = self._undrivable(room, zone)
-        if undrivable:  # never sent a command (_blocked raises CS-313 for it)
-            log(f"[{room.slug}] Z{zone} shot held: {', '.join(undrivable)} can't be switched")
-            return
-        # A shot a plan hold never stops (PLAN_HOLD_EXEMPT) does not wait on the plan here either.
-        strategy_hold = None if plan_exempt else self._strategy_preflight(room, zone, datetime.now())
-        if strategy_hold:
-            log(f"[{room.slug}] Z{zone} shot held: {strategy_hold}")
-            return
-        # Freeze hydraulic sizing before opening hardware. Editing plant count,
-        # substrate or dripper configuration mid-shot must not rewrite its litres.
-        nominal_l = (flow_lps * duration_s if flow_lps is not None
-                     else size_pct / 100.0 * self._substrate_l(room, zone))
-        short = self._tank_short(room, zone, nominal_l)
-        if short:  # the plan-ahead half of the reservoir minimum: _tank_plan asks for the refill
-            log(f"[{room.slug}] Z{zone} shot held: {short}")
-            return
-        if not self._close_waste(room, zone):  # Close for each shot: a waste valve still open, nothing opens
-            log(f"[{room.slug}] Z{zone} shot held: the waste valve did not close")
-            return
-        with self._shot_lock:  # a batch holds rooms under this lock (see _shot_running)
-            making = self._dosing_hold(room)
-            if not making:
-                self._busy = True
-                self._shot_room = room  # the room whose shot is in flight right now (see _safe_off)
-        if making:
-            log(f"[{room.slug}] Z{zone} shot held: {making}")
-            return
-        hw = room.hw
-        valve = hw["valves"].get(zone)
-        pump, mainline = hw.get("pump"), hw.get("mainline")
-        # Read before anything opens, so nothing waits on Home Assistant between the steps.
-        # An integration older than these settings has neither: the 2 s and 1 s always waited apply.
-        prime = lead = 0.0
-        if pump:
-            prime = _lead_time(
-                self._zone_num(room, zone, "pump_prime_time", FALLBACK["pump_prime_time"], optional=True),
-                FALLBACK["pump_prime_time"], PUMP_PRIME_MAX_S)
-        if mainline:
-            lead = _lead_time(
-                self._zone_num(room, zone, "main_line_lead_time", FALLBACK["main_line_lead_time"], optional=True),
-                FALLBACK["main_line_lead_time"], MAIN_LINE_LEAD_MAX_S)
-        # WRITE-AHEAD: what this shot is about to open, and when, saved BEFORE anything opens. If the
-        # controller dies, is killed or loses Home Assistant mid-shot, the next loop closes exactly what
-        # this shot opened, from this record, and nothing else (see _reconcile_room_inflight).
-        room.shot_inflight = {
-            "zone": zone, "valve": valve, "mainline": mainline, "pump": pump,
-            "started": datetime.now(timezone.utc).isoformat(),
-        }
-        self._save_state()
+        if turn:  # it runs: its wait and its pump load are given now
+            self._turn_runs(room, zone, turn)
+        nominal_l = ctx["litres"]  # frozen before anything opens (guards._pre_tank_short)
         shutdown_checked = False
-        valve_started = None
+        valve_started = valve_opened = None
         counted = False
         stopping = False
-        try:
+        errored = False
+        # The journal's record of this shot: its shot.started intent id (None until it is written), the switches
+        # sent ON and read back ON (#208), and how it ended (shot.completed, or shot.aborted's outcome and code).
+        journaled = {"intent_id": None, "sent": [], "on": [], "refused": False, "end": None, "elapsed": None}
+        meter = meter_before = None  # the zone's flow meter and its total before the pump opens (G4)
+
+        def count_water_so_far():
+            # The shot ended without its close counting it (stopped or errored): count the water given
+            # since the valve opened, or the next pass waters the zone as if it had had none.
+            nonlocal counted
+            if valve_started is not None and not counted:
+                counted = True
+                run = (time.monotonic() - valve_started) / duration_s if duration_s > 0 else 1.0
+                self._advance_shot_counters(room, zone, size_pct * run, delivered_l=nominal_l * run,
+                                            steering=steering, learn=learn)
+
+        pending = [None]  # the switch sent ON and not yet read back ON
+
+        def switch_on(ent, what, lead_s=0.0, until=None):
+            """Switch `ent` on and read it back ON, then let what is left of `lead_s` from its ack run out
+            -> (None, _, _) or (why not in the words of its alert, whether it may have been on all the same,
+            what it does to the zone's run of failed shots: "count", "reset" (it read ON just too late) or
+            "keep" (the shot's own time cut the read-back short: not a definite failure)). A relay that takes the command and stays off must not be counted as a shot. The read-back runs
+            inside the lead time, so a switch that reports promptly costs a normal shot nothing; one that
+            reports late stretches the pump's prime or the main line's lead by the difference. A read-back
+            cut short by `until` (the monotonic clock) may have been on: nothing proved it off in time."""
+            pending[0] = ent  # sent ON, not yet read back ON (_close_cut_short)
+            journaled["sent"].append(ent)
+            if not hw_call(ent, True):
+                journaled["refused"] = True
+                if _GATE.state == "all":  # the token refused: not a switch that failed (no CS-302 to CS-304)
+                    raise _ShotStopped(("refused", None))
+                return f"Home Assistant returned an error when the controller tried to {what}.", False, "count"
+            acked, reads = time.monotonic(), []
+            # The operator's switches are read through the read-back and the lead time too (_ShotStopped),
+            # each check bounded by the end of its stage.
+            def stop(end):
+                return self._operator_stop(room, zone, 2.0, end, holds=True)
+
+            # inside a prime or lead under 1 s, the first read comes at its end: a prompt report costs nothing
+            first = min(lead_s, CONFIRM_FIRST_READ_S) if lead_s > 0 else CONFIRM_FIRST_READ_S
+            if not self._confirm_switches((ent,), "on", reads=reads, stop=stop, until=until, first=first):
+                # once more as it is switched off: an ON just after the window
+                reads.append(hw_get(ent, timeout=2.0)[0])
+                if _GATE.state == "all":  # refused late in the read-back: not a switch that failed either
+                    raise _ShotStopped(("refused", None))
+                cut = until is not None and time.monotonic() >= until
+                waited = min(SWITCH_ON_S, until - acked) if until is not None else SWITCH_ON_S
+                # "opening" (a valve. entity on its way) or anything but a definite OFF may be open
+                tally = "reset" if reads[-1] == "on" else "keep" if cut else "count"
+                maybe_on = cut or any(state != "off" for state in reads)
+                journaled["off"] = not maybe_on  # read back a definite OFF (the journal's readback "off")
+                return (f"Home Assistant took the command to {what}, but it did not read on within "
+                        f"{waited:.0f} s."), maybe_on, tally
+            pending[0] = None
+            journaled["on"].append(ent)
+            while (left := lead_s - (time.monotonic() - acked)) > 0:
+                by = stop(acked + lead_s)
+                if by:
+                    raise _ShotStopped(by)
+                time.sleep(min(2.0, left))
+            return None, False, None
+
+        def cancelled(why, named, delivered_s=None, tally="count"):
+            """The shot cancelled because a switch did not read on (`delivered_s`: the valve may have been
+            open that long, and is counted). A definite failure (`tally` "count") is one more such shot in a
+            row for this zone (_switch_on_retry_at); a switch that read ON just too late ("reset") ends the
+            run; one whose read-back the shot's own time cut short ("keep") leaves it as it is
+            -> its alert's message and quiet."""
+            st = room.state[zone]
+            failures = (st.get("on_failures") or {}).get("count", 0)
+            if tally == "count":
+                failures += 1
+                st["on_failures"] = {"count": failures, "last": datetime.now().isoformat()}
+            elif tally == "reset":
+                st["on_failures"], failures = None, 0
+            water = (
+                "No water went to the zone, and the controller did not count the shot."
+                if delivered_s is None
+                else "The controller cannot tell whether water went to the zone, so it counts the "
+                f"{delivered_s:.0f} s from opening the valve to closing it as delivered."
+            )
+            backoff = (
+                f" The last {failures} shots of this zone in a row could not start, so the controller "
+                f"now tries this zone at most once every {SWITCH_ON_BACKOFF_MIN} min, rescue shots too, until "
+                "its switches read on again."
+                if tally == "count" and failures >= SWITCH_ON_BACKOFF_AFTER
+                else ""
+            )
+            # the zone backing off is news: never held back
+            quiet = not (tally == "count" and failures == SWITCH_ON_BACKOFF_AFTER)
+            return f"{why} {water} {_CANCELLED_SHOT_CLEANUP}{backoff}\n\n{named}", quiet
+
+        def stopped_early(aborted, elapsed):
+            """A shot the operator's switches (or a refused token) ended early: CS-305, or a log line.
+            `elapsed` None: it stopped before its valve was sent ON."""
+            when = (f"after {elapsed:.0f} s of {duration_s:.0f} s" if elapsed is not None
+                    else f"before its valve opened (a {duration_s:.0f} s shot)")
+            if aborted[0] == "refused":
+                log(f"[{room.slug}] Z{zone} shot ended {when}: Home Assistant refused this controller's token")
+                return
+            by = aborted[1]
+            why = {
+                room_gate(room): "the kill switch was set to off",
+                f"switch.crop_steering_{room.prefix}room_active": "Room Active was set to off",
+                f"switch.crop_steering_{room.prefix}zone_{zone}_enabled": "this zone was set to off",
+            }.get(by, "manual override was set to on")
+            self._alert(
+                f"killshot_{room.slug}_z{zone}",
+                "CS-305",
+                "shot stopped early",
+                f"The shot stopped {when}, because "
+                f"{why} ({by}). The controller set the valve and the hardware upstream of it to off. "
+                "It counts the water of the shot up to the stop.",
+
+                room=room,
+                zone=zone,
+            )
+
+        commanded = False  # a switch has been sent ON: from here an error must close what may be open
+        try:  # from the moment _busy is set: an error before any valve opens must not leave it set
+            hw = room.hw
+            valve = hw["valves"].get(zone)
+            pump, mainline = hw.get("pump"), hw.get("mainline")
+            # Read before anything opens, so nothing waits on Home Assistant between the steps.
+            # An integration older than these settings has neither: the 2 s and 1 s always waited apply.
+            prime = lead = 0.0
+            if pump:
+                prime = _lead_time(
+                    self._zone_num(room, zone, "pump_prime_time", FALLBACK["pump_prime_time"], optional=True),
+                    FALLBACK["pump_prime_time"], PUMP_PRIME_MAX_S)
+            if mainline:
+                lead = _lead_time(
+                    self._zone_num(room, zone, "main_line_lead_time", FALLBACK["main_line_lead_time"], optional=True),
+                    FALLBACK["main_line_lead_time"], MAIN_LINE_LEAD_MAX_S)
+            meter = self._flow_meter(room, zone)  # None with no supply or no meter: no read, as before
+            if meter:
+                if self.__dict__.get("_flow_late", {}).pop(meter, None):  # a dict, no Home Assistant call (R5)
+                    log(f"[{room.slug}] flow meter {meter}: the last shot through it is not reconciled, the meter "
+                        "did not report before this one")
+                # this pass's reading, or the last shot's after it (_meter_fresh): never a read that waits (R5);
+                # with neither, no baseline and no flow check for this shot
+                meter_before = self.__dict__.get("_meter_fresh", {}).get(meter)
+            # WRITE-AHEAD: what this shot is about to open, and when, saved BEFORE anything opens. If the
+            # controller dies, is killed or loses Home Assistant mid-shot, the next loop closes exactly what
+            # this shot opened, from this record, and nothing else (see _reconcile_room_inflight).
+            room.shot_inflight = {
+                "zone": zone, "valve": valve, "mainline": mainline, "pump": pump,
+                "started": datetime.now(timezone.utc).isoformat(),
+            }
+            saved = self._save_state()
+            unsaved = getattr(self, "_unsaved_rooms", {}).get(room.slug)
+            if not saved or unsaved:  # no record on disk, nothing opens (raised below: CS-212)
+                raise RuntimeError(f"Z{zone} shot refused, its in-flight record was not saved: "
+                                   f"{unsaved or 'the state file could not be written'}")
+            self._journal_shot_started(room, zone, journaled, intent, duration_s, size_pct, nominal_l,
+                                       actor, program_id, reason_text, requested_at)
+            commanded = True
             # OPEN sequence — FAIL CLOSED: if any service call errors, cut what's on, alert, and DO NOT count the shot
             # (otherwise daily_vol / last_shot lie after an auth/entity/service failure and a zone silently starves).
             # Pump and mainline are optional (a one-switch tent has neither): each is sequenced when
             # mapped and skipped, with its lead time, when not. The valve is always required.
-            if pump and not hw_call(pump, True):
+            why, _maybe, tally = switch_on(pump, "start the pump", prime) if pump else (None, False, None)
+            if why:
                 hw_call(pump, False)  # it may be on all the same: off before the alert
-                self._alert(
-                    f"hw_{room.slug}_z{zone}",
-                    "CS-302",
-                    "shot cancelled, the pump did not start",
-                    "Home Assistant returned an error when the controller tried to start the pump. No water "
-                    f"went to the zone, and the controller did not count the shot. {_CANCELLED_SHOT_CLEANUP}"
-                    f"\n\nPump: {pump}",
-                    room=room,
-                    zone=zone,
-                )
+                message, quiet = cancelled(why, f"Pump: {pump}", tally=tally)
+                journaled["end"] = ("failed", "CS-302")
+                self._alert(f"hw_{room.slug}_z{zone}", "CS-302", "shot cancelled, the pump did not start",
+                            message, room=room, zone=zone, quiet=quiet, entity_id=pump)
                 return
-            if pump:
-                time.sleep(prime)
-            if mainline and not hw_call(mainline, True):
+            why, _maybe, tally = (switch_on(mainline, "open the main-line valve", lead) if mainline
+                                  else (None, False, None))
+            if why:
+                hw_call(mainline, False)  # it may open all the same
                 if pump:
                     hw_call(pump, False)
-                self._alert(
-                    f"hw_{room.slug}_z{zone}",
-                    "CS-303",
-                    "shot cancelled, the main-line valve did not open",
-                    "Home Assistant returned an error when the controller tried to open the main-line valve. "
-                    f"No water went to the zone, and the controller did not count the shot. {_CANCELLED_SHOT_CLEANUP}"
-                    f"\n\nMain-line valve: {mainline}",
-                    room=room,
-                    zone=zone,
-                )
+                message, quiet = cancelled(why, f"Main-line valve: {mainline}", tally=tally)
+                journaled["end"] = ("failed", "CS-303")
+                self._alert(f"hw_{room.slug}_z{zone}", "CS-303", "shot cancelled, the main-line valve did not open",
+                            message, room=room, zone=zone, quiet=quiet, entity_id=mainline)
                 return
-            if mainline:
-                time.sleep(lead)
+            # The valve's read-back runs inside the shot's own time, counted from its turn_on. A valve that
+            # reports late enough can hold a very short shot open past its nominal length: that time is
+            # counted too, so such a shot is over-counted, never under-counted (the safe direction).
+            # And it ends with the shot: a valve not read ON once the shot's time (or, for a shot shorter
+            # than it, the first read-back stage) is up may be open, and is closed and counted, so a late
+            # report cannot run a short shot to several times its length.
             valve_started = time.monotonic()
             valve_opened = datetime.now(timezone.utc)  # on Home Assistant's clock too: see _close_cut_short
-            if not hw_call(valve, True):
+            why, maybe_open, tally = switch_on(valve, "open the valve of this zone",
+                                        until=valve_started + max(duration_s, CONFIRM_TIMEOUT_S))
+            if why:
+                hw_call(valve, False)  # it may open all the same
                 for upstream in (mainline, pump):
                     if upstream:
                         hw_call(upstream, False)
-                self._alert(
-                    f"hw_{room.slug}_z{zone}",
-                    "CS-304",
-                    "shot cancelled, the zone valve did not open",
-                    "Home Assistant returned an error when the controller tried to open the valve of this zone. "
-                    f"No water went to the zone, and the controller did not count the shot. {_CANCELLED_SHOT_CLEANUP}"
-                    f"\n\nValve: {valve}",
-                    room=room,
-                    zone=zone,
-                )
+                delivered_s = None
+                if maybe_open:
+                    # Unreadable, or ON too late: water may have flowed. Count it to the off, as a stop does.
+                    delivered_s = time.monotonic() - valve_started
+                    count_water_so_far()
+                message, quiet = cancelled(why, f"Valve: {valve}", delivered_s, tally)
+                journaled["end"] = ("failed", "CS-304")
+                self._alert(f"hw_{room.slug}_z{zone}", "CS-304", "shot cancelled, the zone valve did not open",
+                            message, room=room, zone=zone, quiet=quiet, entity_id=valve)
                 return
+            room.state[zone]["on_failures"] = None  # pump, main line and valve all read on
             elapsed, aborted = self._wait_shot(
                 room, zone, duration_s, started=valve_started
             )
@@ -5669,13 +6371,15 @@ class Controller:
                 run = elapsed / duration_s if duration_s > 0 else 1.0
                 counted = True
                 self._advance_shot_counters(room, zone, size_pct * run, delivered_l=nominal_l * run,
-                                            steering=steering)
+                                            steering=steering, learn=learn)
+                journaled["end"], journaled["elapsed"] = ("aborted", "CS-307"), elapsed
                 return
             # CLOSE sequence. A failed close (e.g. HA went unreachable mid-shot) leaves the valve
             # OPEN and the SOFTWARE CANNOT fix it — only the hardware fail-safe (NC valve /
             # pump-relay-default-off / independent watchdog) can. So check EVERY turn_off + the
             # read-back and ALERT loudly on any non-close (the old code ignored turn_off failures
             # and a dead-HA read-back masked a stuck-open valve as "closed" — silent danger).
+            closing_at = datetime.now(timezone.utc)  # a meter reading is this shot's whole water from here (M1)
             refused = [] if hw_call(valve, False) else [valve]
             # Delivery is estimated, not flow-metered. Include the acknowledgement
             # interval conservatively because the exact physical close time is unknown.
@@ -5693,12 +6397,14 @@ class Controller:
                 # reads it back once Home Assistant accepts this controller again.
                 log(f"[{room.slug}] Z{zone} shot closed with Home Assistant refusing: its offs were sent, "
                     "not read back; left recorded")
+                journaled["close"] = None  # not closed as far as anyone can tell: no code (not CS-301)
             elif refused or not closed:
                 # Which one, and how, as it is now: before the second try below changes it.
                 failures = self._close_failures((valve, *upstream), refused)
                 for ent in reversed(upstream):
                     hw_call(ent, False)
                 self._latch_hardware_fault(room, f"zone {zone} shot end", failures)
+                journaled["close"] = "CS-301"
             else:
                 room.shot_inflight = None  # closed and read back OFF: this shot left nothing open
             shutdown_checked = True
@@ -5710,48 +6416,87 @@ class Controller:
             self._advance_shot_counters(
                 room, zone, delivered_pct,
                 delivered_l=nominal_l * (elapsed / duration_s if duration_s > 0 else 1.0),
-                steering=steering,
+                steering=steering, learn=learn,
             )
-            if aborted and aborted[0] == "refused":
-                log(f"[{room.slug}] Z{zone} shot ended after {elapsed:.0f}/{duration_s:.0f}s: Home Assistant "
-                    "refused this controller's token")
-            elif aborted:
-                by = aborted[1]
-                why = {
-                    room_gate(room): "the kill switch was set to off",
-                    f"switch.crop_steering_{room.prefix}room_active": "Room Active was set to off",
-                    f"switch.crop_steering_{room.prefix}zone_{zone}_enabled": "this zone was set to off",
-                }.get(by, "manual override was set to on")
-                self._alert(
-                    f"killshot_{room.slug}_z{zone}",
-                    "CS-305",
-                    "shot stopped early",
-                    f"The shot stopped after {elapsed:.0f} s of {duration_s:.0f} s, because "
-                    f"{why} ({by}). The controller set the valve and the hardware upstream of it to off. "
-                    "It counts the water of the shot up to the stop.",
-
-                    room=room,
-                    zone=zone,
-                )
+            journaled["elapsed"] = elapsed
+            journaled["end"] = ("aborted", None if aborted[0] == "refused" else "CS-305") if aborted else "completed"
+            if meter_before is not None and not aborted and "close" not in journaled:
+                # closed and read back OFF: what the meter saw of this shot (_journal_shot_end reconciles it)
+                after, reported = self._meter_reading(meter, METER_READ_TIMEOUT_S)
+                if after is not None and after >= meter_before:
+                    if reported is None or reported >= closing_at:
+                        journaled["metered_l"] = after - meter_before
+                        journaled.setdefault("meters_after", {})[meter] = after  # next baseline (_meters_fresh_after)
+                    else:  # not reported since the close: judged once it has (_flow_late_check), never on part of it
+                        journaled["meter_late"] = (meter, meter_before, closing_at)
+                    # CS-319 moves past this shot's water, not past what leaked before it: what the meter saw, or
+                    # what the shot counted when the meter has yet to report all of it (_meters_rebase)
+                    journaled["meter_moved"] = (meter, max(after - meter_before, nominal_l * min(
+                        1.0, elapsed / duration_s if duration_s > 0 else 1.0)))
+            if meter and not aborted and "close" not in journaled:
+                # the room's other meters after the close (a pump's, through which this water ran too): the next
+                # shot's baselines, when read in full since the close or unmoved since this pass's reading
+                fresh = self.__dict__.get("_meter_fresh", {})
+                for other, _zone in self._room_meters(room):
+                    if other != meter:
+                        litres, reported = self._meter_reading(other, METER_READ_TIMEOUT_S)
+                        if litres is not None and (reported is None or reported >= closing_at
+                                                   or litres == fresh.get(other)):
+                            journaled.setdefault("meters_after", {})[other] = litres
+            if aborted:
+                stopped_early(aborted, elapsed)
+        except _ShotStopped as stopped:
+            # The operator (or a refused token, or a hold) stopped the shot while it was opening. Not a switch
+            # that failed to switch on, so no backoff. Water counts only from the valve's turn_on, to the stop.
+            # A failure in here is logged, and the cleanup below runs as after any shot error.
+            journaled["end"] = ("aborted", {"external": "CS-307", "refused": None}.get(stopped.by[0], "CS-305"))
+            try:
+                elapsed = None if valve_started is None else time.monotonic() - valve_started
+                journaled["elapsed"] = elapsed
+                if stopped.by[0] == "external":
+                    # As _wait_shot's: only what is still this shot's is closed, never a pump a hold now owns.
+                    elapsed = self._close_cut_short(room, zone, stopped.by[1], elapsed or 0.0, duration_s,
+                                                    valve_opened or datetime.now(timezone.utc), pending[0])
+                    shutdown_checked = True
+                if valve_started is not None and not counted:
+                    counted = True
+                    run = elapsed / duration_s if duration_s > 0 else 1.0
+                    self._advance_shot_counters(room, zone, size_pct * run, delivered_l=nominal_l * run,
+                                                steering=steering, learn=learn)
+                if stopped.by[0] != "external":  # _close_cut_short raised its CS-307
+                    stopped_early(stopped.by, elapsed)
+            except Exception as e:
+                log("shot error", room.slug, zone, e)
+                errored = True  # its water is still counted, after the cleanup below (count_water_so_far)
         except SystemExit:
             # SIGTERM/SIGINT mid-shot (the app stopped or updated): _safe_exit has already closed what this
             # shot has open, by the reconciler's rules, so the cleanup below must not switch the rest off.
             # Count the water this shot delivered before the process goes, or the next start would water
             # the zone as if it had had none.
             stopping = True
-            if valve_started is not None and not counted:
-                counted = True
-                run = (time.monotonic() - valve_started) / duration_s if duration_s > 0 else 1.0
-                self._advance_shot_counters(room, zone, size_pct * run, delivered_l=nominal_l * run,
-                                            steering=steering)
+            journaled["end"] = ("aborted", None)
+            count_water_so_far()
             raise
         except Exception as e:
             log("shot error", room.slug, zone, e)
+            journaled["end"] = ("failed", None)
+            if not commanded:  # nothing opened: the room's pass stops here and says so (CS-212)
+                raise
+            errored = True
         finally:
             try:
                 # Early command failures and unexpected exceptions need the SAME hold
                 # guarantee as normal shutdown; no path may start the next row blindly.
-                if not shutdown_checked and not stopping:
+                if not commanded and not stopping:
+                    # Nothing was sent ON, so nothing is switched off (a person may be running the pump),
+                    # and the record of this shot (it held every shot of the room until reconciled) goes.
+                    if getattr(room, "shot_inflight", None):
+                        room.shot_inflight = None
+                        try:
+                            self._save_state()
+                        except Exception as e:
+                            log("state save failed", e)
+                elif not shutdown_checked and not stopping:
                     closing = [
                         e for e in (valve, hw.get("mainline"), hw.get("pump")) if e
                     ]
@@ -5763,7 +6508,11 @@ class Controller:
                     # Read back as patiently as after a normal close: a plug that reports OFF 1.6 s
                     # late is not a stuck pump (the 15 Sep false hold, on this very path).
                     closed = self._confirm_switches(closing, "off")
-                    if refused or not closed:
+                    if (refused or not closed) and _GATE.state == "all":
+                        # Refused, not stuck (as after a normal close): left recorded for the reconciler.
+                        log(f"[{room.slug}] Z{zone} shot cleanup with Home Assistant refusing: its offs were "
+                            "sent, not read back; left recorded")
+                    elif refused or not closed:
                         self._latch_hardware_fault(
                             room,
                             f"zone {zone} shot error cleanup",
@@ -5772,9 +6521,297 @@ class Controller:
                     else:
                         room.shot_inflight = None
                         self._save_state()
+                if errored:  # after the close, as a normal shot is: its time counts too
+                    count_water_so_far()
             finally:
                 self._busy = False
                 self._shot_room = None
+                if commanded:  # this shot's water is no leak (_watch_meters)
+                    self._meters_rebase(room, journaled.get("meter_moved"))
+                    self._meters_fresh_after(room, journaled.get("meters_after"))
+                if journaled["intent_id"] is not None:  # its end, after its water is counted (#197)
+                    self._journal_shot_end(room, zone, journaled, valve_started)
+
+    def _journal_shot_started(self, room, zone, journaled, intent, duration_s, size_pct, nominal_l, actor,
+                              program_id, reason_text, requested_at):
+        """shot.started, flushed to the OS (no fsync, ruling R5) before the pump opens (_execute_shot), with a new
+        intent id that its end carries too. A journal problem never stops the shot."""
+        try:
+            st, snap = room.state[zone], intent.get("snap")
+            started = datetime.now().astimezone()
+            requested = requested_at or started
+            vwc = snap.vwc if snap is not None else None
+            rise = snap.p1_expected_rise if snap is not None else None
+            journaled["intent_id"] = new_id()
+            journaled["vol_before"] = float(st.get("daily_vol") or 0.0)
+            journaled["vwc_before"], journaled["ec_before"] = vwc, snap.ec if snap is not None else None
+            self._journal(
+                room.prefix, "shot.started", zone=zone, actor=actor, program_id=program_id, detail=reason_text,
+                correlation={"intent_id": journaled["intent_id"]}, durable=True, now=started,
+                data={
+                    "phase": st.get("phase"),
+                    "kind": intent.get("kind"),
+                    "reason": reason_text,
+                    "size_pct": size_pct,
+                    "duration_s": duration_s,
+                    "commanded_l": round(nominal_l, 3),
+                    "vwc_before": vwc,
+                    "vwc_expected": (round(vwc + rise, 2) if st.get("phase") == "P1" and vwc is not None
+                                     and rise is not None else None),
+                    "requested_at": requested.isoformat(timespec="milliseconds"),
+                    "pump_wait_s": round(max(0.0, (started - requested).total_seconds())),
+                },
+            )
+        except Exception as e:
+            log("journal shot.started error", room.slug, zone, e)
+
+    def _journal_shot_end(self, room, zone, journaled, valve_started):
+        """shot.completed, or shot.aborted with its outcome and code, with the litres the shot counted (#197) and
+        what read back ON (#208): `verified` only when every switch sent ON read back ON, `off` when one read back a
+        definite OFF. A shot whose close failed completes `failed`, with CS-301 when it latched a hardware fault."""
+        try:
+            end = journaled["end"] or ("failed", None)  # an end no path named: not a shot that completed
+            elapsed = journaled["elapsed"]
+            if elapsed is None and valve_started is not None:
+                elapsed = time.monotonic() - valve_started
+            sent, on = journaled["sent"], journaled["on"]
+            status = ("verified" if sent and on == sent
+                      else "refused" if journaled["refused"] or _GATE.state is not None
+                      else "off" if journaled.get("off") else "unread")
+            litres = float(room.state[zone].get("daily_vol") or 0.0) - journaled["vol_before"]
+            completed = end == "completed"
+            outcome, code = ("ok", None) if completed else end
+            if completed and "close" in journaled:
+                outcome, code = "failed", journaled["close"]
+            commanded_l = round(max(0.0, litres), 3)
+            metered = journaled.get("metered_l")
+            metered_l = round(metered, 3) if completed and metered is not None else None
+            self._journal(
+                room.prefix, "shot.completed" if completed else "shot.aborted", zone=zone,
+                outcome=outcome, code=code,
+                correlation={"intent_id": journaled["intent_id"]},
+                data={
+                    "elapsed_s": round(elapsed, 1) if elapsed is not None else 0.0,
+                    "commanded_l": commanded_l,
+                    "metered_l": metered_l,
+                    "vwc_before": journaled["vwc_before"],
+                    "ec_before": journaled["ec_before"],
+                },
+                readback={"status": status, "entities": list(on),
+                          "at": datetime.now().astimezone().isoformat(timespec="milliseconds")},
+            )
+            if metered_l is not None:
+                self._flow_reconciled(room, zone, journaled["intent_id"], commanded_l, metered_l)
+            elif completed and journaled.get("meter_late"):
+                meter, before, closed = journaled["meter_late"]
+                self.__dict__.setdefault("_flow_late", {})[meter] = {
+                    "room": room.prefix, "zone": zone, "intent_id": journaled["intent_id"],
+                    "commanded_l": commanded_l, "before": before, "closed": closed}
+        except Exception as e:
+            log("journal shot end error", room.slug, zone, e)
+
+    def _flow_reconciled(self, room, zone, intent_id, commanded_l, metered_l):
+        """G4: a completed shot's metered litres against the litres it counted -> flow.reconciled (an outbox append),
+        and its sensor and CS-318 kept for the end of the room's pass (_flow_done): nothing here touches Home
+        Assistant, and nothing here changes the water."""
+        verdict = reconcile_flow(commanded_l, metered_l)
+        if verdict["verdict"] == "unmetered":  # nothing counted: no ratio to give
+            return
+        data = {"ratio": verdict["ratio"], "commanded_l": commanded_l, "metered_l": metered_l,
+                "verdict": verdict["verdict"]}
+        self._journal(room.prefix, "flow.reconciled", zone=zone, actor="system",
+                      correlation={"intent_id": intent_id}, data=data)
+        # one row a zone, its latest shot's: a pass that errors before _flow_done never piles them up
+        room.__dict__.setdefault("_flow_pending", {})[zone] = {"zone": zone, "intent_id": intent_id, **data}
+
+    def _flow_done(self, room):
+        """The end of the room's pass: each reconciled shot's sensor.crop_steering_<px>zone_N_flow_ratio, and CS-318
+        raised for a zone that got under flow.LOW of its water, taken down by a shot that got enough. Only tells.
+        A shot whose meter had not reported since its close is reconciled here once it has (M1)."""
+        self._flow_late_check(room)
+        for row in room.__dict__.pop("_flow_pending", {}).values():
+            try:
+                zone, key = row["zone"], f"flow_low_{room.slug}_z{row['zone']}"
+                ha_set(f"sensor.crop_steering_{room.prefix}zone_{zone}_flow_ratio", row["ratio"],
+                       {"commanded_l": row["commanded_l"], "metered_l": row["metered_l"],
+                        "intent_id": row["intent_id"]})
+                if row["verdict"] != "low":
+                    self._dismiss(key)
+                    continue
+                meter = self._flow_meter(room, zone)
+                self._alert(
+                    key,
+                    "CS-318",
+                    "less water than expected",
+                    f"The flow meter saw {row['metered_l']:.2f} L of the {row['commanded_l']:.2f} L that the "
+                    f"controller counted for the last shot of this zone ({row['ratio'] * 100:.0f}%). The controller "
+                    "counts the water from the dripper settings, so the zone can get less than it counts and dry "
+                    "out. Check the line, the drippers and the filter of this zone, and the meter."
+                    + (f"\n\nMeter: {meter}" if meter else ""),
+                    room=room,
+                    zone=zone,
+                    entity_id=meter,
+                )
+            except Exception as e:
+                log("flow reconcile error", room.slug, row.get("zone"), e)
+
+    def _flow_late_check(self, room):
+        """The room's shots whose meter had not reported since their close: each is reconciled once its meter reports
+        after that close, or given up, unjudged, FLOW_LATE_S after it."""
+        late = self.__dict__.get("_flow_late") or {}
+        for meter, row in [(m, r) for m, r in late.items() if r["room"] == room.prefix]:
+            try:
+                after, reported = self._meter_reading(meter, METER_READ_TIMEOUT_S)
+                if after is not None and reported is not None and reported >= row["closed"]:
+                    del late[meter]
+                    if after >= row["before"]:
+                        self._flow_reconciled(room, row["zone"], row["intent_id"], row["commanded_l"],
+                                              round(after - row["before"], 3))
+                elif (datetime.now(timezone.utc) - row["closed"]).total_seconds() > FLOW_LATE_S:
+                    del late[meter]
+                    log(f"[{room.slug}] Z{row['zone']} flow meter {meter} did not report in {FLOW_LATE_S // 60} min "
+                        "after the shot closed: the shot is not reconciled (meter did not report)")
+            except Exception as e:
+                log("flow reconcile error", room.slug, row.get("zone"), e)
+
+    def _flow_meter(self, room, zone):
+        """The flow meter of a zone in this pass's supply (sensor.crop_steering_supply_config): its own in zone_meters
+        ("room:<prefix>" -> zone number as a string), else its pump's flow_meter; None when there is none."""
+        try:
+            supply = getattr(self, "_supply", None) or {}
+            meter = ((supply.get("zone_meters") or {}).get("room:" + room.prefix) or {}).get(str(zone))
+            return meter if isinstance(meter, str) and meter else self._pump_meter(room)
+        except Exception as e:
+            log("flow meter error", room.slug, zone, e)
+            return None
+
+    def _pump_meter(self, room):
+        """The flow_meter of the room's pump in this pass's supply, or None."""
+        pump_id = room.hw.get("pump")
+        pump = next((p for p in (getattr(self, "_supply", None) or {}).get("irrigation_pumps") or []
+                     if isinstance(p, dict) and pump_id and p.get("entity_id") == pump_id), {})
+        meter = pump.get("flow_meter")
+        return meter if isinstance(meter, str) and meter else None
+
+    def _room_meters(self, room):
+        """Every flow meter this room's zones are read on -> [(entity, its zone, or None for the pump's)]."""
+        pump, out = self._pump_meter(room), {}
+        for zone in room.zones:
+            meter = self._flow_meter(room, zone)
+            if meter:
+                out.setdefault(meter, None if meter == pump else zone)
+        return list(out.items())
+
+    def _meter_litres(self, entity, timeout=8):
+        """A flow meter's total in litres (flow.to_litres), or None: unreadable, or a unit it does not know, which is
+        logged once for the meter (no guess at what a pulse is worth)."""
+        return self._meter_reading(entity, timeout)[0]
+
+    def _meter_reading(self, entity, timeout=8):
+        """(_meter_litres, when the meter last reported: the later of its last_updated and last_reported, aware, or
+        None when Home Assistant gives neither)."""
+        try:
+            read = ha_get(entity, timeout=timeout)
+            state, attrs, updated = read
+            value = float(state)
+        except (TypeError, ValueError):
+            return None, None
+        except Exception as e:
+            log("flow meter read error", entity, e)
+            return None, None
+        if not math.isfinite(value):
+            return None, None
+        stamps = [t for t in (_aware(updated), _aware(getattr(read, "last_reported", None))) if t is not None]
+        reported = max(stamps) if stamps else None
+        unit = (attrs or {}).get("unit_of_measurement")
+        litres = to_litres(value, unit)
+        if litres is None:
+            warned = self.__dict__.setdefault("_meter_unit_warned", set())
+            if entity not in warned:
+                warned.add(entity)
+                log(f"flow meter {entity} reports in {unit!r}, not L, m³ or gal: it is not read")
+        return litres, reported
+
+    def _meters_rebase(self, room, moved=None):
+        """A shot of this room ran. The meter it read before and after (`moved`: (entity, litres)) keeps its baseline,
+        moved up by that shot's water, so a leak that runs while the room shoots is still seen. Every other meter of
+        the room, which the shot did not read, loses its baseline and the next pass takes it again (_watch_meters)."""
+        watch = self.__dict__.get("_meter_watch")
+        try:
+            read, litres = moved or (None, 0.0)
+            for entity, _zone in self._room_meters(room) if watch else ():
+                if entity == read and entity in watch:
+                    watch[entity]["base"] += litres
+                else:
+                    watch.pop(entity, None)
+        except Exception as e:
+            log("flow meter error", room.slug, e)
+
+    def _meters_fresh_after(self, room, after=None):
+        """A shot of this room ran: every meter of the room loses this pass's reading (its water may have moved
+        it), but those the shot read in full after its close (`after`: {entity: litres}), which are the next
+        shot's baselines. No Home Assistant call."""
+        fresh = self.__dict__.get("_meter_fresh")
+        try:
+            for entity, _zone in self._room_meters(room) if fresh else ():
+                fresh.pop(entity, None)
+            if fresh is not None:
+                fresh.update(after or {})
+        except Exception as e:
+            log("flow meter error", room.slug, e)
+
+    # ---------- CS-319: water through a meter with no shot in flight (alert only) ----------
+    def _watch_meters(self):
+        """Once a pass, before any room waters: each flow meter of the supply is read. Its baseline moves past each
+        shot's own water (_meters_rebase), or is the first reading after a shot that did not read it, so the meter's
+        late report of a shot is not counted. A rise of more than METER_IDLE_L above it, with no shot in flight in any
+        room that reads it, is CS-319, and the baseline moves up to it; the card goes once the meter stops. A meter
+        that falls (a reset) starts again. A meter, or a zone's meter, no longer in the supply takes its CS-319, or
+        the zone's CS-318, down. Only tells."""
+        watch = self.__dict__.setdefault("_meter_watch", {})
+        fresh = self._meter_fresh = {}  # meter -> litres read this pass: each shot's baseline (_execute_shot)
+        listed = {}  # meter -> [(room, zone)] of every room that reads it; none with no supply
+        for room in self.rooms:
+            for entity, zone in self._room_meters(room):
+                listed.setdefault(entity, []).append((room, zone))
+            for zone in room.zones:
+                if not self._flow_meter(room, zone):
+                    self._dismiss(f"flow_low_{room.slug}_z{zone}")
+        for entity in [e for e in watch if e not in listed]:
+            del watch[entity]
+        for key in [k for k in self._alerted if k.startswith("flow_idle_") and k[len("flow_idle_"):] not in listed]:
+            self._dismiss(key)
+        for entity, readers in listed.items():
+            room, zone = readers[0]
+            key = f"flow_idle_{entity}"
+            if any(getattr(r, "shot_inflight", None) for r, _z in readers):  # a shot still recorded: its water may
+                watch.pop(entity, None)  # be flowing through this meter, whichever room it is in
+                continue
+            litres = self._meter_litres(entity, METER_READ_TIMEOUT_S)
+            if litres is None:
+                continue
+            fresh[entity] = litres
+            st = watch.get(entity)
+            if st is None or litres < st["last"]:
+                watch[entity] = {"base": litres, "last": litres}
+                continue
+            rise = litres - st["base"]
+            if rise > METER_IDLE_L:
+                st["base"] = litres
+                self._alert(
+                    key,
+                    "CS-319",
+                    "water flows with no zone on",
+                    f"The flow meter counted {rise:.2f} L while the controller ran no shot. A valve can be stuck open or leak, a line can be broken, or "
+                    "someone waters by hand. Check the valves and the lines of this meter now. The controller "
+                    f"does not switch anything off.\n\nMeter: {entity}",
+                    room=room,
+                    zone=zone,
+                    entity_id=entity,
+                )
+            elif litres <= st["last"]:
+                self._dismiss(key)
+            st["last"] = litres
 
     def _safe_off(self, deadline=None):
         """Stopping (SIGTERM: the app stopped, updated or restarted): close only what this controller has
@@ -6029,6 +7066,11 @@ class Controller:
 
     def _act_zone(self, room, zone, p, snap, decision, block, lights_on, now):
         st = room.state[zone]
+        # _blocked_by's (guard, why, code) of `block`, as _loop_room kept it this pass (taken now, never kept longer)
+        held_by = room.__dict__.get("_held_by", {}).pop(zone, None)
+        # when this pass decided to fire, as _pump_line kept it (a zone that waits its turn at the pump journals its
+        # real pump_wait_s); with no supply saved, now (taken now, never kept longer)
+        requested_at = room.__dict__.get("_requested_at", {}).pop(zone, None)
         fire, size, reason = decision
         if (
             snap is not None
@@ -6054,64 +7096,26 @@ class Controller:
                 room=room,
                 zone=zone,
             )
+        test = getattr(reason, "kind", None) == "test_shot"
+        actor = shot_actor(reason)  # a test shot is the operator's, a program's slot the timer's
         if fire and block:
             log(
                 f"[{room.slug}] Z{zone} {st['phase']} BLOCKED ({block}): would {reason}"
             )
+            guard, _why, code = held_by or (None, None, None)
+            self._journal_held(room, zone, block, guard=guard and guard.guard, code=code, now=now, would=reason,
+                               actor=actor, program_id=getattr(reason, "program_id", None))
         elif fire:
-            flow = self._zone_flow_lps(room, zone)
-            substrate = self._substrate_l(room, zone)
-            if not (
-                math.isfinite(flow)
-                and flow > 0
-                and math.isfinite(substrate)
-                and substrate > 0
-            ):
-                self._alert(
-                    f"sizing_{room.slug}_z{zone}",
-                    "CS-204",
-                    "shot size cannot be calculated, no shots",
-                    "To calculate a shot, the controller needs the substrate volume (litres for each plant), "
-                    "the plant count, the drippers for each plant and the dripper flow of this zone. One of "
-                    "these is missing, zero or not readable. Set them in Rooms & setup.",
-                    room=room,
-                    zone=zone,
-                )
-                return
-            test = getattr(reason, "kind", None) == "test_shot"
-            raw_dur = float(getattr(reason, "seconds", TEST_SHOT_S)) if test else size / 100.0 * substrate / flow
-            max_dur = self._room_duration_cap(room)
-            if max_dur is None:
-                return
-            # Hydraulic sizing determines nominal runtime; the room's duration
-            # limit bounds every physical shot independently of its requested volume.
-            dur = max(MIN_SHOT_S, min(int(max_dur), int(raw_dur)))
-            if raw_dur > max_dur:
-                self._alert(
-                    f"durcap_{room.slug}_z{zone}",
-                    "CS-306",
-                    "shot cut to the safety limit",
-                    f"The planned shot was {int(raw_dur)} s, more than the {int(max_dur)} s limit of the "
-                    f"room. The shot runs for {int(max_dur)} s and gives less water than planned. Check the "
-                    "substrate volume and the dripper flow of this zone. If they are correct, increase the "
-                    "maximum shot length.",
-                    room=room,
-                    zone=zone,
-                )
-            # A shot that is not exempt from the daily budget gets only what is left of it (22 Sep: a
-            # 607 s, ~28 L flush fired with ~2 L of an 80 L budget left). Copied / blind-schedule
-            # decisions are never exempt either (their Reason, or plain text, is not cap_exempt).
-            if p is not None and not getattr(reason, "cap_exempt", False):
-                left_l = p.max_daily_volume - float(st.get("daily_vol") or 0.0)
-                allowed = int(left_l / flow) if left_l > 0 else 0
-                if allowed < MIN_SHOT_S:
-                    held = f"BLOCK daily-cap ({max(left_l, 0.0):.2f} L left)"
-                    self._alert_daily_cap(room, zone, st, snap is None, held)
-                    log(f"[{room.slug}] Z{zone} {st['phase']} hold — {held}: would {reason}")
-                    return False, 0.0, held
-                if dur > allowed:
-                    log(f"[{room.slug}] Z{zone} shot clipped {dur}s -> {allowed}s: {left_l:.2f} L of the daily budget left")
-                    size, dur = round(size * allowed / dur, 2), allowed
+            requested_at = requested_at or datetime.now().astimezone()  # this pass decided to fire
+            # Sized: guards.SIZED, in order (its size, its longest shot, the day's budget left, which may clip it).
+            ctx = {"reason": reason, "size": size, "test": test, "p": p, "st": st, "snap": snap}
+            hit = guards.first(self, guards.SIZED, room, zone, ctx)
+            if hit:
+                g, held, code = hit
+                self._journal_held(room, zone, held, guard=g.guard, code=code, now=now, would=reason, actor=actor,
+                                   program_id=getattr(reason, "program_id", None))
+                return (False, 0.0, held) if g.reports else None
+            flow, raw_dur, max_dur, size, dur = ctx["flow"], ctx["raw_dur"], ctx["max_dur"], ctx["size"], ctx["dur"]
             what, why = log_words.shot(reason)
             log(f"[{room.slug}] Z{zone} {st['phase']} FIRE {size}% ~{dur}s — {what}: {why}")
             # Count configured flow x actual runtime, including caps, truncation,
@@ -6121,11 +7125,17 @@ class Controller:
             if rescue and snap is not None:  # the last rescue, judged before this one changes the moisture
                 self._rescue_judged(room, zone, safety_ops.rescue_judge(st, snap.vwc, now, early=True))
             was = st.get("last_shot")
+            # what shot.started journals of this pass's decision (_execute_shot takes it before anything opens)
+            room.__dict__.setdefault("_shot_intent", {})[zone] = {"snap": snap, "kind": getattr(reason, "kind", None)}
             self._execute_shot(room, zone, dur, size, flow_lps=flow,
-                               plan_exempt=getattr(reason, "kind", None) in PLAN_HOLD_EXEMPT, steering=not test)
+                               plan_exempt=getattr(reason, "kind", None) in PLAN_HOLD_EXEMPT, steering=not test,
+                               actor=actor, program_id=getattr(reason, "program_id", None),
+                               reason_text=f"{what}: {why}", requested_at=requested_at)
             if rescue and snap is not None and st.get("last_shot") is not was:
                 safety_ops.rescue_fired(st, snap.vwc, now)
                 self._save_state()
+            if st.get("last_shot") is not was:  # the kind of the zone's last delivered shot (blind copy gate)
+                room.__dict__.setdefault("_last_shot_kind", {})[zone] = getattr(reason, "kind", None)
             # A test or manual shot cut to the longest shot is not one of CS-312's run (it resets it, as before).
             self._count_capped(room, zone, raw_dur > max_dur and not test)
         else:
@@ -6224,6 +7234,7 @@ class Controller:
             "can be damaged. The controller does not switch it off. CAUTION: Check the pump now. Stop it, or open "
             f"the valve that it should feed.\n\nSensor: {entity}",
             room=room,
+            entity_id=entity,
         )
 
     # ---------- CS-905: the tank level estimated from the water the shots used (alert only) ----------
@@ -6333,6 +7344,43 @@ class Controller:
                 report[str(zone)] = {"capped": capped, "latched": False}
         return report
 
+    def _shot_sizing(self, room, zone):
+        """guards.SIZED "sizing": -> (flow, substrate, why the shot cannot be sized or None). CS-204 when it cannot."""
+        flow = self._zone_flow_lps(room, zone)
+        substrate = self._substrate_l(room, zone)
+        if not (
+            math.isfinite(flow)
+            and flow > 0
+            and math.isfinite(substrate)
+            and substrate > 0
+        ):
+            self._alert(
+                f"sizing_{room.slug}_z{zone}",
+                "CS-204",
+                "shot size cannot be calculated, no shots",
+                "To calculate a shot, the controller needs the substrate volume (litres for each plant), "
+                "the plant count, the drippers for each plant and the dripper flow of this zone. One of "
+                "these is missing, zero or not readable. Set them in Rooms & setup.",
+                room=room,
+                zone=zone,
+            )
+            return flow, substrate, "shot size cannot be calculated"
+        return flow, substrate, None
+
+    def _alert_shot_cut(self, room, zone, raw_dur, max_dur):
+        """CS-306: a shot planned longer than the room's longest shot runs cut to it (guards.SIZED "max_shot")."""
+        self._alert(
+            f"durcap_{room.slug}_z{zone}",
+            "CS-306",
+            "shot cut to the safety limit",
+            f"The planned shot was {int(raw_dur)} s, more than the {int(max_dur)} s limit of the "
+            f"room. The shot runs for {int(max_dur)} s and gives less water than planned. Check the "
+            "substrate volume and the dripper flow of this zone. If they are correct, increase the "
+            "maximum shot length.",
+            room=room,
+            zone=zone,
+        )
+
     def _alert_daily_cap(self, room, zone, st, blind, detail):
         """CS-205. A zone with a working probe still gets its rescue shots past its daily limit; a zone
         without one gets nothing more, because its copied and timed shots all count against it."""
@@ -6368,7 +7416,9 @@ class Controller:
             self._zone_num(room, zone, suffix, None)  # a read is remembered; a miss is noted for CS-402
             per = f"number.crop_steering_{room.prefix}zone_{zone}_{suffix}"
             glob = f"number.crop_steering_{room.prefix}{suffix}"
-            if per not in seen and glob not in seen:
+            if per in getattr(room, "_settings_missing", ()) and per not in seen:
+                unread.append(per)  # the zone's own number reads no number: never the room's value instead
+            elif per not in seen and glob not in seen:
                 unread.append(glob)
         waiting = sorted(
             e for e in getattr(room, "_settings_missing", ())
@@ -6407,7 +7457,7 @@ class Controller:
                 "CS-402",
                 "settings missing, the controller uses built-in values",
                 "The controller cannot read these settings in Home Assistant. It uses the last value that "
-                "it read since it started, or its built-in value"
+                "it read since it started, else, for a zone's own setting, the room's value, else its built-in value"
                 + (f". {' and '.join(key).capitalize()} set the water of a zone. A zone that has not read "
                    "one of them since the controller started gets no shots, including rescue shots, until "
                    "the setting is back"
@@ -6432,16 +7482,611 @@ class Controller:
                 self._rediscover(now)
             except Exception as e:
                 log("rediscover error", e)
+        self._supply = self._read_supply()
+        try:  # CS-319 only ever tells: read before any room waters, so no shot's water is in it
+            self._watch_meters()
+        except Exception as e:
+            log("flow meter watch error", e)
         all_pub = {}
+        self._calibrating_pass = {}  # the gate's read of dosing_config `calibrating`, once a pass (_calibrating_entry)
         for room in self.rooms:
-            self._guard_read(room)  # before this pass writes the room's heartbeat
-            self._refresh_lights(room)
-            pub = self._loop_room(room, now)
-            self._publish_status(room, pub, now)
-            all_pub[room.slug] = pub
+            try:  # one room's error never stops the rooms after it, nor the steps after the rooms
+                self._guard_read(room)  # before this pass writes the room's heartbeat
+                self._refresh_lights(room)
+                pub = self._loop_room(room, now)
+                self._publish_status(room, pub, now)
+                all_pub[room.slug] = pub
+                if f"room_error_{room.slug}" in self._alerted:  # its pass ran again: CS-212 is over
+                    ha_call("persistent_notification", "dismiss", notification_id=f"f2_room_error_{room.slug}")
+                    del self._alerted[f"room_error_{room.slug}"]
+            except Exception as e:  # only Exception: a stop (SystemExit, KeyboardInterrupt) still stops
+                self._room_error(room, now, e)
+                self._clear_queue(room)
+        self._calibrating_pass = None
         self._check_defaulted_setpoints()
         self._maybe_notify(all_pub, now)
         self._send_events()
+        self._journal_backfill()  # after the pass, never before a shot
+        self._journal_recovered()
+        self._flush_journal()
+
+    def _journal(self, room_prefix, kind, **kw):
+        """One event to the journal's outbox (journal_out.Outbox.emit: a local append that never raises)
+        -> its id, or None for a controller built without one."""
+        journal = getattr(self, "journal", None)
+        return journal.emit(room_prefix, kind, **kw) if journal is not None else None
+
+    def _journal_backfill(self):
+        """A room's history from before the journal, queued over the passes after them, never at start, in two halves
+        with ids derived from each row: its dosing history (dosing_state.json, dosing_runner.history_events) and the AI
+        assistant's ledger rows for it (jev_ledger.jsonl, brain_bridge.ledger_events).
+        - At most JOURNAL_BACKFILL_CHUNK events a pass, and only while the outbox holds under JOURNAL_BACKFILL_SHARE of
+          its cap, so the cap never drops a live event for it.
+        - What is left is kept in memory per room and half. After a restart it starts again from the files: the same
+          ids, which journal_append keeps once.
+        - The room's `_journal_backfill: 1` is set once both its halves are queued. Queued is not delivered: when a
+          flush has since dropped events over the outbox cap (the integration down for long, Outbox.trimmed), every
+          room's flag is cleared and its history queued again, with the same ids, so none of it is lost for good.
+        - Each file is read on its own. One that cannot be read holds back only its own half: it is tried again
+          JOURNAL_BACKOFF_PASSES passes later, logged once for each run of failures. After BACKFILL_LEDGER_TRIES failed
+          runs the ledger is read line by line and its unreadable lines are left out (a damaged ledger never stops
+          anything, brain/ledger.py)."""
+        journal = getattr(self, "journal", None)
+        if journal is None:
+            return
+        queues = self.__dict__.setdefault("_backfill_queue", {})  # (slug, half) -> [(when, kind, keywords)]
+        trimmed = getattr(journal, "trimmed", 0)
+        if trimmed > self.__dict__.setdefault("_backfill_trimmed", 0):
+            self._backfill_trimmed = trimmed
+            if any(getattr(r, "journal_backfill", False) for r in self.rooms) or queues:
+                log("journal backfill: the outbox dropped events before they were delivered; the history is "
+                    "sent again")
+            for room in self.rooms:
+                room.journal_backfill = False
+            queues.clear()
+        todo = [r for r in self.rooms if not getattr(r, "journal_backfill", False)]
+        if not todo:
+            return
+        skip = self.__dict__.setdefault("_backfill_skip", {})  # half -> passes it still waits
+        failed = self.__dict__.setdefault("_backfill_failed", {})  # half -> failed runs in a row
+        for half, read in (("dosing", self._backfill_dosing), ("ledger", self._backfill_ledger)):
+            missing = [r for r in todo if (r.slug, half) not in queues]
+            if not missing:
+                continue
+            if skip.get(half, 0) > 0:
+                skip[half] -= 1
+                continue
+            try:
+                source = read(failed.get(half, 0) >= BACKFILL_LEDGER_TRIES)
+                for room in missing:
+                    queues[(room.slug, half)] = self._backfill_events(room, half, source)
+                failed[half] = 0
+            except Exception as e:
+                if not failed.get(half):
+                    log(f"journal backfill: {half}: error, tried again later:", e)
+                failed[half] = failed.get(half, 0) + 1
+                skip[half] = JOURNAL_BACKOFF_PASSES
+        try:
+            budget = min(JOURNAL_BACKFILL_CHUNK, int(journal.cap * JOURNAL_BACKFILL_SHARE) - journal.count())
+        except OSError as e:
+            log("journal backfill: the outbox could not be counted:", e)
+            return
+        for room in todo:
+            for half in ("dosing", "ledger"):
+                queue = queues.get((room.slug, half))
+                if not queue:
+                    continue
+                take = queue[:max(0, budget)]
+                for _at, kind, kw in take:
+                    journal.emit(room.prefix, kind, **kw)
+                budget -= len(take)
+                queues[(room.slug, half)] = queue[len(take):]
+            if all(queues.get((room.slug, half)) == [] for half in ("dosing", "ledger")):
+                for half in ("dosing", "ledger"):
+                    del queues[(room.slug, half)]
+                room.journal_backfill = True
+
+    def _backfill_dosing(self, _lenient=False):
+        """dosing_state.json's rooms; a missing file is empty, one that cannot be read raises (DosingRunner._write
+        writes through a tmp file, fsync and os.replace, so that is a damaged file, not a torn write)."""
+        try:
+            with open(os.path.join(os.path.dirname(self._state_path) or ".", "dosing_state.json"),
+                      encoding="utf-8") as fh:
+                dosing = json.load(fh).get("rooms") or {}
+        except FileNotFoundError:
+            return {}
+        if not isinstance(dosing, dict):
+            raise ValueError("dosing_state.json has no rooms")
+        return dosing
+
+    def _backfill_ledger(self, lenient=False):
+        """jev_ledger.jsonl's rows; a missing file is empty. A line that cannot be read raises (Ledger writes through a
+        tmp file and os.replace, so that is damage, which the ledger's next save heals), unless `lenient`: then it is
+        left out, with one log line."""
+        rows, bad = [], 0
+        try:
+            with open(os.path.join(os.path.dirname(self._state_path) or ".", "jev_ledger.jsonl"),
+                      encoding="utf-8") as fh:
+                for line in fh:
+                    if not line.strip():
+                        continue
+                    try:
+                        rows.append(json.loads(line))
+                    except ValueError:
+                        if not lenient:
+                            raise
+                        bad += 1
+        except FileNotFoundError:
+            return []
+        if bad:
+            log(f"journal backfill: ledger: {bad} unreadable lines skipped")
+        return rows
+
+    @staticmethod
+    def _backfill_events(room, half, source):
+        """One half of the room's backfill, oldest first: [(when, kind, Outbox.emit keywords)]. A row it cannot read
+        is left out."""
+        events = []
+        if half == "dosing":
+            block = source.get(room.slug)
+            history = block.get("history") if isinstance(block, dict) else None
+            events = [(kw["now"], kind, kw) for kind, kw in
+                      dosing_runner.history_events(room.slug, history if isinstance(history, list) else [])]
+        else:
+            for row in source:
+                if isinstance(row, dict) and row.get("room") == room.slug:
+                    try:
+                        events += [(kw["now"], kind, kw) for kind, kw in brain_bridge.ledger_events(row)]
+                    except (KeyError, TypeError, ValueError):
+                        continue
+        return sorted(events, key=lambda e: e[0].timestamp())
+
+    def _journal_recovered(self):
+        """What a restart interrupted (dosing_runner.DosingRunner.journal_recovered), to the journal after the pass."""
+        dosing = getattr(self, "dosing", None)
+        if dosing is None:
+            return
+        try:
+            dosing.journal_recovered()
+        except Exception as e:
+            log("journal: interrupted dosing not journaled", e)
+
+    def _flush_journal(self):
+        """The outbox to the integration (crop_steering.journal_append), once, after every room's pass and never
+        before or during a shot (ruling R5): a 1 s timeout, stopping at the first failure, after which the next
+        JOURNAL_BACKOFF_PASSES passes send nothing. What is not sent stays in the outbox for a later pass."""
+        journal = getattr(self, "journal", None)
+        if journal is None:
+            return
+        if getattr(self, "_journal_skip", 0) > 0:
+            self._journal_skip -= 1
+            return
+        failed = []
+
+        def send(room_id, events):
+            status, answer = ha_service_response(
+                "crop_steering", "journal_append", {"room_id": room_id, "events": events}, timeout=1)
+            if status != 200 or not isinstance(answer, dict):
+                failed.append(status)
+                return None
+            return answer.get("accepted") or [], answer.get("duplicate") or [], answer.get("rejected") or []
+
+        try:
+            journal.flush(send, budget_s=JOURNAL_FLUSH_BUDGET_S)
+        except Exception as e:
+            log("journal flush error", e)
+            failed.append(e)
+        if failed:
+            self._journal_skip = JOURNAL_BACKOFF_PASSES
+
+    def _journal_held(self, room, zone, reason, *, guard=None, code=None, now, would=None, actor="engine",
+                      program_id=None):
+        """intent.held for a shot the act loop held (_act_zone, and _execute_shot before anything opens), once per
+        (room, zone, guard, reason) and again each HELD_REEMIT_S while it stands. Never from _blocked: it also only
+        describes (_publish_waiting_for's gates). A hold is known by its guard and its words without their numbers
+        and times: a reading that drifts while it holds is one hold, and two holds under one guard are two. A journal
+        error is only logged."""
+        try:
+            seen = self.__dict__.setdefault("_held_journaled", {})
+            key = (room.slug, zone, guard, _HELD_NUMBERS.sub("#", str(reason)))
+            self.__dict__.setdefault("_held_touched", set()).add(key)
+            last = seen.get(key)
+            if last is not None and 0 <= (now - last).total_seconds() < HELD_REEMIT_S:
+                return
+            seen[key] = now
+            data = {"reason": str(reason)}
+            if guard:
+                data["guard"] = guard
+            data["would"] = None if would is None else str(would)
+            self._journal(room.prefix, "intent.held", zone=zone, outcome="held", code=code, actor=actor,
+                          program_id=program_id, data=data)
+        except Exception as e:
+            log("journal intent.held error", room.slug, zone, e)
+
+    def _sweep_held(self, room, zone):
+        """After the zone's act (_loop_room): the holds it no longer has (it fired, or nothing holds it) are
+        forgotten, so one that comes back is journaled again and the keys never grow."""
+        seen = self.__dict__.get("_held_journaled", {})
+        touched = self.__dict__.get("_held_touched", set())
+        for key in [k for k in seen if k[:2] == (room.slug, zone) and k not in touched]:
+            del seen[key]
+        touched.difference_update([k for k in touched if k[:2] == (room.slug, zone)])
+
+    def _read_supply(self):
+        """The attributes of sensor.crop_steering_supply_config (the integration's site store, G1), read once a pass,
+        or None: no supply saved, or one that does not read. None runs every room's act loop as it always ran."""
+        try:
+            state, attrs, _ = ha_get(SUPPLY_SENSOR)
+        except Exception as e:
+            log("supply read error", e)
+            return None
+        if state in (None, "", "unknown", "unavailable") or not isinstance(attrs, dict):
+            return None
+        return attrs if isinstance(attrs.get("irrigation_pumps"), list) else None
+
+    def _pump_line(self, room, decisions):
+        """Guards 16-17 (spec 2.7, ruling R1): with a supply saved, this pass's turns at the room's pump, or None.
+        The zones that fire take their turns in crop_steering_engine.guards.order (rescue, steering, timer, manual;
+        the first asked first), in the act loop's slots for firing zones; every other zone keeps its slot. The
+        controller opens one zone at a time whatever the supply says, so the line only orders, journals and shows:
+        a zone held is held by its own guards, never by the line. Whatever goes wrong here, None: as before."""
+        room.__dict__.pop("_requested_at", None)  # an earlier pass's, should one have been left by an error
+        room.__dict__.pop("_turn", None)
+        supply = getattr(self, "_supply", None)
+        if not supply:
+            return None
+        try:
+            room_id = "room:" + room.prefix
+            pump_id = room.hw.get("pump")
+            pump = next((p for p in supply["irrigation_pumps"]
+                         if isinstance(p, dict) and pump_id and p.get("entity_id") == pump_id), {})
+            demand = {int(z): float(lph) for z, lph in ((supply.get("zone_demand_lph") or {}).get(room_id) or {}).items()
+                      if lph is not None}
+            groups = {int(z): g for z, g in ((supply.get("zone_groups") or {}).get(room_id) or {}).items()}
+            requested_at = datetime.now().astimezone()
+            firing = [z for z in room.zones if z in decisions and decisions[z][0]]
+            turns = supply_order([{"zone": z, "priority": shot_priority(decisions[z][2]),
+                                   "requested_at": requested_at} for z in firing])
+            slots = iter([t["zone"] for t in turns])
+            for z in firing:  # _act_zone journals the shot as asked for now, however long it waits
+                room.__dict__.setdefault("_requested_at", {})[z] = requested_at
+            return {"pump_id": pump_id, "pump": pump, "demand": demand, "groups": groups, "turns": turns, "ran": [],
+                    "taken": {}, "peak": None, "alerts": [],
+                    "visit": [next(slots) if z in firing else z for z in room.zones]}
+        except Exception as e:
+            log("pump line error", room.slug, e)
+            return None
+
+    def _take_turn(self, room, zone, reason, line):
+        """A zone about to water with a supply saved (_loop_room, once nothing holds it). Works out, and calls nothing:
+        when a zone watered before it this pass it waited, and why (the first QUEUE guard that says, pump_capacity
+        when none: the controller opens one zone at a time). _execute_shot journals that (intent.queued, an outbox
+        append) once the shot passed every check before it opens (_turn_runs); _turn_over and _line_done say the rest
+        once the pass is over. Nothing here or there touches Home Assistant before a pump opens (R5: nothing new slows watering)."""
+        try:
+            turns, ahead, lph = line["turns"], line["ran"], line["demand"].get(zone)
+            turn = next(t for t in turns if t["zone"] == zone)
+            most = line["pump"].get("max_flow_lph")
+            queued = None
+            if ahead:
+                hit = guards.first(self, guards.QUEUE, room, zone,
+                                   {"lph": lph, "ahead": ahead, "pump": line["pump"], "groups": line["groups"]})
+                queued = {"position": len(ahead), "priority": turn["priority"],
+                          "requested_at": turn["requested_at"].isoformat(timespec="milliseconds"),
+                          "guard": hit[0].guard if hit else "pump_capacity"}
+            line["taken"][zone] = room.__dict__.setdefault("_turn", {})[zone] = {
+                "queued": queued, "actor": shot_actor(reason), "program_id": getattr(reason, "program_id", None),
+                "lph": lph, "load": lph / most * 100 if lph is not None and most else None, "behind": len(ahead),
+                "waited": (datetime.now().astimezone() - turn["requested_at"]).total_seconds()}
+        except Exception as e:
+            log("pump turn error", room.slug, zone, e)
+
+    def _turn_runs(self, room, zone, turn):
+        """_execute_shot, once its shot passed every check before it opens: its intent.queued when it waited
+        (_take_turn). An outbox append only; a problem here never stops the shot."""
+        try:
+            if turn["queued"]:
+                self._journal(room.prefix, "intent.queued", zone=zone, outcome="queued", actor=turn["actor"],
+                              program_id=turn.get("program_id"), data=turn["queued"])
+        except Exception as e:
+            log("pump turn error", room.slug, zone, e)
+
+    def _turn_over(self, room, zone, line, ran):
+        """After a zone's act (_loop_room): for a shot that ran, its pump load is counted and CS-214 decided (it alone
+        needs more than its pump, or waited longer than QUEUE_ALERT_S; it watered all the same). Nothing is said
+        here: _line_done says it all once every zone had its turn, after the pass's last pump closed."""
+        try:
+            turn = line["taken"].get(zone)
+            if not ran or turn is None:
+                return
+            pump, most, lph, waited = line["pump_id"], line["pump"].get("max_flow_lph"), turn["lph"], turn["waited"]
+            if turn["load"] is not None:
+                line["peak"] = max(line["peak"] or 0.0, turn["load"])
+            line["alerts"].append((
+                f"pump_wait_{room.slug}_z{zone}",
+                (f"zone {zone} waited {waited / 60:.0f} min for {pump}, behind {turn['behind']} other shot(s) of this "
+                 "pass; it watered after them") if turn["behind"] and waited > QUEUE_ALERT_S else None,
+                "the zone waited long for its pump", zone))
+            line["alerts"].append((
+                f"pump_short_{room.slug}_z{zone}",
+                f"zone {zone} needs {lph:.0f} L/h, {pump} gives {most:.0f} L/h; it waters anyway"
+                if lph is not None and most and lph > most else None,
+                "the zone needs more than its pump", zone))
+        except Exception as e:
+            log("pump turn error", room.slug, zone, e)
+
+    def _line_done(self, room, line):
+        """The end of the room's pass, every zone visited and the last pump closed: nobody waits (shot_queued off),
+        pump_load_pct is the most a shot of this pass put on its pump (0 when none ran, unknown without a demand or
+        the pump's max flow), and the CS-214 raises and dismissals the turns decided are made. Never before a pump
+        opens (R5: nothing new slows watering)."""
+        try:
+            self._publish_queue(room, [])
+            self._publish_load(room, line["pump_id"], line["peak"] if line["peak"] is not None
+                               else 0.0 if line["pump"].get("max_flow_lph") else None)
+            for key, message, title, zone in line["alerts"]:
+                if message is None:
+                    self._dismiss(key)
+                    continue
+                self._alert(key, "CS-214", title, message, room=room, zone=zone, entity_id=line["pump_id"])
+        except Exception as e:
+            log("pump line error", room.slug, e)
+
+    def _show_line(self, entity, state, attrs):
+        """Write one of the pump line's states, only when it changes."""
+        shown = self.__dict__.setdefault("_line_shown", {})
+        if shown.get(entity) != (state, attrs):
+            shown[entity] = (state, attrs)
+            ha_set(entity, state, attrs, timeout=LINE_SET_TIMEOUT_S)
+
+    def _publish_queue(self, room, queue):
+        """binary_sensor.crop_steering_<px>shot_queued, attribute queue: [{zone, position, requested_at, priority}],
+        written at the pass's end (_line_done), when nobody waits any more, and on a room error (_clear_queue)."""
+        self._show_line(f"binary_sensor.crop_steering_{room.prefix}shot_queued", "on" if queue else "off",
+                        {"room_id": "room:" + room.prefix, "queue": queue, "friendly_name": "Shot queued"})
+
+    def _publish_load(self, room, pump, load):
+        """sensor.crop_steering_<px>pump_load_pct: the most a shot of the room's last pass put on its pump (its demand
+        against the pump's max_flow_lph), written at the pass's end (_line_done)."""
+        self._show_line(f"sensor.crop_steering_{room.prefix}pump_load_pct",
+                        "unknown" if load is None else round(load, 1),
+                        {"room_id": "room:" + room.prefix, "pump": pump, "unit_of_measurement": "%",
+                         "friendly_name": "Pump load"})
+
+    def _clear_queue(self, room):
+        """A room's pass raised mid-loop (loop_once): a queue or a pump load it showed is taken down, not left until its
+        next pass. Only what this controller showed: a room with no supply saved is never written to."""
+        try:
+            shown = self.__dict__.get("_line_shown", {})
+            entity = f"binary_sensor.crop_steering_{room.prefix}shot_queued"
+            if shown.get(entity, ("off",))[0] == "on":
+                self._publish_queue(room, [])
+            load = shown.get(f"sensor.crop_steering_{room.prefix}pump_load_pct")
+            if load is not None and load[0] not in (0.0, "unknown"):
+                self._publish_load(room, load[1].get("pump"), 0.0)
+        except Exception as e:
+            log("pump queue error", room.slug, e)
+
+    # ---------- Watering by: each zone's irrigation_mode, its timer program and the timeline's skips ----------
+    def _irrigation_modes(self, room):
+        """{zone: steering|timer|off} this pass (R2). The select zone_N_irrigation_mode, read each pass; a mode that
+        reads is the zone's last-known one (room._irrigation_mode, saved in state.json), anything else (unknown,
+        unavailable, absent) uses that, and steering only when no mode was ever seen: an off zone stays off through a
+        Home Assistant restart, and a room whose integration has no select runs as it always ran."""
+        known = room.__dict__.setdefault("_irrigation_mode", {})
+        modes, changed = {}, False
+        for zone in room.zones:
+            state = ha_get(f"select.crop_steering_{room.prefix}zone_{zone}_irrigation_mode")[0]
+            if state in IRRIGATION_MODES and known.get(str(zone)) != state:
+                known[str(zone)], changed = state, True
+            modes[zone] = known.get(str(zone), "steering")
+        if changed:
+            self._save_state()
+        return modes
+
+    def _project(self, room, program, start, end):
+        """One timer program's slots in [start, end) (crop_steering_engine.timers.project, the room's lights), or []
+        for a program that cannot be projected: logged once for each new error, and only it is left out."""
+        try:
+            return project_timer_program(program, (room.lights_on_hour, room.lights_off_hour), start, end)
+        except Exception as e:
+            said = self.__dict__.setdefault("_timer_errors", {})
+            key = (room.slug, str(program.get("id")))
+            if said.get(key) != str(e):
+                said[key] = str(e)
+                log(f"[{room.slug}] timer program {program.get('name') or program.get('id')!r} not run: {e}")
+            return []
+
+    def _slot_expiry(self, room, slot, program):
+        """When an owed timer slot is no longer given: TIMER_OWED_MIN after its time, or the end of the program window
+        it belongs to (a lights-on window ends at lights-off), whichever comes first, in UTC: the minutes are real
+        ones across a DST change, and a window's end is a wall-clock time."""
+        late = slot.at.astimezone(timezone.utc) + timedelta(minutes=TIMER_OWED_MIN)
+        window = program.get("window") or {"kind": "all"}
+        if program.get("type") == "one_off" or not isinstance(window, dict) or window.get("kind") == "all":
+            return late
+        try:
+            start, length = timer_window(window, (room.lights_on_hour, room.lights_off_hour))
+        except Exception:
+            return late
+        into = (slot.at.hour * 60 + slot.at.minute + slot.at.second / 60.0 - start) % 1440
+        return min(late, (slot.at + timedelta(minutes=length - into)).astimezone(timezone.utc))
+
+    def _apply_modes(self, room, decisions, now, since):
+        """Each zone's Watering by on this pass's decisions, before anything opens (R2, R3; spec 6.1):
+        - off: no shot at all, the rescues included;
+        - timer: of the engine's shots only TIMER_KEEPS, plus its program's latest slot in (since, now] (`since` is
+          the room's last decided pass, kept in memory: the first pass after a restart only starts the clock, so no
+          missed slot is owed). A rescue or floor shot due in the same pass goes first, never delayed: the slot stays
+          owed (room._timer_owed, in memory) until it is the zone's decision, a later slot replaces it, or the zone
+          leaves timer mode;
+        - steering: as always.
+        A skip (timers_config.skips, compared as UTC instants) drops a timer slot at its `at`, or the zone's first
+        engine shot outside TIMER_KEEPS in [at, until), once. Both are journaled intent.refused (guard skipped).
+        The slots are decisions like any other: every guard holds them (PASS, SIZED, QUEUE, PREOPEN). A test shot a
+        person asks for is decided after this, untouched, even on an off zone: it is the operator's own act (journaled
+        actor manual), and the kill switch and every other guard still hold it. Nothing here writes to Home
+        Assistant."""
+        modes = self._irrigation_modes(room)
+        warned = self.__dict__.setdefault("_timers_warned", set())  # rooms whose timers_config did not parse
+        state = None
+        try:  # whatever it holds, the zones still act on the engine under their modes (R5)
+            state, attrs, _ = ha_get(TIMERS_SENSOR.format(room.prefix))
+            readable = state not in (None, "", "unknown", "unavailable") and isinstance(attrs, dict)
+            programs = [p for p in attrs.get("programs") or [] if isinstance(p, dict)] if readable else []
+            skips = [s for s in attrs.get("skips") or [] if isinstance(s, dict)] if readable else []
+            warned.discard(room.slug)
+        except Exception as e:
+            programs, skips = [], []
+            if room.slug not in warned:
+                warned.add(room.slug)
+                log(f"[{room.slug}] timer programs not read, none run until they are: {e}")
+        room._timers = {"modes": modes, "programs": programs, "published": state is not None}
+        until = _wall_clock(now)
+        self._timer_last_pass[room.slug] = until
+        tick = timedelta(microseconds=1)  # project() is [start, end): (since, until] is [since + tick, until + tick)
+        owed = room.__dict__.setdefault("_timer_owed", {})  # zone -> (slot, program) not yet the zone's decision
+        for zone in [z for z in owed if modes.get(z) != "timer"]:
+            del owed[zone]
+        for program in programs if since is not None else ():
+            for slot in self._project(room, program, since + tick, until + tick):
+                if modes.get(slot.zone) == "timer":
+                    owed[slot.zone] = (slot, program)  # in time order: the latest slot is the one owed
+        for zone, (slot, program) in list(owed.items()):  # never given late: TIMER_OWED_MIN, or its window's end
+            if until >= self._slot_expiry(room, slot, program):
+                del owed[zone]
+                timed = _timer_reason(program, slot.duration_s)
+                why = f"the {slot.at:%H:%M} slot was not given in time (its window or {TIMER_OWED_MIN} min passed)"
+                self._journal(room.prefix, "intent.refused", zone=zone, outcome="refused", actor="timer",
+                              program_id=timed.program_id, data={"guard": "expired", "reason": why,
+                                                                 "would": str(timed)})
+                log(f"[{room.slug}] Z{zone} {why}: would {timed}")
+        used = room.__dict__.setdefault("_skips_used", set())  # (zone, at) of the skips an engine shot used up
+        now_utc = until.astimezone(timezone.utc)
+        used.difference_update([k for k in used if k[1] < now_utc - timedelta(days=1)])  # long past their until
+
+        def skip_of(zone, test):
+            for s in skips:
+                at, end = _aware(s.get("at")), _aware(s.get("until"))
+                if s.get("zone") == zone and at is not None and test(at.astimezone(timezone.utc), end):
+                    return s, (zone, at.astimezone(timezone.utc))
+            return None, None
+
+        def refuse(zone, skip, actor, would, program_id=None):
+            self._journal(room.prefix, "intent.refused", zone=zone, outcome="refused", actor=actor,
+                          program_id=program_id, data={"guard": "skipped", "reason": _skipped_by(skip),
+                                                       "would": str(would)})
+            log(f"[{room.slug}] Z{zone} {_skipped_by(skip)}: would {would}")
+
+        for zone in room.zones:
+            mode, (fire, _size, reason) = modes[zone], decisions.get(zone, (False, 0.0, None))
+            kind = getattr(reason, "kind", None)
+            if mode == "off":
+                if fire:
+                    decisions[zone] = (False, 0.0, Reason("OFF: this zone is set to no watering", "mode_off"))
+                continue
+            if fire and mode == "timer" and kind not in TIMER_KEEPS:
+                fire = False
+                decisions[zone] = (False, 0.0, Reason(f"TIMER: the engine's {kind} shot is not given", "mode_timer"))
+            if fire and kind not in TIMER_KEEPS:
+                skip, key = skip_of(zone, lambda at, end: (zone, at) not in used and at <= now_utc
+                                    and end is not None and now_utc < end.astimezone(timezone.utc))
+                if skip is not None:
+                    used.add(key)
+                    refuse(zone, skip, "engine", reason)
+                    decisions[zone] = (False, 0.0, Reason(f"SKIPPED: {_skipped_by(skip)}", "skipped"))
+            if zone in owed and not fire:  # a rescue or floor shot firing now goes first; the slot waits a pass
+                slot, program = owed.pop(zone)
+                timed = _timer_reason(program, slot.duration_s)
+                timed.slot = (slot, program)  # owed again should a test shot take this turn (_loop_room)
+                skip, _key = skip_of(zone, lambda at, end: at == slot.at.astimezone(timezone.utc))
+                if skip is not None:
+                    refuse(zone, skip, "timer", timed, timed.program_id)
+                    continue
+                flow, substrate = self._zone_flow_lps(room, zone), self._substrate_l(room, zone)
+                sized = math.isfinite(flow) and flow > 0 and math.isfinite(substrate) and substrate > 0
+                # its size is what the counters add up; unsized, _act_zone says why (CS-204) and runs nothing
+                decisions[zone] = (True, slot.duration_s * flow / substrate * 100.0 if sized else 0.0, timed)
+
+    def _publish_projection(self, room, now):
+        """sensor.crop_steering_<prefix>projection_app (attribute intents), at the end of the room's pass, only when
+        it changes: the next PROJECTION_H hours of its timer zones' program slots, and each steering zone's next shot
+        as the engine expects it (its waiting_for, `expected: true`), each with a stable id. Written only once the
+        integration publishes timer programs (an older one has no timeline to read it). Each program is projected on
+        its own (_project); whatever else goes wrong is logged: it never stops watering (R5). Each intent carries
+        `phase`, the phase the engine expects the zone in then (_phase_at; None where moisture decides)."""
+        timers = getattr(room, "_timers", None)
+        if not timers or not timers["published"]:
+            return
+        try:
+            # the slots on the zone-aware wall clock (a DST change inside the 24 h moves the later ones), each in UTC
+            start, intents = _wall_clock(now), []
+            clocks = getattr(room, "_phase_clock", None) or {}
+
+            def phase(zone, at):
+                clock, then = clocks.get(zone) or (None, None)
+                return None if clock is None else _phase_at(
+                    clock, (at - then.astimezone(timezone.utc)).total_seconds() / 60.0)
+            end = (start.astimezone(timezone.utc) + timedelta(hours=PROJECTION_H)).astimezone(start.tzinfo)
+            for program in timers["programs"]:
+                for slot in self._project(room, program, start, end):
+                    if timers["modes"].get(slot.zone) == "timer":
+                        at = slot.at.astimezone(timezone.utc)
+                        intents.append((at, {
+                            "id": derived_id(at, f"{room.prefix}:{slot.zone}:timer:{slot.program_id}"),
+                            "zone": slot.zone,
+                            "at": at.isoformat(), "duration_s": slot.duration_s, "source": "timer",
+                            "program_id": slot.program_id, "expected": False, "phase": phase(slot.zone, at)}))
+            for zone, (conditions, at) in (getattr(room, "_waiting", None) or {}).items():
+                waits = [c["in_min"] for c in conditions if c.get("shot") and c.get("in_min") is not None]
+                if timers["modes"].get(zone) != "steering" or not waits:
+                    continue
+                when = (_wall_clock(at).astimezone(timezone.utc)
+                        + timedelta(minutes=min(waits))).replace(second=0, microsecond=0)
+                intents.append((when, {
+                    "id": derived_id(when, f"{room.prefix}:{zone}:engine:"), "zone": zone, "at": when.isoformat(),
+                    "duration_s": None, "source": "engine", "expected": True,
+                    # the shot is the rule of the phase the zone is in, unless a timed move comes first
+                    "phase": next((c["to"] for c in sorted(
+                        (c for c in conditions if c.get("to") and c.get("in_min") is not None),
+                        key=lambda c: c["in_min"]) if c["in_min"] <= min(waits)),
+                        (clocks.get(zone) or ({"phase": None}, None))[0]["phase"])}))
+            intents = [i for _at, i in sorted(intents, key=lambda pair: pair[0])]
+            self._show_line(PROJECTION_SENSOR.format(room.prefix), str(len(intents)), {
+                "room_id": "room:" + room.prefix, "intents": intents,
+                "friendly_name": "Crop Steering planned shots (controller)", "engine": PRODUCT})
+        except Exception as e:
+            log("projection error", room.slug, e)
+
+    def _room_error(self, room, now, err):
+        """A room's pass raised (loop_once). The room says so: its heartbeat and its status read error,
+        its decision fires nothing (an earlier pass's shot must not look live), and CS-212 names it, at
+        most each 30 min while the fault stays (_alert); loop_once dismisses it after the room's next
+        pass. The report and the alert are tried apart, so one that fails as well never stops the
+        other, nor the next room."""
+        error = f"{type(err).__name__}: {err}"
+        log(f"[{room.slug}] room error", error)
+        try:
+            ha_set(f"sensor.crop_steering_{room.prefix}app_status", "error",
+                   {"engine": PRODUCT, "updated": now.isoformat()})
+            ha_set(f"sensor.crop_steering_{room.prefix}current_decision", f"Controller error: {error}"[:255],
+                   {"fired": [], "blocked": [f"Controller error: {error}"]})
+            active = room._beat[1] if room._beat else True  # as its last beat said: an off room stays off
+            self._heartbeat(room, now, self._hardware_fault_block(room), active, loop_error=error)
+        except Exception as e:
+            log(f"[{room.slug}] room error report error", e)
+        try:
+            self._alert(
+                f"room_error_{room.slug}",
+                "CS-212",
+                "controller error, this room is skipped",
+                "An error stopped the controller in this room. The room gets no shots until the error "
+                "stops. The controller tries the room again each minute, and the other rooms continue. "
+                f"Read the controller log, and report the error.\n\n{error}",
+                room=room,
+            )
+        except Exception as e:
+            log(f"[{room.slug}] room error alert error", e)
 
     # ---------------------------------------------------------------- two controllers on one room
     def _guard_read(self, room):
@@ -6502,14 +8147,13 @@ class Controller:
     def _blind_time_transition(self, room, zone, now, lights_on, lights_just_on, p=None):
         """Time-only phase forces for a BLIND zone (dead/missing probe), so it can never
         strand overnight while `decide()` is skipped: lights-off -> P3, and P3 -> P0 at the
-        new photoperiod (with the daily-counter reset, mirroring the P0 branch in _loop_room),
+        new photoperiod (with the daily-counter reset: _change_phase, as for decide()),
         also from a P1/P2 left over from a grow-day the controller did not see end (as decide()).
         With the zone's params `p`, decide()'s two exits that need no probe as well: P0 -> P1
         once p0_max_wait_min has passed, and P1 -> P2 at p1_max_shots. The VWC-driven
         transitions (dryback, the P1 rise rule, predictive P3) need a probe and stay paused.
         """
         st = room.state[zone]
-        gds = self._grow_day_start(room, now)
         new_grow_day = self._new_grow_day(room, st, now, lights_on)
         waited = (now - st["last_phase_change"]).total_seconds() / 60.0
         new_phase = None
@@ -6525,21 +8169,34 @@ class Controller:
         elif p is not None and st["phase"] == "P1" and st["shots"] >= p.p1_max_shots:
             new_phase, why = "P2", f"P1 max shots {st['shots']}/{p.p1_max_shots} (no moisture reading)"
         if new_phase and new_phase != st["phase"]:
-            if new_phase == "P0":
-                self._close_grow_day(room, zone, st, now, p)
-                self._keep_day_peak(st)  # the grow-day ending: tomorrow's P1 target (_vwc_maxima)
-                st["daily_vol"], st["shots"], st["peak"] = 0.0, 0, 0.0  # _snapshot takes the peak from the next reading
-                st["ec_offset"], st["last_ec_steer"] = 0.0, None
-                st["last_daily_reset"] = gds
-            if new_phase == "P1":  # the ramp counts its shots from one again, as the engine's own P1 does
-                self._record_phase(room, zone, st, st["phase"], "P1", now, why)
-                st["shots"] = 0
-            was = st["phase"]
-            st["phase"] = new_phase
-            st["last_phase_change"] = now
-            log(f"[{room.slug}] Z{zone} {was} -> {new_phase}: {why}")
-            self._save_state()
-            self._notify_event("phase", room, zone, was, new_phase, why)
+            log(f"[{room.slug}] Z{zone} {st['phase']} -> {new_phase}: {why}")
+            self._change_phase(room, zone, st, new_phase, why, now, p)
+
+    def _change_phase(self, room, zone, st, new_phase, why, now, p=None, snap=None):
+        """Move a zone to `new_phase`, for decide() and for the dead-probe path alike: tell the
+        operator, keep the zone's history, and reset what the new phase starts from. Into P0 (a new
+        grow-day): the day is closed, its counters, EC offset and P1 wet-up curve start again, and the
+        peak is the reading now (no reading: 0.0, and _snapshot takes it from the next one). Into P1:
+        the ramp counts its shots from one again, as the engine's own P1 does."""
+        was = st["phase"]
+        self._notify_event("phase", room, zone, was, new_phase, why)
+        self._record_phase(room, zone, st, was, new_phase, now, why, snap, p)
+        if new_phase == "P0":
+            self._close_grow_day(room, zone, st, now, p)
+            self._keep_day_peak(st)  # the grow-day ending: tomorrow's P1 target (_vwc_maxima)
+            st["daily_vol"], st["shots"] = 0.0, 0
+            st["peak"] = snap.vwc if snap is not None else 0.0
+            st["ec_offset"], st["last_ec_steer"] = 0.0, None
+            st["last_daily_reset"] = self._grow_day_start(room, now)
+            st["vmax_wetup"] = []  # fresh wet-up curve for today's ramp
+        if new_phase == "P1":
+            st["shots"] = 0
+            if snap is not None:
+                # entering P1 already at the target: the shot decide() fires on this tick is the extra shot
+                st["p1_reached"] = snap.vwc >= min(p.p1_target, p.field_capacity)
+        st["phase"] = new_phase
+        st["last_phase_change"] = now
+        self._save_state()
 
     def _apply_phase_request(self, room, zone, st, now):
         """Move a zone to the phase the operator picked on its Set Phase select, once. The select is
@@ -6824,9 +8481,76 @@ class Controller:
         self._save_state()
         return snapshot
 
+    def _restore_unsaved_room(self, room):
+        """The room's state could not be saved (_save_state): this pass stops with an error (CS-212).
+
+        Its last saved block is loaded back, as at start-up, so the next pass runs. What only memory holds
+        and must not be lost stays: a hardware hold, an in-flight record, and, zone by zone, the newer of
+        the shot and water counters (_keep_newer_shots: never less water or an older last shot, so neither
+        the daily cap nor the shot interval is lifted). With no saved block to go back to, or when what
+        memory must keep is itself what cannot be saved, nothing is pretended: the room stays stopped until
+        its state saves or the controller restarts."""
+        self._save_state()  # it may save now
+        error = self._unsaved_rooms.get(room.slug)
+        if not error:
+            return
+        stopped = "the room stays stopped until it saves or the controller restarts"
+        if not isinstance(getattr(self, "_saved_room_blocks", {}).get(room.slug), dict):
+            raise RuntimeError(f"the state of this room cannot be saved ({error}), and there is no saved state "
+                               f"to go back to: {stopped}")
+        fault, inflight = room.hardware_fault, getattr(room, "shot_inflight", None)
+        memory = {z: s for z, s in room.state.items() if isinstance(s, dict)}
+        self._load_room_state(room)
+        room.hardware_fault = room.hardware_fault or fault
+        room.shot_inflight = room.shot_inflight or inflight
+        for z, mem in memory.items():
+            if z in room.state:
+                self._keep_newer_shots(mem, room.state[z])
+        self._save_state()
+        if self._unsaved_rooms.get(room.slug):
+            raise RuntimeError(f"the state of this room cannot be saved ({self._unsaved_rooms[room.slug]}), "
+                               f"even on its last saved state: {stopped}")
+        raise RuntimeError(f"the state of this room could not be saved ({error}); its last saved state "
+                           "was loaded back, and the room runs again next pass")
+
+    @staticmethod
+    def _keep_newer_shots(mem, s):
+        """Into the zone `s` loaded back from the saved block, what memory `mem` has that is newer: the later
+        last shot, and the day's counters (memory's whole, when its day is newer; the larger, on the same
+        day), and each grow-day's larger water. A value of the wrong type in memory is not kept."""
+        def number(v):
+            return isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v) and v >= 0
+
+        shot = mem.get("last_shot")
+        if isinstance(shot, datetime) and (not isinstance(s.get("last_shot"), datetime) or shot > s["last_shot"]):
+            s["last_shot"] = shot
+            s["last_shot_is_anchor"] = bool(mem.get("last_shot_is_anchor"))
+        reset, saved_reset = mem.get("last_daily_reset"), s.get("last_daily_reset")
+        if type(reset) is date and (type(saved_reset) is not date or reset > saved_reset):
+            s["last_daily_reset"] = reset  # a new day in memory: its counters, not the saved day's
+            s["daily_vol"] = mem.get("daily_vol") if number(mem.get("daily_vol")) else s["daily_vol"]
+            s["shots"] = mem.get("shots") if number(mem.get("shots")) else s["shots"]
+        elif reset == saved_reset:
+            for key in ("daily_vol", "shots"):
+                if number(mem.get(key)) and mem[key] > (s.get(key) or 0):
+                    s[key] = mem[key]
+        days = {item["grow_day"]: item for item in s.get("water_history") or []}
+        for item in mem.get("water_history") or []:
+            if (isinstance(item, dict) and isinstance(item.get("grow_day"), str) and number(item.get("litres"))
+                    and item["litres"] > days.get(item["grow_day"], {}).get("litres", -1)):
+                days[item["grow_day"]] = {"grow_day": item["grow_day"], "litres": float(item["litres"]),
+                                          "complete": item.get("complete") is True}
+        if days:
+            s["water_history"] = [days[d] for d in sorted(days)[-7:]]
+
     def _loop_room(self, room, now):
         """One room's full control pass: snapshot -> decide -> act -> build the publish dict.
         Reads/writes only this room's prefixed entities + its own state."""
+        if getattr(self, "_unsaved_rooms", {}).get(room.slug):
+            self._restore_unsaved_room(room)
+        # The end of the room's last decided pass (in memory: _apply_modes puts it back). A room not decided this pass
+        # (off, held) owes no timer slot from it, as after a restart.
+        timer_since = self.__dict__.setdefault("_timer_last_pass", {}).pop(room.slug, None)
         try:
             import prompt_runtime
             prompt_runtime.sync(self, room, ha_get, ha_call)
@@ -6876,6 +8600,7 @@ class Controller:
                 brain_bridge.lights_on(self, room, now)
             except Exception as e:
                 log("brain lights-on error", room.slug, e)
+        self._watch_feed_known(room)
         snaps, decisions, healthy, blind, params = {}, {}, [], [], {}
         for zone in room.zones:
             st = room.state[zone]
@@ -6949,6 +8674,7 @@ class Controller:
 
                     f"\n\nSensor: {self._fused_id(room.prefix, 'ec', zone, room.zones[zone].get('ec'))}",
                     room=room,
+                    entity_id=self._fused_id(room.prefix, "ec", zone, room.zones[zone].get("ec")),
                     zone=zone,
                 )
             healthy.append((zone, p.p1_target))
@@ -6964,22 +8690,7 @@ class Controller:
             if new_phase != st["phase"]:
                 log(f"[{room.slug}] Z{zone} {st['phase']} -> {new_phase}: {log_words.transition(reason)}")
                 # decide()'s reason leads with why the phase moved ("lights-off -> P3 | ..."): the push says it.
-                self._notify_event("phase", room, zone, st["phase"], new_phase, str(reason).split(" | ")[0])
-                self._record_phase(room, zone, st, st["phase"], new_phase, now, str(reason).split(" | ")[0], snap, p)
-                if new_phase == "P0":
-                    self._close_grow_day(room, zone, st, now, p)
-                    self._keep_day_peak(st)  # the grow-day ending: tomorrow's P1 target (_vwc_maxima)
-                    st["daily_vol"], st["shots"], st["peak"] = 0.0, 0, snap.vwc
-                    st["ec_offset"], st["last_ec_steer"] = 0.0, None
-                    st["last_daily_reset"] = self._grow_day_start(room, now)
-                    st["vmax_wetup"] = []  # fresh wet-up curve for today's ramp
-                if new_phase == "P1":
-                    st["shots"] = 0
-                    # entering P1 already at the target: the shot decide() fires on this tick is the extra shot
-                    st["p1_reached"] = snap.vwc >= min(p.p1_target, p.field_capacity)
-                st["phase"] = new_phase
-                st["last_phase_change"] = now
-                self._save_state()
+                self._change_phase(room, zone, st, new_phase, str(reason).split(" | ")[0], now, p, snap)
                 # The snapshot was taken in the old phase: what the new one starts from.
                 shown = dataclasses.replace(
                     snap, phase=new_phase, phase_minutes=0.0,
@@ -7038,24 +8749,50 @@ class Controller:
                 sib = pick_sibling(p.p1_target, healthy)
                 s_fire, s_size, s_reason = decisions[sib]
                 rescue = getattr(s_reason, "kind", None) in PLAN_HOLD_EXEMPT
-                decisions[zone] = (s_fire, s_size, Reason(f"COPY Z{sib} (VWC probe dead)",
-                                                          "blind_copy_rescue" if rescue else "blind_copy"))
+                mss = self._minutes_since_shot(st, now)
+                floor_last = room.__dict__.get("_last_shot_kind", {}).get(zone) == "min_daily"
+                if s_fire and not rescue and floor_last and mss < p.p2_min_interval_min:
+                    # only after this zone's own floor shot (below): no routine copy lands minutes after it.
+                    # Every other copy follows the sibling exactly, its ramp and EC shots included.
+                    decisions[zone] = (False, 0.0, Reason(
+                        f"COPY Z{sib} waits: last shot {mss:.0f}/{p.p2_min_interval_min:.0f} min ago", "blind_copy"))
+                else:
+                    decisions[zone] = (s_fire, s_size, Reason(f"COPY Z{sib} (VWC probe dead)",
+                                                              "blind_copy_rescue" if rescue else "blind_copy"))
                 plan = (
                     "Until the reading is normal again, this zone gets the same shots as "
                     f"{self._zone_title(room, sib)}, which has a good probe."
                 )
             else:
+                sib = None
                 mss = self._minutes_since_shot(st, now)
+                # Only in the day's watering phases: a timer cannot tell a P3 rescue from overwatering.
                 decisions[zone] = (
-                    mss >= self.blind_fallback_min,
+                    lights_on and st["phase"] in ("P1", "P2") and mss >= self.blind_fallback_min,
                     p.p2_shot_size,
                     Reason("FALLBACK schedule (no live probe)", "blind_fallback"),
                 )
                 plan = (
                     "Until the reading is normal again, the zone gets a shot every "
-                    f"{int(self.blind_fallback_min)} min while the kill switch is on, inside its daily "
-                    "water limit. Phase changes that use the moisture reading wait for the probe."
+                    f"{int(self.blind_fallback_min)} min in P1 and P2 while the lights and the kill switch are "
+                    "on, inside its daily water limit. Phase changes that use the moisture reading wait for the probe."
                 )
+            # The minimum daily water needs no probe (decide()'s floor, paced by floor_share): a blind zone behind it
+            # gets it too, with the lights on and past P0, when no other shot fires. Every shot counts toward it.
+            # Never into a table that is not draining (CS-310), the zone's or, in copy mode, its sibling's.
+            backed_up = getattr(room, "_backed_up", None) or {}
+            floor_due = p.min_daily_volume * floor_share(SimpleNamespace(
+                hours_since_lights_on=(24.0 - self._hours_to(now, room.lights_on_hour)) % 24.0,
+                hours_to_lights_off=self._hours_to(now, room.lights_off_hour)), p)
+            if (not decisions[zone][0] and p.min_daily_volume > 0 and lights_on and st["phase"] != "P0"
+                    and zone not in backed_up and sib not in backed_up
+                    and st["daily_vol"] < floor_due and mss >= p.p2_min_interval_min):
+                decisions[zone] = (True, p.p2_shot_size, Reason(
+                    f"MIN-DAILY floor {st['daily_vol']:.1f}<{floor_due:.1f} of {p.min_daily_volume:.1f}L "
+                    "(no live probe)", "min_daily"))
+            if p.min_daily_volume > 0:
+                plan += (f" With the lights on, after P0, it also gets its daily minimum of {p.min_daily_volume:g} L "
+                         "in shots spread over the day.")
             # Re-alert each tick — _alert's 30-min debounce throttles it to a repeating
             # reminder so a dead probe can't sit unnoticed (the silent-freeze lesson). Why it
             # is unusable is read every tick, so a changed cause replaces the card's diagnosis.
@@ -7072,6 +8809,7 @@ class Controller:
                     "position and the wiring of the probe."
                     f"\n\nSensor: {looking}",
                     room=room,
+                    entity_id=looking,
                     zone=zone,
                 )
                 room._blind_zones.add(zone)
@@ -7083,18 +8821,24 @@ class Controller:
                 _PROBE_ALERTS[code][0],
                 f"{what} {plan} {_PROBE_ALERTS[code][1]}\n\nSensor: {looking}",
                 room=room,
+                entity_id=looking,
                 zone=zone,
             )
             room._blind_zones.add(zone)
         room._blind_zones = {z for z in room._blind_zones if z not in snaps}
+        self._apply_modes(room, decisions, now, timer_since)  # each zone's Watering by, its timer slots and skips
         for zone in room.zones:  # a test shot asked for takes the zone's turn this pass
             test = self._test_shot(room, zone, now)
             if test:
+                slot = getattr(decisions.get(zone, (None, None, None))[2], "slot", None)
+                if slot is not None:  # a timer slot it takes the turn from stays owed (_apply_modes)
+                    room._timer_owed[zone] = slot
                 decisions[zone] = test
         if room._beat is None or not room._beat[1]:
             self._report_before_acting(room, decisions, snaps, now)
         pub = {}
-        for zone in room.zones:
+        line = self._pump_line(room, decisions)  # None with no supply saved: the zones in their order, as always
+        for zone in line["visit"] if line else room.zones:
             if zone not in decisions:
                 continue
             fire, size, reason = decisions[zone]
@@ -7113,13 +8857,18 @@ class Controller:
                 decisions[zone] = (fire, size, reason)
             # A held plan is shown on every zone it holds: decide() no longer returns the steering shot it
             # would have stopped (ZoneSnapshot.steering_held), so the hold is said here instead.
-            block = (self._blocked(room, zone, reason) if fire
+            held_by = self._blocked_by(room, zone, reason) if fire else None
+            block = ((held_by[1] if held_by else None) if fire
                      else strategy_block(getattr(room, "strategy_snapshot", None), zone))
+            room.__dict__.setdefault("_held_by", {})[zone] = held_by  # for _act_zone's journal
+            if line and fire and not block:  # its turn at the pump: journaled and shown, never held (R1)
+                self._take_turn(room, zone, reason, line)
             if fire and not block and getattr(self, "jev", None) is not None and getattr(reason, "kind", None) != "test_shot":
                 brain_bridge.shot_started(room, zone, snaps.get(zone), getattr(reason, "kind", None))
             if fire and not block and room.__dict__.get("_shot_check", "off") != "off":
                 shot_audit.started(room, zone, snaps.get(zone), getattr(reason, "kind", None))
             fed_before = room.state[zone]["daily_vol"]
+            shot_before = room.state[zone].get("last_shot")
             acted = self._act_zone(
                 room,
                 zone,
@@ -7130,6 +8879,13 @@ class Controller:
                 lights_on,
                 now,
             )
+            self._sweep_held(room, zone)
+            if line:
+                room.__dict__.get("_turn", {}).pop(zone, None)  # a turn its shot never took (held after it)
+                ran = room.state[zone].get("last_shot") is not shot_before
+                if ran:  # it watered: the next one waits on it
+                    line["ran"].append((zone, line["demand"].get(zone)))
+                self._turn_over(room, zone, line, ran)
             self._grow_day_shot(room, zone, getattr(reason, "kind", None), room.state[zone]["daily_vol"] - fed_before, now)
             if acted is not None:  # held back at the daily budget after all: publish what happened
                 fire, size, reason = decisions[zone] = acted
@@ -7138,14 +8894,12 @@ class Controller:
             # (EC-adjusted) re-water threshold at the current dryback rate. Only meaningful in P2;
             # 0 = due now, None elsewhere. Drives the dashboard's "next" on the frequency card.
             pz = params[zone]
-            next_h = None
-            if snap is not None and room.state[zone]["phase"] == "P2":
-                if snap.vwc <= pz.p2_threshold:
-                    next_h = 0.0
-                elif snap.dryback_rate and snap.dryback_rate > 0:
-                    next_h = round(
-                        min((snap.vwc - pz.p2_threshold) / snap.dryback_rate, 48.0), 2
-                    )
+            zst = room.state[zone]
+            rate = sensing.post_shot_rate(zst["win"], zst["last_shot"])
+            next_h, next_reason = sensing.next_irrigation(
+                zst["phase"], snap.vwc if snap else None, pz.p2_threshold,
+                rate, zst["last_shot"] is not None and not zst.get("last_shot_is_anchor"),
+            )
             pub[zone] = {
                 "phase": room.state[zone]["phase"],
                 "vwc": snap.vwc if snap else None,
@@ -7158,9 +8912,15 @@ class Controller:
                 "p": params[zone],
                 "vmax": room._vmax.get(zone),
                 "next_h": next_h,
+                "next_reason": next_reason,
                 # the zone's live dryback (sensing.dryback): the numbers decide() used this pass
-                "dryback": (snap.peak_vwc, snap.vwc, snap.dryback_rate, snap.minutes_since_shot) if snap else None,
+                "dryback": (snap.peak_vwc, snap.vwc, rate,
+                            snap.minutes_since_shot) if snap else None,
             }
+        if line:  # the pass's turns are over: nobody waits, the pump is idle
+            self._line_done(room, line)
+        self._flow_done(room)  # the shots' flow ratios and CS-318, after the last pump closed (R5)
+        self._publish_projection(room, now)  # after the last pump closed (R5): it never delays a shot
         for z, why in cross_zone_outliers(snaps):
             self._alert(
                 f"xzone_{room.slug}_{z}",
@@ -7416,19 +9176,19 @@ class Controller:
                         "engine": PRODUCT,
                     },
                 )
-                # Estimated hours to the next P2 shot (drives the dashboard "next"). Only published
-                # when computable (P2 + a real dryback rate); skipped otherwise so the card shows "—".
+                # Estimated hours to the next P2 shot (drives the dashboard "next"). Always published: "unknown" with
+                # the reason when the controller has no current estimate, so an old one never stands.
                 nh = d.get("next_h")
-                if nh is not None:
-                    ha_set(
-                        f"sensor.crop_steering_{px}prediction_zone_{zone}_next_irrigation_hours",
-                        nh,
-                        {
-                            "unit_of_measurement": "h",
-                            "friendly_name": f"Zone {zone} next irrigation",
-                            "engine": PRODUCT,
-                        },
-                    )
+                ha_set(
+                    f"sensor.crop_steering_{px}prediction_zone_{zone}_next_irrigation_hours",
+                    "unknown" if nh is None else nh,
+                    {
+                        "unit_of_measurement": "h",
+                        "friendly_name": f"Zone {zone} next irrigation",
+                        "engine": PRODUCT,
+                        **({"reason": d.get("next_reason")} if nh is None else {}),
+                    },
+                )
             sys_stat, unsafe, warn, safe = system_safety_status(labels)
             ha_set(
                 f"sensor.crop_steering_{px}system_safety_status",
@@ -7581,14 +9341,17 @@ class Controller:
         """All phase logic runs on container-local `datetime.now()`. If the Supervisor's TZ
         injection or tzdata is missing, the container is UTC and every lights/dryback/daily-reset
         window silently shifts by the site's offset. Log the effective offset at startup and
-        alert if it disagrees with Home Assistant's configured zone."""
+        alert if it disagrees with Home Assistant's configured zone. -> False while Home Assistant has not
+        answered with its zone, or a mismatch's card is not up: run() asks again each loop until then."""
         now_local = datetime.now().astimezone()
         off = now_local.utcoffset()
         off_h = off.total_seconds() / 3600.0 if off else 0.0
-        log(
-            f"timezone: container local {now_local:%Y-%m-%d %H:%M} "
-            f"(UTC{off_h:+.1f}h) TZ={os.environ.get('TZ', 'unset')}"
-        )
+        if not getattr(self, "_tz_logged", False):
+            self._tz_logged = True
+            log(
+                f"timezone: container local {now_local:%Y-%m-%d %H:%M} "
+                f"(UTC{off_h:+.1f}h) TZ={os.environ.get('TZ', 'unset')}"
+            )
         try:
             r = _session().get(f"{BASE}/config", headers=HDR, timeout=8) if _GATE.allows("other") else None
             if r is not None:
@@ -7597,16 +9360,16 @@ class Controller:
         except Exception:
             ha_tz = None
         if not ha_tz:
-            return
+            return False
         try:
             from zoneinfo import ZoneInfo
 
             ha_off = datetime.now(ZoneInfo(ha_tz)).utcoffset().total_seconds() / 3600.0
         except Exception as e:  # tzdata missing, unknown zone, etc.
             log("timezone: could not resolve HA zone", ha_tz, e)
-            return
+            return True
         if abs(ha_off - off_h) > 0.01:
-            self._alert(
+            return self._alert(  # a card not created is tried again
                 "tz_mismatch",
                 "CS-405",
                 "time zone mismatch, the grow-day can move",
@@ -7624,6 +9387,7 @@ class Controller:
             )
         else:
             log(f"timezone: matches Home Assistant ({ha_tz})")
+        return True
 
     def _check_holds(self):
         """Name every hold (hold_entities) that Home Assistant answers it does not have (404), from the start,
@@ -7662,13 +9426,18 @@ class Controller:
             f"| loop {self.loop_seconds:.0f}s",
         )
         log("token present:", bool(TOKEN), "| base:", SHOWN_BASE)
-        self._log_timezone()
+        tz_checked = self._log_timezone()
         if self.hold_entities:
             self._check_holds()
         self._start_dosing()
         while True:
             if _GATE.state is not None:
                 self._park_refused()
+            if not tz_checked:  # Home Assistant did not answer at start: CS-405 is checked once it does
+                try:  # on its own: a raise here never skips the pass
+                    tz_checked = self._log_timezone()
+                except Exception as e:
+                    log("timezone check error", e)
             try:
                 if self.hold_entities and self._holds_card is not False:
                     self._check_holds()

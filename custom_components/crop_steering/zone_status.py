@@ -45,3 +45,27 @@ def mirrored_status(source, now) -> tuple[str, dict]:
         }
     reason = (getattr(source, "attributes", None) or {}).get("reason")
     return str(source.state), ({"reason": reason} if isinstance(reason, str) else {})
+
+
+def app_phase_entity(prefix: str) -> str:
+    """The entity the controller publishes the room's zone phases on ("Z1:P3, Z2:P3")."""
+    return f"sensor.crop_steering_{prefix}app_current_phase"
+
+
+def mirrored_phase(source, now) -> tuple[str | None, dict]:
+    """The room's current_phase to show -> (state, attributes).
+
+    The controller's own report, or None (unknown) with the reason: a phase is never invented. A
+    controller that has not published, or whose report is older than STALE_MINUTES, leaves the room's
+    phase unknown rather than showing a default.
+    """
+    if source is None or str(source.state).strip().lower() in _DEAD:
+        return None, {"reason": "The controller has not published a phase"}
+    seen = getattr(source, "last_reported", None) or getattr(
+        source, "last_updated", None
+    )
+    if seen is None or (now - seen).total_seconds() > STALE_MINUTES * 60:
+        return None, {
+            "reason": f"No report from the controller for more than {STALE_MINUTES} minutes"
+        }
+    return str(source.state), {}

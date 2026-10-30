@@ -1,0 +1,524 @@
+/* Shared visual primitives: arc gauge, rings, capacity bar, step rail, hold button, sentence. */
+
+/* Arc gauge */
+.arc-gauge {
+  display: block;
+  flex: none;
+  overflow: visible;
+}
+.arc-gauge path {
+  fill: none;
+  stroke-width: 14;
+}
+.arc-gauge-track {
+  stroke: color-mix(in srgb, var(--foreground) 14%, var(--surface));
+}
+.arc-gauge-band {
+  stroke: color-mix(in srgb, var(--success) 55%, transparent);
+}
+.arc-gauge-tick {
+  stroke: var(--foreground);
+  stroke-width: 2;
+}
+.arc-gauge-needle {
+  stroke: var(--foreground);
+  stroke-width: 4;
+  stroke-linecap: round;
+}
+.arc-gauge-hub {
+  fill: var(--foreground);
+}
+.arc-gauge[data-tone="warn"] .arc-gauge-needle {
+  stroke: var(--warning);
+}
+.arc-gauge[data-tone="warn"] .arc-gauge-hub {
+  fill: var(--warning);
+}
+.arc-gauge[data-tone="bad"] .arc-gauge-needle {
+  stroke: var(--destructive);
+}
+.arc-gauge[data-tone="bad"] .arc-gauge-hub {
+  fill: var(--destructive);
+}
+.arc-gauge-end {
+  fill: var(--muted-foreground);
+  font-size: 11px;
+}
+
+/* Rings */
+.ring-track,
+.ring-fill {
+  fill: none;
+}
+.ring-track {
+  stroke: color-mix(in srgb, var(--foreground) 14%, var(--surface));
+}
+.ring-fill {
+  stroke: var(--primary);
+  stroke-linecap: round;
+}
+.health-ring {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+}
+.health-ring svg {
+  flex: none;
+}
+.health-ring text {
+  fill: var(--foreground);
+  font-size: 15px;
+  font-weight: 700;
+}
+.health-ring[data-tone="ok"] .ring-fill {
+  stroke: var(--success);
+}
+.health-ring[data-tone="warn"] .ring-fill {
+  stroke: var(--warning);
+}
+.health-ring[data-tone="bad"] .ring-fill {
+  stroke: var(--destructive);
+}
+.health-ring-label {
+  font-weight: 600;
+}
+
+.stability-ring {
+  position: relative;
+  width: min(264px, 70vw);
+  aspect-ratio: 1;
+  margin-inline: auto;
+}
+.stability-ring svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.stability-ring[data-state="settling"] .ring-fill {
+  stroke: var(--warning);
+}
+.stability-ring[data-state="steady"] .ring-fill {
+  stroke: var(--success);
+}
+.stability-ring[data-state="offline"] .ring-fill {
+  stroke: transparent;
+}
+.stability-ring-body {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  text-align: center;
+}
+.stability-ring-caption {
+  color: var(--muted-foreground);
+  font-size: 14px;
+}
+.stability-ring-value {
+  font-size: clamp(44px, 16vw, 64px);
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.stability-ring-state {
+  font-size: 16px;
+  font-weight: 700;
+}
+.stability-ring[data-state="settling"] .stability-ring-state {
+  color: var(--warning);
+}
+.stability-ring[data-state="steady"] .stability-ring-state {
+  color: var(--success);
+}
+.stability-ring[data-state="offline"] .stability-ring-state {
+  color: var(--muted-foreground);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .stability-ring .ring-fill {
+    transition: stroke-dasharray 0.6s ease, stroke 0.3s ease;
+  }
+  .stability-ring[data-state="settling"] .ring-track {
+    animation: stability-breathe 2s ease-in-out infinite;
+  }
+}
+@keyframes stability-breathe {
+  50% {
+    stroke: color-mix(in srgb, var(--warning) 22%, var(--surface));
+  }
+}
+
+/* Capacity bar */
+.capacity-bar {
+  position: relative;
+  display: flex;
+  height: 22px;
+  overflow: hidden;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--foreground) 10%, var(--surface));
+}
+.capacity-segment {
+  height: 100%;
+  background: var(--primary);
+  box-shadow: inset -1px 0 0 var(--surface);
+}
+.capacity-segment[data-tone="water"] {
+  background: var(--primary);
+}
+.capacity-segment[data-tone="ok"] {
+  background: var(--success);
+}
+.capacity-segment[data-tone="warn"] {
+  background: var(--warning);
+}
+.capacity-segment[data-tone="bad"] {
+  background: var(--destructive);
+}
+.capacity-segment[data-tone="muted"] {
+  background: var(--muted-foreground);
+}
+.capacity-overflow {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--foreground);
+  font-size: 11px;
+  background: repeating-linear-gradient(
+    -45deg,
+    transparent 0 5px,
+    color-mix(in srgb, var(--background) 60%, transparent) 5px 9px
+  );
+}
+.capacity-line {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--foreground);
+}
+
+/* Step rail */
+.step-rail {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin: 0;
+  padding: 16px 24px;
+  list-style: none;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+}
+.step-rail > li {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  color: var(--muted-foreground);
+}
+.step-rail > li:not(:last-child)::after {
+  content: "";
+  flex: 1;
+  min-width: 16px;
+  height: 2px;
+  background: var(--border);
+}
+.step-rail > li[data-done]::after {
+  background: var(--primary);
+}
+.step-rail-dot {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 2px solid currentColor;
+  border-radius: 50%;
+  font-weight: 600;
+}
+.step-rail > li[data-done] .step-rail-dot {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+.step-rail > li[aria-current="step"] {
+  color: var(--primary);
+}
+.step-rail-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  font-size: 13px;
+  line-height: 1.3;
+}
+.step-rail-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--foreground);
+}
+.step-rail > li[aria-current="step"] .step-rail-title {
+  color: var(--primary);
+}
+.step-rail-title:focus {
+  outline: none;
+}
+.step-rail-title:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+.step-rail[data-compact] {
+  display: block;
+  padding: 0;
+  border: 0;
+  background: none;
+}
+.step-rail-bars {
+  display: flex;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.step-rail-bars li {
+  flex: 1;
+  height: 5px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--foreground) 16%, var(--surface));
+}
+.step-rail-bars li[data-done] {
+  background: var(--primary);
+}
+.step-rail-bars li[aria-current="step"] {
+  background: color-mix(in srgb, var(--primary) 75%, var(--foreground));
+}
+.step-rail-heading {
+  margin: 18px 0 0;
+  font-size: 22px;
+  font-weight: 700;
+}
+.step-rail-heading:focus {
+  outline: none;
+}
+
+/* Hold button */
+.hold-button-wrap {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.hold-button {
+  position: relative;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  padding: 0 24px;
+  overflow: hidden;
+  border: 0;
+  border-radius: 10px;
+  background: var(--primary);
+  color: var(--primary-foreground);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 600;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  cursor: pointer;
+}
+.hold-button > span {
+  position: relative;
+}
+.hold-button:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+.hold-button[data-state="running"] {
+  background: var(--success);
+  color: var(--background);
+}
+.hold-button[data-state="disabled"] {
+  background: color-mix(in srgb, var(--foreground) 12%, var(--surface));
+  color: var(--muted-foreground);
+  cursor: not-allowed;
+}
+/* Functional progress, not decoration: it shows how much longer to hold, so it stays under
+   prefers-reduced-motion. */
+.hold-button-fill {
+  position: absolute !important;
+  inset: 0;
+  transform: scaleX(0);
+  transform-origin: left;
+  background: color-mix(in srgb, var(--background) 30%, transparent);
+}
+.hold-button[data-state="holding"] .hold-button-fill {
+  transform: scaleX(1);
+  transition: transform var(--confirm-ms, 1500ms) linear;
+}
+.hold-button-status {
+  font-size: 12px;
+  font-weight: 500;
+}
+.hold-button-reason {
+  color: var(--muted-foreground);
+  font-size: 13px;
+}
+@media (max-width: 720px) {
+  .hold-button {
+    min-height: 64px;
+  }
+}
+
+/* Sentence */
+.sentence {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 12px;
+  font-size: 22px;
+  line-height: 1.3;
+}
+.sentence-word[data-punct] {
+  margin-left: -10px;
+}
+.sentence-token,
+.sentence-input {
+  height: 48px;
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--foreground) 5%, var(--surface));
+  color: var(--foreground);
+  font: inherit;
+  font-weight: 600;
+}
+.sentence-token {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+}
+.sentence-token:focus-visible,
+.sentence-input:focus-visible,
+.sentence-native:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 1px;
+}
+.sentence-number {
+  position: relative;
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.sentence-number .sentence-input {
+  width: 6.5ch;
+  text-align: right;
+}
+.sentence-static {
+  font-weight: 600;
+}
+a.sentence-static {
+  color: var(--primary);
+}
+.sentence-pop {
+  z-index: 60;
+  min-width: var(--radix-popover-trigger-width);
+  max-height: min(320px, var(--radix-popover-content-available-height));
+  overflow-y: auto;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--foreground);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.35);
+}
+.sentence-pop ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  outline: none;
+}
+.sentence-pop li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 15px;
+  cursor: pointer;
+}
+.sentence-pop li[data-active] {
+  background: color-mix(in srgb, var(--primary) 18%, var(--surface));
+}
+.sentence-pop ul:focus-visible li[data-active] {
+  outline: 2px solid var(--ring);
+  outline-offset: -2px;
+}
+.sentence[data-phone] {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 12px 16px;
+  font-size: 18px;
+}
+.sentence-row {
+  display: contents;
+}
+.sentence-row-word {
+  align-self: center;
+  color: var(--muted-foreground);
+}
+.sentence-row-text {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+/* Under the field on desktop so the sentence line does not jump; in the row on phone. */
+.sentence-hint {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 2px;
+  color: var(--warning);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+.sentence[data-phone] .sentence-hint {
+  position: static;
+  flex-basis: 100%;
+  margin-top: 0;
+}
+.sentence-row-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.sentence-native {
+  flex: 1;
+  min-width: 0;
+  height: 52px;
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--foreground) 5%, var(--surface));
+  color: var(--foreground);
+  font: inherit;
+  font-weight: 600;
+}
+.sentence[data-phone] .sentence-input {
+  height: 52px;
+}

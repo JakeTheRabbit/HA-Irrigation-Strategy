@@ -7,10 +7,17 @@ import { InfoTip, UiTip } from "@/components/info-tip";
 import type { Controller } from "@/lib/types";
 import type { HistoryWindow, RunsDocument, RunZone } from "@/lib/comparison-types";
 import { addDays, boundedRange, comparisonRange, dateInZone } from "@/lib/comparison";
-import { ComparisonChart, ComparisonSummary, format, type Loaded } from "./comparison-views";
+import {
+  ComparisonChart,
+  ComparisonSummary,
+  format,
+  type Loaded,
+} from "./comparison-views";
+import { RunCompare } from "./run-compare";
 import { RunWeeks } from "./comparison-weeks";
 import { buildSetpointPreview } from "@/lib/setpoint-preview";
 import { buildComparisonTarget } from "@/lib/comparison-target";
+import { DATE_TIME, formatClock, formatDateTime } from "@/lib/clock";
 import "./comparison.css";
 const errorText = (error: unknown) =>
   error instanceof Error ? error.message : "Comparison request failed.";
@@ -278,109 +285,7 @@ export function Comparison({
           </Button>
         }
       />
-      <section className="panel comparison-controls">
-        <div className="comparison-field">
-          <span className="label-with-tip">
-            <label htmlFor="comparison-current-run">This run</label>
-            <UiTip copyKey="this run" />
-          </span>
-          <select
-            id="comparison-current-run"
-            aria-label="Current run"
-            value={currentId}
-            onChange={(event) => {
-              setCurrentId(event.target.value);
-              setPreviousId("");
-              if (!event.target.value) setReference("current");
-            }}
-          >
-            <option value="">Date range · no run selected</option>
-            {runChoices.map((run) => (
-              <option key={run.id} value={run.id}>
-                {run.name}
-                {run.archived ? " · archived" : ""}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="comparison-field">
-          <span className="label-with-tip">
-            <label htmlFor="comparison-past-run">Compare with</label>
-            <InfoTip
-              label="Compare with"
-              copy={{
-                tooltip: "A past run that the page shows next to this run.",
-                impact:
-                  "The charts and the tables show the two runs side by side. It changes no setting.",
-                guidance: "Select a run first. Select No comparison run to show one run only.",
-              }}
-            />
-          </span>
-          <select
-            id="comparison-past-run"
-            aria-label="Past run"
-            value={previousId}
-            disabled={!currentRun}
-            onChange={(event) => setPreviousId(event.target.value)}
-          >
-            <option value="">No comparison run</option>
-            {runChoices
-              .filter((run) => run.id !== currentId)
-              .map((run) => (
-                <option key={run.id} value={run.id}>
-                  {run.name}
-                  {run.archived ? " · archived" : ""}
-                </option>
-              ))}
-          </select>
-        </div>
-        <div className="comparison-field">
-          <span className="label-with-tip">
-            <label htmlFor="comparison-zone">Zone</label>
-            <UiTip copyKey="zone" />
-          </span>
-          <select
-            id="comparison-zone"
-            aria-label="Comparison zone"
-            value={effectiveZone}
-            onChange={(event) => setZoneId(Number(event.target.value))}
-          >
-            {zoneChoices.map((zone) => (
-              <option key={zone.zone_id} value={zone.zone_id}>
-                {zone.name}
-                {currentRun && !controller.room.zones.some((live) => live.id === zone.zone_id)
-                  ? " · historical zone"
-                  : ""}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="comparison-records-link">
-          <label className="comparison-check">
-            <input
-              type="checkbox"
-              checked={archived}
-              onChange={(event) => {
-                setArchived(event.target.checked);
-                if (!event.target.checked) {
-                  if (currentRun?.archived) {
-                    setCurrentId("");
-                    setPreviousId("");
-                  }
-                  if (previousRun?.archived) setPreviousId("");
-                }
-              }}
-            />{" "}
-            Include archived run records
-          </label>
-          <span className="label-with-tip">
-            <Button variant="ghost" size="sm" onClick={openRecords}>
-              Run records <ArrowRight size={15} aria-hidden="true" />
-            </Button>
-            <UiTip copyKey="run records" />
-          </span>
-        </div>
-      </section>
+      <RunCompare controller={controller} runs={document} refresh={refresh} />
       {metadataLoading && <p role="status">Loading run records…</p>}
       {metadataError && (
         <div className="comparison-notice" role="alert">
@@ -405,194 +310,305 @@ export function Comparison({
           </span>
         </div>
       )}
-      <div className="history-toggle comparison-view" role="group" aria-label="Comparison view">
-        {(
-          [
-            ["By grow week", false],
-            ["Overlay", true],
-          ] as const
-        ).map(([label, value]) => (
-          <button
-            type="button"
-            key={label}
-            aria-pressed={overlay === value}
-            onClick={() => setOverlay(value)}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-      {/* Both views stay mounted, so switching is instant and the weekly notes stay filled. */}
-      <div className="comparison-pane" hidden={overlay}>
-        <RunWeeks
-          controller={controller}
-          current={currentRun}
-          previous={previousRun}
-          zoneId={effectiveZone}
-          zoneName={zoneName}
-          refresh={refresh}
-          onNotes={setWeekNotes}
-        />
-      </div>
-      <div className="comparison-pane" hidden={!overlay} data-section="chart">
+      {/* One zone, two runs, week by week: the drill-down under the room-wide view, closed so the
+          page shows one comparison until it is asked for. */}
+      <details className="comparison-more comparison-zone-detail" data-section="zone-detail">
+        <summary>One zone in detail, by grow week</summary>
         <div className="comparison-more-body">
-          <section className="panel comparison-range">
+          <section className="panel comparison-controls">
             <div className="comparison-field">
               <span className="label-with-tip">
-                <label htmlFor="comparison-history-range">History range</label>
-                <UiTip copyKey="history range" />
+                <label htmlFor="comparison-current-run">This run</label>
+                <UiTip copyKey="this run" />
               </span>
               <select
-                id="comparison-history-range"
-                aria-label="History range"
-                value={period}
-                onChange={(event) => setPeriod(event.target.value)}
+                id="comparison-current-run"
+                aria-label="Current run"
+                value={currentId}
+                onChange={(event) => {
+                  setCurrentId(event.target.value);
+                  setPreviousId("");
+                  if (!event.target.value) setReference("current");
+                }}
               >
-                <option value="day">Day</option>
-                <option value="week">Week · 7 days</option>
-                <option value="month">Calendar month</option>
-                <option value="run" disabled={!currentRun}>
-                  Run to date
-                </option>
-                <option value="custom">Custom dates</option>
+                <option value="">Date range · no run selected</option>
+                {runChoices.map((run) => (
+                  <option key={run.id} value={run.id}>
+                    {run.name}
+                    {run.archived ? " · archived" : ""}
+                  </option>
+                ))}
               </select>
             </div>
-            {period === "custom" && (
-              <>
-                <div className="comparison-field">
-                  <span className="label-with-tip">
-                    <label htmlFor="comparison-start-date">Start date</label>
-                    <UiTip copyKey="from date" />
-                  </span>
-                  <Input
-                    id="comparison-start-date"
-                    aria-label="Comparison start date"
-                    type="date"
-                    value={customStart}
-                    onChange={(event) => setCustomStart(event.target.value)}
-                  />
-                </div>
-                <div className="comparison-field">
-                  <span className="label-with-tip">
-                    <label htmlFor="comparison-end-date">End date</label>
-                    <UiTip copyKey="through date" />
-                  </span>
-                  <Input
-                    id="comparison-end-date"
-                    aria-label="Comparison end date"
-                    type="date"
-                    value={customEnd}
-                    onChange={(event) => setCustomEnd(event.target.value)}
-                  />
-                </div>
-              </>
-            )}
             <div className="comparison-field">
               <span className="label-with-tip">
-                <label htmlFor="comparison-target-reference">Target reference</label>
-                <UiTip copyKey="target reference" />
+                <label htmlFor="comparison-past-run">Compare with</label>
+                <InfoTip
+                  label="Compare with"
+                  copy={{
+                    tooltip: "A past run that the page shows next to this run.",
+                    impact:
+                      "The charts and the tables show the two runs side by side. It changes no setting.",
+                    guidance: "Select a run first. Select No comparison run to show one run only.",
+                  }}
+                />
               </span>
               <select
-                id="comparison-target-reference"
-                aria-label="Target reference"
-                value={reference}
-                onChange={(event) => setReference(event.target.value)}
+                id="comparison-past-run"
+                aria-label="Past run"
+                value={previousId}
+                disabled={!currentRun}
+                onChange={(event) => setPreviousId(event.target.value)}
               >
-                <option value="current">Current configured daily plan</option>
-                <option value="saved" disabled={!currentRun}>
-                  Saved run daily reference
-                </option>
-                <option value="phase">Current phase reference</option>
+                <option value="">No comparison run</option>
+                {runChoices
+                  .filter((run) => run.id !== currentId)
+                  .map((run) => (
+                    <option key={run.id} value={run.id}>
+                      {run.name}
+                      {run.archived ? " · archived" : ""}
+                    </option>
+                  ))}
               </select>
             </div>
-            <p className="small comparison-wide">
-              Calendar: {timeZone}
-              {!doc && !currentRun ? " (browser time zone until run metadata loads)" : ""}. Windows
-              end at the request time; the previous run stops at the same grow age. Run records
-              never enable or arm irrigation.
-            </p>
-          </section>
-          {loading && <p role="status">Loading selected-zone Recorder history…</p>}
-          {historyError && (
-            <p className="comparison-notice" role="alert">
-              {historyError}
-            </p>
-          )}
-          {loaded && (
-            <>
-              <section className="panel comparison-reference">
-                <div>
-                  <h2>{targetLabel}</h2>
-                  <p>
-                    {reference === "phase"
-                      ? `VWC ${format(targets.vwc)}% · EC ${format(targets.ec)} mS/cm`
-                      : `P0–P3 VWC / EC illustration · lights ${format(lights.on)} → ${format(lights.off)} h`}
-                  </p>
-                  <p className="small">
-                    {reference === "saved" && currentRun
-                      ? `${savedZone?.reference_source || currentRun.reference_source}. Captured ${new Date(currentRun.captured_at).toLocaleString(undefined, { timeZone: currentRun.time_zone })} (${currentRun.time_zone}). Saved lights on/off: ${format(currentRun.lights.on)} / ${format(currentRun.lights.off)} h.`
-                      : `Current configuration observed ${controller.lastUpdated ? new Date(controller.lastUpdated).toLocaleString() : "at this page snapshot"}; source: ${preview?.source || "selected live zone unavailable"}.`}
-                  </p>
-                  <p className="small">
-                    This is a reference illustration, not the historical targets used during these
-                    readings. Registering past dates captures today's reference; editing dates keeps
-                    the original capture.
-                  </p>
-                </div>
-              </section>
-              <ComparisonChart
-                loaded={loaded}
-                targets={reference === "phase" ? targets : { vwc: null, ec: null }}
-                dailyTarget={dailyTarget}
-                label={targetLabel}
-              />
-              <p className="small">
-                History requested through{" "}
-                {new Date(loaded.end).toLocaleString(undefined, { timeZone: loaded.timeZone })} (
-                {loaded.timeZone}); loaded {new Date(loaded.loadedAt).toLocaleTimeString()}. Use
-                Refresh history to advance this window. Raw retained state changes are summarized
-                before chart downsampling.
-              </p>
-            </>
-          )}
-        </div>
-      </div>
-      <details className="comparison-more" data-section="quality">
-        <summary>Data quality and history coverage</summary>
-        <div className="comparison-more-body">
-          {!!weekNotes.length && (
-            <section className="comparison-notice" aria-label="Source of the weekly figures">
-              <h2>Source of the weekly figures</h2>
-              {weekNotes.map((note) => (
-                <p key={note}>{note}</p>
-              ))}
-            </section>
-          )}
-          {loaded && (
-            <>
+            <div className="comparison-field">
+              <span className="label-with-tip">
+                <label htmlFor="comparison-zone">Zone</label>
+                <UiTip copyKey="zone" />
+              </span>
+              <select
+                id="comparison-zone"
+                aria-label="Comparison zone"
+                value={effectiveZone}
+                onChange={(event) => setZoneId(Number(event.target.value))}
+              >
+                {zoneChoices.map((zone) => (
+                  <option key={zone.zone_id} value={zone.zone_id}>
+                    {zone.name}
+                    {currentRun && !controller.room.zones.some((live) => live.id === zone.zone_id)
+                      ? " · historical zone"
+                      : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="comparison-records-link">
+
               <label className="comparison-check">
                 <input
                   type="checkbox"
-                  checked={monthly}
-                  onChange={(event) => setMonthly(event.target.checked)}
+                  checked={archived}
+                  onChange={(event) => {
+                    setArchived(event.target.checked);
+                    if (!event.target.checked) {
+                      if (currentRun?.archived) {
+                        setCurrentId("");
+                        setPreviousId("");
+                      }
+                      if (previousRun?.archived) setPreviousId("");
+                    }
+                  }}
                 />{" "}
-                Group recorded ranges by month
+                Include archived run records
               </label>
-              <ComparisonSummary loaded={loaded} monthly={monthly} />
-            </>
-          )}
-          {!!warnings.length && (
-            <section className="comparison-notice" aria-label="History coverage">
-              <h2>History coverage</h2>
-              {[...new Set(warnings)].map((warning) => (
-                <p key={warning}>{warning}</p>
-              ))}
-              <p>
-                Available samples do not establish complete coverage. Recorder exclusion, outages
-                and retention limits can leave partial history.
-              </p>
-            </section>
-          )}
+              <span className="label-with-tip">
+                <Button variant="ghost" size="sm" onClick={openRecords}>
+                  Run records <ArrowRight size={15} aria-hidden="true" />
+                </Button>
+                <UiTip copyKey="run records" />
+              </span>
+            </div>
+          </section>
+          <div className="history-toggle comparison-view" role="group" aria-label="Comparison view">
+            {(
+              [
+                ["By grow week", false],
+                ["Overlay", true],
+              ] as const
+            ).map(([label, value]) => (
+              <button
+                type="button"
+                key={label}
+                aria-pressed={overlay === value}
+                onClick={() => setOverlay(value)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          {/* Both views stay mounted, so switching is instant and the weekly notes stay filled. */}
+          <div className="comparison-pane" hidden={overlay}>
+            <RunWeeks
+              controller={controller}
+              current={currentRun}
+              previous={previousRun}
+              zoneId={effectiveZone}
+              zoneName={zoneName}
+              refresh={refresh}
+              onNotes={setWeekNotes}
+            />
+          </div>
+          <div className="comparison-pane" hidden={!overlay} data-section="chart">
+            <div className="comparison-more-body">
+              <section className="panel comparison-range">
+                <div className="comparison-field">
+                  <span className="label-with-tip">
+                    <label htmlFor="comparison-history-range">History range</label>
+                    <UiTip copyKey="history range" />
+                  </span>
+                  <select
+                    id="comparison-history-range"
+                    aria-label="History range"
+                    value={period}
+                    onChange={(event) => setPeriod(event.target.value)}
+                  >
+                    <option value="day">Day</option>
+                    <option value="week">Week · 7 days</option>
+                    <option value="month">Calendar month</option>
+                    <option value="run" disabled={!currentRun}>
+                      Run to date
+                    </option>
+                    <option value="custom">Custom dates</option>
+                  </select>
+                </div>
+                {period === "custom" && (
+                  <>
+                    <div className="comparison-field">
+                      <span className="label-with-tip">
+                        <label htmlFor="comparison-start-date">Start date</label>
+                        <UiTip copyKey="from date" />
+                      </span>
+                      <Input
+                        id="comparison-start-date"
+                        aria-label="Comparison start date"
+                        type="date"
+                        value={customStart}
+                        onChange={(event) => setCustomStart(event.target.value)}
+                      />
+                    </div>
+                    <div className="comparison-field">
+                      <span className="label-with-tip">
+                        <label htmlFor="comparison-end-date">End date</label>
+                        <UiTip copyKey="through date" />
+                      </span>
+                      <Input
+                        id="comparison-end-date"
+                        aria-label="Comparison end date"
+                        type="date"
+                        value={customEnd}
+                        onChange={(event) => setCustomEnd(event.target.value)}
+                      />
+                    </div>
+                  </>
+                )}
+                <div className="comparison-field">
+                  <span className="label-with-tip">
+                    <label htmlFor="comparison-target-reference">Target reference</label>
+                    <UiTip copyKey="target reference" />
+                  </span>
+                  <select
+                    id="comparison-target-reference"
+                    aria-label="Target reference"
+                    value={reference}
+                    onChange={(event) => setReference(event.target.value)}
+                  >
+                    <option value="current">Current configured daily plan</option>
+                    <option value="saved" disabled={!currentRun}>
+                      Saved run daily reference
+                    </option>
+                    <option value="phase">Current phase reference</option>
+                  </select>
+                </div>
+                <p className="small comparison-wide">
+                  Calendar: {timeZone}
+                  {!doc && !currentRun ? " (browser time zone until run metadata loads)" : ""}.
+                  Windows end at the request time; the previous run stops at the same grow age. Run
+                  records never enable or arm irrigation.
+                </p>
+              </section>
+              {loading && <p role="status">Loading selected-zone Recorder history…</p>}
+              {historyError && (
+                <p className="comparison-notice" role="alert">
+                  {historyError}
+                </p>
+              )}
+              {loaded && (
+                <>
+                  <section className="panel comparison-reference">
+                    <div>
+                      <h2>{targetLabel}</h2>
+                      <p>
+                        {reference === "phase"
+                          ? `VWC ${format(targets.vwc)}% · EC ${format(targets.ec)} mS/cm`
+                          : `P0–P3 VWC / EC illustration · lights ${format(lights.on)} → ${format(lights.off)} h`}
+                      </p>
+                      <p className="small">
+                        {reference === "saved" && currentRun
+                          ? `${savedZone?.reference_source || currentRun.reference_source}. Captured ${new Date(currentRun.captured_at).toLocaleString(undefined, { timeZone: currentRun.time_zone })} (${currentRun.time_zone}). Saved lights on/off: ${format(currentRun.lights.on)} / ${format(currentRun.lights.off)} h.`
+                          : `Current configuration observed ${controller.lastUpdated ? formatDateTime(controller.lastUpdated, DATE_TIME) : "at this page snapshot"}; source: ${preview?.source || "selected live zone unavailable"}.`}
+                      </p>
+                      <p className="small">
+                        This is a reference illustration, not the historical targets used during
+                        these readings. Registering past dates captures today's reference; editing
+                        dates keeps the original capture.
+                      </p>
+                    </div>
+                  </section>
+                  <ComparisonChart
+                    loaded={loaded}
+                    targets={reference === "phase" ? targets : { vwc: null, ec: null }}
+                    dailyTarget={dailyTarget}
+                    label={targetLabel}
+                  />
+                  <p className="small">
+                    History requested through{" "}
+                    {new Date(loaded.end).toLocaleString(undefined, { timeZone: loaded.timeZone })}{" "}
+                    ({loaded.timeZone}); loaded {formatClock(loaded.loadedAt)}.
+                    Use Refresh history to advance this window. Raw retained state changes are
+                    summarized before chart downsampling.
+                  </p>
+                </>
+              )}
+            </div>
+          </div>
+          <details className="comparison-more" data-section="quality">
+            <summary>Data quality and history coverage</summary>
+            <div className="comparison-more-body">
+              {!!weekNotes.length && (
+                <section className="comparison-notice" aria-label="Source of the weekly figures">
+                  <h2>Source of the weekly figures</h2>
+                  {weekNotes.map((note) => (
+                    <p key={note}>{note}</p>
+                  ))}
+                </section>
+              )}
+              {loaded && (
+                <>
+                  <label className="comparison-check">
+                    <input
+                      type="checkbox"
+                      checked={monthly}
+                      onChange={(event) => setMonthly(event.target.checked)}
+                    />{" "}
+                    Group recorded ranges by month
+                  </label>
+                  <ComparisonSummary loaded={loaded} monthly={monthly} />
+                </>
+              )}
+              {!!warnings.length && (
+                <section className="comparison-notice" aria-label="History coverage">
+                  <h2>History coverage</h2>
+                  {[...new Set(warnings)].map((warning) => (
+                    <p key={warning}>{warning}</p>
+                  ))}
+                  <p>
+                    Available samples do not establish complete coverage. Recorder exclusion,
+                    outages and retention limits can leave partial history.
+                  </p>
+                </section>
+              )}
+            </div>
+          </details>
         </div>
       </details>
     </div>

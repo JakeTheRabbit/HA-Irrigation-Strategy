@@ -24,8 +24,7 @@ describe("water per plant", () => {
     expect(room.plants).toBe(144);
     expect(room.ml).toBeCloseTo(((5.3 + 6.2 + 7.1) * 1000) / 144, 6);
   });
-  it("reads a zone recorded in mL as litres", () => {
-    expect(roomPerPlant([zone(1, 3600, "mL")], { 1: 36 })!.ml).toBeCloseTo(100, 6);
+  it("leaves a zone with no water out of the per-plant figure", () => {
     expect(roomPerPlant([zone(1, null)], { 1: 36 })).toBeNull();
   });
 });

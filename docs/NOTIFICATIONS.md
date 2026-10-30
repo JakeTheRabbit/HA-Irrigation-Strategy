@@ -6,6 +6,8 @@ phase changes, hardware lockouts, watering stopped, and so on), and a push goes 
 row ticks that kind of alert. It also adds the events a person can now subscribe to that were never
 alerts: phase changes, the AI assistant's setting changes, and "no watering for a while".
 
+Alert rules, the inbox and quiet hours: [Alerts](features/alerts.md).
+
 This document is the contract between the three layers. Nothing in it names a site's phones or people.
 
 ## Layers
@@ -23,16 +25,16 @@ either gets it once.
 
 | Id | Checkbox | What it covers |
 |---|---|---|
-| `emergency` | Emergencies | Every alert whose severity is critical in docs/error-codes.json (CS-201 to 204, 207, 211, 301, 308, 310, 311, 315, 402, 601, 606, 801, 809, 811, 901, 902) |
-| `hardware` | Hardware lockouts | CS-301 to CS-309 (a pump or valve that did not do what it was told, a hardware hold, a shot cut), CS-310 (moisture rising with no water: a table not draining), CS-311 (the sump pump has not run), CS-312 (a zone that keeps hitting its longest allowed shot), CS-313 (a valve or pump the controller can't switch), CS-314 (the sump water balance does not close), CS-315 (rescue shots that do not raise the moisture), CS-316 (a waste valve that is not closed for a shot), CS-317 (a pump that runs with every valve shut), CS-701 (water isn't reaching a zone) and CS-710 (water may be bypassing the substrate or the probe) |
-| `sensors` | Sensors and drift | CS-101 to CS-104, CS-502 (a zone's probes disagree), CS-503 (a moisture probe set aside for its unit), CS-504 (a zone steering on bulk EC: no pore EC probe reporting), CS-505 (a zone's primary probe is offline), CS-603, CS-604, CS-703, CS-704 |
-| `watering` | Watering stopped | CS-202 to CS-208, CS-602, CS-609 (another controller on the room), **CS-209** (new: no watering for a while), CS-211 (a zone's shots held for too long), and CS-901 to CS-904 (the tank at its minimum, its level unknown, a refill due before the next round of shots, a fill stopped over the full mark), CS-316 (a waste valve that holds the shots), CS-905 (a low estimated tank level) and CS-906 (a batch tank to refill) |
+| `emergency` | Emergencies | Every alert whose severity is critical in docs/error-codes.json (CS-201 to 204, 207, 211, 212, 301, 308, 310, 311, 315, 402, 601, 606, 801, 809, 811, 901, 902) |
+| `hardware` | Hardware lockouts | CS-301 to CS-309 (a pump or valve that did not do what it was told, a hardware hold, a shot cut), CS-310 (moisture rising with no water: a table not draining), CS-311 (the sump pump has not run), CS-312 (a zone that keeps hitting its longest allowed shot), CS-313 (a valve or pump the controller can't switch), CS-314 (the sump water balance does not close), CS-315 (rescue shots that do not raise the moisture), CS-316 (a waste valve that is not closed for a shot), CS-317 (a pump that runs with every valve shut), CS-214 (a zone that needs more than its pump; it waters anyway), CS-318 (a flow meter that saw less water than a shot gave), CS-319 (a flow meter that counts water with no zone on), CS-701 (water isn't reaching a zone) and CS-710 (water may be bypassing the substrate or the probe) |
+| `sensors` | Sensors and drift | CS-101 to CS-104, CS-502 (a zone's probes disagree), CS-503 (a moisture probe set aside for its unit), CS-504 (a zone steering on bulk EC: no pore EC probe reporting), CS-505 (a zone's primary probe is offline), CS-603, CS-604, CS-703, CS-704, CS-907 (a room with no feed EC, so no EC flush) |
+| `watering` | Watering stopped | CS-202 to CS-208, CS-602, CS-609 (another controller on the room), **CS-209** (new: no watering for a while), CS-211 (a zone's shots held for too long), CS-212 (a room skipped after a controller error), and CS-901 to CS-904 (the tank at its minimum, its level unknown, a refill due before the next round of shots, a fill stopped over the full mark), CS-316 (a waste valve that holds the shots), CS-905 (a low estimated tank level) and CS-906 (a batch tank to refill) |
 | `phases` | Phase changes | A zone moving P0 → P1 → P2 → P3 (new event, no card) |
 | `vitals` | Vitals | The controller's regular report on every zone (event `vitals`, no new card). Not ticked on any row until someone ticks it, an upgraded row included |
 | `stock` | Stock tanks | CS-608, CS-807 |
 | `dosing` | Dosing | CS-801 to CS-806, CS-808, CS-809 (the batch tank's pH not corrected), CS-810 and CS-811 (the light dimmed on dry substrate) |
 | `jev` | AI assistant | CS-501, CS-702, CS-705, CS-706, CS-707, CS-404, CS-708 (the AI assistant's budget is spent until lights-on), CS-709 (its key was refused or it is not answering), CS-711 (a proposal to change the feed, for a person to decide), CS-712 (the options name the removed first AI route), CS-713 (the room not running its grow plan as written), and the AI assistant moving a setting (new event, no card) |
-| `setup` | Setup and settings | CS-201, CS-401 to CS-405 (except 404), CS-601, CS-605, CS-606, CS-607, CS-610, CS-611, CS-713 (the room not running its grow plan as written: also under `jev`) |
+| `setup` | Setup and settings | CS-201, CS-401 to CS-405 (except 404), CS-601, CS-605, CS-606, CS-607, CS-610, CS-611, CS-613 (a deprecated service or select in use), CS-614 (a retired entity an automation or script still uses), CS-713 (the room not running its grow plan as written: also under `jev`) |
 
 The mapping lives in one place in the integration (`notify_catalog.py`) and is returned by `notify_get`,
 so the page shows exactly what each checkbox covers. A code the catalog does not know goes to
@@ -77,7 +79,8 @@ docs/error-codes.json is in no kind at all.
       "kinds": ["stock", "dosing"],               // ids from the table above
       "rooms": [],                                // room prefixes ("" = the default room, "f1_"); empty = every room
       "urgent_high_priority": true,               // emergencies go out as high-priority / time-sensitive pushes
-      "digest": false                             // true: what is not an emergency waits for the digest
+      "digest": false,                            // true: what is not an emergency waits for the digest
+      "quiet_hours": {"from": "22:00", "to": "06:00"}  // optional; null or absent = none (see Quiet hours)
     }
   ],
   "digest_hours": 4,                              // a digest phone gets one push this often (1 to 24)
@@ -112,7 +115,7 @@ not the whole setup.
 |---|---|---|---|
 | `crop_steering.notify_get` | any signed-in user | none | `{schema_version: 1, config, kinds[{id, name, detail, codes[], events[]}], phones[{service, name, user_id, user_name}], can_edit_all, user_id}` |
 | `crop_steering.notify_save` | admin: any row; a non-admin: only rows whose `user_id` is their own (they cannot add or remove rows) | `expected_revision, recipients, idle_hours?, digest_hours?, mutes?` | as `notify_get`, or `error` ("revision", "not allowed: …", a readable message) |
-| `crop_steering.notify_test` | admin, or the phone's own user | `service` | `{sent: true}` or `error` |
+| `crop_steering.notify_test` | admin, or the phone's own user | `service`, or `services` (a list of up to 20 phones), not both | `{sent: true}` or `error`; with `services`, `{results: [{service, sent, error}]}` |
 | `crop_steering.notify` | admin (the controller) | `key, code?, event?, room?, zone?, title, message, urgent?` | `{sent_to[], error}`, with `muted: true` or `held[]` (below) |
 
 - `notify` works out the push's kinds from `code` (the catalog) or `event`, then sends to every recipient
@@ -160,6 +163,21 @@ not the whole setup.
   updated, or raised again after Home Assistant restarts, and not again within 30 minutes when a card
   clears and comes back (a probe going on and off line), as the controller repeats an alert. The 30 minutes
   start only once a phone has the push: one that reached nobody is pushed again when the card comes back.
+
+## Quiet hours, alert rules and the alerts inbox
+
+These three are described in full in [Alerts](features/alerts.md):
+
+- **Quiet hours** (`quiet_hours` on a recipient row, `HH:MM` to `HH:MM` in Home Assistant's time zone,
+  may cross midnight). Known non-critical pushes are held and sent as one push when quiet hours end; an
+  urgent push always comes through. The Notifications page does not edit them yet: set them with
+  `notify_save`, and a save from the page keeps them ([Quiet hours](features/alerts.md#quiet-hours)).
+- **Alert rules**: your own threshold rules on a zone, feed, tank, stock tank, probe or controller
+  reading. A rule only notifies and never touches watering. Its `routing` picks the kind of alert it is
+  pushed as, and only `routing: emergency` is urgent ([Alert rules](features/alerts.md#alert-rules)).
+- **The alerts inbox**: `sensor.crop_steering_<prefix>alerts_open` counts each room's open alerts, and
+  `crop_steering.alert_ack` acknowledges one. Any signed-in user can acknowledge
+  ([The alerts inbox](features/alerts.md#the-alerts-inbox-and-acknowledging)).
 
 ## The controller
 

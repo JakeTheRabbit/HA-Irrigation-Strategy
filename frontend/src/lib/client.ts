@@ -4,6 +4,7 @@ import type { HistoryWindow } from "./comparison-types";
 import type { HistoryRequest } from "./comparison-types";
 import type { TimelineRequest, TimelineRows } from "./day-timeline";
 import type { OperatorAction } from "./operator-types";
+import { PARITY_ACTIONS } from "./parity-api";
 import type { Change, EntityState, RoomView, Series, States, WriteResult } from "./types";
 import { numeric, validateChange } from "./model";
 import { viewerTimeZone } from "./comparison";
@@ -235,6 +236,7 @@ export class HaClient {
       "runs_set_harvest",
       "display_get",
       "display_save",
+      ...PARITY_ACTIONS,
     ];
     if (!allowed.includes(action)) throw new Error("Unsupported workspace action.");
     // Keep and Undo answer nothing: asking them for a response is refused.

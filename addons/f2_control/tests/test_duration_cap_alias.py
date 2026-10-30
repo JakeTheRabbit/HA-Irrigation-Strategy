@@ -86,3 +86,114 @@ def test_existing_null_canonical_state_is_not_treated_as_missing(rig, monkeypatc
     )
     fake.set_state("number.crop_steering_veg_maximum_shot_duration", "60")
     assert shot(rig, monkeypatch, "veg_") == []
+
+
+def blip(c, monkeypatch, controller, fake, status=None):
+    """Every read of a room cap entity fails (timeout: status None, or an HA error status)."""
+
+    def failed(entity, timeout=8):
+        return status, controller.HAState()
+
+    def get_status(entity, timeout=8):
+        return (
+            failed(entity)
+            if "shot_duration" in entity
+            else fake.ha_get_status(entity, timeout)
+        )
+
+    def get(entity, timeout=8):
+        return (
+            controller.HAState()
+            if "shot_duration" in entity
+            else fake.ha_get(entity, timeout)
+        )
+
+    monkeypatch.setattr(controller, "ha_get_status", get_status)
+    monkeypatch.setattr(controller, "ha_get", get)
+
+
+@pytest.mark.parametrize("status", [None, 500, 401])
+def test_failed_cap_read_keeps_the_cap_read_earlier(rig, monkeypatch, status):
+    import controller
+
+    c, fake, _clock = rig
+    fake.set_state("number.crop_steering_max_shot_duration", "120")
+    assert shot(rig, monkeypatch, size=20) == [120]
+    blip(c, monkeypatch, controller, fake, status)
+    assert shot(rig, monkeypatch, size=20) == [120]
+
+
+@pytest.mark.parametrize("status", [None, 500])
+def test_failed_cap_read_with_nothing_read_earlier_holds(rig, monkeypatch, status):
+    import controller
+
+    c, fake, _clock = rig
+    fake.set_state("number.crop_steering_max_shot_duration", "120")
+    blip(c, monkeypatch, controller, fake, status)
+    assert shot(rig, monkeypatch, size=20) == []
+    assert any(
+        d.get("notification_id") == "f2_duration_config_default"
+        and "(CS-203)" in d.get("title", "")
+        for _, _, d in fake.calls
+    )
+
+
+def test_failed_read_after_an_invalid_cap_still_holds(rig, monkeypatch):
+    import controller
+
+    c, fake, _clock = rig
+    fake.set_state("number.crop_steering_max_shot_duration", "120")
+    assert shot(rig, monkeypatch, size=20) == [120]
+    fake.set_state("number.crop_steering_max_shot_duration", "0")
+    assert shot(rig, monkeypatch, size=20) == []
+    blip(c, monkeypatch, controller, fake)
+    assert shot(rig, monkeypatch, size=20) == []
+
+
+def test_failed_read_after_the_cap_entity_went_away_holds(rig, monkeypatch):
+    import controller
+
+    c, fake, _clock = rig
+    fake.set_state("number.crop_steering_max_shot_duration", "120")
+    assert shot(rig, monkeypatch, size=20) == [120]
+    del fake.states["number.crop_steering_max_shot_duration"]
+    assert shot(rig, monkeypatch, size=20) == [900]
+    blip(c, monkeypatch, controller, fake)
+    assert shot(rig, monkeypatch, size=20) == []
+
+
+def test_valid_read_takes_down_the_failed_read_card(rig, monkeypatch):
+    import controller
+
+    c, fake, _clock = rig
+    fake.set_state("number.crop_steering_max_shot_duration", "120")
+    with monkeypatch.context() as failing:
+        blip(c, failing, controller, fake)
+        assert shot(rig, monkeypatch, size=20) == []
+    assert "duration_config_default" in c._alerted
+    assert shot(rig, monkeypatch, size=20) == [120]
+    assert "duration_config_default" not in c._alerted
+    assert any(
+        svc == "dismiss" and d.get("notification_id") == "f2_duration_config_default"
+        for _, svc, d in fake.calls
+    )
+
+
+def test_failed_canonical_read_does_not_fall_to_the_legacy_cap(rig, monkeypatch):
+    import controller
+
+    c, fake, _clock = rig
+    fake.set_state("number.crop_steering_max_shot_duration", "120")
+    fake.set_state("number.crop_steering_maximum_shot_duration", "300")
+    assert shot(rig, monkeypatch, size=20) == [120]
+    read = []
+
+    def get_status(entity, timeout=8):
+        read.append(entity)
+        if entity == "number.crop_steering_max_shot_duration":
+            return None, controller.HAState()
+        return fake.ha_get_status(entity, timeout)
+
+    monkeypatch.setattr(controller, "ha_get_status", get_status)
+    assert shot(rig, monkeypatch, size=20) == [120]
+    assert "number.crop_steering_maximum_shot_duration" not in read

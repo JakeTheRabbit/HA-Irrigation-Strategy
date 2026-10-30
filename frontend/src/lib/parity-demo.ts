@@ -1,0 +1,317 @@
+import { demoBackend, type DemoBackend } from "./demo";
+import { PARITY_ACTIONS, type ParityAction } from "./parity-api";
+import { DEMO_TIMER_PROGRAM_ID, demoId, demoJournal } from "./parity-demo/journal";
+import { demoSystemStatus } from "./parity-demo/system";
+import { demoTargetChanges } from "./parity-demo/targets";
+import type {
+  AlertPreview,
+  AlertRuleListItem,
+  CsEvent,
+  DashboardList,
+  HistoryChange,
+  TimelineBlock,
+  TimelineGetData,
+  TimelineSummary,
+  TimerProgramListItem,
+} from "./parity-types";
+
+/** One lane's demo answer. `answer` returns the service's `data`, or a whole v2 envelope
+ * (`api: 2`, e.g. an error) that is passed through as it is. */
+export interface DemoHandler {
+  action: ParityAction;
+  match?(data: Record<string, unknown>): boolean;
+  answer(data: Record<string, unknown>, now: number): unknown;
+}
+
+/** Each lane's `parity-demo/<lane>.ts` exports `handlers`; they run in file-name order. */
+const lanes = import.meta.glob<{ handlers?: DemoHandler[] }>(
+  ["./parity-demo/*.ts", "!./parity-demo/*.test.ts"],
+  { eager: true },
+);
+const LANE_HANDLERS: DemoHandler[] = Object.keys(lanes)
+  .sort()
+  .flatMap((file) => lanes[file].handlers ?? []);
+
+const DEMO_ROOMS = ["room:", "room:room_b_"];
+const iso = (ms: number) => new Date(ms).toISOString();
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  !!value && typeof value === "object" && !Array.isArray(value);
+const roomsOf = (data: Record<string, unknown>) =>
+  Array.isArray(data.rooms) && data.rooms.length ? data.rooms.map(String) : typeof data.room_id === "string" ? [data.room_id] : DEMO_ROOMS;
+const dayEvents = (rooms: string[], now: number) => rooms.flatMap((room) => demoJournal(room, now));
+
+/** The v2 envelope around a demo answer, read back at `now`. */
+export function demoEnvelope(data: unknown, now: number, roomId?: unknown) {
+  return {
+    api: 2,
+    ok: true,
+    room_id: typeof roomId === "string" ? roomId : null,
+    revision: isRecord(data) && typeof data.revision === "number" ? data.revision : null,
+    readback: { status: "verified", at: iso(now) },
+    event_ids: [],
+    data,
+  };
+}
+
+/** The error an integration older than 3.18 gives for a v2 service. */
+export function missingServiceError(action: string): Error {
+  return Object.assign(new Error(`Service crop_steering.${action} not found.`), { code: "service_not_found" });
+}
+
+function timeline(data: Record<string, unknown>, now: number): TimelineGetData {
+  const rooms = roomsOf(data);
+  const zones = Array.isArray(data.zones) ? (data.zones as number[]) : null;
+  return {
+    rooms: rooms.map((room_id) => {
+      const events = demoJournal(room_id, now);
+      const rows = new Map<number, TimelineBlock[]>();
+      const block = (e: CsEvent, extra: Partial<TimelineBlock>): TimelineBlock => ({
+        id: e.id, kind: "shot", status: "done", start: e.ts, end: e.ts, litres: null, metered_l: null, reason: null,
+        phase: null, vwc_before: null, vwc_expected: null, requested_at: null, pump_wait_s: null,
+        source: e.source.actor, code: e.code, event_id: e.id, skippable: false, ...extra,
+      });
+      for (const e of events) {
+        if (e.zone === null || (zones && !zones.includes(e.zone))) continue;
+        const list = rows.get(e.zone) ?? [];
+        rows.set(e.zone, list);
+        if (e.kind === "shot.started") {
+          const done = events.find((c) => c.kind === "shot.completed" && c.correlation?.intent_id === e.correlation?.intent_id);
+          const d = e.data;
+          list.push(block(e, {
+            end: done?.ts ?? iso(now), litres: Number(d.commanded_l), metered_l: (done?.data.metered_l as number) ?? null,
+            reason: String(d.reason), phase: String(d.phase), vwc_before: d.vwc_before as number,
+            vwc_expected: (d.vwc_expected as number | null) ?? null, requested_at: String(d.requested_at),
+            pump_wait_s: Number(d.pump_wait_s), status: done && Number(done.data.metered_l) / Number(d.commanded_l) < 0.8 ? "warning" : "done",
+          }));
+        } else if (e.kind === "intent.held")
+          list.push(block(e, { kind: "held", status: "warning", reason: String(e.data.reason), end: iso(Date.parse(e.ts) + 60_000) }));
+      }
+      // The next shot of each zone that waters, planned 45 min after its last.
+      for (const [zone, list] of rows) {
+        const last = list.filter((b) => b.kind === "shot").at(-1);
+        if (!last) continue;
+        const at = Date.parse(last.start) + 45 * 60_000;
+        list.push({ ...last, id: demoId(at, `planned:${room_id}:${zone}`), status: "planned", kind: "planned",
+          start: iso(at), end: iso(at + 60_000), metered_l: null, event_id: null, source: "engine", skippable: true,
+          expected: true, requested_at: null, pump_wait_s: null, code: null });
+      }
+      const on = demoJournal(room_id, now).find((e) => e.kind === "phase.changed" && e.data.to === "P0");
+      const lightsOn = on ? Date.parse(on.ts) : now;
+      return {
+        room_id,
+        lights: [{ on: iso(lightsOn), off: iso(lightsOn + 12 * 3_600_000) }],
+        rows: [...rows].sort(([a], [b]) => a - b).map(([zone, blocks]) => ({ zone, blocks })),
+        pump: null,
+        pump_rooms: [],
+        planned_source: "projection_app",
+        pump_load: [{ t: iso(now - 3_600_000), pct: 48 }, { t: iso(now), pct: 0 }],
+      };
+    }),
+    errors: { count: 0, markers: [] },
+  };
+}
+
+function summary(data: Record<string, unknown>, now: number): TimelineSummary {
+  const days = Array.isArray(data.days) && data.days.length ? data.days.map(String) : [new Date(now).toLocaleDateString("sv")];
+  const rooms = roomsOf(data);
+  return {
+    days: days.map((date) => ({
+      date,
+      rooms: rooms.map((room_id) => {
+        const on = demoJournal(room_id, now).filter((e) => new Date(e.ts).toLocaleDateString("sv") === date);
+        const count = (kind: string, test: (e: CsEvent) => boolean = () => true) => on.filter((e) => e.kind === kind && test(e)).length;
+        return {
+          room_id,
+          shots: count("shot.completed"),
+          failed: count("shot.aborted"),
+          warnings: count("flow.reconciled", (e) => Number(e.data.ratio) < 0.8),
+          held: count("intent.held"),
+          queued: count("intent.queued"),
+        };
+      }),
+    })),
+  };
+}
+
+function changes(data: Record<string, unknown>, now: number): { changes: HistoryChange[] } {
+  const rooms = typeof data.room_id === "string" ? [data.room_id] : DEMO_ROOMS;
+  const since = typeof data.since === "string" ? Date.parse(data.since) : -Infinity;
+  const until = typeof data.until === "string" ? Date.parse(data.until) : Infinity;
+  const kinds = Array.isArray(data.kinds) ? data.kinds.map(String) : null;
+  // Room A's grow plan moved to its next step at this morning's lights-on: a plan step, not put back.
+  const plan: HistoryChange[] = rooms.includes("room:") && data.zone == null
+    ? [{
+        id: demoId(now, "plan-step"), room_id: "room:", ts: iso(now - 8 * 3_600_000), actor: "plan", kind: "plan", section: "plan",
+        scope: "room", old: null, new: "activated", reason: "The grow plan “F2 Bulk 63 d” moved to its day 38–44 targets at lights-on.",
+        outcome: null, limits: null, revertible: false, user_id: null, user_name: null,
+      }]
+    : [];
+  return { changes: allChanges(data, rooms, now, plan).filter((c) => Date.parse(c.ts) >= since && Date.parse(c.ts) < until && (!kinds || kinds.includes(c.kind)) && (typeof data.key !== "string" || c.key === data.key)) };
+}
+
+function allChanges(data: Record<string, unknown>, rooms: string[], now: number, plan: HistoryChange[]): HistoryChange[] {
+  const kinds = { "target.changed": "setpoint", "config.changed": "setup", "calibration.committed": "calibration" } as const;
+  // The panel's own writes this session (parity-demo/targets.ts), then the Journal's day.
+  const written = demoTargetChanges(rooms).filter((c) => data.zone == null || c.scope === `zone:${Number(data.zone)}`);
+  return [
+      ...plan,
+      ...written,
+      ...dayEvents(rooms, now)
+      .filter((e): e is CsEvent & { kind: keyof typeof kinds } => e.kind in kinds)
+      .filter((e) => data.zone == null || e.zone === Number(data.zone))
+      .map((e): HistoryChange => ({
+        id: e.id, room_id: e.room_id, ts: e.ts, actor: e.source.actor, kind: kinds[e.kind],
+        ...(e.kind === "target.changed" ? { key: String(e.data.key) } : { section: String(e.data.section ?? e.data.probe) }),
+        scope: (e.data.scope as string) ?? null, old: e.data.old ?? null, new: e.data.new ?? null,
+        reason: (e.data.reason as string) ?? null,
+        outcome: e.source.actor === "learner" ? "Too soon to judge — check after the next lights-on." : null,
+        limits: e.source.actor === "learner" ? { writer: "learner", min: 50, max: 65, step_scope: "zone" } : null,
+        // The demo writes nothing for its Journal fixture, so putting one back would claim a write
+        // that never happened: only the demo's own writes this session (above) can be put back.
+        revertible: false,
+        user_id: e.source.user_id ?? null, user_name: e.source.actor === "manual" ? "Ben" : null,
+      })),
+    ].sort((a, b) => Date.parse(b.ts) - Date.parse(a.ts));
+}
+
+const timerProgram = (now: number): TimerProgramListItem => ({
+  id: DEMO_TIMER_PROGRAM_ID, room_id: "room:", name: "Zone 3 day timer", zones: [3], type: "recycle",
+  duration_s: 60, interval_min: 45, frequency_per_day: null, start_at: null,
+  window: { kind: "lights_on" }, sync_time: null, active: true, revision: 1,
+  next_at: iso(now + 30 * 60_000), zones_in_timer_mode: [3],
+});
+
+const rule = (data: Record<string, unknown>): AlertRuleListItem => ({
+  id: "01JDEMORULETANKLOW0000000", kind: "threshold", room_id: "room:", source: "tank.level", op: "below",
+  threshold: 30, unit: "%", window: { kind: "lights_on" }, min_duration_s: 600, severity: "warning", routing: "sensors",
+  active: true, summary_sentence: "Tell when Room A tank level stays below 30% for 10 min during lights-on.", state: "armed", last_fired: null, firing_since: null, current_value: 68,
+  ...(isRecord(data.rule) ? data.rule : {}),
+});
+
+const preview = (now: number): AlertPreview => ({
+  summary_sentence: "Tell when Room A tank level stays below 30% for 10 min during lights-on.",
+  series: Array.from({ length: 24 }, (_, h) => [iso(now - (24 - h) * 3_600_000), 70 - h]),
+  fires: [], ignored: [], count: 0, min: 46, max: 70,
+  sentence: "It wouldn't have fired in the last 24 h. Lowest was 46%.",
+});
+
+const DASHBOARDS: DashboardList = {
+  dashboards: [],
+  templates: [
+    { id: "facility_wall", name: "Facility wall", description: "Every room at a glance, for a wall screen." },
+    { id: "room_tablet", name: "Room tablet", description: "One room's zones and tank, for a tablet by the door." },
+    { id: "dosing_station", name: "Dosing station", description: "Feed tank, stock and pumps." },
+  ],
+};
+
+/** The presets, copy_config and the supply: OperatorDemo answers them from the demo's own states
+ * (parity-demo/presets.ts, and the supply from the demo rooms' own zone sizing). */
+type StatefulAction = "preset_list" | "preset_save" | "preset_apply" | "preset_delete" | "copy_config" | "supply_get" | "supply_save";
+const STATEFUL: readonly string[] = ["preset_list", "preset_save", "preset_apply", "preset_delete", "copy_config", "supply_get", "supply_save"];
+/** migration_report for the demo: Room A came from 3.17 (a report with both lists), Room B is new
+ * (two empty lists, so its report is hidden), as migration.py answers them. */
+function demoUpgradeReport(roomId: string) {
+  const row = (id: string, title: string, status: "carried" | "needs_you", detail: string, page: string, anchor: string) => ({
+    id,
+    title,
+    status,
+    detail,
+    page,
+    doc: `docs/UPGRADING.md#${anchor}`,
+  });
+  const upgraded = roomId === "room:";
+  return {
+    schema_version: 1,
+    release: "3.18.0",
+    room_id: roomId,
+    acknowledged: null,
+    carried: upgraded
+      ? [
+          row("irrigation.mode", "Irrigation mode", "carried", "Every zone waters by Steering, as before (2 zones).", "#/all-zones", "irrigation-mode"),
+          row("presets.snapshot", "Settings before the update", "carried", "A preset of this room's settings before 3.18 was saved. Nothing was applied.", "#/plan/schedule", "presets"),
+          row("notify.recipients", "Notification phones", "carried", "Every phone that had alerts still gets them.", "#/settings/notifications", "quiet-hours"),
+        ]
+      : [],
+    needs_you: upgraded
+      ? [
+          row("supply", "Irrigation supply", "needs_you", "Each pump's real flow, how many zones it feeds at once and its flow meter. Nothing is saved until you save it.", "#/equipment/setup", "supply"),
+          row("feed.calibration", "Feed pH and EC probes", "needs_you", "Calibrate the feed pH and EC probes in two buffer solutions.", "#/equipment/feed-calibration", "feed-calibration"),
+          row("browser.recipes", "Recipes on this browser", "needs_you", "Grow-plan recipes saved only in a browser can be imported as presets on Grow plan & presets.", "#/plan/schedule", "browser-recipes"),
+        ]
+      : [],
+  };
+}
+
+/** Task 3's answer for every other parity action: plausible, deterministic for `now`. */
+const DEFAULTS: Record<Exclude<ParityAction, StatefulAction>, (data: Record<string, unknown>, now: number) => unknown> = {
+  // Never reached: parity-demo/journal.ts always answers journal_query (the record needs a key).
+  journal_query: () => ({ events: [], cursor: null }),
+  timeline_get: timeline,
+  timeline_summary: summary,
+  history_changes: changes,
+  history_revert: (d, now) => ({ reverted_event_id: d.event_id ?? null, new_event_id: demoId(now, `revert:${String(d.event_id)}`), readback: "verified" }),
+  pump_precheck: () => ({ ok: true, blockers: [] }),
+  pump_prime: (d, now) =>
+    // The integration's schema caps a prime at 1–30 s; the envelope reports it as `invalid`.
+    d.seconds !== undefined && !(Number(d.seconds) >= 1 && Number(d.seconds) <= 30)
+      ? { api: 2, ok: false, error: { code: "invalid", message: "value must be between 1 and 30 for dictionary value @ data['seconds']" } }
+      : { request_id: demoId(now, "prime"), outcome: "requested", blockers: [] },
+  pump_stop: (_d, now) => ({ request_id: demoId(now, "stop") }),
+  pump_calibrate: (_d, now) => ({ session_id: demoId(now, "pump-cal"), outcome: "requested" }),
+  pump_calibration_commit: (d) => ({ ml_min: (Number(d.measured_ml) || 150) / 30 * 60, previous_ml_min: 290, flow_entity_written: true }),
+  calibration_start: (_d, now) => ({ session_id: demoId(now, "feed-cal"), raw_entity_id: "sensor.demo_feed_ph", temperature_entity_id: "sensor.demo_tank_temperature", dosing_paused: true, expires_at: iso(now + 30 * 60_000) }),
+  calibration_capture: () => ({ reading: 7.02, raw: 7.08, stable: true, drift: 0.004, stable_s: 32 }),
+  calibration_status: (_d, now) => ({ reading: 7.02, raw: 7.08, stable: true, drift: 0.004, stable_s: 32, points_captured: 0, expires_at: iso(now + 30 * 60_000) }),
+  calibration_commit: () => ({ slope_pct: 98.4, offset: 0.06, verdict: "pass", applied: true }),
+  calibration_revert: () => ({ slope_pct: null, offset: null, verdict: null, applied: false }),
+  calibration_abandon: () => ({ abandoned: true }),
+  probe_offset_set: (d) => ({ offset: 3, corrected_now: 52, fused_before: 49, fused_after: 52, ...(d.preview ? { diff: [{ path: "offset", old: 0, new: 3 }] } : {}) }),
+  alert_rule_set: (d) => ({ ...rule(d), summary_sentence: preview(0).summary_sentence, revision: 2 }),
+  alert_rule_delete: (d) => ({ id: d.id ?? null, revision: 2 }),
+  alert_rule_test: (d, now) => ({ ...preview(now), ...(d.send ? { delivery: [{ service: "notify.mobile_app_demo", ok: true, error: null }] } : {}) }),
+  alert_rule_preview: (_d, now) => preview(now),
+  alert_rule_list: (d) => ({ rules: [rule({})].filter((r) => d.room_id == null || r.room_id === d.room_id) }),
+  alert_ack: (d, now) => ({ alert_event_id: d.alert_event_id ?? null, event_id: demoId(now, "ack") }),
+  timer_program_set: (d, now) => ({ program: { ...timerProgram(now), ...(isRecord(d.program) ? d.program : {}) }, revision: 2, preview: [] }),
+  timer_program_delete: (d) => ({ id: d.id ?? null, revision: 2 }),
+  timer_program_list: (d, now) => ({ programs: [timerProgram(now)].filter((p) => d.room_id == null || p.room_id === d.room_id), revision: 1, revisions: Object.fromEntries(DEMO_ROOMS.map((room) => [room, 1])) }),
+  timer_program_preview: (_d, now) => {
+    const preview = Array.from({ length: 8 }, (_, i) => ({ zone: 3, at: iso(now + (i + 1) * 30 * 60_000), duration_s: 120 }));
+    return { preview, shots: preview.length, total_s: preview.length * 120 };
+  },
+  timer_skip: (d) => ({ skip: { zone: d.zone ?? null, at: d.at ?? null, until: typeof d.at === "string" ? iso(Date.parse(d.at) + 15 * 60_000) : null }, revision: 2 }),
+  dashboard_create: (d, now) => {
+    // As the integration does: crop-steering-<template>-<n>, n the lowest free; listed from then on.
+    const template = String(d.template ?? "facility_wall");
+    const info = DASHBOARDS.templates.find((t) => t.id === template);
+    if (!info) return { api: 2, ok: false, error: { code: "invalid", message: `Unknown dashboard template '${template}'` } };
+    const rooms = Array.isArray(d.rooms) ? d.rooms.map(String) : [];
+    if (!rooms.length) return { api: 2, ok: false, error: { code: "invalid", message: "Choose at least one room" } };
+    if (template === "room_tablet" && rooms.length !== 1)
+      return { api: 2, ok: false, error: { code: "invalid", message: "room_tablet shows one room: choose exactly one" } };
+    let n = 1;
+    while (DASHBOARDS.dashboards.some((x) => x.url_path === `crop-steering-${template}-${n}`)) n += 1;
+    const url_path = `crop-steering-${template}-${n}`;
+    const title = typeof d.title === "string" && d.title.trim() ? d.title.trim() : info.name;
+    DASHBOARDS.dashboards.push({ url_path, title, template, rooms, created_at: iso(now), exists: true });
+    return { url_path, title };
+  },
+  dashboard_list: () => structuredClone(DASHBOARDS),
+  system_status_get: (_d, now) => demoSystemStatus(now),
+  migration_report: (d) => demoUpgradeReport(typeof d.room_id === "string" ? d.room_id : "room:"),
+};
+
+/** The demo's v2 integration: a lane handler whose `match` accepts the call, else Task 3's default.
+ * With `?backend=3.17` every parity action is missing, as on an older integration. */
+export async function parityDemo(
+  action: ParityAction,
+  data: Record<string, unknown>,
+  now: number,
+  backend: DemoBackend = demoBackend(typeof window !== "undefined" ? window.location.search : ""),
+): Promise<unknown> {
+  if (backend === "3.17" || !(PARITY_ACTIONS as readonly string[]).includes(action)) throw missingServiceError(action);
+  const handler = LANE_HANDLERS.find((h) => h.action === action && (!h.match || h.match(data)));
+  if (!handler && STATEFUL.includes(action)) throw new Error(`${action} needs the demo's states: OperatorDemo answers it.`);
+  const answer = handler ? handler.answer(data, now) : DEFAULTS[action as Exclude<ParityAction, StatefulAction>](data, now);
+  return isRecord(answer) && answer.api === 2 ? answer : demoEnvelope(answer, now, data.room_id);
+}

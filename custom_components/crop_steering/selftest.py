@@ -25,6 +25,8 @@ async def async_setup_selftest(hass):
     from homeassistant.core import SupportsResponse
     from homeassistant.exceptions import HomeAssistantError
 
+    from .api_v2 import fields, wrap
+
     async def handle(call):
         await async_require_admin(hass, call, f"{DOMAIN}.{call.service}")
         try:
@@ -47,12 +49,14 @@ async def async_setup_selftest(hass):
     hass.services.async_register(
         DOMAIN,
         "test_shot",
-        handle,
+        wrap(handle),
         schema=vol.Schema(
-            {
-                vol.Required("room_id"): str,
-                vol.Required("zone"): vol.All(int, vol.Range(min=1)),
-            }
+            fields(
+                {
+                    vol.Required("room_id"): str,
+                    vol.Required("zone"): vol.All(int, vol.Range(min=1)),
+                }
+            )
         ),
         supports_response=SupportsResponse.ONLY,
     )

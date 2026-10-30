@@ -112,8 +112,8 @@ def test_phase_transitions():
     assert ph(S(phase="P3", lights_just_on=True, vwc=42), P()) == "P0"
     assert ph(S(phase="P0", vwc=55, peak_vwc=70, dryback_pct=21), P()) == "P1"
     assert (
-        ph(S(phase="P0", vwc=44, peak_vwc=70, dryback_pct=5), P()) == "P1"
-    )  # already-dry bypass
+        ph(S(phase="P0", vwc=40, peak_vwc=70, dryback_pct=5), P()) == "P1"
+    )  # at the rescue floor: the bypass
     # at the ceiling P1 gives one more shot, and ends once a shot no longer raises the peak by 0.5
     at_ceiling = decide(S(phase="P1", vwc=61, ec=5, ec_smooth=5), P())
     assert at_ceiling[0] == "P1" and at_ceiling[4].kind == "p1_extra"

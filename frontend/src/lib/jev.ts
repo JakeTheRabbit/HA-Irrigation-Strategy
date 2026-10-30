@@ -1,6 +1,7 @@
 import { parseControllerTime } from "./controller-health";
 import type { EntityState, States } from "./types";
 import { growerWords } from "./words";
+import { unreadableState } from "./utils";
 
 /** What the controller's AI assistant bridge publishes for a room (addons/f2_control/f2_control/brain_bridge.py):
  * `sensor.crop_steering_<prefix>jev_log` (every decision, newest first), `sensor.crop_steering_<prefix>jev`
@@ -8,7 +9,8 @@ import { growerWords } from "./words";
  * last said about the zone). Read tolerantly: a controller older than the log, or one entry missing a
  * field, must never break the page. */
 
-/** Each judge's plain title, for an entry that carries none (brain/journal.py TITLES). */
+/** Each judge's plain title (brain/journal.py TITLES, plus the grow plan and alert triage, which it does
+ * not title): the one source of judge names on every page. */
 export const JEV_TITLES: Record<string, string> = {
   dawn: "Morning start",
   ramp: "Ramp hand-over",
@@ -20,6 +22,11 @@ export const JEV_TITLES: Record<string, string> = {
   zones: "Zone comparison",
   stage: "Stage arc",
   setpoints: "Setpoints",
+  channel: "Water path",
+  balance: "Room balance",
+  targets: "Targets",
+  shotsize: "Shot sizes",
+  plan: "Grow plan",
   alerts: "Alert triage",
 };
 
@@ -156,7 +163,7 @@ export function parseJevLog(
   );
   const state = text(entity.state);
   return {
-    headline: ["unknown", "unavailable"].includes(state) ? "" : state,
+    headline: unreadableState(state) ? "" : state,
     entries,
   };
 }
@@ -262,7 +269,8 @@ export function parseJevRoom(entity: EntityState | undefined): JevRoom | null {
     deprecatedRoute: a.deprecated_route === true,
     costUsd: count(a.cost_usd_today),
     on:
-      !["rules", "error", "unknown", "unavailable"].includes(text(entity.state)) &&
+      !unreadableState(entity.state) &&
+      !["rules", "error"].includes(text(entity.state)) &&
       (!text(a.state) || BRAIN_ON.includes(text(a.state))),
   };
 }
@@ -307,7 +315,7 @@ export function parseJevZone(
   const state = text(entity.state);
   if (state === "rules" || text(entity.attributes?.provider) === "rules") return null;
   const acting =
-    !state || ["watching", "unknown", "unavailable"].includes(state)
+    unreadableState(state) || state === "watching"
       ? []
       : state
           .split(",")
@@ -489,48 +497,6 @@ export function parseJevSetpoints(entity: EntityState | undefined): JevSetpoints
     last: growerWords(text(item.last)) || null,
     pausedUntil: paused === null || paused === undefined ? null : entryTime(paused),
   };
-}
-
-/** What a decision changed, when it changed something: a phase brought forward, a setpoint moved, a
- * probe set aside, the EC steer's mode, or an alert raised. Null for everything else (no action,
- * waiting, refused, an outcome, and a setpoint the grower set by hand, which the AI assistant only noted). */
-export type JevChange = "phase" | "setpoint" | "probe" | "ec" | "alert" | "other";
-export function jevChange(entry: JevEntry): JevChange | null {
-  if (entry.kind !== "decision") return null;
-  const action = entry.action.toLowerCase();
-  if (entry.result === "advice") return /^cs-\d+/.test(action) ? "alert" : null;
-  if (entry.result !== "acted" || !action) return null;
-  if (entry.judge === "alerts" || /^cs-\d+/.test(action)) return "alert";
-  if (entry.judge === "setpoints") return entry.verdict === "set by hand" ? null : "setpoint";
-  if (
-    /^(start the ramp|hand over to maintenance|end the day's watering|move to p[0-3])/.test(action)
-  )
-    return "phase";
-  if (action.startsWith("set the probe aside")) return "probe";
-  if (action.includes("ec steer")) return "ec";
-  return "other";
-}
-/** A change in a few words. An alert triage entry names its code, its title and how it was sent. */
-export function jevChangeText(entry: JevEntry): string {
-  if (entry.judge === "alerts") {
-    const [code, how] = entry.action.split(/:\s*/, 2);
-    return `${code}: ${entry.reason || "alert"}${how ? ` (${how})` : ""}`;
-  }
-  return entry.action.replaceAll("->", "→");
-}
-/** The decisions since `since` that changed something, newest first. One alert raised twice (by
- * its judge, then by the triage that sent it) is one change. */
-export function jevChanges(entries: readonly JevEntry[], since: number): JevEntry[] {
-  const seen = new Set<string>();
-  return entries.filter((entry) => {
-    if (entry.time === null || entry.time < since || !jevChange(entry)) return false;
-    const code = jevChange(entry) === "alert" ? entry.action.match(/^CS-\d+/i)?.[0] : undefined;
-    if (!code) return true;
-    const key = `${entry.zone}:${code.toUpperCase()}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
 }
 
 /** Outcome entries attached to the decision each checks: same judge and zone, and `of` naming the

@@ -4,7 +4,7 @@ the services save both; a push for a muted room goes to nobody but an emergency;
 arrive as one on Home Assistant's own clock; and the REAL controller reads the mute from the REAL sensor."""
 
 import json
-from datetime import timedelta
+from datetime import datetime, timedelta
 from pathlib import Path
 
 from homeassistant.util import dt as dt_util
@@ -115,3 +115,51 @@ async def test_the_controller_reads_the_mute_from_the_real_sensor(hass, hass_adm
     assert [call for call in fake.calls if call[0] == "notify"] == []  # muted: not even to the option
     assert c._alert("hw", "CS-301", "hardware fault", "m", room=room, zone=1)
     assert [(dom, svc) for dom, svc, _d in fake.calls if dom == "notify"] == [("notify", "mobile_app_old_phone")]
+
+
+async def test_quiet_hours_hold_a_warning_until_they_end_on_home_assistants_own_clock(
+    hass, hass_admin_user, freezer
+):
+    """Quiet hours are read in Home Assistant's time zone: a "not watering" warning (CS-316) waits for the window's end and
+    arrives as one push there, digest or not; an emergency goes at once; notify_test tests several phones."""
+    await hass.config.async_set_time_zone("Pacific/Auckland")
+    freezer.move_to(datetime(2026, 10, 15, 22, 30, tzinfo=dt_util.get_time_zone("Pacific/Auckland")))
+    received = await _set_up(hass, hass_admin_user)
+    window = {"from": "22:00", "to": "23:00"}
+    # Hardware, not watering: no Repairs card the clock moves (CS-602) joins the digest under test.
+    doc = await _call(
+        hass,
+        hass_admin_user,
+        "notify_save",
+        expected_revision=0,
+        recipients=[
+            {"service": STAFF_PHONE, "kinds": ["hardware", "emergency"], "quiet_hours": window},
+            {"service": TABLET, "kinds": ["hardware"]},
+        ],
+    )
+    assert doc["error"] is None
+    assert [r["quiet_hours"] for r in doc["config"]["recipients"]] == [window, None]
+    refused = await _call(
+        hass,
+        hass_admin_user,
+        "notify_save",
+        expected_revision=1,
+        recipients=[{"service": STAFF_PHONE, "quiet_hours": {"from": "22:00", "to": "22:00"}}],
+    )
+    assert refused["error"] == "phone 1: Quiet hours need a start and an end that differ"
+    answer = await _call(hass, None, "notify", key="dry", code="CS-316", room="", title="Pump ran dry", message="M")
+    assert answer == {"sent_to": [TABLET], "error": None, "held": [STAFF_PHONE]}
+    answer = await _call(hass, None, "notify", key="e", code="CS-301", room="", urgent=True, title="Fault", message="M")
+    assert sorted(answer["sent_to"]) == [TABLET, STAFF_PHONE] and "held" not in answer
+    before = len(received[STAFF_PHONE])
+    freezer.move_to(datetime(2026, 10, 15, 22, 59, tzinfo=dt_util.get_time_zone("Pacific/Auckland")))
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+    assert len(received[STAFF_PHONE]) == before
+    freezer.move_to(datetime(2026, 10, 15, 23, 1, tzinfo=dt_util.get_time_zone("Pacific/Auckland")))
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+    [digest] = received[STAFF_PHONE][before:]
+    assert (digest["title"], digest["message"]) == ("Crop Steering: 1 push held", "Warnings\n• Pump ran dry")
+    results = await _call(hass, hass_admin_user, "notify_test", services=[STAFF_PHONE, TABLET])
+    assert [(r["service"], r["sent"]) for r in results["results"]] == [(STAFF_PHONE, True), (TABLET, True)]

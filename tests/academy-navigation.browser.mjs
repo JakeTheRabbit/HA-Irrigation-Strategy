@@ -31,6 +31,7 @@ try {
   const drawerButton = name => page.locator('.lp-drawer').getByRole('button', {name});
   await page.goto(base + '#/lesson/A1');
   await waitLesson('A1');
+  await page.locator('.lp-drawer select option').first().waitFor({state:'attached'});
   assert.equal(await page.locator('.lp-drawer select option').count(),24,'All lessons remain directly available');
   await menu();
   assert.equal(await drawerButton(/^Previous lesson:/).count(),0,'First lesson has no previous lesson');
@@ -81,6 +82,8 @@ try {
   const nextGroup = page.getByRole('button',{name:'Next video: Pi setup',exact:true});
   await nextGroup.click();
   await page.waitForURL('**/#/watch/setup-pi');
+  // The URL changes before hashchange re-renders; wait for the new group, not the old player.
+  await page.locator('.watch-player h2', {hasText: 'Pi setup'}).waitFor();
   await page.locator('.watch-player video').waitFor();
   await page.waitForFunction(() => document.querySelector('video')?.readyState >= 1);
   const chapter = page.getByRole('combobox',{name:'Choose grouped video section',exact:true});

@@ -1,6 +1,7 @@
 import type { PillTone } from "@/components/mini-visuals";
 import type { SetupRoom } from "./operator-types";
 import type { EntityState, States, Zone } from "./types";
+import { unreadableState } from "./utils";
 
 /** Equipment › Probes: each probe behind a zone's moisture and pore EC, and whether to believe it.
  * The integration combines a zone's probes into one reading (calculations.py fuse_probes) and
@@ -12,7 +13,8 @@ import type { EntityState, States, Zone } from "./types";
  * page does not always see): its "not reporting", or a combined reading the zone no longer uses. */
 export const PROBE_RANGE = { vwc: [0, 100], ec: [0, 20] } as const;
 /** A reading unchanged this long is likely stuck. Pore EC sits still for hours overnight;
- * moisture keeps drying. */
+ * moisture keeps drying. The dashboard's own heuristic: neither the controller nor the integration
+ * judges a probe stuck, so no hold or alert follows from it. */
 export const STUCK_MS = { vwc: 3 * 3_600_000, ec: 6 * 3_600_000 } as const;
 
 export type ProbeKind = "vwc" | "ec";
@@ -60,8 +62,7 @@ export interface Probe {
   text: string;
 }
 
-const readable = (state: string | undefined) =>
-  !!state && !["unavailable", "unknown", "none", ""].includes(state.toLowerCase());
+const readable = (state: string | undefined) => !unreadableState(state);
 const stamp = (value: string | undefined) => {
   const time = value ? Date.parse(value) : NaN;
   return Number.isFinite(time) ? time : null;
@@ -252,5 +253,62 @@ export function probeChoicePayload(room: SetupRoom, choices: Record<string, Prob
         }),
       ),
     })),
+  };
+}
+
+/** The probe's health in a word or two, for its pill: "Silent 3 h", "Stuck 4 h", "Out of range". */
+export function healthChip(probe: Probe, now: number): string {
+  switch (probe.health) {
+    case "stale":
+      return probe.reported === null ? "Not reporting" : `Silent ${duration(now - probe.reported)}`;
+    case "stuck":
+      return probe.changed === null ? "Stuck" : `Stuck ${duration(now - probe.changed)}`;
+    case "out-of-range":
+      return "Out of range";
+    case "no-reading":
+      return "No reading";
+    case "left-out":
+      return "Left out";
+    case "not-counted":
+      return "Does not count";
+    default:
+      return "OK";
+  }
+}
+
+/** A moisture probe whose reading points at where it sits (out of range, or far from the zone's other
+ * probes): moving it is the fix, not an offset. */
+export const placementProblem = (probe: Probe) =>
+  probe.kind === "vwc" && (probe.health === "out-of-range" || probe.reason === "excluded_outlier");
+
+/** One row of Probes & offsets: a moisture probe, and the pore EC probe on its side of the slab (by
+ * "front"/"back" in their names, else by order). */
+export interface ProbeRow {
+  side: string;
+  vwc: Probe;
+  ec: Probe | null;
+}
+const sideOf = (probe: Probe) => /\b(front|back)\b/i.exec(probe.name)?.[1].toLowerCase() ?? null;
+export function probeRows(probes: readonly Probe[]): ProbeRow[] {
+  const moisture = probes.filter((probe) => probe.kind === "vwc");
+  const ec = probes.filter((probe) => probe.kind === "ec");
+  return moisture.map((vwc, index) => {
+    const side = sideOf(vwc);
+    return {
+      side: side ? side[0].toUpperCase() + side.slice(1) : moisture.length > 1 ? vwc.name : "Probe",
+      vwc,
+      ec: (side ? ec.find((probe) => sideOf(probe) === side) : undefined) ?? ec[index] ?? null,
+    };
+  });
+}
+
+/** Every probe on Probes & offsets, moisture and the pore EC beside it, each once: how many, how many
+ * are healthy, and how many the zone values use. */
+export function probeCounts(rows: readonly ProbeRow[]) {
+  const probes = [...new Map(rows.flatMap((row) => [row.vwc, ...(row.ec ? [row.ec] : [])]).map((probe) => [probe.id, probe])).values()];
+  return {
+    total: probes.length,
+    healthy: probes.filter((probe) => probe.health === "ok").length,
+    used: probes.filter((probe) => probe.used !== false && probe.health !== "not-counted").length,
   };
 }

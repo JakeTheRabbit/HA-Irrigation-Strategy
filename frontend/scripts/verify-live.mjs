@@ -187,13 +187,21 @@ const connected = (target = page) =>
 const menu = async (name) => {
   await page
     .getByRole("navigation", { name: "Main navigation" })
-    .getByRole("button", { name: name === "Today" ? "Status" : name, exact: true })
+    // Status is a link to its page; the other sections are disclosures.
+    .getByRole(name === "Today" ? "link" : "button", { name: name === "Today" ? "Status" : name, exact: true })
     .click();
   if (name === "Today")
     // The Status tabs give way to the room tree on a desktop; open the room page directly.
     await page.evaluate(() => {
       location.hash = "#/today";
     });
+};
+/** Opens a page from the tree menu: its section opened first if it is closed. */
+const tree = async (section, label) => {
+  const nav = page.getByRole("navigation", { name: "Main navigation" });
+  const head = nav.locator(`button[data-nav-section="${section}"]`);
+  if ((await head.getAttribute("aria-expanded")) === "false") await head.click();
+  await nav.getByRole("link", { name: label, exact: true }).click();
 };
 async function check(name, run) {
   await run();
@@ -255,7 +263,7 @@ try {
         assert.ok((await drawer.evaluate((el) => el.scrollTop)) > 0, "it really scrolled");
         // and the first item is still reachable on the way back
         await drawer
-          .getByRole("button", { name: "Status", exact: true })
+          .getByRole("link", { name: "Status", exact: true })
           .scrollIntoViewIfNeeded();
       } finally {
         await phone.close();
@@ -274,7 +282,7 @@ try {
     },
   );
   await check(
-    "an open dropdown can be read on a dark Home Assistant theme (targets, timeline, capability directory, compare)",
+    "an open dropdown can be read on a dark Home Assistant theme (targets, explorer, capability directory, compare)",
     async () => {
       // Home Assistant's input fill is a translucent rgba of the text colour. The browser cannot
       // paint an option list with it and fell back to white under light text.
@@ -290,7 +298,8 @@ try {
         };
         for (const route of [
           "plan/targets",
-          "history/timeline",
+          // The explorer's zone detail: its probe comparison pickers.
+          "history/explorer?zone=1",
           "settings/features",
           "history/compare",
         ]) {
@@ -336,12 +345,12 @@ try {
     failWrite = "number.crop_steering_room_b_zone_1_p2_vwc_threshold";
     await field("p1_target_vwc").fill("65");
     await field("p2_vwc_threshold").fill("55");
-    await page.getByRole("button", { name: /^Review 2 changes/ }).click();
-    await page
-      .getByRole("dialog")
-      .getByRole("button", { name: "Apply 2 changes", exact: true })
-      .click();
-    await visible(page.getByText("Some changes were not applied.", { exact: true }));
+    const bar = page.getByRole("region", { name: "Review and apply" });
+    await bar.getByRole("button", { name: "Apply 2 changes", exact: true }).click();
+    // The refused row is named with what the controller still holds; the other was read back.
+    await visible(bar.getByText(/^Controller still holds .+: written and read back\.$/));
+    // The refused row stays in the draft, by name; the applied one has gone.
+    assert.deepEqual(await bar.locator(".review-apply-label").allInnerTexts(), ["Re-water point"]);
     assert.equal(states["number.crop_steering_room_b_zone_1_p1_target_vwc"].state, "65");
     assert.equal(states["number.crop_steering_zone_1_p1_target_vwc"].state, "64");
     assert.equal(calls.length, 2);
@@ -354,33 +363,30 @@ try {
       fullPage: true,
     });
     failWrite = "";
-    await page
-      .getByRole("dialog")
-      .getByRole("button", { name: "Apply 1 change", exact: true })
-      .click();
-    await page.getByRole("dialog").waitFor({ state: "hidden" });
+    await bar.getByRole("button", { name: "Apply 1 change", exact: true }).click();
+    await visible(bar.getByText(/^Written and read back \d\d:\d\d$/));
     assert.equal(calls.length, 3);
     assert.equal(calls[2].entity_id, "number.crop_steering_room_b_zone_1_p2_vwc_threshold");
   });
   await check("service acknowledgement without readback is a visible failure", async () => {
     ignoreWrite = "number.crop_steering_room_b_zone_1_p1_target_vwc";
     await field("p1_target_vwc").fill("66");
-    await page.getByRole("button", { name: /^Review 1 change/ }).click();
-    await page
-      .getByRole("dialog")
-      .getByRole("button", { name: "Apply 1 change", exact: true })
-      .click();
-    await visible(page.getByText("Some changes were not applied.", { exact: true }));
+    const bar = page.getByRole("region", { name: "Review and apply" });
+    await bar.getByRole("button", { name: "Apply 1 change", exact: true }).click();
+    // Not read back is not a refusal: the row is named, nothing is claimed about what the
+    // controller holds, and the draft keeps it.
+    await visible(bar.getByText("The controller did not confirm: Peak target.", { exact: true }));
+    assert.equal(await bar.getByText(/still holds/).count(), 0);
+    assert.deepEqual(await bar.locator(".review-apply-label").allInnerTexts(), ["Peak target"]);
     assert.equal(states[ignoreWrite].state, "65");
-    await page.getByRole("button", { name: "Back to editing" }).click();
-    await page.getByRole("button", { name: "Discard draft" }).click();
+    await bar.getByRole("button", { name: "Discard edits" }).click();
     ignoreWrite = "";
   });
   await check("missing live sensor stays unavailable and timestamps remain honest", async () => {
     states["sensor.crop_steering_room_b_ec_zone_1"].state = "unavailable";
     await page.getByRole("button", { name: "Refresh controller data" }).click();
     await menu("Today");
-    await visible(page.getByRole("heading", { name: "Room B today", exact: true }));
+    await visible(page.getByRole("heading", { name: "Room B", exact: true, level: 1 }));
     // The room's line counts the alert; opened, it says which zone and why.
     await page.locator(".today-alerts").click();
     await visible(
@@ -390,13 +396,14 @@ try {
     );
     assert.equal(await page.getByText("Invalid Date", { exact: false }).count(), 0);
     assert.equal(await page.locator(".demo-pill").count(), 0);
-    // The room's line first, then a card per zone.
+    // The room's line first, then today's strip, then a row per zone; the AI assistant's changes
+    // are not repeated on the room page.
     const order = await page.evaluate(() =>
-      [...document.querySelectorAll(".today-head, .today-zones, [data-jev-today]")].map(
-        (el) => el.classList[0],
+      [...document.querySelectorAll(".today-head, [data-today-strip], .today-zones, [data-jev-today]")].map(
+        (el) => (el.matches("[data-today-strip]") ? "today-strip" : el.classList[0]),
       ),
     );
-    assert.deepEqual(order, ["today-head", "today-zones"]);
+    assert.deepEqual(order, ["today-head", "today-strip", "today-zones"]);
     assert.equal(await page.locator("article.today-zone").count(), 2);
   });
   await check(
@@ -405,23 +412,45 @@ try {
       const probe = "sensor.crop_steering_room_b_vwc_zone_1";
       states[probe].last_updated = "2020-01-01T00:00:00Z";
       await page.getByRole("button", { name: "Refresh controller data" }).click();
-      await menu("Equipment");
-      await visible(page.getByRole("heading", { name: "Probes", exact: true }));
+      await tree("equipment", "Probes & offsets");
+      await visible(page.getByRole("heading", { name: "Probes & offsets", exact: true }));
       // An older integration names no probes: each zone's combined reading stands in for them. Zone 1's
       // moisture has gone quiet (amber) and its pore EC reads nothing (red); zone 2's are fine.
       const health = (id) =>
-        page.locator(`.probes-table tr[data-probe="${id}"] [data-probe-health]`);
+        page.locator(`.probes-table tr[data-probe="${id}"] td[data-label="Health"] [data-probe-health]`);
       await visible(health(probe));
       assert.equal(await health(probe).getAttribute("data-probe-health"), "stale");
       assert.equal(await health(probe).getAttribute("data-tone"), "warn");
+      // Pore EC sits beside the moisture on its row: zone 1's reads nothing, zone 2's is fine.
       const ec = "sensor.crop_steering_room_b_ec_zone_1";
-      assert.equal(await health(ec).getAttribute("data-probe-health"), "no-reading");
-      assert.equal(await health(ec).getAttribute("data-tone"), "off");
+      const ecCell = (id) => page.locator(`.probes-table [data-probe-ec="${id}"]`);
       assert.equal(
-        await health("sensor.crop_steering_room_b_ec_zone_2").getAttribute("data-tone"),
-        "on",
+        await ecCell("sensor.crop_steering_room_b_ec_zone_1").locator("[data-probe-health]").getAttribute("data-probe-health"),
+        "no-reading",
       );
-      assert.match(await page.locator(".probes-status").innerText(), /Probes\s+2 of 4 OK/);
+      assert.match(await ecCell("sensor.crop_steering_room_b_ec_zone_1").innerText(), /No reading/);
+      assert.equal(await ecCell("sensor.crop_steering_room_b_ec_zone_2").locator("[data-probe-health]").count(), 0);
+      assert.equal(
+        (await page.locator('tbody[data-probes-room="room:room_b_"] .probes-room-health').innerText()).trim(),
+        "2 of 4 probes healthy",
+      );
+      // A moisture probe reading out of range: "Check placement" on its row focuses the placement card,
+      // which says what is wrong with that probe.
+      const misplaced = "sensor.crop_steering_room_b_vwc_zone_2";
+      const kept = states[misplaced].state;
+      states[misplaced].state = "130";
+      await page.getByRole("button", { name: "Refresh controller data" }).click();
+      const placementButton = page.locator(`[data-check-placement="${misplaced}"]`);
+      await visible(placementButton);
+      await placementButton.click();
+      assert.equal(
+        await page.evaluate(() => document.activeElement?.hasAttribute("data-placement-card")),
+        true,
+      );
+      await visible(page.locator(`[data-placement-warning="${misplaced}"]`));
+      states[misplaced].state = kept;
+      await page.getByRole("button", { name: "Refresh controller data" }).click();
+      await page.locator(`[data-check-placement="${misplaced}"]`).waitFor({ state: "detached" });
       // The controller's own sensors, one tap down: stale is amber, reporting green, down red.
       const internals = page.locator("details.probes-more", {
         hasText: "All sensors of this room",
@@ -461,12 +490,12 @@ try {
     "probes: each probe's line, and the controller's sensors', one request each",
     async () => {
       // Settings reads no history: anything asked for after this is Equipment's.
-      await menu("Settings");
-      await visible(page.getByRole("heading", { name: "Settings", exact: true }));
+      await tree("settings", "Dashboards & display");
+      await visible(page.getByRole("heading", { name: "Dashboards & display", exact: true }));
       await page.waitForTimeout(1000);
       history.length = 0;
-      await menu("Equipment");
-      await visible(page.getByRole("heading", { name: "Probes", exact: true }));
+      await tree("equipment", "Probes & offsets");
+      await visible(page.getByRole("heading", { name: "Probes & offsets", exact: true }));
       await page.waitForFunction(() => document.querySelectorAll(".probes-table tr").length > 1);
       await page.waitForTimeout(1000);
       const probes = [1, 2]
@@ -516,17 +545,18 @@ try {
       await page.getByRole("button", { name: "Refresh controller data" }).click();
       await visible(page.getByText("Controller disconnected", { exact: true }));
       assert.equal(await page.locator(".data-age").innerText(), "Offline");
-      await menu("Equipment");
-      await page
-        .getByRole("navigation", { name: "Equipment views" })
-        .getByRole("button", { name: "Tank and feed", exact: true })
-        .click();
+      // Feed & dosing owns the tank: its card keeps the last readings and says so, and dosing
+      // says why nothing can be dosed.
+      await tree("equipment", "Feed & dosing");
+      await visible(page.getByRole("heading", { name: /^Feed & dosing · /, level: 1 }));
       await visible(
         page
           .locator("[data-tank-status]")
           .getByText("Disconnected · last received", { exact: true }),
       );
-      await menu("Irrigation");
+      await visible(page.getByText("Dosing not available", { exact: true }));
+      await visible(page.getByText(/^Connect to Home Assistant before using this action\./));
+      await tree("plan", "Current day");
       assert.equal(await field("p1_target_vwc").isDisabled(), true);
       assert.equal(await page.locator(".demo-pill").count(), 0);
       await page.screenshot({
@@ -578,11 +608,7 @@ try {
       await visible(
         page.locator('input[id="setting-number.crop_steering_f2_zone_1_p2_vwc_threshold"]'),
       );
-      await menu("Settings");
-      await page
-        .getByRole("navigation", { name: "Settings views" })
-        .getByRole("button", { name: "Help", exact: true })
-        .click();
+      await tree("settings", "Help");
       await visible(page.getByRole("heading", { name: "Help", exact: true }));
       assert.equal(
         await page.locator('a[href*="f2-classic.html"]').count(),
@@ -590,7 +616,7 @@ try {
         "Named F2 must not open default classic controls",
       );
       await page.goto(`${base}/dashboard.html?room=f2&view=climate`, { waitUntil: "networkidle" });
-      await visible(page.getByRole("heading", { name: "Probes", exact: true }));
+      await visible(page.getByRole("heading", { name: "Probes & offsets", exact: true }));
       assert.equal(
         new URL(page.url()).pathname,
         "/dashboard.html",
@@ -683,84 +709,74 @@ try {
     },
   );
   await check(
-    "AI permissions: reviewed owner, read-only Today summary, refusal preserves draft, 1440 and 390",
+    "AI judges: a switch per room writes at once with Undo, a refusal says so, read-only Today summary, 1440 and 390",
     async () => {
-      const labels = [
-        "Start the next phase early",
-        "End the morning ramp",
-        "Set a probe aside",
-        "Change the EC steer",
-        "Adjust maintenance watering",
-        "Apply today's plan day",
-        "Set targets from what a zone reaches",
-        "Tune shot sizes",
-      ];
       const id = (key) => `switch.crop_steering_room_b_ai_power_${key}`;
-      const box = (key) => page.locator(`#config-ai_power_${key}`).getByRole("switch");
-      async function applyReview() {
-        await page.getByRole("button", { name: "Review changes", exact: true }).click();
-        await page
-          .getByRole("dialog")
-          .getByRole("button", { name: "Apply 1 change", exact: true })
-          .click();
-      }
+      const judges = page.locator("[data-ai-judges]");
+      const sw = (name) => judges.getByRole("switch", { name: `${name} in Room B`, exact: true });
+      const toast = page.locator("[data-sonner-toast]");
       for (const width of [1440, 390]) {
         await page.setViewportSize({ width, height: width === 390 ? 844 : 1000 });
         await page.goto(`${base}/dashboard.html?room=room_b#/settings/ai`, {
           waitUntil: "networkidle",
         });
         await connected();
-        const powers = page.locator('[id^="config-ai_power_"]');
-        await visible(powers.first());
-        assert.equal(await powers.getByRole("switch").count(), 8);
-        for (const label of labels)
-          await visible(powers.getByRole("heading", { name: new RegExp(label, "i") }));
-        for (const toggle of await powers.getByRole("switch").all())
-          assert.ok(
-            (await toggle.getAttribute("aria-label"))?.endsWith("Room default"),
-            "permission has an accessible room-scoped label",
-          );
+        await visible(judges);
+        assert.equal(await judges.locator("tbody tr").count(), 15);
+        // Room B has a switch per power (9 judges that can act); Room A's integration has none.
+        assert.equal(await judges.getByRole("switch", { name: / in Room B$/ }).count(), 9);
+        assert.equal(await judges.getByRole("switch", { name: / in Room A$/ }).count(), 0);
+        // Every other room here models an integration from before the power switches.
+        const others = (await judges.locator("thead th.ai-room-col").count()) - 1;
+        assert.equal(await judges.locator("td", { hasText: "No switch" }).count(), 9 * others);
+        // One editor: the judges table. A Capabilities link lands on the judge row of its power.
+        assert.equal(
+          await page.locator('[id^="config-ai_power_"]').count(),
+          await judges.locator('tr[id^="config-ai_power_"]').count(),
+          "the powers have one editor on the page",
+        );
+        assert.equal(await judges.locator('tr[id^="config-ai_power_"]').count(), 8, "a landing row per power");
         assert.equal(
           await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
           true,
           `no horizontal scroll at ${width}`,
         );
         await page.screenshot({
-          path: path.join(out, `live-ai-powers-${width}.png`),
+          path: path.join(out, `live-ai-judges-${width}.png`),
           fullPage: true,
         });
       }
+      // One switch turns both judges on it, at once, and Undo puts it back.
       let before = calls.length;
-      await box("advance_phase").click();
-      assert.equal(calls.length, before, "permission changes stay draft until reviewed");
-      await applyReview();
-      await page.getByRole("dialog").waitFor({ state: "hidden" });
-      assert.equal(await box("advance_phase").isChecked(), false);
+      await sw("Morning start").click();
+      await visible(toast.filter({ hasText: /^Morning start and Day end off in Room B\. Written and read back/ }));
       assert.deepEqual(calls.slice(before), [
         { path: "/api/services/switch/turn_off", entity_id: id("advance_phase") },
       ]);
+      assert.equal(await sw("Day end").getAttribute("aria-checked"), "false");
+      await toast.getByRole("button", { name: "Undo" }).first().click();
+      await visible(toast.filter({ hasText: /^Morning start and Day end on again in Room B\./ }));
+      assert.deepEqual(calls.slice(before + 1), [
+        { path: "/api/services/switch/turn_on", entity_id: id("advance_phase") },
+      ]);
+      assert.equal(await sw("Morning start").getAttribute("aria-checked"), "true");
+      // A refused write says so in place and the switch keeps the controller's state.
+      failWrite = id("ec_mode");
+      await sw("Pore EC").click();
+      await visible(judges.getByRole("alert").filter({ hasText: /^Pore EC in Room B was not turned off/ }));
+      assert.equal(states[id("ec_mode")].state, "on");
+      assert.equal(await sw("Pore EC").getAttribute("aria-checked"), "true");
+      failWrite = "";
+      // From the other room's page too: the judges of every room sit side by side.
+      await page.setViewportSize({ width: 1440, height: 1000 });
+      await roomChip("room:").click();
+      await visible(judges);
       before = calls.length;
-      await box("tune_shot_sizes").click();
-      await applyReview();
-      await page.getByRole("dialog").waitFor({ state: "hidden" });
-      assert.equal(await box("tune_shot_sizes").isChecked(), true);
+      await sw("Shot sizes").click();
+      await visible(toast.filter({ hasText: /^Shot sizes on in Room B\. Written and read back/ }));
       assert.deepEqual(calls.slice(before), [
         { path: "/api/services/switch/turn_on", entity_id: id("tune_shot_sizes") },
       ]);
-      failWrite = id("ec_mode");
-      await box("ec_mode").click();
-      await applyReview();
-      await visible(page.getByRole("dialog").getByText(/Fixture refused write/));
-      assert.equal(states[id("ec_mode")].state, "on");
-      await page.getByRole("button", { name: "Back to editing" }).click();
-      assert.equal(
-        await box("ec_mode").isChecked(),
-        false,
-        "failed permission draft remains available",
-      );
-      await page.getByRole("button", { name: "Discard draft", exact: true }).click();
-      assert.equal(await box("ec_mode").isChecked(), true);
-      failWrite = "";
       before = calls.length;
       await page.goto(`${base}/dashboard.html?room=room_b#/today/ai`, { waitUntil: "networkidle" });
       assert.equal(
@@ -776,8 +792,9 @@ try {
       assert.equal(await old.locator("input").count(), 0);
       assert.match(await old.innerText(), /Unavailable/);
       await page.getByRole("link", { name: "Manage permissions" }).click();
+      await visible(judges);
       assert.equal(
-        await page.locator('[id^="config-ai_power_"] input').count(),
+        await judges.getByRole("switch", { name: / in Room A$/ }).count(),
         0,
         "missing entities have no pretend editor",
       );

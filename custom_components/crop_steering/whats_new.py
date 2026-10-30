@@ -134,6 +134,8 @@ async def async_setup_whats_new(hass, entry, fresh: bool) -> None:
     from homeassistant.core import SupportsResponse
     from homeassistant.exceptions import HomeAssistantError
 
+    from .api_v2 import fields, wrap
+
     data = hass.data.setdefault(DOMAIN, {})
     data.setdefault("_whats_new_entries", set()).add(entry.entry_id)
     if "_whats_new" in data:
@@ -155,15 +157,15 @@ async def async_setup_whats_new(hass, entry, fresh: bool) -> None:
     hass.services.async_register(
         DOMAIN,
         "whats_new_get",
-        handle,
-        schema=vol.Schema({}),
+        wrap(handle),
+        schema=vol.Schema(fields({})),
         supports_response=SupportsResponse.ONLY,
     )
     hass.services.async_register(
         DOMAIN,
         "whats_new_seen",
-        handle,
-        schema=vol.Schema({vol.Required("version"): str}),
+        wrap(handle),
+        schema=vol.Schema(fields({vol.Required("version"): str})),
         supports_response=SupportsResponse.ONLY,
     )
 

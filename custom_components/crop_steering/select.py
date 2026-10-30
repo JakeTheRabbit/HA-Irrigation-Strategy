@@ -21,6 +21,7 @@ from .const import (
     PROBE_METHODS,
     STEERING_MODES,
     GROWTH_STAGES,
+    IRRIGATION_MODES,
     NO_TOUCH_OPTIONS,
     RECIPE_STAGES,
     RECIPE_PARAMS,
@@ -33,6 +34,7 @@ from .const import (
     SUBSTRATES,
     WATER_TODAY_VIEWS,
 )
+from .deprecations import note_deprecated
 from .room import restored_state_is_ours, room_prefix, zone_device_name
 from .recipe import get_manager
 from .calculations import ec_type_key
@@ -57,6 +59,7 @@ SELECT_DESCRIPTIONS = [
         name="Irrigation phase",
         icon="mdi:water-circle",
         options=PHASES,  # Use constant from const.py (P0-P3 only)
+        entity_registry_visible_default=False,  # deprecated, nothing reads it (deprecation.py)
     ),
     # Named-stage recipe: picking a stage applies its setpoints to the zones.
     SelectEntityDescription(
@@ -179,6 +182,21 @@ async def async_setup_entry(
             )
         )
 
+        # What waters the zone: the engine (the default, as always), the room's timer programs, or
+        # nothing. The controller app reads it.
+        selects.append(
+            CropSteeringSelect(
+                entry,
+                SelectEntityDescription(
+                    key=f"zone_{zone_num}_irrigation_mode",
+                    name=f"Zone {zone_num} Watering by",
+                    options=IRRIGATION_MODES,
+                    icon="mdi:timer-cog-outline",
+                ),
+                zone_num=zone_num,
+            )
+        )
+
         # Move the zone to a phase by hand. The controller applies a choice once, within a
         # minute, and sets this back to Keep; its own rules carry on from that phase.
         selects.append(
@@ -289,12 +307,34 @@ class CropSteeringSelect(SelectEntity, RestoreEntity):
             if last_state.state in self.options:
                 self._attr_current_option = last_state.state
                 self._since = last_state.attributes.get("since")
+            elif self.entity_description.key.endswith("_irrigation_mode"):
+                # A saved mode this code cannot read is not steering: the select reads unknown
+                # until someone picks, and the controller keeps the mode it last knew.
+                self._attr_current_option = None
         # The recipe stage's source of truth is the server-side recipe Store, not
         # the restored entity state — reflect the loaded recipe's active stage.
         if self.entity_description.key == "recipe_stage":
             mgr = get_manager(self.hass, self._entry)
             if mgr is not None and mgr.active_stage in self.options:
                 self._attr_current_option = mgr.active_stage
+            # The apply_recipe service shows its stage here (see sync_stage).
+            self.hass.data.setdefault(DOMAIN, {}).setdefault("_recipe_selects", {})[
+                self._entry.entry_id
+            ] = self
+
+    async def async_will_remove_from_hass(self) -> None:
+        """Stop offering this select to the apply_recipe service."""
+        if self.entity_description.key == "recipe_stage":
+            self.hass.data.get(DOMAIN, {}).get("_recipe_selects", {}).pop(
+                self._entry.entry_id, None
+            )
+
+    def sync_stage(self) -> None:
+        """Show the recipe's active stage without applying anything."""
+        mgr = get_manager(self.hass, self._entry)
+        if mgr is not None and mgr.active_stage in self.options:
+            self._attr_current_option = mgr.active_stage
+            self.async_write_ha_state()
 
     @property
     def device_info(self) -> DeviceInfo:
@@ -321,12 +361,31 @@ class CropSteeringSelect(SelectEntity, RestoreEntity):
     async def async_select_option(self, option: str) -> None:
         """Change the selected option."""
         if option in self.options:
+            # A recipe stage is applied first: the select shows it only once its setpoints
+            # are written, and a refused stage (ServiceValidationError) leaves it unchanged.
+            if self.entity_description.key == "recipe_stage":
+                note_deprecated(
+                    self.hass,
+                    "recipe_stage",
+                    "Choosing a value in the Recipe stage select",
+                    "Set the targets of the room in the dashboard, or use a grow plan.",
+                )
+                mgr = get_manager(self.hass, self._entry)
+                if mgr is not None:
+                    await mgr.async_apply(option)
+                    option = mgr.active_stage
             self._attr_current_option = option
             self._since = dt_util.utcnow().isoformat()
             self.async_write_ha_state()
             # Announce a manual phase pick on the event bus for automations. The controller
             # keeps each zone's phase itself and does not read this select.
             if getattr(self.entity_description, "key", None) == "irrigation_phase":
+                note_deprecated(
+                    self.hass,
+                    "irrigation_phase",
+                    "Choosing a value in the Irrigation phase select (it moves no zone)",
+                    "Move one zone by hand with its Set phase select.",
+                )
                 self.hass.bus.async_fire(
                     "crop_steering_phase_transition",
                     {
@@ -335,11 +394,6 @@ class CropSteeringSelect(SelectEntity, RestoreEntity):
                         "forced": True,
                     },
                 )
-            # Selecting a recipe stage applies its setpoints to the zone numbers.
-            elif self.entity_description.key == "recipe_stage":
-                mgr = get_manager(self.hass, self._entry)
-                if mgr is not None:
-                    await mgr.async_apply(option)
 
     @property
     def extra_state_attributes(self):

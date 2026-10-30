@@ -26,7 +26,7 @@ export function NotificationPredictions({ controller }: { controller: Controller
         <h2>Notifications</h2>
         <p>The controller&rsquo;s vitals report, for {controller.room.room.name}.</p>
       </div>
-      <div>
+      <div id="config-notify_predictions">
         <div className="label-with-tip">
           <h3 id="predictions-label">Next action of each zone</h3>
           <UiTip copyKey="include what each zone does next" />

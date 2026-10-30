@@ -47,6 +47,13 @@ def _custom_integrations(hass, enable_custom_integrations):
     yield
 
 
+@pytest.fixture(autouse=True)
+def _config_dir_per_test(hass, tmp_path):
+    """The event journal's file (<config>/crop_steering/journal.db) belongs to one test, never shared."""
+    hass.config.config_dir = str(tmp_path)
+    yield
+
+
 @pytest.fixture
 async def real_api(hass, socket_enabled):
     """Home Assistant's real REST API, with its auth and ban middlewares, served on a loopback port:

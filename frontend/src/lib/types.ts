@@ -2,6 +2,7 @@ import type { RoomDisplay } from "./display";
 import type { DailyRanges, HistoryRequest, HistoryWindow } from "./comparison-types";
 import type { TimelineRequest, TimelineRows } from "./day-timeline";
 import type { OperatorAction } from "./operator-types";
+import type { CsEvent } from "./parity-types";
 import type { AutoSetpointStatus } from "./auto-setpoints";
 import type { Waiting } from "./waiting-for";
 import type { WaterRecord, WaterRecordRequest } from "./water-use";
@@ -178,4 +179,7 @@ export interface Controller {
   /** The selected room's water-today counters over a span of grow-days (the Water use panel). */
   waterRecord: (request: WaterRecordRequest) => Promise<WaterRecord>;
   operator: <T>(action: OperatorAction, data?: Record<string, unknown>) => Promise<T>;
+  /** The newest 300 live Journal events over every room, oldest first, deduped on id (lib/events.ts).
+   * Live deltas only: history views call `pagedQuery` themselves. */
+  recentEvents: readonly CsEvent[];
 }

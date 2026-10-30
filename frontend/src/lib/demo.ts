@@ -14,7 +14,7 @@ import { dateForDay, localDate } from "./grow-plan";
 import { numeric } from "./model";
 import { demoStock, stockAttributes, stockLinks } from "./stock-demo";
 import { TANK_KEYS } from "./tank-level";
-import { DISPLAY_DEFAULTS } from "./display";
+import { DISPLAY_DEFAULTS, UNIT_KEYS } from "./display";
 
 /** The demo room camera's still image: a plain frame, no photo. */
 const DEMO_CAMERA =
@@ -26,6 +26,11 @@ export function isDemoLocation(location: Pick<Location, "hostname" | "search">):
   return (
     new URLSearchParams(location.search).has("demo") || location.hostname.endsWith(".github.io")
   );
+}
+export type DemoBackend = "3.17" | "3.18";
+/** `?backend=3.17`: the demo plays an integration without the parity (v2) services. */
+export function demoBackend(search: string): DemoBackend {
+  return new URLSearchParams(search).get("backend") === "3.17" ? "3.17" : "3.18";
 }
 export function createDemo(now = Date.now()): States {
   const states: States = {};
@@ -99,7 +104,18 @@ export function createDemo(now = Date.now()): States {
       // no feed-water probe, so its gate is off. Both have been saved in Rooms and setup.
       ...(index
         ? {}
-        : { feed_ec_sensor: "sensor.demo_tank_ec", feed_ph_sensor: "sensor.demo_tank_ph" }),
+        : {
+            feed_ec_sensor: "sensor.demo_tank_ec",
+            feed_ph_sensor: "sensor.demo_tank_ph",
+            // The feed EC probe's applied calibration (calibration.py feed_calibration).
+            feed_calibration: {
+              ec: {
+                gain: 1.012,
+                bias: -0.03,
+                calibrated_at: new Date(now - 9 * 86_400_000).toISOString(),
+              },
+            },
+          }),
       setup_revision: 1,
     });
     put(`switch.demo_${prefix}pump`, index ? "off" : "on");
@@ -164,10 +180,18 @@ export function createDemo(now = Date.now()): States {
       options: ["Zone total", "Per plant"],
     });
     // What the dashboard shows in the room (Settings → Display): every option off until turned on.
-    put(`sensor.crop_steering_${prefix}display`, 0, { ...DISPLAY_DEFAULTS });
+    // The units and clock are 3.18 options: demoParityStatus adds them, an older integration has none.
+    const panels = Object.fromEntries(
+      Object.entries(DISPLAY_DEFAULTS).filter(([key]) => !(UNIT_KEYS as readonly string[]).includes(key)),
+    );
+    put(`sensor.crop_steering_${prefix}display`, 0, panels);
     put(`sensor.crop_steering_${prefix}ai_heartbeat`, "online", {
       enable_flag: enable,
       last_beat: new Date(now - 18_000).toISOString(),
+      // What the controller judges with, as its heartbeat publishes it.
+      max_sensor_age_s: 1200,
+      max_shot_s: 900,
+      pore_ec_neutral: [0.8, 1.0],
     });
     put(`sensor.crop_steering_${prefix}app_status`, "safe_idle");
     const fired = index ? [] : [`Z1 P1 ramp shot ${demoRampShot(now)}/6 (demo)`];
@@ -203,6 +227,9 @@ export function createDemo(now = Date.now()): States {
           below_minimum: false,
           over_full: false,
           minimum_pct: 8,
+          release_pct: 12,
+          over_pct: 102,
+          over_release_pct: 98,
         },
       );
     number(prefix, "irrigation_ec_min", 2.3, 0, 6, 0.1, "mS/cm");
@@ -255,10 +282,37 @@ export function createDemo(now = Date.now()): States {
           toLightsOff: minutesUntil(now, index ? 20 : 22),
         }),
       });
-      put(`${base}${key}daily_water_app`, (4.4 + id * 0.9 + index).toFixed(1), {
+      // Room B's zone 3 is paused: no water and no shots today.
+      const paused = index && id === 3;
+      put(`${base}${key}daily_water_app`, paused ? "0.0" : (4.4 + id * 0.9 + index).toFixed(1), {
         unit_of_measurement: "L",
       });
-      put(`${base}${key}irrigation_count_app`, 5 + id + index);
+      put(`${base}${key}irrigation_count_app`, paused ? 0 : 5 + id + index);
+      // The controller's own dryback, from the same peak and VWC as its waiting-for conditions;
+      // in P2 its estimate of the next top-up; zone 1 has a detected ramp ceiling.
+      const peak = 64 + index * 2,
+        vwc = 54 + id * 2 + index * 3;
+      put(`${base}${key}dryback_app`, (((peak - vwc) / peak) * 100).toFixed(2), {
+        unit_of_measurement: "%",
+        peak_vwc: peak,
+        dryback_points: peak - vwc,
+        rate_points_per_h: 0.6,
+        drying_back: true,
+        friendly_name: `Zone ${id} dryback`,
+      });
+      // As the controller works it out: to the re-water point (the trigger above) at that rate.
+      if (id !== 1)
+        put(
+          `${base}prediction_${key}next_irrigation_hours`,
+          Math.max(0, (vwc - 61 - index * 2) / 0.6).toFixed(2),
+          { unit_of_measurement: "h", friendly_name: `Zone ${id} next irrigation` },
+        );
+      else
+        put(`${base}${key}vmax_detected`, peak + 1.5, {
+          confidence: 0.8,
+          unit_of_measurement: "%",
+          friendly_name: `Zone ${id} detected Vmax (advisory)`,
+        });
       put(`switch.crop_steering_${prefix}${key}enabled`, index && id === 3 ? "off" : "on");
       put(`switch.crop_steering_${prefix}${key}manual_override`, "off");
       put(
@@ -489,6 +543,7 @@ function demoDosing(
     friendly_name: `${room} dosing configuration`,
     pumps,
     batch,
+    profile: { min_flow_ml_s: 0.05, max_dose_s: 1200 },
     request: null,
     updated_at: at(24 * 6),
     // The feed schedule's pick today (Room B has none, so its batch recipe has no name either).
@@ -577,6 +632,19 @@ function demoDosing(
     handled: null,
     handled_result: null,
     history,
+    // Room A's last batch failed its mix check: its EC read over the room's feed band 5 min after
+    // the mix stopped (a hand trim since has brought the tank back). Room B checks nothing.
+    mix: prefix
+      ? null
+      : {
+          batch: at(filled + 0.25),
+          due: at(filled - 5 / 60),
+          verdict: "off target",
+          checked_at: at(filled - 5 / 60),
+          why: "its EC reads 3.71, outside the feed EC band of the room (2.3 to 3.5)",
+          ec: 3.71,
+          ph: 5.82,
+        },
     updated_at: new Date(now - 18_000).toISOString(),
   });
 }
@@ -1472,10 +1540,14 @@ function demoTank(
   ];
   const iso = (time: number) => new Date(time).toISOString();
   const before = model.fills.filter((fill) => fill <= from).at(-1);
+  const level = [from, ...model.draws.map((run) => run.stop), ...model.fills, to]
+    .filter((time, index) => !index || (time > from && time <= to))
+    .map((time) => ({ state: String(model.level(time)), time }));
   return {
-    [mapped(TANK_KEYS.level)]: [from, ...model.draws.map((run) => run.stop), ...model.fills, to]
-      .filter((time, index) => !index || (time > from && time <= to))
-      .map((time) => ({ state: String(model.level(time)), time })),
+    [mapped(TANK_KEYS.level)]: level,
+    // The controller's own reading of it records the same level (Feed & dosing times the next
+    // batch from it).
+    [`sensor.crop_steering_${String(config.attributes.prefix ?? "")}tank_level`]: level,
     [mapped(TANK_KEYS.pump)]: switched(model.runs),
     [mapped(TANK_KEYS.filling)]: switched(
       model.fills.map((fill) => ({ start: fill - FILL_MS, stop: fill })),
@@ -1517,6 +1589,8 @@ export function demoDay(states: States, request: TimelineRequest, now = Date.now
         {
           state: past && id.endsWith("room_active") ? "on" : states[id].state,
           time: request.start,
+          // Asked for with attributes (the controller's dryback with its peak): as they are now.
+          ...(request.attributeIds.includes(id) ? { attributes: states[id].attributes } : {}),
         },
       ]);
   for (const config of Object.values(states)) {
@@ -1617,7 +1691,10 @@ export function demoDay(states: States, request: TimelineRequest, now = Date.now
     }
     put(`sensor.crop_steering_${prefix}current_decision`, decision);
     // The batch tank, for the tank chart, when it is asked for.
-    if (Object.values(TANK_KEYS).some((key) => wanted.has(String(config.attributes[key]))))
+    if (
+      Object.values(TANK_KEYS).some((key) => wanted.has(String(config.attributes[key]))) ||
+      wanted.has(`sensor.crop_steering_${prefix}tank_level`)
+    )
       for (const [id, list] of Object.entries(demoTank(states, config, request.start, end, now)))
         put(id, list);
   }

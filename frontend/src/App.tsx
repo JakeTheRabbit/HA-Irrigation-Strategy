@@ -1,14 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import {
-  Activity,
-  ArrowUpRight,
-  CalendarRange,
-  Droplets,
-  History,
-  House,
-  Settings2,
-  Wrench,
-} from "lucide-react";
+import { ArrowUpRight, Droplets, House } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -26,22 +17,33 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { useController } from "@/lib/use-controller";
+import { useDisplayUnits } from "@/lib/display-units";
+import { useKeepAwake, useWakeLock } from "@/lib/wake-lock";
 import { useHaTheme } from "@/lib/ha-theme";
 import { useHaShell } from "@/lib/ha-shell";
 import { errorText } from "@/lib/utils";
+import { discardDrafts } from "@/lib/drafts";
 import { resolveRequestedRoom, runningVersions } from "@/lib/model";
 import {
   canonicalHash,
+  parseRoute,
   routeHash,
   sameRoute,
+  SECTION_PAGES,
   sectionOf,
+  ZONE_FOCUS_PAGES,
+  zoneOnPage,
   type Page,
   type Route,
 } from "@/lib/routes";
+import { featureLabel, featureTargets, useHashFeature } from "@/lib/feature-focus";
+import { NAV_TREE } from "@/lib/nav-tree";
 import { AppHeader, StaleBanner } from "@/components/app-header";
 import { UiTip } from "@/components/info-tip";
-import { PageTabs, pageLabel, SECTION_LABELS } from "@/components/page-tabs";
-import { RoomTree } from "@/components/room-tree";
+import { PageTabs, pageLabel } from "@/components/page-tabs";
+import { NavTree } from "@/components/nav-tree";
+import { RoomPickContext, RoomTree, type RoomPick } from "@/components/room-tree";
+import { useNarrow } from "@/lib/use-narrow";
 import { WaterViewProvider } from "@/lib/water-view";
 import { WhatsNewOnUpdate } from "@/components/whats-new";
 import { Tour } from "@/components/tour";
@@ -51,7 +53,7 @@ import { initialRoute, readLandingView } from "@/lib/landing-view";
 import { Today } from "@/pages/today";
 import { type Drafts } from "@/pages/strategy";
 import { Irrigation } from "@/pages/irrigation";
-import { Timeline } from "@/pages/timeline";
+import { Explorer } from "@/pages/explorer";
 import { Probes } from "@/pages/probes";
 import { Settings } from "@/pages/settings";
 import { Features } from "@/pages/features";
@@ -62,21 +64,24 @@ import { Comparison } from "@/pages/comparison";
 import { Grows } from "@/pages/grows";
 import { DrybackDrivers } from "@/pages/drivers";
 import { StockTanks } from "@/pages/stock";
-import { Reservoir } from "@/pages/reservoir";
 import { Dosing } from "@/pages/dosing";
 import { WaterUsePage } from "@/pages/water-use";
 import { AiSettings, BrainPage } from "@/components/brain";
-
-const navigation = [
-  { page: "all-zones", label: SECTION_LABELS.today, icon: Activity },
-  { page: "plan/targets", label: SECTION_LABELS.plan, icon: CalendarRange },
-  { page: "history/timeline", label: SECTION_LABELS.history, icon: History },
-  { page: "equipment/probes", label: SECTION_LABELS.equipment, icon: Wrench },
-  { page: "settings", label: SECTION_LABELS.settings, icon: Settings2 },
-] as const satisfies readonly { page: Page; label: string; icon: unknown }[];
+import { Watering } from "@/pages/watering";
+import { Timers } from "@/pages/timers";
+import { Changes } from "@/pages/changes";
+import { changesHash, changesQuery } from "@/lib/changes";
+import { pickKey } from "@/lib/facility";
+import { PumpCalibration } from "@/pages/pump-calibration";
+import { FeedCalibration } from "@/pages/feed-calibration";
+import { AlertRules } from "@/pages/alert-rules";
+import { SystemStatus } from "@/pages/system";
 
 /** The page this address opens; an old or short form of it is rewritten in place (no new history
  * entry), keeping a Help link's `?code=`. */
+/** Pages whose address query outlives a room pick (openRoomPage). */
+const KEEPS_QUERY: Page[] = ["plan/watering"];
+
 function readRoute(): Route {
   const next = canonicalHash(window.location.hash, window.location.search);
   if (next !== null) window.history.replaceState(null, "", next);
@@ -85,13 +90,19 @@ function readRoute(): Route {
 
 export default function App() {
   const controller = useController();
+  useDisplayUnits(controller);
+  // Settings › "Keep this screen on while open": a wall screen or tablet stays on.
+  useWakeLock(useKeepAwake()[0]);
   const [route, setRoute] = useState<Route>(readRoute);
   const [mobile, setMobile] = useState(false);
   const [drafts, setDrafts] = useState<Drafts>({});
-  /** The zone Plan › Targets starts on, or the one History › Timeline shows. */
+  /** The zone Plan › Targets starts on, or the one History › Explorer shows. */
   const [focusZone, setFocusZone] = useState<number | undefined>(() => route.zone ?? undefined);
   const [workspaceDirty, setWorkspaceDirty] = useState(false);
   const [pending, setPending] = useState<(() => void) | null>(null);
+  // A page's room pick (Copy to room…): the sidebar's tree on desktop, a bottom sheet on a phone.
+  const [roomPick, setRoomPick] = useState<RoomPick | null>(null);
+  const phone = useNarrow(720);
   const [refreshing, setRefreshing] = useState(false);
   const [refreshError, setRefreshError] = useState("");
   const theme = useHaTheme();
@@ -106,17 +117,15 @@ export default function App() {
     else action();
   }
   /** Opens a page. `zone` opens that zone's page, picks the zone Plan › Targets starts on, or the
-   * zone History › Timeline shows. */
+   * zone History › Explorer shows. */
   function navigate(next: Page, zone?: number) {
+    const focused = ZONE_FOCUS_PAGES.includes(next);
     const target: Route =
       next === "zone"
         ? { page: "zone", zone: zone ?? null }
-        : zone !== undefined &&
-            (next === "plan/targets" || next === "plan/schedule" || next === "history/timeline")
+        : zone !== undefined && focused
           ? { page: next, zone }
           : { page: next };
-    const focused =
-      next === "plan/targets" || next === "plan/schedule" || next === "history/timeline";
     if (sameRoute(target, route) && (!focused || zone === undefined)) {
       setMobile(false);
       return;
@@ -162,12 +171,87 @@ export default function App() {
   }, []);
   const zoneName =
     page === "zone"
-      ? (controller.room.zones.find((zone) => zone.id === route.zone) ?? controller.room.zones[0])
-          ?.name
+      ? (zoneOnPage(controller.room.zones, route.zone ?? null)?.name ??
+        (controller.room.zones.length ? `Zone ${route.zone} not in this room` : undefined))
       : undefined;
   useEffect(() => {
     document.title = `${zoneName ?? pageLabel(page)} · ${controller.room.room.name} · Crop Steering`;
   }, [page, zoneName, controller.room.room.name]);
+  // A `?feature=` link opens its page at the feature's control, once the control is on screen.
+  // Keyboard focus moves to the control and a screen reader hears which feature it is.
+  const roomRef = useRef(controller.room);
+  roomRef.current = controller.room;
+  const feature = useHashFeature();
+  const [announce, setAnnounce] = useState("");
+  useEffect(() => {
+    document
+      .querySelectorAll("[data-feature-focus]")
+      .forEach((element) => element.removeAttribute("data-feature-focus"));
+    const id = feature;
+    if (!id) return;
+    let landed: HTMLElement | null = null;
+    // True once the control has keyboard focus; until then the page may still be loading it, or
+    // have it disabled while it loads.
+    const land = () => {
+      if (!landed?.isConnected) {
+        const { room, zones } = roomRef.current;
+        landed =
+          featureTargets(id, room.prefix, zones.map((zone) => zone.id))
+            .map((item) => document.getElementById(item))
+            .find((element) => element?.getClientRects().length) ?? null;
+        if (!landed) return false;
+        const target = landed;
+        // A control inside a folded group (Setup's limits) is shown by opening the group.
+        let fold = target.closest("details");
+        while (fold) {
+          fold.open = true;
+          fold = fold.parentElement?.closest("details") ?? null;
+        }
+        target.setAttribute("data-feature-focus", id);
+        if (!target.matches("a[href], button, input, select, textarea, [tabindex]"))
+          target.setAttribute("tabindex", "-1");
+        setAnnounce(`Opened at ${featureLabel(id) ?? id}`);
+        requestAnimationFrame(() => centre(target));
+      }
+      landed.focus({ preventScroll: true });
+      return document.activeElement === landed;
+    };
+    // The window, not scrollIntoView: a control inside a panel that clips its overflow does not
+    // scroll the page.
+    const centre = (target: HTMLElement) => {
+      const box = target.getBoundingClientRect();
+      window.scrollTo({ top: window.scrollY + box.top - (window.innerHeight - box.height) / 2 });
+    };
+    // The control can arrive later: the room's states, or a page's own data, still loading. The
+    // grower's own click, key or wheel ends the wait, so focus is never taken back from them.
+    const observer = new MutationObserver(() => land() && observer.disconnect());
+    if (!land())
+      observer.observe(document.body, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ["disabled"],
+      });
+    // Content above a landed control can still be loading (the AI instructions, say) and push it
+    // out of view, so it is kept in the middle of the window while the page grows.
+    const resize = new ResizeObserver(() => {
+      if (landed?.isConnected && document.activeElement === landed) centre(landed);
+    });
+    resize.observe(document.body);
+    const timer = setTimeout(() => stop(), 10_000);
+    const stop = () => {
+      observer.disconnect();
+      resize.disconnect();
+      clearTimeout(timer);
+      window.removeEventListener("pointerdown", stop, true);
+      window.removeEventListener("keydown", stop, true);
+      window.removeEventListener("wheel", stop, true);
+    };
+    window.addEventListener("pointerdown", stop, true);
+    window.addEventListener("keydown", stop, true);
+    window.addEventListener("wheel", stop, true);
+    return stop;
+  }, [route, feature]);
   async function refresh() {
     setRefreshing(true);
     setRefreshError("");
@@ -179,30 +263,45 @@ export default function App() {
       setRefreshing(false);
     }
   }
-  function selectRoom(id: string) {
-    confirmNavigation(() => {
-      setDrafts({});
-      setFocusZone(undefined);
-      controller.changeRoom(id);
-      setMobile(false);
-    });
+  /** Drops Current day's drafts, with their stored copies, so a reload never brings them back. */
+  function dropDrafts() {
+    setDrafts({});
+    // This tab's copies only: another tab may be editing another room.
+    discardDrafts("targets:", false);
   }
   function openRoomPage(id: string, next: Page, zone?: number) {
     confirmNavigation(() => {
       const target: Route = next === "zone" ? { page: next, zone: zone ?? null } : { page: next };
-      setDrafts({});
+      // The watering timeline shows every room: its choices (span, date, filters) stay in the address.
+      const hash = window.location.hash;
+      const kept = next === page && KEEPS_QUERY.includes(next) && hash.includes("?") ? hash.slice(hash.indexOf("?")) : "";
+      dropDrafts();
       setWorkspaceDirty(false);
       setFocusZone(zone);
       controller.changeRoom(id);
       setRoute(target);
-      window.history.pushState(null, "", routeHash(target));
+      window.history.pushState(null, "", routeHash(target) + kept);
       setMobile(false);
       window.scrollTo({ top: 0 });
+    });
+  }
+  /** History › Changes: a room or zone picked in the room list narrows the page to it (its address
+   * carries the pick), and selects that room. */
+  function narrowChanges(id: string, zone?: number) {
+    confirmNavigation(() => {
+      if (id !== controller.roomId) {
+        dropDrafts();
+        controller.changeRoom(id);
+      }
+      const query = changesQuery(window.location.hash);
+      window.location.hash = changesHash({ ...query, room: zone === undefined ? id : pickKey(id, zone), id: undefined });
+      setMobile(false);
     });
   }
   /** Opens a room in the section already open: Status opens the room's own page, any other
    * section stays where it is. */
   function openRoom(id: string) {
+    if (page === "history/changes") return narrowChanges(id);
     const next: Page = page === "all-zones" || page === "zone" ? "today" : page;
     if (id === controller.roomId) navigate(next);
     else openRoomPage(id, next);
@@ -244,30 +343,24 @@ export default function App() {
           Crop Steering<small>Irrigation control</small>
         </span>
       </a>
-      <nav aria-label="Main navigation">
-        {navigation.map((item) => (
-          <button
-            key={item.page}
-            className={`${section === sectionOf(item.page) ? "active" : ""} ${item.page === "settings" ? "nav-separated" : ""}`}
-            aria-current={section === sectionOf(item.page) ? "page" : undefined}
-            onClick={() => navigate(item.page)}
-          >
-            <item.icon size={19} />
-            <span>{item.label}</span>
-            {item.page === "plan/targets" && Object.keys(drafts).length > 0 && (
-              <i className="nav-draft-count">{Object.keys(drafts).length}</i>
-            )}
-          </button>
-        ))}
-      </nav>
+      <NavTree
+        page={page}
+        navigate={(next) => navigate(next)}
+        badges={{ "plan/targets": Object.keys(drafts).length }}
+      />
       <RoomTree
         controller={controller}
         allRooms={page === "all-zones"}
         currentZone={page === "zone" ? (route.zone ?? controller.room.zones[0]?.id ?? null) : null}
         openRoom={openRoom}
         openZone={(room, zone) =>
-          room === controller.roomId ? navigate("zone", zone) : openRoomPage(room, "zone", zone)
+          page === "history/changes"
+            ? narrowChanges(room, zone)
+            : room === controller.roomId
+              ? navigate("zone", zone)
+              : openRoomPage(room, "zone", zone)
         }
+        pick={variant === "desktop" && !phone ? roomPick : null}
       />
       <div className="sidebar-footer">
         {haShell.available && (
@@ -306,6 +399,162 @@ export default function App() {
     </>
   );
   const pageKey = controller.roomId;
+  /** The open page's component; every page in RENDERED_PAGES has a case. */
+  function renderPage() {
+    switch (page) {
+      case "all-zones":
+        return <AllZones controller={controller} open={openRoomPage} />;
+      case "today":
+        return <Today key={pageKey} controller={controller} navigate={navigate} />;
+      case "zone":
+        return (
+          <ZonePage
+            key={pageKey}
+            controller={controller}
+            zoneId={route.zone ?? null}
+            onDirtyChange={setWorkspaceDirty}
+            navigate={navigate}
+          />
+        );
+      case "today/ai":
+        return <BrainPage key={pageKey} controller={controller} navigate={navigate} />;
+      case "plan/targets":
+      case "plan/schedule":
+        return (
+          <Irrigation
+            key={controller.roomId}
+            controller={controller}
+            drafts={drafts}
+            setDrafts={setDrafts}
+            onDirtyChange={setWorkspaceDirty}
+            zoneId={focusZone}
+            initialView={page === "plan/schedule" ? "calendar" : "current"}
+            navigate={navigate}
+          />
+        );
+      case "plan/watering":
+        return (
+          <Watering
+            key={pageKey}
+            controller={controller}
+            navigate={navigate}
+            onDirtyChange={setWorkspaceDirty}
+          />
+        );
+      case "plan/timers":
+        return (
+          <Timers
+            key={pageKey}
+            controller={controller}
+            navigate={navigate}
+            onDirtyChange={setWorkspaceDirty}
+          />
+        );
+      case "history/explorer":
+        return <Explorer key={pageKey} controller={controller} zone={focusZone} />;
+      case "history/water":
+        return <WaterUsePage key={pageKey} controller={controller} />;
+      case "history/drivers":
+        return <DrybackDrivers key={pageKey} controller={controller} />;
+      case "history/compare":
+        return <Comparison key={pageKey} controller={controller} navigate={navigate} />;
+      case "history/changes":
+        return (
+          <Changes
+            key={pageKey}
+            controller={controller}
+            navigate={navigate}
+            onDirtyChange={setWorkspaceDirty}
+          />
+        );
+      case "history/grows":
+        return <Grows key={pageKey} controller={controller} onDirtyChange={setWorkspaceDirty} />;
+      case "equipment/probes":
+        return (
+          <Probes
+            key={pageKey}
+            controller={controller}
+            navigate={navigate}
+            onDirtyChange={setWorkspaceDirty}
+          />
+        );
+      case "equipment/stock":
+        return <StockTanks key={pageKey} controller={controller} navigate={navigate} />;
+      case "equipment/dosing":
+        return (
+          <Dosing
+            key={pageKey}
+            controller={controller}
+            navigate={navigate}
+            onDirtyChange={setWorkspaceDirty}
+          />
+        );
+      case "equipment/pump-calibration":
+        return (
+          <PumpCalibration
+            key={pageKey}
+            controller={controller}
+            navigate={navigate}
+            onDirtyChange={setWorkspaceDirty}
+          />
+        );
+      case "equipment/feed-calibration":
+        return (
+          <FeedCalibration
+            key={pageKey}
+            controller={controller}
+            navigate={navigate}
+            onDirtyChange={setWorkspaceDirty}
+          />
+        );
+      case "equipment/setup":
+        return <Setup key={pageKey} controller={controller} onDirtyChange={setWorkspaceDirty} />;
+      case "settings":
+        return (
+          <Settings
+            controller={controller}
+            theme={theme.preference}
+            setTheme={theme.setPreference}
+            themeSource={theme.source}
+            onDirtyChange={setWorkspaceDirty}
+          />
+        );
+      case "settings/alerts":
+        return (
+          <AlertRules
+            key={pageKey}
+            controller={controller}
+            navigate={navigate}
+            onDirtyChange={setWorkspaceDirty}
+          />
+        );
+      case "settings/notifications":
+        return (
+          <Notifications key={pageKey} controller={controller} onDirtyChange={setWorkspaceDirty} />
+        );
+      case "settings/system":
+        return (
+          <SystemStatus
+            key={pageKey}
+            controller={controller}
+            navigate={navigate}
+            onDirtyChange={setWorkspaceDirty}
+          />
+        );
+      case "settings/ai":
+        return (
+          <AiSettings key={pageKey} controller={controller} onDirtyChange={setWorkspaceDirty} />
+        );
+      case "settings/features":
+        return <Features key={pageKey} controller={controller} />;
+      case "help":
+        return <Help controller={controller} />;
+      default: {
+        const unrendered: never = page;
+        return unrendered;
+      }
+    }
+  }
   const shell = (
     <div className="app-shell">
       <a
@@ -331,10 +580,20 @@ export default function App() {
       <div className="app-main">
         <AppHeader
           controller={controller}
+          title={zoneName ?? pageLabel(page)}
+          roomName={controller.room.room.name}
           haMenu={haShell.available ? haShell.toggle : null}
           openNavigation={() => setMobile(true)}
-          selectRoom={selectRoom}
-          openLog={() => navigate("history/timeline")}
+          jump={(entry) => {
+            // Another room's page opens in that room; an address with more than a page in it
+            // (`?rule=new`) goes through the address, so the page reads it.
+            const { route: target } = parseRoute(entry.hash);
+            if (entry.room && entry.room !== controller.roomId)
+              openRoomPage(entry.room, target.page, target.zone ?? undefined);
+            else if (routeHash(target) !== entry.hash) window.location.hash = entry.hash;
+            else navigate(target.page, target.zone ?? undefined);
+          }}
+          openLog={() => navigate("history/explorer")}
           openBrain={() => navigate("today/ai")}
           refresh={() => void refresh()}
           refreshing={refreshing}
@@ -366,141 +625,50 @@ export default function App() {
                 )}
               </div>
             )}
-            {section !== "plan" && (
-              <PageTabs
-                page={page}
-                navigate={(next) => navigate(next)}
-                badges={{ "plan/targets": Object.keys(drafts).length }}
-                hidden={
-                  controller.room.display.options.show_dryback_drivers ? [] : ["history/drivers"]
-                }
-              />
-            )}
-            {page === "all-zones" && <AllZones controller={controller} open={openRoomPage} />}
-            {page === "today" && (
-              <Today key={pageKey} controller={controller} navigate={navigate} />
-            )}
-            {page === "zone" && (
-              <ZonePage
-                key={pageKey}
-                controller={controller}
-                zoneId={route.zone ?? null}
-                onDirtyChange={setWorkspaceDirty}
-                navigate={navigate}
-              />
-            )}
-            {page === "today/ai" && (
-              <BrainPage key={pageKey} controller={controller} navigate={navigate} />
-            )}
-            {(page === "plan/targets" || page === "plan/schedule") && (
-              <Irrigation
-                key={controller.roomId}
-                controller={controller}
-                drafts={drafts}
-                setDrafts={setDrafts}
-                onDirtyChange={setWorkspaceDirty}
-                zoneId={focusZone}
-                initialView={page === "plan/schedule" ? "calendar" : "current"}
-                navigate={navigate}
-              />
-            )}
-            {page === "history/timeline" && (
-              <Timeline
-                key={pageKey}
-                controller={controller}
-                zone={focusZone}
-                onZoneChange={(zone) => {
-                  setFocusZone(zone);
-                  const query = new URLSearchParams(window.location.hash.split("?")[1] ?? "");
-                  if (zone) query.set("zone", String(zone));
-                  else query.delete("zone");
-                  const target: Route = zone
-                    ? { page: "history/timeline", zone }
-                    : { page: "history/timeline" };
-                  setRoute(target);
-                  window.history.replaceState(
-                    null,
-                    "",
-                    "#/history/timeline" + (query.size ? "?" + query.toString() : ""),
-                  );
-                }}
-              />
-            )}
-            {page === "history/water" && <WaterUsePage key={pageKey} controller={controller} />}
-            {page === "history/drivers" && <DrybackDrivers key={pageKey} controller={controller} />}
-            {page === "history/compare" && (
-              <Comparison key={pageKey} controller={controller} navigate={navigate} />
-            )}
-            {page === "history/grows" && (
-              <Grows key={pageKey} controller={controller} onDirtyChange={setWorkspaceDirty} />
-            )}
-            {page === "equipment/probes" && (
-              <Probes
-                key={pageKey}
-                controller={controller}
-                navigate={navigate}
-                onDirtyChange={setWorkspaceDirty}
-              />
-            )}
-            {page === "equipment/stock" && (
-              <StockTanks key={pageKey} controller={controller} navigate={navigate} />
-            )}
-            {page === "equipment/feed" && (
-              <Reservoir key={pageKey} controller={controller} navigate={navigate} />
-            )}
-            {page === "equipment/dosing" && (
-              <Dosing
-                key={pageKey}
-                controller={controller}
-                navigate={navigate}
-                onDirtyChange={setWorkspaceDirty}
-              />
-            )}
-            {page === "equipment/setup" && (
-              <Setup key={pageKey} controller={controller} onDirtyChange={setWorkspaceDirty} />
-            )}
-            {page === "settings" && (
-              <Settings
-                controller={controller}
-                theme={theme.preference}
-                setTheme={theme.setPreference}
-                themeSource={theme.source}
-                onDirtyChange={setWorkspaceDirty}
-              />
-            )}
-            {page === "settings/features" && <Features key={pageKey} controller={controller} />}
-            {page === "settings/notifications" && (
-              <Notifications
-                key={pageKey}
-                controller={controller}
-                onDirtyChange={setWorkspaceDirty}
-              />
-            )}
-            {page === "settings/ai" && (
-              <AiSettings key={pageKey} controller={controller} onDirtyChange={setWorkspaceDirty} />
-            )}
-            {page === "help" && <Help controller={controller} />}
+            <PageTabs
+              page={page}
+              navigate={(next) => navigate(next)}
+              badges={{ "plan/targets": Object.keys(drafts).length }}
+            />
+            {renderPage()}
           </div>
         </main>
       </div>
       <nav className="bottom-nav" aria-label="Sections">
-        {navigation.map((item) => (
-          <button
-            type="button"
-            key={item.page}
-            aria-current={section === sectionOf(item.page) ? "page" : undefined}
-            onClick={() => navigate(item.page)}
-          >
-            <span className="bottom-nav-icon">
-              <item.icon size={21} aria-hidden="true" />
-              {item.page === "plan/targets" && Object.keys(drafts).length > 0 && (
-                <i className="nav-draft-count">{Object.keys(drafts).length}</i>
-              )}
-            </span>
-            <span>{item.label}</span>
-          </button>
-        ))}
+        {NAV_TREE.map((group) => {
+          const target = SECTION_PAGES[group.section] ?? group.items[0].page;
+          return (
+            <button
+              type="button"
+              key={group.section}
+              aria-current={section === group.section ? "page" : undefined}
+              onClick={() => navigate(target)}
+            >
+              <span className="bottom-nav-icon">
+                <group.icon size={21} aria-hidden="true" />
+                {group.section === "plan" && Object.keys(drafts).length > 0 && (
+                  <i className="nav-draft-count">{Object.keys(drafts).length}</i>
+                )}
+              </span>
+              <span>{group.label}</span>
+            </button>
+          );
+        })}
       </nav>
+      <p id="feature-announce" className="sr-only" role="status">
+        {announce}
+      </p>
+      {phone && roomPick && (
+        <RoomTree
+          controller={controller}
+          allRooms={false}
+          currentZone={null}
+          openRoom={() => {}}
+          openZone={() => {}}
+          pick={roomPick}
+        />
+      )}
+
       <WhatsNewOnUpdate controller={controller} />
       <Tour navigate={navigate} />
       <Dialog
@@ -525,7 +693,7 @@ export default function App() {
               variant="destructive"
               onClick={() => {
                 const action = pending;
-                setDrafts({});
+                dropDrafts();
                 setWorkspaceDirty(false);
                 dirtyRef.current = false;
                 setPending(null);
@@ -539,5 +707,9 @@ export default function App() {
       </Dialog>
     </div>
   );
-  return <WaterViewProvider controller={controller}>{shell}</WaterViewProvider>;
+  return (
+    <WaterViewProvider controller={controller}>
+      <RoomPickContext.Provider value={setRoomPick}>{shell}</RoomPickContext.Provider>
+    </WaterViewProvider>
+  );
 }

@@ -1,4 +1,4 @@
-import { sizingChangedSince } from "@/lib/setup-sizing";
+import { newZone, sizingChangedSince } from "@/lib/setup-sizing";
 import { CanonicalControls } from "@/components/canonical-controls";
 import { AllZonesSwitch, RoomPower } from "@/components/room-controls";
 import { useLayoutEffect, useEffect, useState } from "react";
@@ -28,6 +28,7 @@ import { UiTip } from "@/components/info-tip";
 import { ControllerSettings } from "@/components/controller-settings";
 import { HistoryConnection } from "@/components/history-connection";
 import { SetupWizard } from "@/components/setup-wizard";
+import { SupplyEditor } from "@/components/supply-editor";
 import { RunoffPanel } from "@/components/runoff";
 import { Pill } from "@/components/mini-visuals";
 import {
@@ -50,7 +51,7 @@ import {
   plumbingUses,
   type PlumbingLayout,
 } from "@/lib/plumbing";
-import { errorText } from "@/lib/utils";
+import { errorText, unreadableState } from "@/lib/utils";
 import { needsWizard } from "@/lib/commissioning";
 import type {
   Commissioning,
@@ -88,11 +89,10 @@ export function MappingPicker({
   );
   const selected = values.filter(Boolean);
   // A mapped entity Home Assistant reports no state for is mapped, but not usable.
-  const silent = selected.filter((id) =>
-    ["unavailable", "unknown"].includes(
-      candidates.find((c) => c.entity_id === id)?.state.toLowerCase() ?? "",
-    ),
-  ).length;
+  const silent = selected.filter((id) => {
+    const candidate = candidates.find((c) => c.entity_id === id);
+    return !!candidate && unreadableState(candidate.state);
+  }).length;
   return (
     <div className="mapping-picker">
       <div className="mapping-head">
@@ -197,23 +197,6 @@ export function MappingPicker({
     </div>
   );
 }
-/** A new zone, its sizing from the integration's one defaults table (`defaults`; these values
- * where an older integration does not send it). */
-function newZone(id: number, defaults: SetupDocument["sizing_defaults"] = {}): SetupZone {
-  return {
-    id,
-    name: "Zone " + id,
-    active: true,
-    valve: "",
-    vwc_sensors: [],
-    ec_sensors: [],
-    plant_count: 1,
-    substrate_volume: 5,
-    drippers_per_plant: 1,
-    dripper_flow_rate: 2,
-    ...defaults,
-  };
-}
 const hardwareFields = [
   ["pump_switch", "Room pump", "switch"],
   ["main_line_switch", "Mainline valve", "switch"],
@@ -253,12 +236,13 @@ export function Setup({
   const units = useSizingUnits();
   const [settingsDirty, setSettingsDirty] = useState(false);
   const [equipmentDirty, setEquipmentDirty] = useState(false);
+  const [supplyDirty, setSupplyDirty] = useState(false);
   const dirty = !!draft && (isNew || JSON.stringify(draft) !== JSON.stringify(original));
   const connected = ["live", "demo"].includes(controller.connection);
   useLayoutEffect(() => {
-    onDirtyChange(dirty || settingsDirty || equipmentDirty);
+    onDirtyChange(dirty || settingsDirty || equipmentDirty || supplyDirty);
     return () => onDirtyChange(false);
-  }, [dirty, settingsDirty, equipmentDirty, onDirtyChange]);
+  }, [dirty, settingsDirty, equipmentDirty, supplyDirty, onDirtyChange]);
   function selectRoom(room: SetupRoom | undefined) {
     setIsNew(false);
     setOriginal(room ? structuredClone(room) : null);
@@ -601,6 +585,7 @@ export function Setup({
           </Button>
         }
       />
+      {connected && <SupplyEditor key={controller.roomId} controller={controller} onDirtyChange={setSupplyDirty} />}
       <div className="workspace-tabs" role="tablist" aria-label="Setup view">
         <button role="tab" aria-selected={tab === "rooms"} onClick={() => setTab("rooms")}>
           Rooms & mappings

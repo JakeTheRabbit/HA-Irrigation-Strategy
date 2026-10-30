@@ -33,8 +33,10 @@ async def _call(hass, service, user=None, room=ROOM, **data):
 
 
 def test_every_option_defaults_to_the_dashboard_as_it_was():
+    units = {"ec_unit": "mS/cm", "temp_unit": "C", "volume_unit": "auto", "clock": 24}
     assert defaults() == {
-        key: ("cards" if key == "today_zone_layout" else False) for key in OPTIONS
+        key: units.get(key, "cards" if key == "today_zone_layout" else False)
+        for key in OPTIONS
     }
 
 
@@ -96,11 +98,17 @@ async def test_a_save_is_refused_for_a_stale_revision_or_a_bad_option(
         ({"no_such_option": True}, "Unknown display option"),
         ({"show_climate": "yes"}, "true or false"),
         ({"today_zone_layout": "grid"}, "one of"),
+        ({"clock": "12"}, "one of: 12, 24"),
+        ({"ec_unit": "ppm640"}, "one of"),
         ({}, "at least one"),
     ):
         with pytest.raises(HomeAssistantError, match=match):
             await _call(
-                hass, "display_save", hass_admin_user, expected_revision=0, options=options
+                hass,
+                "display_save",
+                hass_admin_user,
+                expected_revision=0,
+                options=options,
             )
     with pytest.raises(HomeAssistantError, match="changed elsewhere"):
         await _call(
@@ -111,7 +119,9 @@ async def test_a_save_is_refused_for_a_stale_revision_or_a_bad_option(
             options={"show_climate": True},
         )
     with pytest.raises(vol.Invalid):
-        await _call(hass, "display_save", hass_admin_user, options={"show_climate": True})
+        await _call(
+            hass, "display_save", hass_admin_user, options={"show_climate": True}
+        )
     with pytest.raises(HomeAssistantError, match="unknown or ambiguous"):
         await _call(hass, "display_get", room="room:nowhere_")
     assert hass.states.get(SENSOR).state == "0"
@@ -124,6 +134,10 @@ async def test_a_non_administrator_reads_but_may_not_save(hass):
     assert (await _call(hass, "display_get", staff))["revision"] == 0
     with pytest.raises(HomeAssistantError, match=REFUSED):
         await _call(
-            hass, "display_save", staff, expected_revision=0, options={"show_camera": True}
+            hass,
+            "display_save",
+            staff,
+            expected_revision=0,
+            options={"show_camera": True},
         )
     assert hass.states.get(SENSOR).state == "0"

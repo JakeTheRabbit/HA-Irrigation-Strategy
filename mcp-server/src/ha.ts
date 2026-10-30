@@ -1,18 +1,55 @@
-export class SafeError extends Error {}
-export type Service =
-  | "setup_read"
-  | "setup_save"
-  | "strategy_get"
-  | "strategy_preview"
-  | "strategy_save"
-  | "runs_get";
-const services = new Set<Service>([
+import { v2Answer } from "./schemas.js";
+
+// `code`: the API v2 error code of a refused answer (stale_revision, guard_refused, ...); `data`:
+// what the service answered with it (a preset's `applied` rows, written or not).
+export class SafeError extends Error {
+  constructor(
+    message: string,
+    readonly code?: string,
+    readonly data?: unknown,
+  ) {
+    super(message);
+  }
+}
+// Every Crop Steering service this process may call. Nothing that moves hardware (intent_submit,
+// pump_*, calibration_*) is here.
+export const SERVICES = [
   "setup_read",
   "setup_save",
   "strategy_get",
   "strategy_preview",
   "strategy_save",
   "runs_get",
+  "journal_query",
+  "timeline_get",
+  "timeline_summary",
+  "history_changes",
+  "supply_get",
+  "system_status_get",
+  "alert_rule_list",
+  "timer_program_list",
+  "timer_program_preview",
+  "alert_rule_preview",
+  "timer_program_set",
+  "alert_rule_set",
+  "preset_apply",
+  "copy_config",
+  "probe_offset_set",
+  "supply_save",
+] as const;
+export type Service = (typeof SERVICES)[number];
+const services = new Set<Service>(SERVICES);
+// The writes, gated by CROP_STEERING_ALLOW_WRITES. The last four also dry-run with `preview: true`,
+// which is not gated.
+const writes = new Set<Service>([
+  "setup_save",
+  "strategy_save",
+  "timer_program_set",
+  "alert_rule_set",
+  "preset_apply",
+  "copy_config",
+  "probe_offset_set",
+  "supply_save",
 ]);
 export interface Config {
   url: string;
@@ -139,7 +176,7 @@ export class HaClient {
   ): Promise<unknown> {
     if (!services.has(service))
       throw new SafeError("Unsupported Crop Steering service.");
-    if (service.endsWith("_save") && !this.config.writes)
+    if (writes.has(service) && data.preview !== true && !this.config.writes)
       throw new SafeError(
         "Writes are disabled. Set CROP_STEERING_ALLOW_WRITES=true and restart to allow reviewed configuration saves.",
       );
@@ -156,6 +193,31 @@ export class HaClient {
         "The updated Crop Steering response API is required.",
       );
     return result.service_response;
+  }
+  // An API v2 read (custom_components/crop_steering/api_v2.py): asks with `api: 2` and answers
+  // the envelope's `data`; `ok: false` is an error carrying its code and message.
+  async read(
+    service: Service,
+    data: Record<string, unknown> = {},
+  ): Promise<unknown> {
+    const answer = v2Answer.safeParse(
+      await this.service(service, { ...data, api: 2 }),
+    );
+    if (!answer.success)
+      throw new SafeError(
+        `Unsupported Crop Steering ${service} response. Update the integration to one that answers API v2.`,
+      );
+    if (!answer.data.ok) {
+      const error = answer.data.error;
+      throw new SafeError(
+        error
+          ? `${error.code}: ${this.redact(error.message).slice(0, 600)}`
+          : `Home Assistant refused ${service}.`,
+        error?.code,
+        answer.data.data,
+      );
+    }
+    return answer.data.data;
   }
   async state(entity: string): Promise<Record<string, unknown> | null> {
     if (!/^[a-z_]+\.[a-z0-9_]+$/.test(entity))

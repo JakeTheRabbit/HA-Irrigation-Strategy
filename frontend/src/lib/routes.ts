@@ -2,58 +2,47 @@
  * the old eleven-page menu's included: a bookmark or a notification link from before keeps working
  * and lands where that page's content lives now. */
 
-export type Page =
-  | "all-zones"
-  | "today"
-  | "zone"
-  | "today/ai"
-  | "plan/targets"
-  | "plan/schedule"
-  | "history/timeline"
-  | "history/water"
-  | "history/compare"
-  | "history/grows"
-  | "history/drivers"
-  | "equipment/probes"
-  | "equipment/stock"
-  | "equipment/feed"
-  | "equipment/dosing"
-  | "equipment/setup"
-  | "settings"
-  | "settings/features"
-  | "settings/notifications"
-  | "settings/ai"
-  | "help";
-
 export interface Route {
   page: Page;
   /** The zone page's zone; null opens the room's first zone. */
   zone?: number | null;
 }
 
-export const PAGES: readonly Page[] = [
+/** Every page, each with a component in App's render switch: that switch ends in an exhaustive
+ * `never` check, so a page added here without a component fails the type check. */
+export const RENDERED_PAGES = [
   "all-zones",
   "today",
   "zone",
   "today/ai",
+  "plan/watering",
   "plan/targets",
+  "plan/timers",
   "plan/schedule",
-  "history/timeline",
+  "history/explorer",
   "history/water",
   "history/compare",
+  "history/changes",
   "history/grows",
   "history/drivers",
   "equipment/probes",
-  "equipment/stock",
-  "equipment/feed",
   "equipment/dosing",
+  "equipment/stock",
+  "equipment/pump-calibration",
+  "equipment/feed-calibration",
   "equipment/setup",
   "settings",
-  "settings/features",
+  "settings/alerts",
   "settings/notifications",
+  "settings/system",
   "settings/ai",
+  "settings/features",
   "help",
-];
+] as const;
+
+export type Page = (typeof RENDERED_PAGES)[number];
+
+export const PAGES: readonly Page[] = RENDERED_PAGES;
 
 export type Section = "today" | "plan" | "history" | "equipment" | "settings";
 
@@ -74,11 +63,15 @@ export const LEGACY_PAGES: Readonly<Record<string, Page>> = {
   "grow-plan": "plan/schedule",
   compare: "history/compare",
   insights: "equipment/probes",
-  activity: "history/timeline",
+  activity: "history/explorer",
+  log: "history/explorer",
+  logs: "history/explorer",
   sensors: "equipment/probes",
   stock: "equipment/stock",
   setup: "equipment/setup",
-  "equipment/tank": "equipment/feed",
+  "equipment/tank": "equipment/dosing",
+  "equipment/feed": "equipment/dosing",
+  "history/timeline": "history/explorer",
   settings: "settings",
   help: "help",
 };
@@ -92,9 +85,9 @@ export const LEGACY_VIEWS: Readonly<Record<string, Page>> = {
   strategy: "plan/targets",
   timeline: "plan/schedule",
   recipes: "plan/schedule",
-  logs: "history/timeline",
-  log: "history/timeline",
-  activity: "history/timeline",
+  logs: "history/explorer",
+  log: "history/explorer",
+  activity: "history/explorer",
   sensors: "equipment/probes",
   climate: "equipment/probes",
   substrate: "equipment/probes",
@@ -106,18 +99,22 @@ export const LEGACY_VIEWS: Readonly<Record<string, Page>> = {
   help: "help",
 };
 
-/** A menu entry opened on its own opens its first page. */
-const SECTION_PAGES: Readonly<Record<string, Page>> = {
-  plan: "plan/targets",
-  history: "history/timeline",
+/** A menu entry opened on its own opens its first page; the phone's bottom bar opens these too. */
+export const SECTION_PAGES: Readonly<Record<string, Page>> = {
+  plan: "plan/watering",
+  history: "history/explorer",
   equipment: "equipment/probes",
+  settings: "settings/alerts",
 };
+
+/** The pages that keep a zone in their address (`?zone=2`). */
+export const ZONE_FOCUS_PAGES: readonly Page[] = ["plan/targets", "plan/schedule", "history/explorer"];
 
 export function routeHash(route: Route): string {
   if (route.page === "zone" && route.zone) return `#/zone/${route.zone}`;
   return (
     `#/${route.page}` +
-    (route.zone && ["plan/targets", "plan/schedule", "history/timeline"].includes(route.page)
+    (route.zone && ZONE_FOCUS_PAGES.includes(route.page)
       ? `?zone=${route.zone}`
       : "")
   );
@@ -125,7 +122,7 @@ export function routeHash(route: Route): string {
 
 export const sameRoute = (a: Route, b: Route) =>
   a.page === b.page &&
-  (!["zone", "plan/targets", "plan/schedule", "history/timeline"].includes(a.page) ||
+  ((a.page !== "zone" && !ZONE_FOCUS_PAGES.includes(a.page)) ||
     (a.zone ?? null) === (b.zone ?? null));
 
 /**
@@ -151,7 +148,7 @@ export function parseRoute(hash: string, search = ""): { route: Route; canonical
   if ((PAGES as readonly string[]).includes(path)) {
     const zone = Number(new URLSearchParams(hash.split("?")[1] ?? "").get("zone"));
     const focused =
-      ["plan/targets", "plan/schedule", "history/timeline"].includes(path) &&
+      ZONE_FOCUS_PAGES.includes(path as Page) &&
       Number.isSafeInteger(zone) &&
       zone > 0;
     return {
@@ -170,4 +167,10 @@ export function canonicalHash(hash: string, search = ""): string | null {
   if (canonical) return null;
   const query = hash.includes("?") ? hash.slice(hash.indexOf("?")) : "";
   return routeHash(route) + query;
+}
+
+/** The zone a zone page shows: the addressed one, the room's first for a bare `#/zone`, and none
+ * when the address names a zone the room does not have (a stale bookmark or notification). */
+export function zoneOnPage<T extends { id: number }>(zones: T[], zoneId: number | null): T | undefined {
+  return zoneId === null ? zones[0] : zones.find((zone) => zone.id === zoneId);
 }

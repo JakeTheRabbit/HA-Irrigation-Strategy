@@ -1,0 +1,25 @@
+.needs-integration {
+  padding: 12px 14px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-lg);
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+}
+.needs-integration h3 {
+  margin: 0 0 4px;
+  color: var(--foreground);
+  font-size: var(--text-base);
+}
+.needs-integration p {
+  margin: 0;
+}
+.needs-integration.is-compact {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 4px 2px 10px;
+}
+.needs-integration.is-compact strong {
+  color: var(--foreground);
+  font-weight: 600;
+}

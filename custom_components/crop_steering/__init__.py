@@ -28,9 +28,10 @@ except ImportError:  # pragma: no cover - enables non-HA unit tests
         SELECT = "select"
         NUMBER = "number"
         BUTTON = "button"
+        BINARY_SENSOR = "binary_sensor"
 
 
-from .const import DOMAIN
+from .const import DEPRECATED, DOMAIN
 
 # Set up from the UI only: nothing is read from configuration.yaml. Saying so is what hassfest asks
 # of an integration with async_setup, and Home Assistant then tells anyone who writes a
@@ -56,6 +57,7 @@ PLATFORMS: list[Platform] = [
     Platform.SELECT,
     Platform.NUMBER,
     Platform.BUTTON,
+    Platform.BINARY_SENSOR,
 ]
 
 # Entities earlier versions created that nothing reads or sets any more, by platform and key. A key
@@ -145,6 +147,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     except Exception as err:  # pragma: no cover - never block setup on the notify store
         _LOGGER.warning("Notifications unavailable: %s", err)
 
+    # The event journal (spec section 4): one per site. A journal that cannot open only logs.
+    try:
+        from .journal_api import async_setup_journal
+
+        await async_setup_journal(hass, entry)
+    except Exception as err:  # pragma: no cover - never block setup on the journal
+        _LOGGER.warning("Event journal unavailable: %s", err)
+
     # Load this room's named-stage recipe (server-side Store) before the platforms
     # come up, so the recipe select + sensor can read it on setup.
     try:
@@ -191,6 +201,30 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     ) as err:  # pragma: no cover - never block setup on the display options
         _LOGGER.warning("Display options unavailable: %s", err)
 
+    # The site store (pumps, exclusive groups, meters): one per site, set up with the first room.
+    try:
+        from .site_api import async_setup_site
+
+        await async_setup_site(hass, entry)
+    except Exception as err:  # pragma: no cover - never block setup on the site store
+        _LOGGER.warning("Site settings unavailable: %s", err)
+
+    # Wall, tablet and dosing dashboards from templates (G11): one store per site.
+    try:
+        from .dashboards import async_setup_dashboards
+
+        await async_setup_dashboards(hass, entry)
+    except Exception as err:  # pragma: no cover - never block setup on the dashboards
+        _LOGGER.warning("Dashboard templates unavailable: %s", err)
+
+    # Timer programs (G7): the room's watering timers, published for the controller app.
+    try:
+        from .timers_api import async_setup_timers
+
+        await async_setup_timers(hass, entry)
+    except Exception as err:  # pragma: no cover - never block setup on the timer store
+        _LOGGER.warning("Timer programs unavailable: %s", err)
+
     # Tests from the dashboard: a zone's test shot.
     from .selftest import async_setup_selftest
 
@@ -208,7 +242,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         _LOGGER.warning("Ask why unavailable: %s", err)
 
     _remove_retired_entities(hass, entry)
-    _hide_retired_switches(hass, entry)
+    _hide_retired_entities(hass, entry)
 
     # Set up platforms
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
@@ -219,6 +253,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # A number platform that failed to set up leaves nothing to check, never a failed room.
     numbers = hass.data[DOMAIN].get("_numbers", {}).get(entry.entry_id, {})
     check_held_values(hass, entry, numbers.values())
+    # Once Home Assistant has started: name each deprecated entity an automation or script uses.
+    from .deprecation import async_setup_deprecation
+
+    async_setup_deprecation(hass, entry)
 
     # Set up services
     await async_setup_services(hass)
@@ -246,6 +284,26 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     from .overlays import async_setup_overlays
 
     await async_setup_overlays(hass, entry)
+    # The journal's history from the stores that now exist (once per room; in the background, setup never
+    # waits on it).
+    try:
+        from .journal_api import async_backfill_room
+        from .migration import note_history
+
+        async def _backfill():
+            added = await async_backfill_room(hass, entry)
+            # The Upgrade report says how much history came across.
+            if added and not fresh:
+                await note_history(hass, entry, added)
+
+        hass.async_create_task(_backfill())
+    except Exception as err:  # pragma: no cover - never block setup on the journal
+        _LOGGER.warning("Journal backfill unavailable: %s", err)
+    # The upgrade to 3.18 (migration.py): the room's settings carried into the new features, and its
+    # Upgrade report. Never stops the room loading.
+    from .migration import async_migrate_room
+
+    await async_migrate_room(hass, entry, fresh)
     await async_setup_panel(hass)
     # What's new: the release highlights the dashboard shows once after an update.
     try:
@@ -255,16 +313,26 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     except Exception as err:  # pragma: no cover - never block setup on the highlights
         _LOGGER.warning("What's new unavailable: %s", err)
 
+    # System status (G17): one system_health sensor for the site and system_status_get.
+    try:
+        from .system_status import async_setup_system_status
+
+        async_setup_system_status(hass, entry)
+    except Exception as err:  # pragma: no cover - never block setup on the status
+        _LOGGER.warning("System status unavailable: %s", err)
+
     # Setup health checks -> Home Assistant Repairs (read-only diagnostics)
     from datetime import timedelta
 
     from homeassistant.helpers.event import async_call_later, async_track_time_interval
 
     from .health import run_health_check
+    from .system_status import tick as system_status_tick
 
     @callback
     def _hc(_now=None):
         run_health_check(hass, entry)
+        system_status_tick(hass, entry)
 
     hass.data[DOMAIN].setdefault("_hc_unsubs", {})[entry.entry_id] = [
         async_call_later(hass, 60, _hc),  # first check once the add-on has booted
@@ -329,11 +397,15 @@ def _remove_retired_entities(hass: HomeAssistant, entry: ConfigEntry) -> None:
         _LOGGER.info("Removed %d retired entities from the registry", removed)
 
 
-# Switches kept only for controllers from 2.24.0 or before (see switch.py): hidden, not removed.
-_HIDDEN_RETIRED = {"system_enabled", "auto_irrigation_enabled"}
+# Hidden, not removed: switches kept only for controllers from 2.24.0 or before (see switch.py), and
+# the entities kept only for an old install's automations and scripts (deprecation.py).
+_HIDDEN_RETIRED = {
+    "switch": {"system_enabled", "auto_irrigation_enabled"},
+    **DEPRECATED,
+}
 
 
-def _hide_retired_switches(hass: HomeAssistant, entry: ConfigEntry) -> None:
+def _hide_retired_entities(hass: HomeAssistant, entry: ConfigEntry) -> None:
     """Hide this room's existing registry entries for _HIDDEN_RETIRED. A new install creates them
     hidden (entity_registry_visible_default); an older one registered them visible."""
     from homeassistant.helpers import entity_registry as er
@@ -342,11 +414,7 @@ def _hide_retired_switches(hass: HomeAssistant, entry: ConfigEntry) -> None:
     head = f"{DOMAIN}_{entry.entry_id}_"
     for item in er.async_entries_for_config_entry(registry, entry.entry_id):
         key = str(item.unique_id).removeprefix(head)
-        if (
-            item.domain == "switch"
-            and key in _HIDDEN_RETIRED
-            and item.hidden_by is None
-        ):
+        if key in _HIDDEN_RETIRED.get(item.domain, ()) and item.hidden_by is None:
             registry.async_update_entity(
                 item.entity_id, hidden_by=er.RegistryEntryHider.INTEGRATION
             )
@@ -420,6 +488,21 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     from .display import async_unload_display
 
     await async_unload_display(hass, entry)
+    from .site_api import async_unload_site
+
+    await async_unload_site(hass, entry)
+    from .journal_api import async_leave_journal
+
+    async_leave_journal(hass, entry)
+    from .system_status import async_unload_system_status
+
+    async_unload_system_status(hass, entry)
+    from .dashboards import async_unload_dashboards
+
+    await async_unload_dashboards(hass, entry)
+    from .timers_api import async_unload_timers
+
+    await async_unload_timers(hass, entry)
     from .brain_api import async_unload_brain
 
     await async_unload_brain(hass, entry)
@@ -442,6 +525,11 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         if e.entry_id != entry.entry_id
     ]
     if not others_loaded:
+        from .journal_api import async_unload_journal
+        from .migration import async_unload_migration
+
+        await async_unload_journal(hass)
+        await async_unload_migration(hass)
         await async_unload_services(hass)
         from .selftest import async_unload_selftest
 

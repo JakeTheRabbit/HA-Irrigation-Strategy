@@ -2,6 +2,9 @@
 
 DOMAIN = "crop_steering"
 
+# Every stored journal event is re-fired on the bus under this type (journal_api.py).
+EVENT_JOURNAL = "crop_steering_event"
+
 # The default room's kill switch on an installation from before the setup wizard: a helper the
 # operator made by hand, and the controller app's shipped `enable_flag` option. A room made by the
 # wizard stops on its own Engine Enabled switch instead. Named here once; room.room_gate decides.
@@ -22,12 +25,18 @@ MIN_ZONES = 1
 MAX_ZONES = 24  # No practical limit — env parser auto-detects zones
 DEFAULT_NUM_ZONES = 1
 
-# Calculation constants
-SECONDS_PER_HOUR = 3600
-PERCENTAGE_TO_RATIO = 0.01
-DEFAULT_EC_RATIO = 1.0
-DEFAULT_EC_FALLBACK = 3.0
-VWC_ADJUSTMENT_PERCENT = 5.0
+# Entities kept only for an old install's automations and scripts, which nothing reads any more,
+# by platform and key (deprecation.py): hidden, never removed.
+DEPRECATED = {
+    "sensor": {"ec_ratio", "p2_vwc_threshold_adjusted"},
+    "number": {
+        "p2_ec_high_threshold",
+        "p2_ec_low_threshold",
+        "ec_target_veg_p3",
+        "ec_target_gen_p3",
+    },
+    "select": {"irrigation_phase"},
+}
 
 # Combining a zone's probes. The ranges are the ones the controller refuses a zone reading outside
 # of, and the age is the controller's own: a probe that has not reported for longer is set aside
@@ -61,7 +70,7 @@ MOISTURE_RANGES = {
 
 
 # Software version - single source of truth
-SOFTWARE_VERSION = "3.17.0"
+SOFTWARE_VERSION = "3.18.1"
 
 # Crop steering phases (P0-P3 only, Manual removed)
 PHASES = ["P0", "P1", "P2", "P3"]
@@ -206,5 +215,8 @@ SERVICE_SAVE_RECIPE = "save_recipe"
 # A zone's P2 mode (select zone_N_p2_mode): the first is the default, moisture-driven P2 as always.
 # The controller maps them to the engine's p2_mode moisture / timed / timed_guarded.
 P2_MODES = ["Moisture", "Timed", "Timed with guards"]
+# What waters a zone (select zone_N_irrigation_mode): the first is the default, the engine as always;
+# timer runs the room's timer programs (timers_api.py) and off waters nothing.
+IRRIGATION_MODES = ["steering", "timer", "off"]
 # Which automatic writers the room's Max setpoint move per day holds; the first is the default.
 SETPOINT_STEP_SCOPES = ["Auto setpoints", "Auto setpoints and AI"]

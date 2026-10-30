@@ -121,6 +121,15 @@ class RecipeManager:
         )
         for eid, err in failed:
             _LOGGER.warning("crop_steering: recipe apply failed for %s: %s", eid, err)
+        if failed:
+            from homeassistant.exceptions import HomeAssistantError
+
+            raise HomeAssistantError(
+                f"Stage '{stage}' only partly applied: {applied} setpoint(s) were "
+                "written and stay as written; failed: "
+                + ", ".join(f"{eid} ({err})" for eid, err in failed)
+                + ". The active stage is unchanged."
+            )
         self.recipe["active_stage"] = stage
         if self._store is not None:
             await self._store.async_save(self.recipe)

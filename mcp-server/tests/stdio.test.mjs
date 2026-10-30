@@ -29,7 +29,7 @@ test("real stdio initialize, tools/list, bounded reads, exact room isolation, an
     { client, stderr } = await stdio(t, ha);
   assert.equal(client.getServerVersion().name, "crop-steering");
   const tools = (await client.listTools()).tools;
-  assert.equal(tools.length, 9);
+  assert.equal(tools.length, 22);
   assert.deepEqual(
     tools
       .filter((tool) => !tool.annotations.readOnlyHint)
@@ -175,7 +175,7 @@ test("candidate existence, units, duplicate zones and foreign zones are checked 
     { client } = await stdio(t, ha);
   for (const [changes, pattern] of [
     [{ hardware: { tank_ec_sensor: "sensor.room_b_vwc" } }, /Incompatible ec/],
-    [{ hardware: { pump_switch: "switch.missing" } }, /existing switch/],
+    [{ hardware: { pump_switch: "switch.missing" } }, /existing input_boolean[/]switch[/]valve/],
     [{ zones: [{ id: 2, plant_count: 20 }] }, /existing zone IDs/],
     [{ zones: [{ id: 1 }, { id: 1 }] }, /Duplicate/],
     [
@@ -188,6 +188,32 @@ test("candidate existence, units, duplicate zones and foreign zones are checked 
       pattern,
     );
   assert.equal(ha.saveCount, 0);
+});
+
+test("what the integration accepts is accepted: actuator domains and every probe unit it converts", async (t) => {
+  const ha = await mockHa(t),
+    { client } = await stdio(t, ha);
+  for (const changes of [
+    { hardware: { pump_switch: "input_boolean.room_b_bool_pump" } },
+    { hardware: { pump_switch: "valve.room_b_valve_entity" } },
+    { zones: [{ id: 1, valve: "valve.room_b_valve_entity" }] },
+    { zones: [{ id: 1, valve: "input_boolean.room_b_bool_pump" }] },
+    { zones: [{ id: 1, vwc_sensors: ["sensor.room_b_vwc_fraction"] }] },
+    { zones: [{ id: 1, ec_sensors: ["sensor.room_b_ec_us"] }] },
+    { hardware: { tank_ec_sensor: "sensor.room_b_ec_us" } },
+  ])
+    assert.ok(
+      data(await call(client, "preview_setup", { room_id: "room:room_b_", changes })).proposal_token,
+      JSON.stringify(changes),
+    );
+  // Still a refusal where the integration refuses: a light is not an actuator, a % is not an EC.
+  error(
+    await call(client, "preview_setup", {
+      room_id: "room:room_b_",
+      changes: { hardware: { waste_switch: "valve.room_b_valve_entity" } },
+    }),
+    /existing switch/,
+  );
 });
 
 test("HA validates plan preview, then only draft saved with exact readback; no activation call", async (t) => {

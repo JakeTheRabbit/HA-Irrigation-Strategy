@@ -104,8 +104,8 @@ export function ZoneSlab({
   );
 }
 
-/** A feed tank drawn with its liquid at its level, the controller's minimum dashed across, and its
- * fill float on the lid. */
+/** A feed tank drawn with its liquid at its level, the controller's minimum dashed across (when it
+ * publishes one), and its fill float on the lid. */
 export function FeedTankDrawing({
   level,
   minimum,
@@ -114,7 +114,7 @@ export function FeedTankDrawing({
   label,
 }: {
   level: number | null;
-  minimum: number;
+  minimum: number | null;
   full: boolean | null;
   low: boolean;
   label: string;
@@ -136,7 +136,9 @@ export function FeedTankDrawing({
         </g>
       )}
       <rect className="feed-tank-edge" x="12" y="14" width="56" height="78" rx="8" />
-      <line className="feed-tank-minimum" x1="12" x2="68" y1={ty(minimum)} y2={ty(minimum)} />
+      {minimum !== null && (
+        <line className="feed-tank-minimum" x1="12" x2="68" y1={ty(minimum)} y2={ty(minimum)} />
+      )}
       <rect className="feed-tank-lid" x="8" y="8" width="64" height="8" rx="3" />
       <line className="feed-tank-float-rod" x1="58" x2="58" y1="16" y2="24" />
       <circle className="feed-tank-float" cx="58" cy="27" r="3.5" data-full={full === true || undefined} />

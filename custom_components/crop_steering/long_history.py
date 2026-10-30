@@ -17,10 +17,13 @@ from urllib.parse import urlsplit
 import aiohttp
 
 from .admin import async_require_admin
+from .api_v2 import StaleRevision
 from .const import DOMAIN
 from .room import room_prefix
 
 SERVICES = ("history_connection_get", "history_connection_save", "history_long")
+MAX_SENSORS = 16
+PER_SERIES_SECONDS = 8
 MAX_POINTS = 1000
 MAX_BYTES = 2_000_000
 
@@ -241,7 +244,65 @@ class LongHistory:
             for v in cfg.get("hardware", {}).values()
             if isinstance(v, str) and v.startswith("sensor.")
         )
+        # The sensors this room's archived runs were registered with: Comparison reads an old run's
+        # curve through them, and the room may have re-mapped since. They are this room's own
+        # history; no other entity is.
+        runs = self.hass.data.get(DOMAIN, {}).get("_runs", {}).get(self.entry.entry_id)
+        for run in getattr(runs, "document", {}).get("runs", []):
+            for zone in run.get("zones", []):
+                allowed.update(
+                    v
+                    for v in (zone.get("vwc_sensor"), zone.get("ec_sensor"))
+                    if isinstance(v, str)
+                )
+                allowed.update(p["entity_id"] for p in zone.get("probes", []))
         return allowed
+
+    async def read(self, session, config, entity, first, last, seconds):
+        state = self.hass.states.get(entity)
+        measurement = config["measurement"] or (
+            state.attributes.get("unit_of_measurement") if state else None
+        )
+        if not measurement:
+            measurement = entity
+        query = queries(config, entity, str(measurement), first, last, seconds)
+        if config["version"] == "1":
+            request = session.get(
+                config["url"] + "/query",
+                params={"db": config["database"], "q": query},
+                auth=(
+                    aiohttp.BasicAuth(config["username"], config["password"])
+                    if config["username"]
+                    else None
+                ),
+                allow_redirects=False,
+            )
+        else:
+            request = session.post(
+                config["url"] + "/api/v2/query",
+                params={"org": config["org"]},
+                data=query,
+                headers={
+                    "Authorization": "Token " + config["token"],
+                    "Content-Type": "application/vnd.flux",
+                    "Accept": "text/csv",
+                },
+                allow_redirects=False,
+            )
+        async with request as response:
+            if response.status != 200:
+                raise ValueError("InfluxDB connection or read query failed")
+            body = bytearray()
+            async for chunk in response.content.iter_chunked(65536):
+                body.extend(chunk)
+                if len(body) > MAX_BYTES:
+                    raise ValueError("InfluxDB response exceeds the history size limit")
+            points = parse_values(body.decode("utf-8"), config["version"])
+        return [
+            p
+            for p in points
+            if first.timestamp() * 1000 <= p["time"] < last.timestamp() * 1000
+        ]
 
     async def query(self, config, ids, start, end):
         from homeassistant.helpers.aiohttp_client import async_get_clientsession
@@ -249,61 +310,20 @@ class LongHistory:
         first, last, seconds = window(start, end)
         session = async_get_clientsession(self.hass)
         series = []
-        async with asyncio.timeout(8):
-            for entity in ids:
-                state = self.hass.states.get(entity)
-                measurement = config["measurement"] or (
-                    state.attributes.get("unit_of_measurement") if state else None
-                )
-                if not measurement:
-                    measurement = entity
-                query = queries(config, entity, str(measurement), first, last, seconds)
-                if config["version"] == "1":
-                    request = session.get(
-                        config["url"] + "/query",
-                        params={"db": config["database"], "q": query},
-                        auth=(
-                            aiohttp.BasicAuth(config["username"], config["password"])
-                            if config["username"]
-                            else None
-                        ),
-                        allow_redirects=False,
+        for entity in ids:
+            row = {"entityId": entity, "points": []}
+            try:
+                async with asyncio.timeout(PER_SERIES_SECONDS):
+                    row["points"] = await self.read(
+                        session, config, entity, first, last, seconds
                     )
-                else:
-                    request = session.post(
-                        config["url"] + "/api/v2/query",
-                        params={"org": config["org"]},
-                        data=query,
-                        headers={
-                            "Authorization": "Token " + config["token"],
-                            "Content-Type": "application/vnd.flux",
-                            "Accept": "text/csv",
-                        },
-                        allow_redirects=False,
-                    )
-                async with request as response:
-                    if response.status != 200:
-                        raise ValueError("InfluxDB connection or read query failed")
-                    body = bytearray()
-                    async for chunk in response.content.iter_chunked(65536):
-                        body.extend(chunk)
-                        if len(body) > MAX_BYTES:
-                            raise ValueError(
-                                "InfluxDB response exceeds the history size limit"
-                            )
-                    points = parse_values(body.decode("utf-8"), config["version"])
-                series.append(
-                    {
-                        "entityId": entity,
-                        "points": [
-                            p
-                            for p in points
-                            if first.timestamp() * 1000
-                            <= p["time"]
-                            < last.timestamp() * 1000
-                        ],
-                    }
-                )
+                if not row["points"] and self.hass.states.get(entity) is None:
+                    row["error"] = "Not found in history: the sensor no longer exists"
+            except (ValueError, OSError, aiohttp.ClientError, TimeoutError):
+                # One sensor failing must not hide the others, and an upstream error body or
+                # URL may hold credentials, so none is relayed.
+                row["error"] = "InfluxDB read failed or timed out for this sensor"
+            series.append(row)
         return {
             "start": first.isoformat(),
             "end": last.isoformat(),
@@ -318,6 +338,8 @@ async def async_setup_long_history(hass, entry):
     import voluptuous as vol
     from homeassistant.core import SupportsResponse
     from homeassistant.exceptions import HomeAssistantError
+
+    from .api_v2 import fields, wrap
 
     manager = LongHistory(hass, entry)
     stored = await manager.store.async_load()
@@ -353,7 +375,10 @@ async def async_setup_long_history(hass, entry):
                     return target.public()
                 if call.service == "history_connection_save":
                     if call.data["expected_revision"] != target.revision:
-                        raise ValueError("History connection changed elsewhere; reload")
+                        raise StaleRevision(
+                            "History connection changed elsewhere; reload",
+                            target.revision,
+                        )
                     candidate = connection(call.data["connection"], target.config)
                     if candidate["source"] == "influxdb":
                         probe = sorted(target.allowed())[:1]
@@ -362,22 +387,28 @@ async def async_setup_long_history(hass, entry):
                                 "Map a room sensor before testing InfluxDB"
                             )
                         now = datetime.now(timezone.utc)
-                        await target.query(
+                        tested = await target.query(
                             candidate,
                             probe,
                             (now - timedelta(hours=1)).isoformat(),
                             now.isoformat(),
                         )
+                        if any(
+                            "failed" in row.get("error", "") for row in tested["series"]
+                        ):
+                            raise ValueError("InfluxDB connection or read query failed")
                     await target.store.async_save(
                         {"revision": target.revision + 1, "connection": candidate}
                     )
                     target.config, target.revision = candidate, target.revision + 1
                     return target.public()
                 ids = list(dict.fromkeys(call.data["entity_ids"]))
-                if not 1 <= len(ids) <= 4 or any(
+                if not 1 <= len(ids) <= MAX_SENSORS or any(
                     e not in target.allowed() for e in ids
                 ):
-                    raise ValueError("Select 1-4 sensors already mapped to this room")
+                    raise ValueError(
+                        f"Select 1-{MAX_SENSORS} sensors mapped to this room or its runs"
+                    )
                 if target.config["source"] != "influxdb":
                     raise ValueError("InfluxDB history is not enabled")
                 return await target.query(
@@ -412,8 +443,10 @@ async def async_setup_long_history(hass, entry):
         hass.services.async_register(
             DOMAIN,
             service,
-            handle,
-            schema=vol.Schema({vol.Required("room_id"): str, **schemas[service]}),
+            wrap(handle),
+            schema=vol.Schema(
+                fields({vol.Required("room_id"): str, **schemas[service]})
+            ),
             supports_response=SupportsResponse.ONLY,
         )
 

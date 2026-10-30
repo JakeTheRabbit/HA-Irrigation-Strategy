@@ -18,7 +18,6 @@ import {
   CHART_LAYERS,
   dayScales,
   hourTicks,
-  overnightDryback,
   parseChartPrefs,
   phaseColumns,
   placeBadges,
@@ -34,7 +33,6 @@ import {
   type ChartPrefs,
   type Column,
   type Compare,
-  type Dryback,
   type Readout,
   type Steering,
 } from "@/lib/day-chart";
@@ -74,7 +72,7 @@ import {
   type TimelineRows,
   type TypicalPoint,
 } from "@/lib/day-timeline";
-import { budgetShare, DRYBACK_WINDOW_H, drybackTrend } from "@/lib/dryback";
+import { budgetShare } from "@/lib/dryback";
 import { jevAnswer, jevResult, readJev, type JevEntry } from "@/lib/jev";
 import { descriptor, numeric } from "@/lib/model";
 import {
@@ -84,12 +82,22 @@ import {
   smoothRecorded,
   type PlanningPhaseId,
 } from "@/lib/planning-curve";
+import {
+  drybackId,
+  publishedDryback,
+  publishedNextIrrigation,
+  publishedVmax,
+  recordedDryback,
+  type PublishedDryback,
+} from "@/lib/published";
 import { buildSetpointPreview } from "@/lib/setpoint-preview";
 import { waitingText } from "@/lib/waiting-for";
 import type { Controller, Setting, Zone } from "@/lib/types";
 import { errorText } from "@/lib/utils";
 import { dailyWater, estimateRuntime, flowInputs, waterParameters } from "@/lib/water-delivery";
 import { plantAmount, useWaterView, zonePlants } from "@/lib/water-view";
+import { ecTargetBand, poreEcNeutral } from "@/lib/ec-band";
+import { formatDateTime } from "@/lib/clock";
 import "./day-timeline.css";
 
 /** Each phase as the zone views name it, and as its chart column says it where there is room. */
@@ -108,8 +116,6 @@ const HELD: Record<Block["kind"], string> = {
 };
 const NO_ESTIMATE: Partial<Record<NextShot["basis"], string>> = {
   late: "no shot expected before lights-off at the current dry-down",
-  settling: "VWC is still settling after the last shot",
-  "no-dry-down": "VWC is not falling measurably",
   "no-reading": "no live VWC reading",
   unknown: "not enough to go on",
 };
@@ -164,12 +170,15 @@ interface Lane {
   steps: Steps;
   projection: Projection | null;
   yesterday: DayTrace | null;
+  /** The day today's VWC is drawn against: yesterday, or the last run's day of the same number. */
+  versus: { trace: DayTrace; name: string; series: "yesterday" | "last-run" } | null;
   past: DayTrace[];
   typical: TypicalPoint[];
   steering: Steering | null;
   /** The pore EC band the stage calls for, else the zone's EC target ±10 % (the steer's own band). */
   ecBand: { band: [number, number]; source: string } | null;
-  dryback: { night: "tonight" | "last night"; value: Dryback } | null;
+  /** The controller's dryback: tonight's live, else last night's as recorded at lights-on. */
+  dryback: { night: "tonight" | "last night"; value: PublishedDryback };
   jev: JevEntry[];
   /** The room publishes the AI assistant's log: the chart keeps a lane for its decisions. */
   jevOn: boolean;
@@ -279,18 +288,43 @@ function useEarlierDays(
  * numbers, then what the zone did today (its phases, shots and pore EC), where it is now against
  * today's stage, and what comes next. Today is downloaded once when the page opens and live updates
  * extend it; the earlier days (yesterday, the typical day, last night's dryback) are downloaded once. */
-export function ZoneDay({ controller, zone }: { controller: Controller; zone: Zone }) {
+/** What the zone page compares today's VWC with. */
+export type ZoneCompare = "off" | "yesterday" | "last-run" | "typical";
+
+export function ZoneDay({
+  controller,
+  zone,
+  compare: compareWith,
+  onCompare,
+  lastRun = null,
+  beside,
+}: {
+  controller: Controller;
+  zone: Zone;
+  /** What today's VWC is compared with, chosen in the chart's heading (`onCompare`): Off,
+   * Yesterday, the last run's day of the same number, or the typical day (median of 7). */
+  compare: ZoneCompare;
+  onCompare: (next: ZoneCompare) => void;
+  /** The previous run's grow-day of the same number; "Last run" is offered only with one. */
+  lastRun?: { day: number; trace: DayTrace } | null;
+  /** A second chart beside today's VWC: under it on a wide screen, swiped to on a phone. */
+  beside?: { name: string; chart: ReactNode };
+}) {
   const [, tick] = useState(0);
   useEffect(() => {
     // The clock moves between live updates, and a quiet controller sends none.
     const timer = window.setInterval(() => tick((value) => value + 1), 30_000);
     return () => window.clearInterval(timer);
   }, []);
-  const [compare, setCompare] = useState(() => storedChart().compare);
-  const choose = (next: Compare) => {
-    setCompare(next);
-    rememberChart({ compare: next });
-  };
+  const versusRun = compareWith === "last-run" && lastRun ? lastRun : null;
+  const compare: Compare =
+    compareWith === "typical"
+      ? "typical"
+      : compareWith === "yesterday" || versusRun
+        ? "yesterday"
+        : "none";
+  const slides = useRef<HTMLDivElement>(null);
+  const [slide, setSlide] = useState(0);
   const { room, states } = controller;
   const now = Date.now();
   const prefix = room.room.prefix;
@@ -349,71 +383,125 @@ export function ZoneDay({ controller, zone }: { controller: Controller; zone: Zo
     : -Infinity;
   const age = Number.isFinite(newest) ? now - newest : null;
   const lane =
-    rows && day ? buildLane(controller, zone, entities, day, rows, now, earlier, compare) : null;
+    rows && day
+      ? buildLane(controller, zone, entities, day, rows, now, earlier, compare, versusRun)
+      : null;
+  const choices: [ZoneCompare, string][] = [
+    ["off", "Off"],
+    ["yesterday", "Yesterday"],
+    ...(lastRun ? [["last-run", `Last run, day ${lastRun.day}`] as [ZoneCompare, string]] : []),
+    ["typical", "Typical"],
+  ];
+  const chart = (
+    <section className="panel zone-day-chart" aria-labelledby={`zone-day-${zone.id}`}>
+      <div className="panel-heading">
+        <h2 id={`zone-day-${zone.id}`}>{beside ? "Today · VWC" : "Today"}</h2>
+        {beside && (
+          <span className="zone-day-swipe" aria-hidden="true">
+            Swipe: VWC · {beside.name}
+          </span>
+        )}
+        {rows && (
+          <div className="timeline-heading-side">
+            <div className="zone-day-compare" role="group" aria-label="Compare with">
+              <span className="timeline-compare" aria-hidden="true">
+                Compare with
+              </span>
+              {choices.map(([value, label]) => (
+                <button
+                  type="button"
+                  key={value}
+                  aria-pressed={compareWith === value}
+                  data-compare={value}
+                  title={value === "typical" ? "The median of the last 7 days, with its middle half" : undefined}
+                  onClick={() => onCompare(value)}
+                >
+                  {label}
+                </button>
+              ))}
+              <UiTip copyKey="compare with" />
+            </div>
+            <span className="timeline-age" data-age={ageTone(age)}>
+              {controller.demo ? "Demo data · " : ""}
+              {age === null ? "Nothing recorded yet" : `Newest reading ${ageText(age)} old`}
+            </span>
+          </div>
+        )}
+      </div>
+      {!ready && !rows ? (
+        <div className="chart-placeholder" role="status">
+          <LoaderCircle className="spin" />
+          Waiting for Home Assistant…
+        </div>
+      ) : !day ? (
+        <Empty
+          title="No lights schedule"
+          tip={<UiTip copyKey="no lights schedule" />}
+          detail="Set this room’s lights-on and lights-off hours to draw its grow day."
+        />
+      ) : error ? (
+        <Empty
+          title="Grow-day did not load"
+          tip={<UiTip copyKey="the grow day could not load" />}
+          detail={error}
+          action={
+            <Button variant="outline" onClick={() => setRetry((value) => value + 1)}>
+              Retry
+            </Button>
+          }
+        />
+      ) : !lane ? (
+        <div className="chart-placeholder" role="status">
+          <LoaderCircle className="spin" />
+          Loading today’s recorded history…
+        </div>
+      ) : (
+        <DayChart lane={lane} day={day} now={now} compare={compare} />
+      )}
+      {lane &&
+        day &&
+        compare !== "none" &&
+        !versusRun &&
+        room.display.options.zone_day_deltas && (
+          <DayDeltaChips controller={controller} zone={zone} lane={lane} day={day} now={now} compare={compare} />
+        )}
+    </section>
+  );
+  const names = beside ? ["VWC", beside.name] : [];
   return (
     <div className="day-timeline zone-day" data-day-timeline data-zone={zone.id}>
       <ZoneNumbers controller={controller} zone={zone} lane={lane} day={day} />
-      <section className="panel zone-day-chart" aria-labelledby={`zone-day-${zone.id}`}>
-        <div className="panel-heading">
-          <h2 id={`zone-day-${zone.id}`}>Today</h2>
-          {rows && (
-            <div className="timeline-heading-side">
-              <span className="label-with-tip">
-                <label htmlFor="day-timeline-compare" className="timeline-compare">
-                  Compare with
-                </label>
-                <UiTip copyKey="compare with" />
-              </span>
-              <select
-                id="day-timeline-compare"
-                value={compare}
-                onChange={(event) => choose(event.target.value as Compare)}
-              >
-                <option value="yesterday">Yesterday</option>
-                <option value="typical">Typical (median of 7 days)</option>
-                <option value="none">None</option>
-              </select>
-              <span className="timeline-age" data-age={ageTone(age)}>
-                {controller.demo ? "Demo data · " : ""}
-                {age === null ? "Nothing recorded yet" : `Newest reading ${ageText(age)} old`}
-              </span>
-            </div>
-          )}
+      {beside ? (
+        <div className="zone-day-charts">
+          <div
+            className="zone-day-slides"
+            ref={slides}
+            data-slide={slide}
+            onScroll={(event) => {
+              const box = event.currentTarget;
+              setSlide(Math.round(box.scrollLeft / Math.max(1, box.clientWidth)));
+            }}
+          >
+            {chart}
+            {beside.chart}
+          </div>
+          <div className="zone-day-dots" role="group" aria-label="Charts">
+            {names.map((name, index) => (
+              <button
+                type="button"
+                key={name}
+                aria-label={`Show the ${name} chart`}
+                aria-current={slide === index ? "true" : undefined}
+                onClick={() =>
+                  slides.current?.scrollTo({ left: index * slides.current.clientWidth, behavior: "smooth" })
+                }
+              />
+            ))}
+          </div>
         </div>
-        {!ready && !rows ? (
-          <div className="chart-placeholder" role="status">
-            <LoaderCircle className="spin" />
-            Waiting for Home Assistant…
-          </div>
-        ) : !day ? (
-          <Empty
-            title="No lights schedule"
-            tip={<UiTip copyKey="no lights schedule" />}
-            detail="Set this room’s lights-on and lights-off hours to draw its grow day."
-          />
-        ) : error ? (
-          <Empty
-            title="Grow-day did not load"
-            tip={<UiTip copyKey="the grow day could not load" />}
-            detail={error}
-            action={
-              <Button variant="outline" onClick={() => setRetry((value) => value + 1)}>
-                Retry
-              </Button>
-            }
-          />
-        ) : !lane ? (
-          <div className="chart-placeholder" role="status">
-            <LoaderCircle className="spin" />
-            Loading today’s recorded history…
-          </div>
-        ) : (
-          <DayChart lane={lane} day={day} now={now} compare={compare} />
-        )}
-        {lane && day && compare !== "none" && room.display.options.zone_day_deltas && (
-          <DayDeltaChips controller={controller} zone={zone} lane={lane} day={day} now={now} compare={compare} />
-        )}
-      </section>
+      ) : (
+        chart
+      )}
     </div>
   );
 }
@@ -484,12 +572,13 @@ function buildLane(
   now: number,
   earlier: Earlier | null,
   compare: Compare,
+  lastRun: { day: number; trace: DayTrace } | null = null,
 ): Lane {
   const { room, states } = controller;
   const root = `crop_steering_${room.room.prefix}`;
   const jev = readJev(states, room.room.prefix);
   const stage = jev.room?.stage ?? null;
-  const decisions = rows[entities.attributeIds[0]] ?? [];
+  const decisions = (entities.decision && rows[entities.decision]) || [];
   const settings = new Map(room.settings.map((setting) => [setting.entityId, setting]));
   const changes = setpointChanges(rows, [...settings.keys()], day.start, now).map(
     (change): Change => {
@@ -525,7 +614,6 @@ function buildLane(
   // The zone's target (model.ts) is what the controller compares with in its phase, the plan's
   // while one runs; a plan's timing is its own, so P0 and P1 are not estimated under one.
   const phaseTarget = (key: string) => (zone.phase === phase ? zone.target.value : read(key));
-  const target = phase === "P2" ? phaseTarget("p2_vwc_threshold") : null;
   const stopped = !room.roomActive
     ? "the room is off"
     : zone.stale
@@ -549,9 +637,16 @@ function buildLane(
           since,
           held,
           lastShot: shots.at(-1) ?? null,
-          points,
           vwc: zone.vwc.value,
-          threshold: target,
+          estimate: publishedNextIrrigation(
+            states,
+            room.room.prefix,
+            zone.id,
+            phase,
+            since,
+            shots.at(-1)?.end ?? null,
+            now,
+          ),
           ceiling,
           interval: planned ? null : water.p1_time_between_shots,
           maxWait: planned ? null : read("p0_maximum_wait_time"),
@@ -638,7 +733,7 @@ function buildLane(
       ? past.length >= 3
         ? past
         : []
-      : compare === "yesterday" && yesterday
+      : compare === "yesterday" && yesterday && !lastRun
         ? [yesterday]
         : [];
   const moved = earlier?.setup.filter(
@@ -652,11 +747,9 @@ function buildLane(
   const choice = states[`select.${root}zone_${zone.id}_steering_mode`]?.state;
   const steering = steeringOf(choice, stage?.steering);
   const ecTarget = zone.ecTarget.value;
-  // Last night's dryback runs from yesterday's evening into today; tonight's from today's.
+  const targetBand = ecTargetBand(poreEcNeutral(states, room.room.prefix), ecTarget);
+  // Tonight's dryback is the controller's live one; last night's, what it held at lights-on.
   const tonight = now >= day.lightsOff;
-  const night = tonight
-    ? overnightDryback(points, day.lightsOff, day.end, now)
-    : yesterday && overnightDryback(yesterday.points, yesterday.day.lightsOff, day.start, now);
   return {
     zone,
     bands,
@@ -675,6 +768,12 @@ function buildLane(
     steps,
     projection,
     yesterday,
+    versus:
+      compare !== "yesterday"
+        ? null
+        : lastRun
+          ? { trace: lastRun.trace, name: `Last run, day ${lastRun.day}`, series: "last-run" }
+          : yesterday && { trace: yesterday, name: "Yesterday", series: "yesterday" },
     past,
     typical:
       compare === "typical" && past.length >= 3
@@ -683,13 +782,18 @@ function buildLane(
     steering,
     ecBand: stage?.poreEc
       ? { band: stage.poreEc, source: `the pore EC band for ${stage.name}` }
-      : ecTarget !== null && ecTarget > 0
+      : targetBand
         ? {
-            band: [ecTarget * 0.9, ecTarget * 1.1],
-            source: `the zone’s EC target ${number(ecTarget, 2)} ±10 %`,
+            band: targetBand,
+            source: `the zone’s EC target ${number(ecTarget, 2)}, where the controller leaves a shot’s size alone`,
           }
         : null,
-    dryback: night ? { night: tonight ? "tonight" : "last night", value: night } : null,
+    dryback: tonight
+      ? { night: "tonight", value: publishedDryback(states, room.room.prefix, zone.id) }
+      : {
+          night: "last night",
+          value: recordedDryback(rows[drybackId(room.room.prefix, zone.id)], day.start),
+        },
     jev: (jev.log?.entries ?? []).filter(
       (entry) =>
         entry.kind === "decision" &&
@@ -746,23 +850,15 @@ function ZoneNumbers({
   const lastShot = zone.lastIrrigation.timestamp ?? null;
   const next = lane && day ? nextWords(lane, day) : null;
   const dryback = lane?.dryback;
-  // How fast it dries since the last shot settled, from today's readings.
-  const rate = lane
-    ? drybackTrend(
-        lane.points.map((point) => ({
-          time: new Date(point.time).toISOString(),
-          value: point.value,
-        })),
-        lastShot,
-        zone.vwc.value,
-        Date.now(),
-      ).rate
-    : null;
+  // The peak, the dryback and its rate are the controller's own (published.ts), never worked out here.
+  const prefix = controller.room.room.prefix;
+  const live = publishedDryback(controller.states, prefix, zone.id);
+  const vmax = publishedVmax(controller.states, prefix, zone.id);
+  const rate = live.rate;
   // The four key values against their targets; water and shots are the facts under them.
   const targets = buildSetpointPreview(controller.room, controller.states, zone.id, {}).saved
     .parameters;
   const phase = lane?.phase ?? (/^P[0-3]$/.test(zone.phase) ? zone.phase : null);
-  const peak = lane?.points.length ? Math.max(...lane.points.map((point) => point.value)) : null;
   const gauges = [
     {
       id: "vwc",
@@ -778,7 +874,8 @@ function ZoneNumbers({
       id: "peak",
       model: gauge({
         label: "Peak today",
-        value: peak,
+        value: live.peak,
+        quality: live.reason ?? undefined,
         target: targets.p1_target_vwc ?? null,
         unit: "%",
         tolerance: 3,
@@ -790,6 +887,7 @@ function ZoneNumbers({
       model: gauge({
         label: dryback?.night === "tonight" ? "Dryback tonight" : "Last night’s dryback",
         value: dryback?.value.percent ?? null,
+        quality: dryback?.value.reason ?? undefined,
         target: targets.dryback_target ?? null,
         reference: referenceDryback(stage?.drybackPoints, dryback?.value.peak),
         unit: "%",
@@ -870,26 +968,52 @@ function ZoneNumbers({
           <dd>{zone.shots.value === null ? "—" : number(zone.shots.value, 0)}</dd>
           {lastShot !== null && <dd className="zone-sub">last {clock(lastShot)}</dd>}
         </div>
-        {rate !== null && (
-          <div
-            title={`Dryback rate. The VWC points that the zone lost each hour since the last shot settled. The calculation uses up to the last ${DRYBACK_WINDOW_H} hours.`}
-          >
-            <dt>Dryback rate</dt>
-            <dd>
-              {Math.abs(rate) < 0.05 ? (
-                "steady"
-              ) : (
-                <>
-                  {number(Math.abs(rate), Math.abs(rate) < 1 ? 2 : 1)}
-                  <span className="unit"> pts/h</span>
-                </>
-              )}
-            </dd>
-            {Math.abs(rate) >= 0.05 && (
-              <dd className="zone-sub">{rate > 0 ? "drying" : "wetting"}</dd>
+        <div
+          title="Ramp ceiling. The highest VWC that the controller saw the slab reach on the morning ramp. It is advisory: the controller does not change a setpoint from it."
+          data-vmax={zone.id}
+        >
+          <dt>Ramp ceiling</dt>
+          <dd>{vmax.value === null ? "—" : `${number(vmax.value)}%`}</dd>
+          <dd className="zone-sub">
+            {vmax.value === null
+              ? vmax.reason
+              : [
+                  vmax.detected === null
+                    ? "detected"
+                    : day && vmax.detected >= day.start
+                      ? "detected today"
+                      : `detected ${ageText(Date.now() - vmax.detected)} ago, not yet today`,
+                  vmax.confidence === null ? null : `${number(vmax.confidence * 100, 0)}% sure`,
+                ]
+                  .filter(Boolean)
+                  .join(", ")}
+          </dd>
+        </div>
+        <div
+          title="Dryback rate. The VWC points that the zone loses each hour, as the controller measures it for its decisions."
+          data-dryback-rate={zone.id}
+        >
+          <dt>Dryback rate</dt>
+          <dd>
+            {rate === null ? (
+              "—"
+            ) : Math.abs(rate) < 0.05 ? (
+              "steady"
+            ) : (
+              <>
+                {number(Math.abs(rate), Math.abs(rate) < 1 ? 2 : 1)}
+                <span className="unit"> pts/h</span>
+              </>
             )}
-          </div>
-        )}
+          </dd>
+          {rate === null ? (
+            <dd className="zone-sub">{live.reason ?? "not published by the controller"}</dd>
+          ) : (
+            Math.abs(rate) >= 0.05 && (
+              <dd className="zone-sub">{rate > 0 ? "drying" : "wetting"}</dd>
+            )
+          )}
+        </div>
       </dl>
       {next && (
         <p className="zone-next" title={next.detail} data-tone={next.tone}>
@@ -990,7 +1114,7 @@ function DayChart({
           jev={lane.jevOn}
           compare={
             compare === "yesterday"
-              ? "Yesterday"
+              ? (lane.versus?.name ?? "Yesterday")
               : compare === "typical"
                 ? typicalDays >= 3
                   ? `Typical day (${typicalDays} days)`
@@ -1211,8 +1335,7 @@ function Chart({
   const timeAt = (px: number) => day.start + ((px - L) / plotW) * (day.end - day.start);
   const hourOf = (time: number) => (time - day.start) / 3_600_000;
   // Earlier days sit on today's axis by hours since their own lights-on.
-  const yesterday = compare === "yesterday" ? lane.yesterday : null;
-  const before = (yesterday?.points ?? [])
+  const before = ((compare === "yesterday" && lane.versus?.trace.points) || [])
     .filter((point) => point.hour <= hourOf(day.end))
     .map((point) => ({ time: day.start + point.hour * 3_600_000, value: point.value }));
   const typical = compare === "typical" ? lane.typical : [];
@@ -1533,7 +1656,12 @@ function Chart({
           <path data-layer="rescue" d={flat(rescue)} className="rescue-line" />
         )}
         {before.length > 0 && (
-          <path data-layer="yesterday" d={linePath(before, x, yOpen)} className="yesterday-line" />
+          <path
+            data-layer="yesterday"
+            data-series={lane.versus?.series}
+            d={linePath(before, x, yOpen)}
+            className="yesterday-line"
+          />
         )}
         {show("ec") && lane.ec.length > 1 && ecAxis && (
           <path
@@ -1697,9 +1825,7 @@ function columnText(column: Column, lane: Lane, day: GrowDay, now: number): stri
 
 /** A clock hour short enough for an axis: "4 PM", "16". */
 const hourLabel = (time: number) =>
-  new Date(time)
-    .toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
-    .replace(/:00(?=\D|$)/, "");
+  formatDateTime(time, { hour: "numeric", minute: "2-digit" }).replace(/:00(?=\D|$)/, "");
 const diamond = (cx: number, cy: number) =>
   `M${cx} ${cy - 5}L${cx + 5} ${cy}L${cx} ${cy + 5}L${cx - 5} ${cy}Z`;
 /** The recorded VWC as one path, broken where readings stop for more than 20 minutes. */
@@ -1789,9 +1915,9 @@ function readingText(
     ];
     if (readings.length) lines.push(readings.join(" · "));
   }
-  if (compare === "yesterday" && lane.yesterday) {
+  if (compare === "yesterday" && lane.versus) {
     const value = valueAtTime(before, at);
-    lines.push(`Yesterday ${value === null ? "not recorded" : `${number(value)}%`}`);
+    lines.push(`${lane.versus.name} ${value === null ? "not recorded" : `${number(value)}%`}`);
     if (lane.setupNote) lines.push(lane.setupNote);
   }
   if (compare === "typical") {
@@ -1835,14 +1961,14 @@ function nextWords(lane: Lane, day: GrowDay): { text: string; detail: string; to
       ? waitingText(zone.waiting, {
           number: (value) => number(value),
           clock,
-          shotEstimate: next.basis === "dry-down" ? next.at : null,
+          shotEstimate: next.basis === "controller" ? next.at : null,
         })
       : "";
   const first = conditions.split(" · ")[0];
   const estimate =
     next.at === null
       ? null
-      : next.basis === "dry-down"
+      : next.basis === "controller"
         ? `shot ≈ ${clock(next.at)}`
         : next.basis === "due"
           ? "shot due now"
@@ -1858,7 +1984,7 @@ function nextWords(lane: Lane, day: GrowDay): { text: string; detail: string; to
         ? ""
         : next.basis === "due"
           ? " · due now"
-          : next.basis === "dry-down"
+          : next.basis === "controller"
             ? ` · ≈ ${clock(next.at)}`
             : "";
     return { text: `${first}${when}`, detail: `What the controller waits for: ${conditions}` };
@@ -1871,14 +1997,21 @@ function nextWords(lane: Lane, day: GrowDay): { text: string; detail: string; to
           : `overnight, no shots until ${clock(day.end)}`,
       detail: "Overnight the controller waters only to rescue a zone that dries below its floor.",
     };
-  if (estimate) return { text: estimate, detail: "An estimate from today’s readings." };
+  if (estimate)
+    return {
+      text: estimate,
+      detail:
+        next.basis === "controller"
+          ? "The controller’s estimate: VWC down to the re-water point at its current dryback rate."
+          : "An estimate from today’s readings.",
+    };
   if (next.basis === "ramp-done")
     return { text: "hand-over to P2 maintenance", detail: "The ramp is at its ceiling." };
   if (next.basis === "late")
     return { text: "no more shots before lights-off", detail: NO_ESTIMATE.late! };
   return {
     text: "no estimate yet",
-    detail: NO_ESTIMATE[next.basis] ?? "not enough to go on",
+    detail: next.reason ?? NO_ESTIMATE[next.basis] ?? "not enough to go on",
   };
 }
 function changeText(change: Change): string {

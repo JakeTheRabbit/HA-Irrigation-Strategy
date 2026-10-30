@@ -6,6 +6,10 @@ import type { SetupDocument } from "./operator-types";
 import {
   ecType,
   fusionMethod,
+  healthChip,
+  placementProblem,
+  probeCounts,
+  probeRows,
   probeChoicePayload,
   probeChoices,
   probeHealth,
@@ -217,5 +221,38 @@ describe("which of a zone's probes count, and its primary", () => {
       ["Zone 1 back EC", "ok", false],
     ]);
     expect(probeChoices(after)["1:vwc"]).toEqual(choices["1:vwc"]);
+  });
+});
+
+describe("Probes & offsets rows", () => {
+  const states = createDemo(now);
+  const room = buildRoom(
+    states,
+    discoverRooms(states).find((item) => item.prefix === "")!,
+  );
+  it("puts each moisture probe on a row with the pore EC probe on its side of the slab", () => {
+    const rows = probeRows(zoneProbes(room.zones[2], states, now));
+    expect(rows.map((row) => [row.side, row.vwc.id, row.ec?.id])).toEqual([
+      ["Front", "sensor.demo_z3_front_vwc", "sensor.demo_z3_front_ec"],
+      ["Back", "sensor.demo_z3_back_vwc", "sensor.demo_z3_back_ec"],
+    ]);
+  });
+  it("counts every probe on the page, moisture and pore EC, in health and in zone values", () => {
+    const rows = probeRows(zoneProbes(room.zones[2], states, now));
+    expect(probeCounts(rows)).toEqual({ total: 4, healthy: 3, used: 3 });
+    expect(probeCounts([rows[0], { ...rows[1], ec: rows[0].ec }])).toMatchObject({ total: 3 });
+  });
+  it("says each probe's health in a word or two, and whether the zone leaves it out", () => {
+    const probes = zoneProbes(room.zones[2], states, now);
+    expect(probes.map((probe) => healthChip(probe, now))).toEqual(["OK", "OK", "OK", "Silent 3 h"]);
+    expect(healthChip({ ...probes[0], health: "stuck", changed: now - 4 * H }, now)).toBe("Stuck 4 h");
+    expect(healthChip({ ...probes[0], health: "out-of-range" }, now)).toBe("Out of range");
+  });
+  it("names a moisture probe that reads out of range or far from the others as a placement problem", () => {
+    const [front] = zoneProbes(room.zones[0], states, now);
+    expect(placementProblem(front)).toBe(false);
+    expect(placementProblem({ ...front, health: "out-of-range" })).toBe(true);
+    expect(placementProblem({ ...front, reason: "excluded_outlier" })).toBe(true);
+    expect(placementProblem({ ...front, kind: "ec", health: "out-of-range" })).toBe(false);
   });
 });

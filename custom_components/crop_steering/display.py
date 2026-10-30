@@ -16,6 +16,7 @@ import asyncio
 from copy import deepcopy
 
 from .admin import async_require_admin
+from .api_v2 import StaleRevision, Unavailable
 from .const import DOMAIN
 from .room import room_prefix
 
@@ -39,6 +40,12 @@ OPTIONS: dict[str, dict] = {
     # Plan
     "planner_reference_rows": {"default": False},
     "planner_day_curve": {"default": False},
+    # Units and clock: display only, per room. Storage and the API stay canonical.
+    "ec_unit": {"default": "mS/cm", "choices": ("mS/cm", "ppm500", "ppm700")},
+    "temp_unit": {"default": "C", "choices": ("C", "F")},
+    # "auto" follows Home Assistant's unit system, as the dashboard does today.
+    "volume_unit": {"default": "auto", "choices": ("auto", "L", "gal")},
+    "clock": {"default": 24, "choices": (12, 24)},
 }
 
 
@@ -52,8 +59,12 @@ def clean_option(key, value):
     if spec is None:
         raise ValueError(f"Unknown display option: {key}")
     if "choices" in spec:
-        if value not in spec["choices"]:
-            raise ValueError(f"{key} must be one of: {', '.join(spec['choices'])}")
+        # Same type first: True == 1 and 12.0 == 12 must not pass for a number choice.
+        if type(value) not in {type(c) for c in spec["choices"]} or (
+            value not in spec["choices"]
+        ):
+            choices = ", ".join(str(c) for c in spec["choices"])
+            raise ValueError(f"{key} must be one of: {choices}")
         return value
     if type(value) is not bool:
         raise ValueError(f"{key} must be true or false")
@@ -129,10 +140,11 @@ class DisplayOptions:
     async def save(self, expected_revision, changes) -> dict:
         async with self._lock:
             if self.error:
-                raise ValueError(self.error)
+                raise Unavailable(self.error)
             if expected_revision != self.document["revision"]:
-                raise ValueError(
-                    "Display options changed elsewhere. Reload before saving."
+                raise StaleRevision(
+                    "Display options changed elsewhere. Reload before saving.",
+                    self.document["revision"],
                 )
             if not isinstance(changes, dict) or not changes:
                 raise ValueError("Give at least one display option to save")
@@ -166,6 +178,8 @@ async def async_setup_display(hass, entry):
     from homeassistant.core import SupportsResponse
     from homeassistant.exceptions import HomeAssistantError
 
+    from .api_v2 import fields, wrap
+
     manager = DisplayOptions(hass, entry)
     await manager.async_init()
     hass.data.setdefault(DOMAIN, {}).setdefault("_display", {})[
@@ -197,8 +211,8 @@ async def async_setup_display(hass, entry):
         hass.services.async_register(
             DOMAIN,
             service,
-            handle,
-            schema=vol.Schema(schemas[service]),
+            wrap(handle),
+            schema=vol.Schema(fields(schemas[service])),
             supports_response=SupportsResponse.ONLY,
         )
 

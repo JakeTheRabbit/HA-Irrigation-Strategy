@@ -29,12 +29,12 @@ jobs:
         python-version: [ '3.11', '3.12' ]
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 1
 
       - name: Setup Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: ${{ matrix.python-version }}
           # no pip cache: the repo intentionally has no requirements.txt/pyproject
@@ -52,10 +52,11 @@ jobs:
           ruff check .
 
       - name: Black (format check)
-        # Scoped to the integration + tests (the add-on is deployed file-for-file, exempt).
+        # Scoped to the integration + tests. The add-on, the engine, tests_ha, tests/container and
+        # scripts are not format-gated, on purpose: docs/TESTING.md, "What the format gate covers".
         run: |
           black --version
-          black --check custom_components/ tests/
+          black --check custom_components/ tests/ --extend-exclude 'tests/container/'
 
       - name: Yamllint
         run: |
@@ -115,10 +116,10 @@ jobs:
           PYTHONPATH=crop-steering-engine/src python -m pytest crop-steering-engine/tests -q
 
       - name: Hassfest
-        uses: home-assistant/actions/hassfest@master
+        uses: home-assistant/actions/hassfest@86d4564712fa02543c808e3a693dd04f9d3f8361 # master, 2026-10-17 (no releases)
 
       - name: HACS Validation (integration)
-        uses: hacs/action@main
+        uses: hacs/action@d556e736723344f83838d08488c983a15381059a # 22.5.0
         with:
           category: integration
           # Nothing is ignored: HACS lists a repository in its default store only when this passes
@@ -132,17 +133,17 @@ jobs:
     timeout-minutes: 20
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 1
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
       - name: Build the add-on image
         # Proves the Dockerfile builds from a clean checkout (COPY www/public, apk deps,
         # vendored engine). Uses the amd64 base from build.yaml; no push.
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: addons/f2_control
           push: false
@@ -150,7 +151,7 @@ jobs:
             BUILD_FROM=ghcr.io/home-assistant/amd64-base-python:3.12-alpine3.20
 
   container-smoke:
-    # One image, both install modes: the same amd64 image runs tests_container as a standalone
+    # One image, both install modes: the same amd64 image runs tests/container as a standalone
     # container and as the Supervisor runs the app, against a fake Home Assistant. Runs on every
     # Validate run with no path or `if` filter, so a required check never waits on a job that did
     # not run. Nothing is pushed.
@@ -159,25 +160,25 @@ jobs:
     timeout-minutes: 30
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 1
 
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: '3.12'
 
       - name: Install pytest
-        run: python -m pip install pytest==8.2.2
+        run: python -m pip install pytest==8.2.2 pytest-xdist==3.6.1
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
       - name: Build the controller image
         # As the add-on build job, plus load: the image must be in the local daemon to be run.
         id: build
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: addons/f2_control
           push: false
@@ -186,12 +187,17 @@ jobs:
             BUILD_FROM=ghcr.io/home-assistant/amd64-base-python:3.12-alpine3.20
 
       - name: Container smoke, both modes, on that image
-        # tests_container skips without an image; inspecting it first keeps a skip from passing.
+        # tests/container skips without an image; inspecting it first keeps a skip from passing.
         env:
           CONTROLLER_IMAGE: ${{ steps.build.outputs.imageid }}
         run: |
           docker image inspect "$CONTROLLER_IMAGE" > /dev/null
-          python -m pytest tests_container -q -rs
+          # Four workers: the tests are slow because they wait (watch periods, restarts, a controller
+          # loop of seconds), not because they compute, and each makes its own network, volume and
+          # container names, so they do not share anything. Run one after another they took 22.9 minutes
+          # of this job's 30 (run 39553259477); 28 tests on four workers took 12.5 minutes on a developer
+          # machine, the longest single test (6 minutes) being the floor. --durations names the slow ones.
+          python -m pytest tests/container -q -rs -n 4 --durations=5
 
   addon-image-per-arch:
     # The image's Python packages come from pinned, hashed files: requirements.txt, and the
@@ -212,7 +218,7 @@ jobs:
           - arch: armv7
             platform: linux/arm/v7
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 1
       - name: Base image from build.yaml
@@ -220,10 +226,10 @@ jobs:
         env:
           ARCH: ${{ matrix.arch }}
         run: echo "from=$(awk -v key="${ARCH}:" '$1 == key {print $2}' addons/f2_control/build.yaml)" >> "$GITHUB_OUTPUT"
-      - uses: docker/setup-qemu-action@v3
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - name: Build the add-on image for ${{ matrix.arch }}
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: addons/f2_control
           platforms: ${{ matrix.platform }}
@@ -282,7 +288,7 @@ jobs:
       contents: read
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 1
       - name: Dependency Review
@@ -290,7 +296,7 @@ jobs:
         # the review visible in PR logs, but do not fail the whole validation suite
         # when GitHub reports repository-level support is unavailable.
         continue-on-error: true
-        uses: actions/dependency-review-action@v4
+        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
         with:
           fail-on-severity: high
 
@@ -328,8 +334,8 @@ jobs:
             install: 'pytest-homeassistant-custom-component==0.13.171 josepy==1.14.0'
             suffix: ' - oldest supported Home Assistant'
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: ${{ matrix.python }}
       - name: Install Home Assistant ${{ matrix.homeassistant }} and its pytest plugin
@@ -352,10 +358,10 @@ jobs:
   frontend:
     name: Dashboard build and browser workflows
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '24'
           cache: npm
@@ -395,7 +401,45 @@ jobs:
           node frontend/scripts/verify-tank-status.mjs
           node frontend/scripts/verify-calibration.mjs
           node frontend/scripts/verify-ha-shell.mjs
-      - uses: actions/upload-artifact@v4
+          node frontend/scripts/verify-navigation.mjs
+          node frontend/scripts/verify-ai-instructions.mjs
+          node frontend/scripts/verify-irrigation-workspace.mjs
+      - name: Verify parity pages against their mockups
+        # Each serves frontend/dist itself: 1440x1000 and 390x844, demo on the current and the 3.17
+        # integration; the compare files land in output/playwright/parity/.
+        run: |
+          node frontend/scripts/verify-parity-harness.mjs
+          for script in frontend/scripts/verify-parity-*.mjs; do
+            [ "$script" = frontend/scripts/verify-parity-harness.mjs ] && continue
+            echo "::group::$script"
+            node "$script"
+            echo "::endgroup::"
+          done
+      - name: Build Academy catalogue and install the pinned lesson media
+        # The same three commands the Pages deploy runs after merge; here they gate the PR.
+        run: |
+          python scripts/build_course.py
+          python scripts/install_course_media.py
+          python scripts/build_course.py --verify-media
+      - name: Install Google Chrome
+        # The lesson videos are H.264. Playwright's bundled Chromium cannot decode them.
+        working-directory: frontend
+        run: npx playwright install --with-deps chrome
+      - name: Academy browser suites
+        # academy-scene-sync.browser.mjs is not run: it compares the videos with private production
+        # masters (ACADEMY_PRODUCTION) that are kept outside Git. See docs/dev/academy.md.
+        env:
+          BROWSER_CHANNEL: chrome
+        run: |
+          node frontend/node_modules/vite/bin/vite.js preview --outDir www --host 127.0.0.1 --port 8794 &
+          trap 'kill $!' EXIT
+          curl -sf --retry 30 --retry-delay 1 --retry-connrefused http://127.0.0.1:8794/learn/ >/dev/null \
+            || { echo "::error::Academy preview server did not start"; exit 1; }
+          node tests/academy.browser.mjs
+          node tests/academy-navigation.browser.mjs
+          node tests/academy-video.browser.mjs
+          node tests/academy-media.browser.mjs
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: dashboard-browser-evidence
@@ -406,8 +450,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '24'
           cache: npm

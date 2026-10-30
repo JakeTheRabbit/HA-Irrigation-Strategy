@@ -158,6 +158,9 @@ describe("watched entities", () => {
       "sensor.crop_steering_zone_2_jev",
       "sensor.crop_steering_room_b_jev_log",
       "sensor.crop_steering_room_b_zone_1_jev",
+      // Feed calibration's corrected readings: the wizard's proof line reads them once applied.
+      "sensor.crop_steering_feed_ph_corrected",
+      "sensor.crop_steering_room_b_feed_ec_corrected",
     ])
       expect(ids).toContain(id);
     expect(ids).not.toContain("sensor.crop_steering_room_b_zone_2_phase");
@@ -210,6 +213,21 @@ describe("watched entities", () => {
     ])
       expect(ids).toContain(id);
     expect(ids).not.toContain("switch.not_in_ha");
+  });
+  it("includes the flow meters the published supply names, so History › Water & flow's meter line stays live", () => {
+    const ids = watchedEntities({
+      ...home(),
+      ...states(
+        entity("sensor.crop_steering_supply_config", "1", {
+          zone_meters: { "room:room_b_": { "2": "sensor.z2_meter" } },
+          irrigation_pumps: [{ entity_id: "switch.main_pump", flow_meter: "sensor.main_meter" }],
+        }),
+        entity("sensor.z2_meter", "12.5"),
+        entity("sensor.main_meter", "1040.2"),
+      ),
+    });
+    expect(ids).toContain("sensor.z2_meter");
+    expect(ids).toContain("sensor.main_meter");
   });
   it("is empty without crop-steering entities, so nothing subscribes to all of Home Assistant", () => {
     expect(watchedEntities(states(entity("light.kitchen", "on")))).toEqual([]);
@@ -266,19 +284,21 @@ describe("inside Home Assistant", () => {
   function homeAssistant() {
     const ha: States = { ...createDemo(), "light.kitchen": entity("light.kitchen", "on") };
     const calls: string[] = [];
-    const listeners = new Map<string, () => void>();
+    const listeners = new Map<string, Set<() => void>>();
     let push: ((update: EntityUpdate) => void) | undefined;
     const connection = {
       connected: true,
-      subscribeMessage: vi.fn(async (callback: (update: EntityUpdate) => void) => {
-        push = callback;
+      // The crop_steering event feed subscribes too (lib/events.ts); its events are not pushed here.
+      subscribeMessage: vi.fn(async (callback: (update: EntityUpdate) => void, message: { type: string }) => {
+        if (message.type === "subscribe_entities") push = callback;
         return vi.fn();
       }),
       sendMessagePromise: vi.fn(
         async (_message: Record<string, unknown>): Promise<unknown> => ({}),
       ),
-      addEventListener: (event: string, callback: () => void) => listeners.set(event, callback),
-      removeEventListener: (event: string) => listeners.delete(event),
+      addEventListener: (event: string, callback: () => void) =>
+        listeners.set(event, (listeners.get(event) ?? new Set()).add(callback)),
+      removeEventListener: (event: string, callback: () => void) => listeners.get(event)?.delete(callback),
     };
     const session = {
       connection,
@@ -322,7 +342,7 @@ describe("inside Home Assistant", () => {
       connection,
       session,
       push: (update: EntityUpdate) => push!(update),
-      fire: (event: string) => listeners.get(event)?.(),
+      fire: (event: string) => listeners.get(event)?.forEach((callback) => callback()),
       fullFetches: () => calls.filter((call) => call === "GET states").length,
     };
   }
@@ -427,7 +447,9 @@ describe("inside Home Assistant", () => {
     home.fire("ready");
     await vi.advanceTimersByTimeAsync(0);
     expect(home.fullFetches()).toBe(2);
-    expect(home.connection.subscribeMessage).toHaveBeenCalledTimes(2);
+    expect(
+      home.connection.subscribeMessage.mock.calls.filter(([, message]) => message.type === "subscribe_entities"),
+    ).toHaveLength(2);
     expect(store.getSnapshot().connection).toBe("live");
     store.stop();
   });
@@ -442,6 +464,52 @@ describe("inside Home Assistant", () => {
     await vi.advanceTimersByTimeAsync(30_000);
     expect(home.fullFetches()).toBe(2);
     store.stop();
+  });
+  it("subscribes the crop_steering event feed, and ends it on stop, disconnect and connect", async () => {
+    vi.useFakeTimers();
+    const home = homeAssistant();
+    const feeds: { message: Record<string, unknown>; options: unknown; unsubscribe: ReturnType<typeof vi.fn>; push: (event: unknown) => void }[] = [];
+    const subscribe = home.connection.subscribeMessage.getMockImplementation()!;
+    home.connection.subscribeMessage.mockImplementation(async (callback, message, ...rest: unknown[]) => {
+      if (message.type !== "crop_steering/subscribe") return subscribe(callback, message);
+      const unsubscribe = vi.fn();
+      feeds.push({ message, options: rest[0], unsubscribe, push: callback as (event: unknown) => void });
+      return unsubscribe;
+    });
+    const run = async (end: (store: ControllerStore) => unknown) => {
+      const store = new ControllerStore(false);
+      store.start();
+      await vi.advanceTimersByTimeAsync(0);
+      const feed = feeds.at(-1)!;
+      return { store, feed, end: async () => { await end(store); await vi.advanceTimersByTimeAsync(0); } };
+    };
+
+    const first = await run((store) => store.stop());
+    const rooms = first.store.getSnapshot().rooms.map((room) => room.id).sort();
+    expect(feeds).toHaveLength(1);
+    expect(first.feed.message).toEqual({ type: "crop_steering/subscribe", rooms });
+    expect(first.feed.options).toEqual({ resubscribe: false });
+    const event = { v: 1, id: "01JEVENT", ts: new Date().toISOString(), room_id: rooms[0], zone: 1, kind: "shot.completed",
+      outcome: "ok", code: null, source: { actor: "engine" }, data: {} };
+    first.feed.push(event);
+    expect(first.store.getSnapshot().recentEvents).toEqual([event]);
+    // A write's refresh keeps the same feed.
+    await first.store.refresh();
+    expect(feeds).toHaveLength(1);
+    await first.end();
+    expect(first.feed.unsubscribe).toHaveBeenCalledTimes(1);
+
+    const second = await run((store) => store.disconnect());
+    await second.end();
+    expect(second.feed.unsubscribe).toHaveBeenCalledTimes(1);
+    second.store.stop();
+
+    const third = await run((store) => store.connect("http://other.test", "token"));
+    third.feed.push(event);
+    await third.end();
+    expect(third.feed.unsubscribe).toHaveBeenCalledTimes(1);
+    expect(third.store.getSnapshot().recentEvents).toEqual([]);
+    third.store.stop();
   });
   const DECISION = "sensor.crop_steering_current_decision";
   const VALVE = "switch.demo_valve_1";
@@ -532,6 +600,7 @@ describe("inside Home Assistant", () => {
       statistic_ids: [WATER],
       period: "hour",
       types: ["state"],
+      units: { volume: "L" },
     });
     expect(home.calls).toEqual([]);
     store.stop();

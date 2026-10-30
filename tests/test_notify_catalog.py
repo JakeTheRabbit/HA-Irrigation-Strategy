@@ -60,6 +60,7 @@ def test_the_table_is_the_contracts():
         "jev_setpoint": "jev",
     }
     assert set(_kind("hardware")) == {f"CS-30{n}" for n in range(1, 10)} | {
+        "CS-214",
         "CS-310",
         "CS-311",
         "CS-312",
@@ -67,6 +68,8 @@ def test_the_table_is_the_contracts():
         "CS-315",
         "CS-316",
         "CS-317",
+        "CS-318",
+        "CS-319",
         "CS-314",
         "CS-701",
         "CS-710",

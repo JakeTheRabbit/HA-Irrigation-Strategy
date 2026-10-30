@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Phone: calibrate pH</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#4fc3f7;text-decoration:none}a:hover{color:#b3e5fc}
+</style>
+</helmet>
+<!-- SHELL: 390x844 frame. Tokens: canvas #111111, surface #1c1c1c, raised #232323, border #2e2e2e, text #e1e1e1, muted #a4a4a4, faint #8a8a8a, primary #03a9f4, link #4fc3f7, success #81c995, warning #ffca5b, danger #f28b82. Phase P0 #6b7580, P1 #2f6fb5, P2 #6450b0, P3 #34405a. Font Roboto; sizes 12/14/15/17/20/24. Radius 12. -->
+<div style="width: 390px; height: 844px; position: relative; box-sizing: border-box; background: #111111; color: #e1e1e1; font-family: Roboto, Arial, sans-serif; overflow: hidden">
+<header style="position: absolute; left: 0; right: 0; top: 0; height: 60px; border-bottom: 1px solid #2e2e2e; background: #1c1c1c; display: flex; align-items: center; gap: 8px; padding: 0 8px 0 4px">
+<button type="button" aria-label="Open menu" style="width: 48px; height: 48px; border: 0; background: transparent; color: #e1e1e1; display: flex; align-items: center; justify-content: center"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="4" y1="7" x2="20" y2="7"></line><line x1="4" y1="12" x2="20" y2="12"></line><line x1="4" y1="17" x2="20" y2="17"></line></svg></button>
+<span style="display: flex; flex-direction: column; min-width: 0"><b style="font-size: 17px; font-weight: 600">{{title}}</b><span style="font-size: 12px; color: #a4a4a4">Equipment · step {{step}} of 5 · dosing paused</span></span>
+<a href="E2-Dosing.dc.html" aria-label="Leave calibration" style="margin-left: auto; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; color: #b8b8b8"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><line x1="6" y1="6" x2="18" y2="18"></line><line x1="18" y1="6" x2="6" y2="18"></line></svg></a>
+</header>
+
+<main style="position: absolute; left: 0; right: 0; top: 60px; bottom: 68px; box-sizing: border-box; padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 14px">
+<div aria-hidden="true" style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px"><sc-for list="{{dots}}" as="d" hint-placeholder-count="5"><span style="height: 5px; border-radius: 3px; background: {{d.c}}"></span></sc-for></div>
+<h1 style="margin: 0; font-size: 22px; font-weight: 600">{{stepTitle}}</h1>
+
+<sc-if value="{{is1}}" hint-placeholder-val="{{false}}">
+<div role="radiogroup" aria-label="Probe" style="display: flex; flex-direction: column; gap: 10px">
+<sc-for list="{{probes}}" as="p" hint-placeholder-count="2"><button type="button" role="radio" aria-checked="{{p.on}}" onClick="{{p.pick}}" style="{{p.style}}"><b style="font-size: 18px; font-weight: 600">{{p.name}}</b><span style="font-size: 14px; color: #b8b8b8">Reads {{p.now}} raw · calibrated {{p.cal}}</span><span style="font-size: 14px; color: {{p.dueInk}}">{{p.due}}</span></button></sc-for>
+</div>
+<p style="margin: 0; font-size: 15px; line-height: 1.5; color: #b8b8b8">You need the two buffers, clean water and a tissue. About 10 minutes.</p>
+</sc-if>
+
+<sc-if value="{{isPoint}}" hint-placeholder-val="{{true}}">
+<p style="margin: 0; font-size: 15px; line-height: 1.45; color: #e1e1e1">{{pointHelp}}</p>
+<div role="status" aria-label="{{stabTxt}}" style="position: relative; align-self: center; width: 280px; height: 280px">
+<svg width="280" height="280" viewBox="0 0 280 280" aria-hidden="true" style="position: absolute; left: 0; top: 0">
+<circle cx="140" cy="140" r="124" fill="#1c1c1c" stroke="#2e2e2e" stroke-width="16"></circle>
+<circle cx="140" cy="140" r="124" fill="none" stroke="{{stabInk}}" stroke-width="16" stroke-linecap="round" stroke-dasharray="779.1" stroke-dashoffset="{{ringOff}}" transform="rotate(-90 140 140)"></circle>
+</svg>
+<span style="position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px">
+<span style="font-size: 14px; color: #a4a4a4">{{unit}} in {{bufTxt}} buffer</span>
+<b style="font-size: 76px; line-height: 1; font-weight: 600; letter-spacing: -1px">{{live}}</b>
+<span style="font-size: 17px; font-weight: 600; color: {{stabInk}}">{{stabShort}}</span>
+</span>
+</div>
+<span style="text-align: center; font-size: 14px; color: #b8b8b8">{{stabTxt}} · 21.3 °C</span>
+</sc-if>
+
+<sc-if value="{{is4}}" hint-placeholder-val="{{false}}">
+<span style="align-self: flex-start; display: flex; align-items: center; height: 40px; padding: 0 18px; border-radius: 20px; border: 2px solid {{gradeInk}}; background: {{gradeBg}}; color: {{gradeInk}}; font-size: 18px; font-weight: 700">{{grade}}</span>
+<span style="font-size: 15px; line-height: 1.5">{{gradeTxt}}</span>
+<div style="display: flex; flex-direction: column; gap: 6px; padding: 14px; border-radius: 12px; background: #1c1c1c">
+<span style="display: flex; justify-content: space-between; font-size: 15px"><span style="color: #a4a4a4">Slope</span><b style="font-weight: 600">{{slope}}</b></span>
+<span style="position: relative; height: 12px; border-radius: 6px; background: #333333"><span style="position: absolute; top: 0; bottom: 0; left: 33.3%; width: 33.3%; background: rgba(129,201,149,.45)"></span><span style="position: absolute; top: -6px; bottom: -6px; left: {{sTick}}; width: 4px; border-radius: 2px; background: #e1e1e1"></span></span>
+<span style="display: flex; justify-content: space-between; font-size: 15px; margin-top: 10px"><span style="color: #a4a4a4">Offset</span><b style="font-weight: 600">{{offset}}</b></span>
+<span style="position: relative; height: 12px; border-radius: 6px; background: #333333"><span style="position: absolute; top: 0; bottom: 0; left: 25%; width: 50%; background: rgba(129,201,149,.45)"></span><span style="position: absolute; top: -6px; bottom: -6px; left: {{oTick}}; width: 4px; border-radius: 2px; background: #e1e1e1"></span></span>
+<span style="font-size: 12px; color: #a4a4a4; margin-top: 6px">Green = pass. Points: {{pointsTxt}}</span>
+</div>
+</sc-if>
+
+<sc-if value="{{is5}}" hint-placeholder-val="{{false}}">
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px">
+<span style="display: flex; flex-direction: column; gap: 2px; padding: 14px; border-radius: 12px; background: #1c1c1c"><span style="font-size: 13px; color: #a4a4a4">Raw</span><b style="font-size: 40px; font-weight: 600; color: #b8b8b8">{{rawNow}}</b></span>
+<span style="display: flex; flex-direction: column; gap: 2px; padding: 14px; border-radius: 12px; background: #14212a; border: 1px solid #03a9f4"><span style="font-size: 13px; color: #b8b8b8">Corrected</span><b style="font-size: 40px; font-weight: 600; color: #4fc3f7">{{corNow}}</b></span>
+</div>
+<span style="font-size: 14px; line-height: 1.5; color: #b8b8b8">The mix check and pH auto-correct will use the corrected value. Raw stays recorded.</span>
+<sc-if value="{{applied}}" hint-placeholder-val="{{false}}"><div role="status" style="display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border: 1px solid rgba(129,201,149,.5); border-radius: 12px; background: rgba(129,201,149,.08); font-size: 15px"><span style="display: flex; align-items: center; gap: 8px; font-weight: 600"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#81c995" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: none"><polyline points="4 12 10 18 20 6"></polyline></svg>Written and read back 14:06</span><span>Next calibration due <b>21 Nov</b>, in 30 days.</span></div></sc-if>
+</sc-if>
+
+<div style="margin-top: auto; display: flex; gap: 10px">
+<button type="button" onClick="{{back}}" aria-label="Back" aria-disabled="{{backOff}}" style="flex: none; width: 56px; height: 56px; border: 1px solid #3a3a3a; border-radius: 12px; background: transparent; color: {{backInk}}; display: flex; align-items: center; justify-content: center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 5 8 12 15 19"></polyline></svg></button>
+<button type="button" onClick="{{primary}}" aria-disabled="{{primaryOff}}" style="flex: 1; height: 56px; border: 0; border-radius: 12px; background: {{primaryBg}}; color: {{primaryInk}}; font: inherit; font-size: 17px; font-weight: 600">{{primaryLabel}}</button>
+</div>
+</main>
+<nav aria-label="Main navigation" style="position: absolute; left: 0; right: 0; bottom: 0; height: 68px; border-top: 1px solid #2e2e2e; background: #1c1c1c; display: grid; grid-template-columns: repeat(5, 1fr)">
+<a href="P1-AllRooms.dc.html" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; color: #a4a4a4; font-size: 11px; font-weight: 500"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>Status</a>
+<a href="I1-Timeline.dc.html" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; color: #a4a4a4; font-size: 11px; font-weight: 500"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.7l5.7 5.7a8 8 0 1 1-11.3 0z"></path></svg>Irrigation</a>
+<a href="H1-Explorer.dc.html" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; color: #a4a4a4; font-size: 11px; font-weight: 500"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><polyline points="12 7 12 12 15 14"></polyline></svg>History</a>
+<a href="E1-Probes.dc.html" aria-current="page" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; color: #4fc3f7; font-size: 11px; font-weight: 700; box-shadow: inset 0 2px 0 #03a9f4; background: #232323"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"></path></svg>Equipment</a>
+<a href="T1-AlertRules.dc.html" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; color: #a4a4a4; font-size: 11px; font-weight: 500"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="4" y1="7" x2="20" y2="7"></line><line x1="4" y1="17" x2="20" y2="17"></line><circle cx="9" cy="7" r="2.5"></circle><circle cx="15" cy="17" r="2.5"></circle></svg>Settings</a>
+</nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+var KIND = {
+  ph: { label: 'pH', unit: 'pH', b: [7.00, 4.00], read: [7.12, 4.21], short: ['7.00', '4.00'], pass: [95, 105, 0.30], drift: [90, 110, 0.50], offMax: 0.6, sR: [85, 115], start: 5.96 },
+  ec: { label: 'EC', unit: 'mS/cm', b: [1.413, 2.77], read: [1.36, 2.66], short: ['1.413', '2.77'], pass: [90, 110, 0.10], drift: [85, 115, 0.20], offMax: 0.2, sR: [80, 120], start: 2.31 }
+};
+var PROBES = [
+  { id: 'ph', name: 'F2 feed pH', now: 5.96, cal: '22 Sep', due: 'Due today', dueInk: '#ffca5b' },
+  { id: 'ec', name: 'F2 feed EC', now: 2.31, cal: '13 Oct', due: 'Due in 21 days', dueInk: '#a4a4a4' }
+];
+function rawAt(K, point, t) {
+  var target = K.read[point], start = point === 0 ? K.start : K.read[0];
+  return target + (start - target) * Math.exp(-t / 5) + 0.04 * Math.exp(-t / 9) * Math.sin(t * 1.7) + 0.002 * Math.sin(t * 2.3);
+}
+function pos(v, lo, hi) { return Math.max(0, Math.min(99, (v - lo) / (hi - lo) * 100)).toFixed(1) + '%'; }
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { step: 2, probe: 'ph', t: 0, stable: 0, live: null, cap: [null, null], applied: false }; }
+  startSim(point) {
+    var self = this, prev = null;
+    this._booted = true;
+    clearInterval(this._sim);
+    this.setState({ t: 0, stable: 0, live: null });
+    this._sim = setInterval(function () {
+      var st = self.state, K = KIND[st.probe], t = st.t + 1, v = rawAt(K, point, t);
+      var stable = prev !== null && Math.abs(v - prev) < 0.01 ? st.stable + 1 : 0;
+      prev = v;
+      self.setState({ t: t, stable: stable, live: v });
+      if (stable >= 40) clearInterval(self._sim);
+    }, 110);
+  }
+  renderVals() {
+    var self = this, st = this.state, K = KIND[st.probe], P = PROBES.filter(function (p) { return p.id === st.probe; })[0];
+    function set(p) { self.setState(p); }
+    var isPoint = st.step === 2 || st.step === 3, point = st.step === 3 ? 1 : 0;
+    if (isPoint && !this._booted) { this._booted = true; setTimeout(function () { self.startSim(point); }, 300); }
+    var live = st.live !== null ? st.live : rawAt(K, point, 0), captured = isPoint && st.cap[point] !== null, ready = st.stable >= 30;
+    var c1 = st.cap[0] !== null ? st.cap[0] : K.read[0], c2 = st.cap[1] !== null ? st.cap[1] : K.read[1];
+    var slope = (c1 - c2) / (K.b[0] - K.b[1]) * 100, off = c1 - K.b[0];
+    var grade = slope >= K.pass[0] && slope <= K.pass[1] && Math.abs(off) <= K.pass[2] ? 'Pass' : slope >= K.drift[0] && slope <= K.drift[1] && Math.abs(off) <= K.drift[2] ? 'Drift' : 'Fail';
+    var cor = K.b[0] + (P.now - c1) * (K.b[0] - K.b[1]) / (c1 - c2);
+    var stabInk = captured || ready ? '#81c995' : st.stable > 0 ? '#03a9f4' : '#ffca5b';
+    var GR = { Pass: ['#81c995', 'rgba(129,201,149,.16)'], Drift: ['#ffca5b', 'rgba(255,202,91,.16)'], Fail: ['#f28b82', 'rgba(242,139,130,.16)'] };
+    var prim;
+    if (st.step === 1) prim = ['Next: probe in ' + K.short[0], true, function () { set({ step: 2 }); self.startSim(0); }];
+    else if (isPoint && !captured) prim = [ready ? 'Capture ' + K.short[point] + ' point' : 'Waiting for a steady reading', ready, function () { clearInterval(self._sim); var c = st.cap.slice(); c[point] = Math.round(live * 100) / 100; set({ cap: c }); }];
+    else if (isPoint) prim = [point === 0 ? 'Next: rinse, into ' + K.short[1] : 'Next: see the result', true, function () { if (point === 0) { set({ step: 3 }); self.startSim(1); } else set({ step: 4 }); }];
+    else if (st.step === 4) prim = ['Next: review the correction', grade !== 'Fail', function () { set({ step: 5 }); }];
+    else prim = st.applied ? ['Revert to raw', true, function () { set({ applied: false }); }] : ['Apply correction', true, function () { set({ applied: true }); }];
+    return {
+      title: 'Calibrate ' + P.name, step: st.step,
+      stepTitle: ['Which probe?', 'Buffer ' + K.short[0], 'Buffer ' + K.short[1], 'Result', 'Apply the correction'][st.step - 1],
+      dots: [1, 2, 3, 4, 5].map(function (n) { return { c: n < st.step || (n === 5 && st.applied) ? '#03a9f4' : n === st.step ? '#4fc3f7' : '#3a3a3a' }; }),
+      is1: st.step === 1, isPoint: isPoint, is4: st.step === 4, is5: st.step === 5,
+      probes: PROBES.map(function (p) { var on = p.id === st.probe; return { name: p.name, now: p.now.toFixed(2), cal: p.cal, due: p.due, dueInk: p.dueInk, on: on ? 'true' : 'false', pick: function () { set({ probe: p.id, cap: [null, null], applied: false }); },
+        style: 'display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-height: 88px; padding: 14px 16px; text-align: left; border-radius: 12px; border: ' + (on ? '2px solid #03a9f4' : '1px solid #3a3a3a') + '; background: ' + (on ? '#14212a' : '#1c1c1c') + '; color: #e1e1e1; font: inherit' }; }),
+      pointHelp: point === 0 ? 'Rinse the probe, dab it dry, stand it in the ' + K.short[0] + ' buffer and leave it still.' : 'Rinse the probe again, dab it dry, stand it in the ' + K.short[1] + ' buffer.',
+      unit: K.unit, bufTxt: K.short[point], live: (captured ? st.cap[point] : live).toFixed(2),
+      stabInk: stabInk, ringOff: (779.1 * (1 - (captured ? 1 : Math.min(1, st.stable / 30)))).toFixed(1),
+      stabShort: captured ? 'Captured' : ready ? 'Stable' : st.stable > 0 ? 'Stable ' + st.stable + ' s' : 'Settling…',
+      stabTxt: captured ? 'Captured ' + st.cap[point].toFixed(2) + ' at 14:0' + (3 + point) : ready ? 'Steady for 30 s, ready to capture' : st.stable > 0 ? 'Needs 30 s steady, ' + (30 - st.stable) + ' s to go' : 'Reading is still moving',
+      grade: grade, gradeInk: GR[grade][0], gradeBg: GR[grade][1],
+      gradeTxt: grade === 'Pass' ? 'The probe is healthy. Apply the correction.' : grade === 'Drift' ? 'Usable. Clean the probe and calibrate again within 7 days.' : 'Do not apply. Clean or replace the probe and start again.',
+      slope: slope.toFixed(1) + '%', offset: (off >= 0 ? '+' : '−') + Math.abs(off).toFixed(2),
+      sTick: pos(slope, K.sR[0], K.sR[1]), oTick: pos(off, -K.offMax, K.offMax), pointsTxt: K.short[0] + ' read ' + c1.toFixed(2) + ', ' + K.short[1] + ' read ' + c2.toFixed(2),
+      rawNow: P.now.toFixed(2), corNow: cor.toFixed(2), applied: st.applied,
+      back: function () { if (st.step === 1) return; clearInterval(self._sim); var s = st.step - 1; set({ step: s }); if ((s === 2 || s === 3) && st.cap[s - 2] === null) self.startSim(s - 2); },
+      backOff: st.step === 1 ? 'true' : 'false', backInk: st.step === 1 ? '#5a5a5a' : '#e1e1e1',
+      primaryLabel: prim[0], primaryOff: prim[1] ? 'false' : 'true', primaryBg: prim[1] ? (st.applied ? '#232323' : '#03a9f4') : '#2a2a2a', primaryInk: prim[1] ? (st.applied ? '#4fc3f7' : '#0b1d27') : '#a4a4a4',
+      primary: function () { if (prim[1]) prim[2](); }
+    };
+  }
+}
+</script>
+</body>
+</html>

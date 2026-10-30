@@ -1,6 +1,7 @@
 import { roomDurationCapEntityId } from "./model";
 import type { RoomView, Setting, States } from "./types";
 import type { PlanningBounds } from "./planning-curve";
+import { unreadableState } from "./utils";
 
 export type PreviewDrafts = Record<string, { value: string }>;
 export interface SetpointCurveState {
@@ -134,10 +135,10 @@ export function buildSetpointPreview(
       return null;
     }
     let raw = draft?.value ?? choice?.value ?? states[id]?.state;
-    if (!raw || ["unknown", "unavailable"].includes(raw))
+    if (unreadableState(raw))
       raw = states[`select.${root}growth_stage`]?.state;
     // The engine reads zone steering_mode, then legacy growth_stage, not room steering_mode.
-    if (!raw || ["unknown", "unavailable"].includes(raw)) return null;
+    if (!raw || unreadableState(raw)) return null;
     if (raw.toLowerCase().startsWith("veg")) return "Vegetative";
     if (
       raw.toLowerCase().startsWith("gen") ||

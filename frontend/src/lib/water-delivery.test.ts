@@ -117,15 +117,13 @@ describe("runtime water estimates", () => {
 describe("daily controller estimates", () => {
   it("divides the all-plant zone total and preserves a known zero", () => {
     expect(dailyWater(zone(5.6), 42).mlPerPlant).toBeCloseTo(133.3333333);
-    expect(dailyWater(zone(5600, "mL"), 42).mlPerPlant).toBeCloseTo(133.3333333);
     expect(dailyWater(zone(0), 42)).toEqual({ zoneL: 0, plants: 42, mlPerPlant: 0 });
   });
-  it("never turns unknown delivery/count or unsupported units into zero", () => {
+  it("never turns unknown delivery or count into zero", () => {
     for (const value of [null, NaN, -1, Infinity])
       expect(dailyWater(zone(value), 42).mlPerPlant).toBeNull();
     for (const plants of [null, 0, -1, 1.5, Infinity])
       expect(dailyWater(zone(5.6), plants).mlPerPlant).toBeNull();
-    expect(dailyWater(zone(5.6, "gal"), 42).zoneL).toBeNull();
   });
 });
 
@@ -192,7 +190,10 @@ it("every demo zone has explicit usable runtime and P1 budget inputs", () => {
       const parameters = waterParameters(c, zone.id);
       expect(estimatePercent(parameters, parameters.p1_initial_shot_size).effective).not.toBeNull();
       expect(p1WaterBudget(parameters)).not.toBeNull();
-      expect(dailyWater(zone, parameters.plant_count).mlPerPlant).toBeGreaterThan(0);
+      // A paused zone (Room B zone 3) drank nothing today; its reading is still usable.
+      const ml = dailyWater(zone, parameters.plant_count).mlPerPlant;
+      if (zone.enabled === false) expect(ml).toBe(0);
+      else expect(ml).toBeGreaterThan(0);
     }
   }
 });

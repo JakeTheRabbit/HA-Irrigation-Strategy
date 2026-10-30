@@ -247,8 +247,9 @@ def engine_facts(doc, paths):
          phase(phase="P3", lights_just_on=True) == "P0" and phase(phase="P3", new_grow_day=True) == "P0"),
         ("PH-3", "A zone still in P1 or P2 when a new grow-day begins resets to P0 with fresh counters and budget.",
          phase(phase="P2", new_grow_day=True) == "P0" and phase(phase="P1", new_grow_day=True) == "P0"),
-        ("PH-4", "P0 ends on VWC at or below re-water, the drop since lights-on at p0_additional_dryback when positive (otherwise dryback_target), or its maximum wait. A positive additional setting replaces the target; it is not summed.",
-         phase(phase="P0", vwc=45) == "P1" and phase(phase="P0", vwc=50, dryback_pct=20) == "P1"
+        ("PH-4", "P0 ends on VWC at or below the rescue floor (p3_emergency_floor), the drop since lights-on at p0_additional_dryback when positive (otherwise dryback_target), or its maximum wait. Under the re-water threshold alone it keeps waiting. A positive additional setting replaces the target; it is not summed.",
+         phase(phase="P0", vwc=40) == "P1" and phase(phase="P0", vwc=45) == "P0"
+         and phase(phase="P0", vwc=50, dryback_pct=20) == "P1"
          and phase(phase="P0", vwc=50, phase_minutes=45) == "P1" and phase(phase="P0", vwc=50) == "P0"),
         ("PH-5", "P1 ends on maximum shots, a trusted below-target stall after minimum shots and the interval, the extra-shot cap at target, budget spent at target, or the settled-rise test after an extra shot. The needed rise is p1_rise_pts or 30% of learned expected gain, whichever is greater. A stalled day re-waters below its achieved reading.",
          phase(phase="P1", vwc=50, shot_count=12) == "P2"
@@ -352,20 +353,23 @@ def engine_facts(doc, paths):
         ("CT-2", "EC steer (only with EC stacking on, in P2, every 30 min, on the settled EC): step the offset toward +1 when EC > 110% of the P2 target, toward -1 when < 90%, else toward 0, within +/-20% of the base threshold. An optional PID replaces the step.",
          "ec_smooth < ec_target_p2 * 0.90" in ctrl and "ec_smooth > ec_target_p2 * 1.10" in ctrl and "0.20 * base" in ctrl and "p.stacking_on" in ctrl),
         ("CT-3", "At lights-on (P0) the day's counters, peak, EC offset and PID integral reset.",
-         'st["daily_vol"], st["shots"], st["peak"] = 0.0, 0, snap.vwc' in ctrl and 'st["ec_offset"], st["last_ec_steer"] = 0.0, None' in ctrl),
+         'st["daily_vol"], st["shots"] = 0.0, 0' in ctrl and 'st["peak"] = snap.vwc if snap is not None else 0.0' in ctrl and 'st["ec_offset"], st["last_ec_steer"] = 0.0, None' in ctrl),
         ("CT-4", "Relative dryback the engine compares: (peak - vwc) / peak x 100. The peak restarts at the lights-on reading when the zone enters P0 and then follows the highest reading of the grow-day, so in P0 the figure is the drop since lights-on and later in the day it is the drop from the day's peak.",
          '(st["peak"] - vwc) / st["peak"] * 100' in ctrl and 'if vwc > st["peak"]:' in ctrl
-         and 'st["daily_vol"], st["shots"], st["peak"] = 0.0, 0, snap.vwc' in ctrl),
-        ("CT-5", "Dead or set-aside probe: after a 15 min grace the zone copies the healthiest sibling's shot (closest p1_target) or, with no sibling, waters every blind_fallback_min (default 90) within its own budget; VWC-driven phase changes wait; the lights' edges, the P0 maximum wait (p0_max_wait_min) and the P1 maximum shots still move it.",
+         and 'st["daily_vol"], st["shots"] = 0.0, 0' in ctrl and 'st["peak"] = snap.vwc if snap is not None else 0.0' in ctrl),
+        ("CT-5", "Dead or set-aside probe: after a 15 min grace the zone copies the healthiest sibling's shot (closest p1_target) or, with no sibling, waters every blind_fallback_min (default 90) in P1 and P2 with the lights on, within its own budget; the minimum daily floor (CT-9) needs no probe and waters it too, with the lights on and past P0, when no other shot fires; VWC-driven phase changes wait; the lights' edges, the P0 maximum wait (p0_max_wait_min) and the P1 maximum shots still move it.",
          "BLIND_GRACE_MIN = 15" in ctrl and 'o.get("blind_fallback_min", 90)' in ctrl
+         and '"(no live probe)", "min_daily"' in ctrl
          and 'st["phase"] == "P0" and waited >= p.p0_max_wait_min' in ctrl
          and 'st["phase"] == "P1" and st["shots"] >= p.p1_max_shots' in ctrl),
         ("CT-6", "Source-water gate, two halves (feed EC, feed pH), each only when its feed sensor is configured and its band is set (feed sensors default to empty): a feed outside its band holds the zone; a dead feed probe holds after feed_grace_min (default 30). External holds apply only when configured (none by default). Offline pump or valve switches hold too.",
          'o.get("feed_grace_min", 30)' in ctrl and "holding (fail-closed)" in ctrl
          and "if room.feed_ec_sensor:" in ctrl and "if room.feed_ph_sensor:" in ctrl and "if lo > 0 or hi > 0:" in ctrl),
         ("CT-7", "SIGTERM closes whatever is in flight, saves state and exits.", "signal.SIGTERM" in ctrl),
-        ("CT-8", f"With no live feed EC reading (no feed EC sensor, or its last good reading older than feed_grace_min) the controller uses declared recipe EC when available, otherwise hands decide() an assumed feed EC of {core.ZoneSnapshot.__dataclass_fields__['feed_ec'].default:.1f} mS/cm, not a measurement, for the dilution comparison. Recipe EC and fallback EC are not measurements.",
-         "feed_ec=(feed_ec if feed_ec is not None else 3.0)" in ctrl and core.ZoneSnapshot.__dataclass_fields__["feed_ec"].default == 3.0),
+        ("CT-8", "With no live feed EC reading (no feed EC sensor, or its last good reading older than feed_grace_min) the controller uses declared recipe EC when available, otherwise hands decide() no feed EC: the feed is unknown, so decide() takes no EC flush or dilute and no feed-not-dilutive hold (CS-206) and waters the zone on its moisture. Recipe EC is not a measurement.",
+         "feed_ec=feed_ec," in ctrl and "else 3.0" not in ctrl
+         and run({"ec": 10.0, "feed_ec": None})[4].kind not in ("flush_high_ec", "block_high_ec")
+         and run({"ec": 10.0, "feed_ec": None, "vwc": 40})[4].kind == "p2_topup"),
         ("CT-9", "The minimum daily floor is each zone's Min Daily Water Per Plant setting (min_daily_ml_per_plant, mL per plant per grow-day; an integration older than the setting has only the hand-made helper of the same name, read in its place) times the zone's plant count, defaulting to 0: a fresh install runs with the floor off. Its VWC ceiling is field capacity plus a margin, inside 50-100.",
          re.search(r'"min_daily_ml_per_plant",\s*self\._num\(f"[^"]*zone_\{zone\}_min_daily_ml_per_plant", 0\.0\)', ctrl) is not None
          and 'min_daily_key = f"zone_{zone_num}_min_daily_ml_per_plant"' in nums

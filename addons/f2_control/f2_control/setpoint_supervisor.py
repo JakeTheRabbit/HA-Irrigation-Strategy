@@ -2,10 +2,9 @@
 own shots trace the reference curve. It never fires a shot - it only proposes setpoint writes. Pure, no I/O.
 
 Why setpoints have to move during the day (from the engine's actual rules):
-  * P0 is skipped whenever VWC <= the P2 threshold. After any real overnight dryback that is always
-    true, so "transpiration before irrigation" never happens. Holding the threshold BELOW the zone
-    overnight and through P0 gives a real P0, which then ends on Athena's 1-5% additional dryback
-    (the engine measures P0 dryback from the lights-on reading) or on the wait timeout.
+  * P0 is bypassed only at or below the rescue floor (p3_emergency_floor; before #195 it was the P2
+    threshold, which skipped P0 after every real overnight dryback). Otherwise P0 ends on Athena's 1-5%
+    additional dryback (the engine measures P0 dryback from the lights-on reading) or on the wait timeout.
   * P1 only graduates at its target. A target above what the probe can read burns every ramp shot
     into runoff, so the target follows the zone's own saturation knee.
   * P2 tops up under its threshold until lights-off. Dropping the threshold at the planned stop time

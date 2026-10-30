@@ -1,8 +1,8 @@
 # Crop Steering Academy
 
-The [R4 rebuild record](training/crop-steering-from-zero/COURSE-REBUILD-2026-10-20-R4.md) tracks the current rewrite, media build and checks; the [R4 writing guide](training/crop-steering-from-zero/R4-WRITING-GUIDE.md) holds the scaffolding rules and term ledger every lesson follows. The [R3 rebuild record](training/crop-steering-from-zero/COURSE-REBUILD-2026-10-19-R3.md), [R2 pilot repair](training/crop-steering-from-zero/PILOT-REPAIR-2026-10-19.md) and [original delivery record](training/crop-steering-from-zero/DELIVERY-2026-10-19.md) are historical records of earlier editions.
+**A practical introduction for someone who has never used a moisture sensor or an irrigation controller.**
 
-[Open the academy](https://jaketherabbit.github.io/HA-Irrigation-Strategy/learn/) · [Try the isolated software demo](https://jaketherabbit.github.io/HA-Irrigation-Strategy/dashboard.html?demo=1) · [Course plan and workbook](training/crop-steering-from-zero/README.md)
+[Open the academy](https://jaketherabbit.github.io/HA-Irrigation-Strategy/learn/) · [Try the isolated software demo](https://jaketherabbit.github.io/HA-Irrigation-Strategy/dashboard.html?demo=1) · [Course plan and workbook](#the-supporting-pack)
 
 The academy teaches a beginner to explain a reading, understand a watering day and check what a Crop Steering action changes. It contains **24 lessons and 153 slides**. R3 includes a captioned 480p video for every lesson. Its five introductory paragraph-led lessons use 108 matched visual cards; the other 19 use 126 lesson-specific scenes. The R3 rebuild record contains the measured media checks and publication status. Five longer, chaptered parts combine related lessons, with separate alternative Pi and x86 setup parts. The public learning exercises do not connect to Home Assistant or operate equipment.
 
@@ -16,13 +16,15 @@ Start with water, roots and air. Continue through VWC, capacity, dryback, EC and
 | Build with Raspberry Pi | A1–A6 → B1–B4 → C1 → C2a → C3–C7 → D1–D6 | 23 |
 | Build with dedicated x86-64 | A1–A6 → B1–B4 → C1 → C2b → C3–C7 → D1–D6 | 23 |
 
-C2a and C2b are alternatives. Existing suitable Home Assistant installations need not be erased or reinstalled for the course. Operators can study the software in the demo before local handover; independent live operation still requires that handover and verified commissioning evidence. Builders should prove one zone before expanding.
+C2a and C2b are alternatives. Existing suitable Home Assistant installations need not be erased or reinstalled for the course. Operators can study the software in the demo before local handover; independent live operation still requires that handover and verified commissioning evidence. Real operators also need a competent local handover covering the room/zone labels, physical shutdown and commissioning evidence. A demo can teach the interface before that handover, but cannot prove physical readiness. Builders should prove one zone before expanding.
 
 Use several sessions and return to the exercises. Installation, measurement and local supervision take additional time; an online lesson count is not a physical-work deadline. The [course plan](training/crop-steering-from-zero/COURSE-PLAN.md) describes the gates, and the [equipment guide](training/crop-steering-from-zero/EQUIPMENT-AND-SETUP.md) gives the compatibility record and staged commissioning sequence.
 
 ## Learn, practise and return
 
 Each lesson is one screen that never needs page scrolling, on a phone or a desktop. It runs as a sequence of steps: an introduction, then one step per section, then a practice task, then one knowledge-check question per screen and a result. On each section step the video plays only that section and pauses at its end. Beside it (below it on a phone) are the section's key points, any worked example and a **quick check** question. Continue unlocks once the check is answered correctly; after two wrong tries the answer is shown with its explanation, so nobody gets stuck. Every term is explained in plain words before the course relies on it, following the [term ledger](training/crop-steering-from-zero/R4-WRITING-GUIDE.md). Operators skip the setup lessons, so daily-operation lessons re-explain any setup term they use. The practice bench provides dryback and delivery calculations and a synthetic threshold graph whose recorded example observations do not move when a reference changes.
+
+The lesson pattern is explanation, worked example, partly supported practice, independent practice and explanatory quiz feedback. Recall earlier ideas before revealing the answer, then revisit them after a delay.
 
 This design draws on the IES practice guide [Organizing Instruction and Study to Improve Student Learning](https://ies.ed.gov/ncee/wwc/PracticeGuide/1), including worked examples, graphics with explanations, retrieval and spaced study. The academy's particular sequence and review intervals are design choices. **No learner outcome trial has been conducted**, so this release does not establish that the course improves competence or retention.
 
@@ -68,48 +70,14 @@ R4 uses synthetic speech generated locally for all 24 lessons with [Kokoro ONNX]
 
 **Human listening review has not been performed.** File validation, caption generation and browser playback checks do not establish pronunciation, pacing or instructional quality. The course also has no completed learner outcome trial. These remain explicit review tasks when assessing a later edition.
 
-## Editable sources and local development
+## The supporting pack
 
-The academy is a static site under [www/learn](../www/learn/). Edit lesson modules in [course/modules](../www/learn/course/modules/), glossary entries in [glossary.json](../www/learn/course/glossary.json), diagrams in [visuals.mjs](../www/learn/visuals.mjs), and practice behaviour in [labs.mjs](../www/learn/labs.mjs) and [practice.mjs](../www/learn/practice.mjs). Lesson text, correct-answer feedback, example values and diagram captions must agree. Keep physical evidence separate from online progress.
+| Resource | Purpose |
+| --- | --- |
+| [Course plan](training/crop-steering-from-zero/COURSE-PLAN.md) | Current four-module sequence, outcomes, practice and evidence gates; original production intentions are labelled historical |
+| [Equipment and setup](training/crop-steering-from-zero/EQUIPMENT-AND-SETUP.md) | Functional kit, compatibility sheet, water/control paths and staged commissioning |
+| [Learner workbook](training/crop-steering-from-zero/WORKBOOK.md) | Glossary, calculations, graph exercises, setup record, daily routine and explained answers |
+| [Current source transcript](../www/learn/course/all-lesson-transcripts.txt) · [published transcript](https://jaketherabbit.github.io/HA-Irrigation-Strategy/learn/course/all-lesson-transcripts.txt) | Generated narration and independent practice for all 24 lessons; the published copy changes only with a release |
+| [Production and evidence](training/crop-steering-from-zero/PRODUCTION-AND-SOURCES.md) | Source ledger, production rationale and proposed evaluation/update process |
 
-From the repository root:
-
-```sh
-python scripts/build_course.py
-node --test tests/academy.test.mjs
-python -m unittest tests.test_course_media tests.test_academy_catalogue -v
-python scripts/install_course_media.py
-npm ci --prefix frontend
-node frontend/node_modules/vite/bin/vite.js preview --outDir www --host 127.0.0.1 --port 8080
-```
-
-Open [the local academy](http://localhost:8080/learn/). Use the Vite preview server rather than opening the HTML file directly. It serves JSON, modules and byte-range requests for video seeking; Python’s basic HTTP server does not provide reliable seeking in this browser. The catalogue compiler validates lesson IDs, required content, quiz answers and prerequisites, then writes `www/learn/course/course.json`. When `course/video-index.json` is present, it must bind all 24 videos to the current narration hash and exact chapter IDs. `course/video-groups.json` defines the five parts and their learning-route coverage. The compiler does not regenerate narration.
-
-Large media masters stay outside Git history. Pages installs a versioned public release bundle using `www/learn/course/media-release.json`, which supplies an HTTPS `url` and the whole-archive `sha256`. The [installer](../scripts/install_course_media.py) verifies that pin before inspecting the ZIP, requires root `manifest.json` schema 1, binds each declared path to its byte count and SHA-256, rejects unsafe members, and stages a complete replacement. Every non-manifest file must be declared; the manifest does not list itself. The destination is restricted to this repository's `www/learn/media`.
-
-Stop the local preview server before replacing media on Windows; its directory watch can prevent the installer’s atomic folder replacement. For a previously downloaded matching bundle, use:
-
-```sh
-python scripts/install_course_media.py --archive /path/to/course-media.zip
-```
-
-The configured checksum remains mandatory for local archives. When replacing a media edition, publish the bundle, update its pin and run `python scripts/build_course.py --verify-media` against the installed catalogue/media. This requires all 24 lesson videos, five route-complete groups, all 153 narration bindings and matching file byte counts and SHA-256 hashes. A failed check leaves the generated catalogue and transcript untouched. The [Pages workflow](../.github/workflows/pages.yml) builds the workspace and academy catalogue, runs knowledge/practice tests, installs the pinned media, then uploads `www`. Learners do not install Kokoro, provide keys or run these commands.
-
-
-## Verify a completed video edition
-
-Serve the compiled website for media checks. Vite preview preserves the published HTML bytes and supports byte-range requests for seeking:
-
-```sh
-node frontend/node_modules/vite/bin/vite.js preview --outDir www --host 127.0.0.1 --port 8794
-node tests/academy-navigation.browser.mjs
-node tests/academy-video.browser.mjs
-node tests/academy.browser.mjs
-node tests/academy-media.browser.mjs
-```
-
-The media check requires all 24 individual videos and five longer parts, verifies caption words against current scripts, decodes and seeks each video, and checks the actual served dashboard bytes. `HASH_MEDIA=1` additionally downloads and hashes every video against the installed manifest. Use `BASE_URL` to repeat against the published academy.
-
-With the private production masters available, set `ACADEMY_PRODUCTION` and run `node tests/academy-scene-sync.browser.mjs`. It compares decoded video scenes with their source-bound PNGs, including a changed-pixel check that the draft threshold actually moves. `QA_PARTIAL=1` permits an explicitly labelled check of completed files during production; it never establishes that all 29 videos are complete.
-
-Assemble with [build_course_videos.py](../scripts/build_course_videos.py), then package completed outputs with [package_course_videos.py](../scripts/package_course_videos.py). Source masters stay outside Git. The final archive and installed media must pass the strict compiler and browser checks before publication. Synthetic speech still needs human listening review; these checks do not establish learner outcomes.
+Course records, editable sources, local development and media checks are in the [Academy developer notes](dev/academy.md).

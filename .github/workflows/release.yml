@@ -20,12 +20,12 @@ jobs:
     timeout-minutes: 20
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 1
 
       - name: Set up frontend build runtime
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '24'
       - name: Build the bundled operator dashboard
@@ -45,7 +45,7 @@ jobs:
           git archive --format=zip --output=dist/crop_steering_mcp_source.zip HEAD mcp-server docs/MCP.md LICENSE
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: release-artifacts
           path: dist/*.zip
@@ -54,7 +54,7 @@ jobs:
 
       - name: Attach assets to GitHub Release
         if: github.event_name == 'release'
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           files: |
             dist/custom_components_crop_steering.zip

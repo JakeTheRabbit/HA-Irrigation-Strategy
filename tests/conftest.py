@@ -30,6 +30,7 @@ class Platform(str, Enum):
     SELECT = "select"
     NUMBER = "number"
     BUTTON = "button"
+    BINARY_SENSOR = "binary_sensor"
 
 
 config_entries.ConfigEntry = ConfigEntry

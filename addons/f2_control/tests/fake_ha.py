@@ -27,6 +27,8 @@ class FakeHA:
         self.events: list[tuple] = []  # (event_type, data)
         self.sets: dict[str, tuple] = {}  # entity_id -> (state, attributes)
         self.history: dict[str, list] = {}  # entity_id -> what ha_history returns (a test's own)
+        # (domain, service) -> handler(data, timeout) -> (status, answer): ha_service_response's answer (a test's own)
+        self.responses: dict[tuple, object] = {}
 
     # ---- state helpers ----
     def set_state(self, entity_id, state, attributes=None, last_updated=_CURRENT_TIMESTAMP):
@@ -59,8 +61,12 @@ class FakeHA:
         return True
 
     def ha_service_response(self, domain, service, data, timeout=12):
-        """A service call asking for its answer: recorded as a call, answered with nothing."""
+        """A service call asking for its answer: recorded as a call, answered by the test's handler in
+        `responses` (given the caller's timeout), else with nothing."""
         self.calls.append((domain, service, dict(data)))
+        handler = self.responses.get((domain, service))
+        if handler is not None:
+            return handler(dict(data), timeout=timeout)
         return 200, None
 
     def ha_history(self, entity, since, timeout=12):
@@ -85,6 +91,17 @@ class FakeHA:
         """A state written lands in `states` too, stamped now, as Home Assistant's own does."""
         self.sets[entity] = (state, attributes or {})
         self.set_state(entity, state, attributes)
+
+
+def status_from_get(controller):
+    """A ha_get_status for a rig that stubs only ha_get: it answers from whatever controller.ha_get is when
+    called, 200 with that read, or 404 when it reads no state. Such a rig never reaches the real HTTP API."""
+
+    def ha_get_status(entity, timeout=8):
+        read = controller.ha_get(entity)
+        return (404 if read[0] is None else 200), read
+
+    return ha_get_status
 
 
 def install(controller, fake: FakeHA, options: dict):

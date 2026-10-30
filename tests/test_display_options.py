@@ -26,7 +26,8 @@ def test_an_option_a_newer_version_saved_is_dropped_not_the_store():
 
 def test_a_store_without_options_reads_every_option_off():
     assert from_store({"revision": 0}) == {"revision": 0, "options": {}}
-    assert all(defaults()[k] in (False, "cards") for k in OPTIONS)
+    units = {"ec_unit", "temp_unit", "volume_unit", "clock"}
+    assert all(defaults()[k] in (False, "cards") for k in OPTIONS if k not in units)
 
 
 @pytest.mark.parametrize("bad", [None, [], {"revision": "1"}, {"options": {}}])
@@ -40,3 +41,33 @@ def test_values_are_checked():
     for key, value in (("show_climate", 1), ("today_zone_layout", "grid"), ("x", True)):
         with pytest.raises(ValueError):
             clean_option(key, value)
+
+
+def test_old_store_reads_units_as_mS_C_auto_24():
+    old = from_store({"revision": 2, "options": {"show_climate": True}})
+    assert old["options"] == {"show_climate": True}
+    shown = {**defaults(), **old["options"]}
+    assert (shown["ec_unit"], shown["temp_unit"]) == ("mS/cm", "C")
+    assert (shown["volume_unit"], shown["clock"]) == ("auto", 24)
+
+
+def test_save_refuses_an_unknown_unit():
+    for key, value in (
+        ("ec_unit", "ppm640"),
+        ("temp_unit", "K"),
+        ("volume_unit", "oz"),
+        ("clock", "12"),
+        ("clock", 13),
+        ("clock", True),
+        ("clock", 12.0),
+    ):
+        with pytest.raises(ValueError):
+            clean_option(key, value)
+    for key, value in (
+        ("ec_unit", "ppm700"),
+        ("temp_unit", "F"),
+        ("volume_unit", "gal"),
+        ("volume_unit", "auto"),
+        ("clock", 12),
+    ):
+        assert clean_option(key, value) == value

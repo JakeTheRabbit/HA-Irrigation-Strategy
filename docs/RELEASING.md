@@ -6,7 +6,7 @@ This controller opens valves and runs pumps on unattended crops. A bug that reac
 
 An explicitly owner-approved, bounded rehearsal exception is recorded as `approved-rehearsal` in step 5. It changes the accepted promotion scope for that candidate; it does not turn an isolated software rehearsal into a hardware soak or permission to operate unverified plumbing. Without that explicit decision, the normal staging requirements below apply.
 
-CI is necessary and nowhere near sufficient. On one day in September 2026 this repository published four releases in under ten hours. 2.17.1 shipped nineteen minutes after 2.17.0 because "the room on/off control did nothing on a fresh 2.17.0 install", which its changelog records as "Found on the first live install". 2.18.0 was published one minute after its pull request merged. Every one of those builds was green. Four defects that survived all of them, including one that stopped the integration loading at all on Home Assistant older than 2026.5, are written up in [dev/audits/2026-09-21-first-run-review.md](dev/audits/2026-09-21-first-run-review.md). Production was the test environment. This process moves that job to a staging room.
+CI is necessary and nowhere near sufficient. On one day in September 2026 this repository published four releases in under ten hours. 2.17.1 shipped nineteen minutes after 2.17.0 because "the room on/off control did nothing on a fresh 2.17.0 install", which its changelog records as "Found on the first live install". 2.18.0 was published one minute after its pull request merged. Every one of those builds was green. Four defects that survived all of them, including one that stopped the integration loading at all on Home Assistant older than 2026.5, are written up in [archive/audits/2026-09-21-first-run-review.md](archive/audits/2026-09-21-first-run-review.md). Production was the test environment. This process moves that job to a staging room.
 
 How a change gets *in* (one change, one branch, one pull request) is in [CONTRIBUTING.md](../CONTRIBUTING.md). This document is how it gets *out*.
 
@@ -62,7 +62,7 @@ Every pull request states its class. The class sets the minimum soak. When in do
 
 ### 2. Automated checks, green on the exact commit
 
-`bash tests/run_ci.sh` locally, and on GitHub every job of `Validate`: ruff, black, yamllint, vendored engine identical, the stub suite, the controller suite, the engine suite, **the real-Home-Assistant tier (`tests_ha/`)**, hassfest, HACS validation, the add-on image build, the add-on image per arch (amd64, aarch64, armv7: imports and pinned packages), **the controller container smoke in both modes (`tests_container/`)**, the dashboard build (**and proof that the committed dashboard file is exactly what `frontend/src` builds**), the browser checks, MCP.
+`bash tests/run_ci.sh` locally, and on GitHub every job of `Validate`: ruff, black, yamllint, vendored engine identical, the stub suite, the controller suite, the engine suite, **the real-Home-Assistant tier (`tests_ha/`)**, hassfest, HACS validation, the add-on image build, the add-on image per arch (amd64, aarch64, armv7: imports and pinned packages), **the controller container smoke in both modes (`tests/container/`)**, the dashboard build (**and proof that the committed dashboard file is exactly what `frontend/src` builds**), the browser checks, MCP.
 
 A C2 or C3 change is not reviewable without:
 

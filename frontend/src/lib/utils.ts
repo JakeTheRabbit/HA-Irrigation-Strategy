@@ -1,15 +1,16 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
+import { calendarDays, formatDateTime } from "./clock";
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
-/** The local calendar day of `at` as seen from `now`: "" for today, "Yesterday", else "Fri 26 Sep". */
+/** The calendar day of `at` as seen from `now`, on Home Assistant's calendar (lib/clock.ts): "" for
+ * today, "Yesterday", else "Fri 26 Sep". */
 export function dayWord(at: number, now: number): string {
-  const midnight = (ms: number) => new Date(ms).setHours(0, 0, 0, 0);
-  const days = Math.round((midnight(now) - midnight(at)) / 86_400_000);
+  const days = calendarDays(at, now);
   if (days === 0) return "";
   if (days === 1) return "Yesterday";
-  return new Date(at).toLocaleDateString([], { weekday: "short", day: "numeric", month: "short" });
+  return formatDateTime(at, { weekday: "short", day: "numeric", month: "short" });
 }
 /** Readable text for anything a catch block can receive. Home Assistant rejects
  * service calls with plain objects, which String() renders as "[object Object]". */
@@ -39,4 +40,25 @@ export function errorText(e: unknown): string {
     }
   }
   return String(e);
+}
+
+/** A Home Assistant state that holds no reading: missing, blank, "unknown", "unavailable" or
+ * "none", in any case. The integration's own test (`_DEAD` in health.py, stock.py and
+ * zone_status.py); every page asks this one, so an entity is never live on one page and missing on
+ * another. */
+export function unreadableState(state: string | null | undefined): boolean {
+  const text = state?.trim().toLowerCase() ?? "";
+  return !text || ["unknown", "unavailable", "none"].includes(text);
+}
+
+/** A number to at most `digits` decimals, without trailing zeros: 1.50 → "1.5", 2.00 → "2". */
+export function trimNumber(value: number, digits = 2): string {
+  return String(Number(value.toFixed(digits)));
+}
+
+/** Whether an entity's state reads `want`: a finite number within half its step (the precision
+ * Home Assistant keeps), or within 1e-6 where the step is unknown. */
+export function sameValue(state: string | undefined, want: number, step?: number): boolean {
+  const value = state === undefined || state.trim() === "" ? NaN : Number(state);
+  return Number.isFinite(value) && Number.isFinite(want) && Math.abs(value - want) <= Math.max(1e-6, (step ?? 0) / 2);
 }

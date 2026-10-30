@@ -20,6 +20,7 @@ import math
 import re
 
 from .admin import async_require_admin
+from .api_v2 import StaleRevision
 from .const import DOMAIN, MAX_ZONES
 from .room import room_prefix
 
@@ -184,7 +185,9 @@ class HarvestStore:
     async def set(self, data):
         async with self._lock:
             if data.get("expected_revision") != self.revision:
-                raise ValueError("Harvests changed elsewhere. Reload before saving.")
+                raise StaleRevision(
+                    "Harvests changed elsewhere. Reload before saving.", self.revision
+                )
             run_id = data.get("run_id")
             runs = (
                 self.hass.data.get(DOMAIN, {}).get("_runs", {}).get(self.entry.entry_id)
@@ -226,6 +229,8 @@ async def async_setup_harvests(hass, entry):
     from homeassistant.core import SupportsResponse
     from homeassistant.exceptions import HomeAssistantError
 
+    from .api_v2 import fields, wrap
+
     manager = HarvestStore(hass, entry)
     await manager.async_init()
     hass.data.setdefault(DOMAIN, {}).setdefault("_harvests", {})[
@@ -257,8 +262,10 @@ async def async_setup_harvests(hass, entry):
         hass.services.async_register(
             DOMAIN,
             service,
-            handle,
-            schema=vol.Schema({vol.Required("room_id"): str, **schemas[service]}),
+            wrap(handle),
+            schema=vol.Schema(
+                fields({vol.Required("room_id"): str, **schemas[service]})
+            ),
             supports_response=SupportsResponse.ONLY,
         )
 

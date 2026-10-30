@@ -1,0 +1,329 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Pump prime & calibrate</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#4fc3f7;text-decoration:none}a:hover{color:#b3e5fc}
+</style>
+</helmet>
+<!-- SHELL: 1440x1000 frame. Tokens: canvas #111111, surface #1c1c1c, raised #232323, border #2e2e2e, text #e1e1e1, muted #a4a4a4, faint #8a8a8a, primary #03a9f4, link #4fc3f7, success #81c995, warning #ffca5b, danger #f28b82. Phase P0 #6b7580, P1 #2f6fb5, P2 #6450b0, P3 #34405a. Font Roboto; sizes 12/14/15/17/20/24. Radius 12. -->
+<div style="width: 1440px; height: 1000px; box-sizing: border-box; background: #111111; color: #e1e1e1; font-family: Roboto, Arial, sans-serif; display: flex; overflow: hidden">
+
+<!-- SHELL: menu (sections + live room tree) -->
+<aside style="width: 248px; flex-shrink: 0; background: #1c1c1c; border-right: 1px solid #2e2e2e; padding: 22px 12px 16px; box-sizing: border-box; display: flex; flex-direction: column; gap: 4px">
+<div style="display: flex; align-items: center; gap: 10px; padding: 0 8px 18px">
+<span style="width: 36px; height: 36px; border-radius: 10px; background: #03a9f4; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0b1d27" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.7l5.7 5.7a8 8 0 1 1-11.3 0z"></path></svg></span>
+<span style="display: flex; flex-direction: column"><b style="font-size: 16px; font-weight: 600">Crop Steering</b><span style="font-size: 12px; color: #a4a4a4">Irrigation control</span></span>
+</div>
+<nav aria-label="Main navigation" style="display: flex; flex-direction: column; gap: 1px">
+<a href="S1-AllRooms.dc.html" style="display: flex; align-items: center; gap: 12px; min-height: 38px; padding: 0 12px; border-radius: 8px; color: #b8b8b8; font-weight: 500; font-size: 15px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>Status</a>
+<button type="button" aria-expanded="false" style="display: flex; align-items: center; gap: 12px; min-height: 38px; padding: 0 12px; border: 0; border-radius: 8px; background: transparent; color: #b8b8b8; font: inherit; font-size: 15px; font-weight: 500; text-align: left; cursor: pointer"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.7l5.7 5.7a8 8 0 1 1-11.3 0z"></path></svg>Irrigation<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="margin-left: auto"><polyline points="9 6 15 12 9 18"></polyline></svg></button>
+<button type="button" aria-expanded="false" style="display: flex; align-items: center; gap: 12px; min-height: 38px; padding: 0 12px; border: 0; border-radius: 8px; background: transparent; color: #b8b8b8; font: inherit; font-size: 15px; font-weight: 500; text-align: left; cursor: pointer"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><polyline points="12 7 12 12 15 14"></polyline></svg>History<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="margin-left: auto"><polyline points="9 6 15 12 9 18"></polyline></svg></button>
+<button type="button" aria-expanded="true" style="display: flex; align-items: center; gap: 12px; min-height: 38px; padding: 0 12px; border: 0; border-radius: 8px; background: transparent; color: #e1e1e1; font: inherit; font-size: 15px; font-weight: 600; text-align: left; cursor: pointer"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"></path></svg>Equipment<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="margin-left: auto"><polyline points="6 9 12 15 18 9"></polyline></svg></button>
+<div style="display: flex; flex-direction: column; gap: 1px; margin: 0 0 4px 21px; padding-left: 10px; border-left: 1px solid #333">
+<a href="E1-Probes.dc.html" style="display: flex; align-items: center; min-height: 32px; padding: 0 10px; border-radius: 6px; color: #b8b8b8; font-size: 14px">Probes &amp; offsets</a>
+<a href="E2-Dosing.dc.html" style="display: flex; align-items: center; min-height: 32px; padding: 0 10px; border-radius: 6px; color: #b8b8b8; font-size: 14px">Feed &amp; dosing</a>
+<a href="E5-Stock.dc.html" style="display: flex; align-items: center; min-height: 32px; padding: 0 10px; border-radius: 6px; color: #b8b8b8; font-size: 14px">Stock</a>
+<a href="E3-PumpWizard.dc.html" aria-current="page" style="display: flex; align-items: center; min-height: 32px; padding: 0 10px; border-radius: 6px; background: #2a2a2a; box-shadow: inset 2px 0 0 #03a9f4; color: #4fc3f7; font-size: 14px; font-weight: 600">Pump calibration</a>
+<a href="E4-FeedCal.dc.html" style="display: flex; align-items: center; min-height: 32px; padding: 0 10px; border-radius: 6px; color: #b8b8b8; font-size: 14px">Feed pH/EC calibration</a>
+<a href="E6-Setup.dc.html" style="display: flex; align-items: center; min-height: 32px; padding: 0 10px; border-radius: 6px; color: #b8b8b8; font-size: 14px">Pumps &amp; valves</a>
+</div>
+<button type="button" aria-expanded="false" style="display: flex; align-items: center; gap: 12px; min-height: 38px; padding: 0 12px; margin-top: 10px; border: 0; border-radius: 8px; background: transparent; color: #b8b8b8; font: inherit; font-size: 15px; font-weight: 500; text-align: left; cursor: pointer"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="4" y1="7" x2="20" y2="7"></line><line x1="4" y1="17" x2="20" y2="17"></line><circle cx="9" cy="7" r="2.5"></circle><circle cx="15" cy="17" r="2.5"></circle></svg>Settings<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="margin-left: auto"><polyline points="9 6 15 12 9 18"></polyline></svg></button>
+</nav>
+<nav aria-label="Rooms" style="display: flex; flex-direction: column; gap: 1px; margin-top: 16px">
+<span style="padding: 0 12px 6px; font-size: 12px; font-weight: 600; letter-spacing: .06em; color: #a4a4a4">ROOMS</span>
+<sc-for list="{{rooms}}" as="r" hint-placeholder-count="3">
+<a href="S2-Room.dc.html" style="display: flex; align-items: center; gap: 8px; min-height: 36px; padding: 0 10px; margin-top: 6px; border-radius: 8px; background: {{r.bg}}; color: #e1e1e1; font-size: 14px; font-weight: 500"><span style="width: 8px; height: 8px; border-radius: 4px; background: {{r.dot}}"></span>{{r.name}}<span style="margin-left: auto; font-size: 12px; color: #a4a4a4; font-weight: 400">{{r.state}}</span></a>
+<sc-for list="{{r.zones}}" as="z" hint-placeholder-count="3">
+<a href="S3-Zone.dc.html" style="display: flex; align-items: center; gap: 8px; min-height: 30px; padding: 0 10px 0 24px; border-radius: 8px; color: #b8b8b8; font-size: 13px"><span style="min-width: 22px; padding: 0 4px; border-radius: 4px; background: {{z.phColor}}; color: #fff; font-size: 11px; font-weight: 700; text-align: center">{{z.ph}}</span>{{z.name}}<span style="margin-left: auto; font-size: 12px; color: #a4a4a4">{{z.vwc}}</span></a>
+</sc-for>
+</sc-for>
+</nav>
+<div style="margin-top: auto; padding: 0 8px; font-size: 12px; color: #8a8a8a">Integration 3.17.1 · Controller 3.17.1</div>
+</aside>
+
+<div style="flex: 1; min-width: 0; display: flex; flex-direction: column">
+<!-- SHELL: top bar (no room chips on desktop: the tree is the picker) -->
+<header style="height: 56px; flex-shrink: 0; border-bottom: 1px solid #2e2e2e; display: flex; align-items: center; justify-content: flex-end; gap: 12px; padding: 0 24px">
+<span style="font-size: 13px; color: #a4a4a4">Updated 12 s ago</span>
+<span style="display: flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border: 1px solid #2e2e2e; border-radius: 15px; font-size: 13px; font-weight: 600"><span style="width: 7px; height: 7px; border-radius: 4px; background: #81c995"></span>AI acting</span>
+<button type="button" aria-label="Search, Ctrl K" style="display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 12px; border: 1px solid #2e2e2e; border-radius: 8px; background: #1c1c1c; color: #a4a4a4; font: inherit; font-size: 13px">Jump to… <span style="border: 1px solid #3a3a3a; border-radius: 4px; padding: 0 5px; font-size: 11px">Ctrl K</span></button>
+<span style="font-size: 13px; color: #a4a4a4">F2</span>
+<button type="button" style="display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 14px; border: 1px solid #2e2e2e; border-radius: 8px; background: #1c1c1c; color: #e1e1e1; font: inherit; font-size: 14px; font-weight: 600"><span style="width: 8px; height: 8px; border-radius: 4px; background: #81c995"></span>Watering on</button>
+<button type="button" style="height: 34px; padding: 0 14px; border: 1px solid #f28b82; border-radius: 8px; background: transparent; color: #f28b82; font: inherit; font-size: 14px; font-weight: 600">Stop all</button>
+</header>
+
+<main style="flex: 1; min-height: 0; overflow: hidden; padding: 22px 28px; display: flex; flex-direction: column; gap: 14px">
+<div style="display: flex; align-items: center; gap: 12px; height: 40px; flex-shrink: 0">
+<a href="E2-Dosing.dc.html" style="font-size: 15px; font-weight: 500">Feed &amp; dosing · F2</a><span style="color: #8a8a8a">›</span>
+<h1 style="margin: 0; font-size: 24px; font-weight: 600">Prime &amp; calibrate a pump</h1>
+
+</div>
+
+<ol aria-label="Steps" style="list-style: none; margin: 0; padding: 12px 18px; flex-shrink: 0; display: grid; grid-template-columns: repeat(5, 1fr); gap: 0; background: #1c1c1c; border: 1px solid #2e2e2e; border-radius: 12px">
+<sc-for list="{{steps}}" as="sp" hint-placeholder-count="5">
+<li aria-current="{{sp.aria}}" style="display: flex; align-items: center; gap: 10px; min-width: 0">
+<span style="flex: none; width: 32px; height: 32px; border-radius: 16px; box-sizing: border-box; border: 2px solid {{sp.edge}}; background: {{sp.fill}}; color: {{sp.numInk}}; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700"><sc-if value="{{sp.done}}" hint-placeholder-val="{{false}}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0b1d27" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" aria-label="done"><polyline points="4 12 10 18 20 6"></polyline></svg></sc-if><sc-if value="{{sp.notDone}}" hint-placeholder-val="{{true}}">{{sp.mark}}</sc-if></span>
+<span style="display: flex; flex-direction: column; min-width: 0"><b style="font-size: 14px; font-weight: 600; color: {{sp.ink}}">{{sp.label}}</b><span style="font-size: 12px; color: #a4a4a4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{sp.sub}}</span></span>
+<span style="flex: 1; height: 2px; margin: 0 12px; background: {{sp.line}}"></span>
+</li>
+</sc-for>
+</ol>
+
+<sc-if value="{{locked}}" hint-placeholder-val="{{true}}">
+<div role="status" style="flex-shrink: 0; display: flex; align-items: center; gap: 10px; height: 42px; padding: 0 14px; border: 1px solid rgba(255,202,91,.5); border-radius: 10px; background: rgba(255,202,91,.10); font-size: 14px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ffca5b" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: none"><rect x="5" y="11" width="14" height="10" rx="2"></rect><path d="M8 11V8a4 4 0 0 1 8 0v3"></path></svg><b style="font-weight: 600">Mixer off · F2 dosing locked</b><span style="color: #b8b8b8">while this wizard runs. Both come back when you save or leave.</span><a href="E2-Dosing.dc.html" style="margin-left: auto; font-size: 14px; font-weight: 600">Leave and unlock</a></div>
+</sc-if>
+
+<section aria-label="{{stepTitle}}" style="flex: 1; min-height: 0; background: #1c1c1c; border: 1px solid #2e2e2e; border-radius: 12px; display: flex; flex-direction: column">
+<div style="flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 28px; padding: 22px 26px">
+<div style="display: flex; flex-direction: column; gap: 16px; min-width: 0">
+<h2 style="margin: 0; font-size: 20px; font-weight: 600">{{stepTitle}}</h2>
+
+<sc-if value="{{is1}}" hint-placeholder-val="{{true}}">
+<div role="radiogroup" aria-label="Pump" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px">
+<sc-for list="{{pumps}}" as="p" hint-placeholder-count="4">
+<button type="button" role="radio" aria-checked="{{p.on}}" onClick="{{p.pick}}" style="{{p.style}}">
+<span style="display: flex; align-items: center; gap: 8px"><b style="font-size: 17px; font-weight: 600">{{p.name}}</b><span style="font-size: 12px; color: #a4a4a4">pump {{p.n}}</span><span style="margin-left: auto; width: 18px; height: 18px; border-radius: 9px; box-sizing: border-box; border: 2px solid {{p.dotEdge}}; background: {{p.dot}}"></span></span>
+<span style="font-size: 13px; color: #b8b8b8">Calibrated {{p.cal}} · {{p.last}}</span>
+<span style="font-size: 13px; color: {{p.dueInk}}">{{p.due}}</span>
+</button>
+</sc-for>
+</div>
+<div style="display: flex; flex-direction: column; gap: 8px">
+<span style="font-size: 14px; font-weight: 600">What this pump doses</span>
+<div role="radiogroup" aria-label="Solution type" style="display: flex; border: 1px solid #3a3a3a; border-radius: 8px; overflow: hidden; width: 520px">
+<sc-for list="{{sols}}" as="so" hint-placeholder-count="4"><button type="button" role="radio" aria-checked="{{so.on}}" onClick="{{so.pick}}" style="{{so.style}}">{{so.name}}</button></sc-for>
+</div>
+<span style="font-size: 13px; color: #a4a4a4">pH down pumps only run inside the pH auto-correct lockouts. Nutrient pumps are blocked while the pH pump runs.</span>
+</div>
+<div style="display: flex; flex-direction: column; gap: 6px; font-size: 14px; font-weight: 600">Pump head, peristaltic
+<span role="radiogroup" aria-label="Pump head" style="display: flex; border: 1px solid #3a3a3a; border-radius: 8px; overflow: hidden; width: 520px"><sc-for list="{{heads}}" as="h" hint-placeholder-count="4"><button type="button" role="radio" aria-checked="{{h.on}}" onClick="{{h.pick}}" style="{{h.style}}">{{h.label}}</button></sc-for></span>
+<span style="font-size: 13px; font-weight: 400; color: #a4a4a4">Sets the nominal flow we compare your result against.</span>
+</div>
+</sc-if>
+
+<sc-if value="{{is2}}" hint-placeholder-val="{{false}}">
+<p style="margin: 0; font-size: 15px; line-height: 1.5; color: #e1e1e1">Put the end of the {{pumpName}} dosing line in a waste cup. Hold the button until liquid runs out with no bubbles. The pump stops the moment you let go, and by itself after 20 s.</p>
+<button type="button" onMouseDown="{{primeStart}}" onMouseUp="{{primeStop}}" onMouseLeave="{{primeStop}}" onTouchStart="{{primeStart}}" onTouchEnd="{{primeStop}}" aria-pressed="{{primeAria}}" style="{{primeStyle}}">
+<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.7l5.7 5.7a8 8 0 1 1-11.3 0z"></path></svg>{{primeLabel}}</button>
+<span style="display: flex; align-items: baseline; gap: 10px"><b style="font-size: 28px; font-weight: 600">{{primedTxt}}</b><span style="font-size: 14px; color: #a4a4a4">{{primedMl}}</span></span>
+<span style="font-size: 13px; color: #a4a4a4">Last prime of this line: 30 Sep, 4.6 s.</span>
+</sc-if>
+
+<sc-if value="{{is3}}" hint-placeholder-val="{{false}}">
+<p style="margin: 0; font-size: 15px; line-height: 1.5">Move the line into an empty measuring cup that holds at least 250 mL. The pump runs exactly 30 s at full speed, then stops and reads back off.</p>
+<span style="display: flex; gap: 10px">
+<sc-if value="{{canStart}}" hint-placeholder-val="{{true}}"><button type="button" onClick="{{runStart}}" style="height: 48px; padding: 0 20px; border: 0; border-radius: 10px; background: #03a9f4; color: #0b1d27; font: inherit; font-size: 16px; font-weight: 600">{{startLabel}}</button></sc-if>
+<sc-if value="{{running}}" hint-placeholder-val="{{false}}"><button type="button" onClick="{{runStop}}" style="height: 48px; padding: 0 20px; border: 1px solid #f28b82; border-radius: 10px; background: transparent; color: #f28b82; font: inherit; font-size: 16px; font-weight: 600">Stop the run</button></sc-if>
+</span>
+<span style="display: flex; align-items: center; gap: 8px; font-size: 14px; color: {{runMsgInk}}">{{runMsg}}</span>
+</sc-if>
+
+<sc-if value="{{is4}}" hint-placeholder-val="{{false}}">
+<label style="display: flex; flex-direction: column; gap: 8px; font-size: 14px; font-weight: 600">How much is in the cup?
+<span style="display: flex; align-items: center; gap: 10px"><input type="text" inputmode="decimal" value="{{ml}}" onChange="{{onMl}}" style="width: 130px; height: 52px; box-sizing: border-box; padding: 0 14px; border: 2px solid {{mlEdge}}; border-radius: 10px; background: #111111; color: #e1e1e1; font: inherit; font-size: 26px; font-weight: 600"><span style="font-size: 20px; font-weight: 500">mL</span></span>
+</label>
+<sc-if value="{{mlValid}}" hint-placeholder-val="{{true}}">
+<div style="display: flex; flex-direction: column; gap: 4px; padding: 14px 16px; border-radius: 10px; background: #111111; border: 1px solid #2e2e2e">
+<span style="font-size: 15px; color: #b8b8b8">{{ml}} mL in 30 s =</span>
+<b style="font-size: 34px; font-weight: 600; color: #4fc3f7">{{rateTxt}}</b>
+</div>
+<div style="display: flex; flex-direction: column; gap: 6px">
+<span style="position: relative; height: 12px; border-radius: 6px; background: #333333"><span style="position: absolute; top: 0; bottom: 0; left: {{okL}}; width: {{okW}}; border-radius: 6px; background: rgba(129,201,149,.35)"></span><span style="position: absolute; top: -5px; bottom: -5px; left: {{nomPos}}; width: 2px; background: #b8b8b8"></span><span style="position: absolute; top: -5px; bottom: -5px; left: {{lastPos}}; width: 2px; background: #8a8a8a"></span><span style="position: absolute; top: -7px; bottom: -7px; left: {{newPos}}; width: 4px; border-radius: 2px; background: #4fc3f7"></span></span>
+<span style="display: flex; gap: 20px; font-size: 13px; color: #b8b8b8"><span>{{vsNominal}}</span><span>{{vsLast}}</span></span>
+</div>
+</sc-if>
+<sc-if value="{{hasMlMsg}}" hint-placeholder-val="{{false}}"><span style="display: flex; align-items: center; gap: 8px; font-size: 14px; color: {{mlMsgInk}}">{{mlMsg}}</span></sc-if>
+</sc-if>
+
+<sc-if value="{{is5}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; align-items: center; gap: 14px; padding: 14px 16px; border-radius: 10px; background: #111111; border: 1px solid #2e2e2e">
+<span style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 13px; color: #a4a4a4">{{pumpName}} flow</span><span style="font-size: 15px"><span style="color: #a4a4a4; text-decoration: line-through">{{lastTxt}}</span> → <b style="font-size: 24px; font-weight: 600; color: #4fc3f7">{{rateTxt}}</b></span></span>
+<sc-if value="{{canSave}}" hint-placeholder-val="{{true}}"><button type="button" onClick="{{save}}" style="margin-left: auto; height: 48px; padding: 0 20px; border: 0; border-radius: 10px; background: #03a9f4; color: #0b1d27; font: inherit; font-size: 16px; font-weight: 600">{{saveLabel}}</button></sc-if>
+<sc-if value="{{saving}}" hint-placeholder-val="{{false}}"><span style="margin-left: auto; font-size: 14px; color: #4fc3f7">Writing and reading back…</span></sc-if>
+</div>
+<sc-if value="{{saved}}" hint-placeholder-val="{{false}}">
+<div role="status" style="display: flex; flex-direction: column; gap: 6px; padding: 12px 16px; border: 1px solid rgba(129,201,149,.5); border-radius: 10px; background: rgba(129,201,149,.08); font-size: 14px">
+<span style="display: flex; align-items: center; gap: 8px; font-weight: 600"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#81c995" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: none"><polyline points="4 12 10 18 20 6"></polyline></svg>Written and read back 14:02 · {{entity}} = {{rateNum}}</span>
+<span style="color: #b8b8b8">{{nextDose}}</span>
+<span style="display: flex; gap: 10px; margin-top: 4px"><button type="button" onClick="{{undo}}" style="height: 36px; padding: 0 14px; border: 1px solid #3a3a3a; border-radius: 8px; background: transparent; color: #4fc3f7; font: inherit; font-size: 14px; font-weight: 600">Undo, keep {{lastTxt}}</button><button type="button" onClick="{{another}}" style="height: 36px; padding: 0 14px; border: 1px solid #3a3a3a; border-radius: 8px; background: #232323; color: #e1e1e1; font: inherit; font-size: 14px">Calibrate another pump</button><a href="E2-Dosing.dc.html" style="display: flex; align-items: center; height: 36px; padding: 0 14px; border-radius: 8px; background: #03a9f4; color: #0b1d27; font-size: 14px; font-weight: 600">Done, unlock dosing</a></span>
+</div>
+</sc-if>
+<div style="display: flex; flex-direction: column; gap: 2px">
+<span style="font-size: 13px; font-weight: 600; color: #a4a4a4; letter-spacing: .04em">{{historyTitle}}</span>
+<sc-for list="{{history}}" as="hi" hint-placeholder-count="3"><span style="display: grid; grid-template-columns: 120px 120px 1fr; gap: 10px; min-height: 30px; align-items: center; border-bottom: 1px solid #262626; font-size: 14px; color: {{hi.ink}}"><span>{{hi.when}}</span><b style="font-weight: 600">{{hi.rate}}</b><span style="color: #a4a4a4">{{hi.note}}</span></span></sc-for>
+</div>
+</sc-if>
+</div>
+
+<div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; border-radius: 12px; background: #111111; border: 1px solid #262626">
+<sc-if value="{{showPump}}" hint-placeholder-val="{{true}}">
+<svg width="340" height="300" viewBox="0 0 340 300" role="img" aria-label="{{pumpName}} bottle, pump and dosing line">
+<rect x="34" y="96" width="70" height="150" rx="10" fill="#26343c" stroke="#8a8a8a" stroke-width="1.5"></rect><rect x="50" y="82" width="38" height="16" rx="3" fill="#5a5a5a"></rect>
+<rect x="34" y="150" width="70" height="96" fill="#2f86c4" fill-opacity="0.65"></rect>
+<text x="69" y="272" text-anchor="middle" fill="#e1e1e1" font-size="13" font-family="Roboto, Arial">{{pumpName}}</text>
+<rect x="140" y="110" width="92" height="92" rx="14" fill="#232323" stroke="#8a8a8a" stroke-width="1.5"></rect>
+<circle cx="186" cy="156" r="30" fill="none" stroke="#5a5a5a" stroke-width="10"></circle><circle cx="186" cy="156" r="8" fill="#8a8a8a"></circle>
+<text x="186" y="226" text-anchor="middle" fill="#e1e1e1" font-size="13" font-family="Roboto, Arial">{{nominalTxt}}</text>
+<path d="M69 82 V60 H160 V126 M212 126 V60 H300 V210" fill="none" stroke="#3a3a3a" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"></path>
+<path d="M69 82 V60 H160 V126 M212 126 V60 H300 V210" fill="none" stroke="#4fc3f7" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" pathLength="100" stroke-dasharray="{{tubeDash}}"></path>
+<path d="M274 226 H326 L320 290 H280 Z" fill="none" stroke="#8a8a8a" stroke-width="1.5"></path>
+<text x="300" y="212" text-anchor="end" fill="#a4a4a4" font-size="11" font-family="Roboto, Arial" transform="translate(-14 0)">waste cup</text>
+</svg>
+<span style="font-size: 14px; color: #b8b8b8">{{visualNote}}</span>
+</sc-if>
+<sc-if value="{{is3}}" hint-placeholder-val="{{false}}">
+<svg width="220" height="220" viewBox="0 0 220 220" role="img" aria-label="{{ringLabel}}">
+<circle cx="110" cy="110" r="84" fill="none" stroke="#2e2e2e" stroke-width="14"></circle>
+<circle cx="110" cy="110" r="84" fill="none" stroke="{{ringInk}}" stroke-width="14" stroke-linecap="round" stroke-dasharray="527.8" stroke-dashoffset="{{ringOff}}" transform="rotate(-90 110 110)"></circle>
+<text x="110" y="112" text-anchor="middle" fill="#e1e1e1" font-size="44" font-weight="600" font-family="Roboto, Arial">{{runSec}}</text>
+<text x="110" y="140" text-anchor="middle" fill="#a4a4a4" font-size="14" font-family="Roboto, Arial">of 30 s</text>
+</svg>
+<span style="font-size: 14px; color: #b8b8b8">{{ringNote}}</span>
+</sc-if>
+<sc-if value="{{showCup}}" hint-placeholder-val="{{false}}">
+<svg width="200" height="280" viewBox="0 0 200 280" role="img" aria-label="Measuring cup with {{ml}} mL">
+<path d="M30 30 H170 L158 262 H42 Z" fill="#1c1c1c" stroke="#8a8a8a" stroke-width="2"></path>
+<path d="{{cupFill}}" fill="#2f86c4" fill-opacity="0.65"></path>
+<g stroke="#8a8a8a" stroke-width="1.5"><line x1="150" y1="216" x2="164" y2="216"></line><line x1="148" y1="170" x2="166" y2="170"></line><line x1="146" y1="124" x2="168" y2="124"></line><line x1="144" y1="78" x2="170" y2="78"></line></g>
+<g fill="#a4a4a4" font-size="11" font-family="Roboto, Arial"><text x="118" y="220">50</text><text x="112" y="174">100</text><text x="112" y="128">150</text><text x="112" y="82">200</text></g>
+</svg>
+<span style="font-size: 14px; color: #b8b8b8">{{ml}} mL in the cup</span>
+</sc-if>
+</div>
+</div>
+
+<div style="flex-shrink: 0; height: 68px; border-top: 1px solid #2e2e2e; display: flex; align-items: center; gap: 12px; padding: 0 26px">
+<button type="button" onClick="{{back}}" aria-disabled="{{backOff}}" style="height: 42px; padding: 0 16px; border: 1px solid #3a3a3a; border-radius: 8px; background: transparent; color: {{backInk}}; font: inherit; font-size: 15px">Back</button>
+<span style="font-size: 13px; color: #a4a4a4">Step {{step}} of 5</span>
+<sc-if value="{{hasNext}}" hint-placeholder-val="{{true}}"><button type="button" onClick="{{next}}" aria-disabled="{{nextOff}}" style="margin-left: auto; height: 42px; padding: 0 20px; border: 0; border-radius: 8px; background: {{nextBg}}; color: {{nextInk}}; font: inherit; font-size: 15px; font-weight: 600">{{nextLabel}}</button></sc-if>
+</div>
+</section>
+</main>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1000}}'>
+var PH = { P0: '#6b7580', P1: '#2f6fb5', P2: '#6450b0', P3: '#34405a' };
+function tz(name, ph, vwc) { return { name: name, ph: ph, phColor: PH[ph], vwc: vwc + '%' }; }
+function treeRooms(sel, f2state, f2dot) {
+  return [
+    { name: 'F2', dot: f2dot || '#03a9f4', state: f2state || 'Watering', bg: sel === 'F2' ? '#2a2a2a' : 'transparent', zones: [tz('Zone 1', 'P2', 59.4), tz('Zone 2', 'P2', 58.1), tz('Zone 3', 'P2', 60.2)] },
+    { name: 'F1', dot: '#81c995', state: 'Holding', bg: sel === 'F1' ? '#2a2a2a' : 'transparent', zones: [tz('Zone 1', 'P1', 63.8), tz('Zone 2', 'P1', 62.9), tz('Zone 3', 'P1', 64.4)] }
+  ];
+}
+var PUMPS = [
+  { id: 'A', n: 1, name: 'Part A', sol: 'Nutrient', head: 'p320', last: 298, cal: '30 Sep', days: 22, ent: 'part_a' },
+  { id: 'B', n: 2, name: 'Part B', sol: 'Nutrient', head: 'p320', last: 305, cal: '14 Aug', days: 69, ent: 'part_b' },
+  { id: 'C', n: 3, name: 'Cal-Mag', sol: 'Additive', head: 'p160', last: 151, cal: '30 Sep', days: 22, ent: 'cal_mag' },
+  { id: 'D', n: 4, name: 'pH down', sol: 'pH down', head: 'p64', last: 62, cal: '02 Oct', days: 20, ent: 'ph_down' }
+];
+var HEADS = { p320: ['Peristaltic, 320 mL/min head', 320], p160: ['Peristaltic, 160 mL/min head', 160], p64: ['Peristaltic, 64 mL/min head', 64], p600: ['Peristaltic, 600 mL/min head', 600] };
+var SOLS = ['Nutrient', 'pH up', 'pH down', 'Additive'];
+var LABELS = ['Pick pump', 'Prime', '30 s run', 'Enter mL', 'Save'];
+var TITLES = ['Which pump are you calibrating?', 'Prime the line', 'Run 30 s into a measuring cup', 'Enter what you measured', 'Save the new flow'];
+var HIST = { A: [['30 Sep', '298 mL/min'], ['02 Aug', '305 mL/min'], ['18 Jun', '311 mL/min']], B: [['14 Aug', '305 mL/min'], ['20 Jun', '309 mL/min']], C: [['30 Sep', '151 mL/min'], ['02 Aug', '154 mL/min']], D: [['02 Oct', '62 mL/min'], ['04 Aug', '63 mL/min']] };
+function seg(on) { return 'flex: 1; height: 38px; border: 0; background: ' + (on ? '#03a9f4' : 'transparent') + '; color: ' + (on ? '#0b1d27' : '#b8b8b8') + '; font: inherit; font-size: 14px; font-weight: ' + (on ? 600 : 500); }
+function fmt(v) { return (Math.round(v * 10) / 10).toFixed(1).replace(/\.0$/, ''); }
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { step: 1, pump: 'A', sol: { A: 'Nutrient', B: 'Nutrient', C: 'Additive', D: 'pH down' }, head: { A: 'p320', B: 'p320', C: 'p160', D: 'p64' },
+      primed: 0, priming: false, runT: 0, running: false, aborted: false, ml: '150', saving: false, saved: false };
+  }
+  stopTimers() { clearInterval(this._prime); clearInterval(this._run); this._prime = this._run = null; }
+  renderVals() {
+    var self = this, st = this.state;
+    function set(p) { self.setState(p); }
+    var P = PUMPS.filter(function (p) { return p.id === st.pump; })[0];
+    var nominal = HEADS[st.head[P.id]][1];
+    var ml = parseFloat(st.ml), mlOk = !isNaN(ml) && ml > 0 && ml <= 1000;
+    var rate = mlOk ? ml * 2 : 0, dev = mlOk ? (rate - nominal) / nominal * 100 : 0, devLast = mlOk ? (rate - P.last) / P.last * 100 : 0;
+    var far = mlOk && Math.abs(dev) > 25;
+    var runDone = st.runT >= 30;
+    var canNext = [true, st.primed >= 1 && !st.priming, runDone, mlOk && !far, false][st.step - 1];
+    var steps = LABELS.map(function (l, i) {
+      var n = i + 1, done = n < st.step || (n === 5 && st.saved), cur = n === st.step && !done;
+      var subs = [P.name + ' · ' + st.sol[P.id], st.primed ? fmt(st.primed) + ' s primed' : 'hold to fill the line', runDone ? 'done, 30.0 s' : 'into a cup', mlOk && st.step > 3 ? fmt(rate) + ' mL/min' : 'from the cup', st.saved ? 'read back 14:02' : 'write + read back'];
+      return { label: l, sub: subs[i], mark: String(n), done: done, notDone: !done, aria: cur ? 'step' : 'false', edge: done || cur ? '#03a9f4' : '#5a5a5a', fill: done ? '#03a9f4' : 'transparent',
+        numInk: done ? '#0b1d27' : cur ? '#4fc3f7' : '#a4a4a4', ink: cur ? '#4fc3f7' : done ? '#e1e1e1' : '#a4a4a4', line: n === 5 ? 'transparent' : done ? '#03a9f4' : '#3a3a3a' };
+    });
+    var pumps = PUMPS.map(function (p) {
+      var on = p.id === st.pump;
+      return { name: p.name, n: p.n, cal: p.cal, last: p.last + ' mL/min', on: on ? 'true' : 'false', due: p.days > 60 ? p.days + ' days ago · due, every 60 days' : p.days + ' days ago', dueInk: p.days > 60 ? '#ffca5b' : '#a4a4a4',
+        dot: on ? '#03a9f4' : 'transparent', dotEdge: on ? '#03a9f4' : '#5a5a5a',
+        style: 'display: flex; flex-direction: column; gap: 4px; padding: 14px 16px; text-align: left; border-radius: 10px; border: ' + (on ? '2px solid #03a9f4' : '1px solid #3a3a3a') + '; background: ' + (on ? '#14212a' : '#111111') + '; color: #e1e1e1; font: inherit',
+        pick: function () { set({ pump: p.id, ml: String(Math.round(HEADS[st.head[p.id]][1] * 0.47)), primed: 0, runT: 0, saved: false }); } };
+    });
+    var sols = SOLS.map(function (s) { return { name: s, on: st.sol[P.id] === s ? 'true' : 'false', style: seg(st.sol[P.id] === s), pick: function () { var o = Object.assign({}, st.sol); o[P.id] = s; set({ sol: o }); } }; });
+    var heads = Object.keys(HEADS).map(function (k) { var on = k === st.head[P.id]; return { label: HEADS[k][1] + ' mL/min', on: on ? 'true' : 'false', style: seg(on), pick: function () { var o = Object.assign({}, st.head); o[P.id] = k; set({ head: o }); } }; });
+    var C = 527.8;
+    var hist = HIST[P.id].map(function (h, i) { return { when: h[0], rate: h[1], note: i === 0 ? 'current until saved' : '', ink: '#b8b8b8' }; });
+    if (st.saved) { hist = [{ when: '22 Oct 14:02', rate: fmt(rate) + ' mL/min', note: 'you · 30 s run, ' + fmt(ml) + ' mL', ink: '#e1e1e1' }].concat(HIST[P.id].map(function (h) { return { when: h[0], rate: h[1], note: '', ink: '#a4a4a4' }; })); }
+    var lo = nominal * 0.5, span = nominal;
+    function pos(v) { return Math.max(0, Math.min(99, (v - lo) / span * 100)).toFixed(1) + '%'; }
+    var cupTop = 262 - Math.min(250, mlOk ? ml : 0) / 50 * 46;
+    var cupW = function (y) { return 12 * (262 - y) / 232; };
+    var nextLabels = ['Next: prime ' + P.name, 'Line is full, next', 'Next: enter measured mL', 'Next: review and save', ''];
+    return {
+      rooms: treeRooms('F2'),
+      steps: steps, step: st.step, stepTitle: TITLES[st.step - 1], locked: st.step >= 2 && !st.saved,
+      is1: st.step === 1, is2: st.step === 2, is3: st.step === 3, is4: st.step === 4, is5: st.step === 5,
+      showPump: st.step <= 2, showCup: st.step >= 4,
+      pumps: pumps, sols: sols, heads: heads, pumpName: P.name,
+      nominalTxt: nominal + ' mL/min nominal',
+      tubeDash: st.step === 1 ? '0 100' : Math.min(100, st.primed / 4 * 100).toFixed(0) + ' 100',
+      visualNote: st.step === 1 ? 'Last calibrated ' + P.last + ' mL/min on ' + P.cal : st.primed >= 4 ? 'Line full to the outlet' : 'Line ' + Math.round(Math.min(1, st.primed / 4) * 100) + '% full',
+      primeLabel: st.priming ? 'Priming… let go to stop' : 'Hold to prime', primeAria: st.priming ? 'true' : 'false',
+      primeStyle: 'display: flex; align-items: center; justify-content: center; gap: 12px; width: 300px; height: 96px; border-radius: 14px; border: 2px solid #03a9f4; background: ' + (st.priming ? '#03a9f4' : '#14212a') + '; color: ' + (st.priming ? '#0b1d27' : '#4fc3f7') + '; font: inherit; font-size: 20px; font-weight: 600; user-select: none',
+      primedTxt: fmt(st.primed) + ' s primed', primedMl: 'about ' + Math.round(st.primed * nominal / 60) + ' mL to waste',
+      primeStart: function () {
+        if (self._prime) return;
+        set({ priming: true });
+        self._prime = setInterval(function () { var t = Math.min(20, self.state.primed + 0.1); self.setState({ primed: t }); if (t >= 20) { clearInterval(self._prime); self._prime = null; self.setState({ priming: false }); } }, 100);
+      },
+      primeStop: function () { if (self._prime) { clearInterval(self._prime); self._prime = null; } if (self.state.priming) set({ priming: false }); },
+      canStart: !st.running && !runDone, running: st.running, startLabel: st.aborted ? 'Restart 30 s calibration run' : 'Start 30 s calibration run',
+      runStart: function () {
+        set({ running: true, runT: 0, aborted: false });
+        self._run = setInterval(function () { var t = Math.min(30, self.state.runT + 0.5); self.setState({ runT: t }); if (t >= 30) { clearInterval(self._run); self._run = null; self.setState({ running: false }); } }, 100);
+      },
+      runStop: function () { clearInterval(self._run); self._run = null; set({ running: false, runT: 0, aborted: true }); },
+      runMsg: runDone ? 'Pump stopped at 30.0 s and read back off. Measure what is in the cup.' : st.running ? 'Running at full speed. Keep the line in the cup.' : st.aborted ? 'Run stopped. Empty the cup and start again.' : 'Ready. Dosing stays locked during the run.',
+      runMsgInk: runDone ? '#81c995' : st.aborted ? '#ffca5b' : '#b8b8b8',
+      runSec: st.runT >= 30 ? '30' : String(Math.floor(st.runT)), ringOff: (C * (1 - st.runT / 30)).toFixed(1), ringInk: runDone ? '#81c995' : '#03a9f4',
+      ringLabel: 'Calibration run ' + Math.floor(st.runT) + ' of 30 seconds', ringNote: runDone ? 'Complete' : st.running ? 'about ' + Math.round(st.runT * nominal / 60) + ' mL so far' : 'Not started',
+      ml: st.ml, onMl: function (e) { set({ ml: e.target.value }); }, mlEdge: !mlOk ? '#f28b82' : far ? '#ffca5b' : '#03a9f4', mlValid: mlOk,
+      rateTxt: fmt(rate) + ' mL/min', rateNum: fmt(rate) + ' mL/min',
+      okL: pos(nominal * 0.75), okW: (nominal * 0.5 / span * 100).toFixed(1) + '%', nomPos: pos(nominal), lastPos: pos(P.last), newPos: pos(rate),
+      vsNominal: Math.abs(dev).toFixed(1) + '% ' + (dev < 0 ? 'under' : 'over') + ' nominal ' + nominal,
+      vsLast: Math.abs(devLast).toFixed(1) + '% ' + (devLast < 0 ? 'under' : 'over') + ' last calibration ' + P.last,
+      hasMlMsg: !mlOk || far, mlMsgInk: !mlOk ? '#f28b82' : '#ffca5b',
+      mlMsg: !mlOk ? 'Enter the mL in the cup, a number above 0.' : 'More than 25% off nominal: check for air in the line or a worn tube, then run again.',
+      lastTxt: P.last + ' mL/min', canSave: !st.saved && !st.saving, saving: st.saving, saved: st.saved,
+      saveLabel: 'Save ' + fmt(rate) + ' mL/min to ' + P.name,
+      save: function () { set({ saving: true }); setTimeout(function () { self.setState({ saving: false, saved: true }); }, 900); },
+      undo: function () { set({ saved: false }); },
+      another: function () { self.stopTimers(); set({ step: 1, primed: 0, runT: 0, saved: false, aborted: false }); },
+      entity: 'sensor.f2_' + P.ent + '_calibrated_ml_min',
+      nextDose: 'Next dose uses it: batch 215 doses ' + (P.id === 'D' ? '40' : P.id === 'C' ? '248' : '744') + ' mL of ' + P.name + ' in ' + (function () { var s = Math.round((P.id === 'D' ? 40 : P.id === 'C' ? 248 : 744) / rate * 60); return Math.floor(s / 60) + ' min ' + (s % 60) + ' s'; })() + '.',
+      historyTitle: 'CALIBRATION HISTORY · ' + P.name.toUpperCase(), history: hist,
+      cupFill: 'M' + (42 - cupW(cupTop)).toFixed(1) + ' ' + cupTop.toFixed(1) + ' H' + (158 + cupW(cupTop)).toFixed(1) + ' L158 262 H42 Z',
+      back: function () { if (st.step === 1) return; self.stopTimers(); set({ step: Math.max(1, st.step - 1), priming: false, running: false }); }, backOff: st.step === 1 ? 'true' : 'false', backInk: st.step === 1 ? '#5a5a5a' : '#e1e1e1',
+      hasNext: st.step < 5, nextLabel: nextLabels[st.step - 1], nextOff: canNext ? 'false' : 'true',
+      nextBg: canNext ? '#03a9f4' : '#2a2a2a', nextInk: canNext ? '#0b1d27' : '#8a8a8a',
+      next: function () { if (!canNext) return; self.stopTimers(); set({ step: st.step + 1, priming: false }); }
+    };
+  }
+}
+</script>
+</body>
+</html>

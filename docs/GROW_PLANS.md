@@ -1,5 +1,35 @@
 # Steering and whole-grow planning
 
+## The words you'll see
+
+Container growers can apply small irrigation events called **shots**. Water content, EC, drainage and environmental conditions contribute to steering:
+
+- **Vegetative steering** aims to support vegetative growth through a coordinated set of conditions.
+- **Generative steering** aims to support reproductive development through a different coordinated set of conditions.
+
+These describe an intended direction, not a guaranteed plant response. The slider blends your configured endpoints; pot size and dripper flow alone cannot establish safe targets. Start with the [academy](https://jaketherabbit.github.io/HA-Irrigation-Strategy/learn/) if the terms below are new.
+
+A group of plants on one valve is a **zone**. The probes in the substrate give the numbers that the controller uses:
+
+| Term | Meaning |
+| --- | --- |
+| **VWC** (moisture) | Water volume divided by total measured sample volume, usually expressed as a percentage. It is not percent plant-available water. |
+| **Pore EC** | Conductivity of water in substrate pore spaces, in mS/cm. Identify the measurement type: feed, bulk substrate, pore-water and runoff/extract EC are not interchangeable. |
+| **Dryback** | The decrease of VWC between shots, overnight or in the morning. |
+| **Field capacity** | A configured reference in this program. Establish the appropriate drained container condition with a documented method; an entered value does not prove physical capacity. |
+| **Shot** | One short delivery of water. Its size is a percentage of the substrate volume. |
+
+Each grow-day has four phases:
+
+| Phase | What occurs | Why |
+| --- | --- | --- |
+| **P0: morning dryback** | After lights-on, the controller uses configured timing and dryback conditions before ramp-up. | Sets the conditions for the first shot; it does not guarantee a root-growth response. |
+| **P1: ramp** | The controller gives small shots, some minutes apart, until VWC reaches your peak target. | The ramp fills the substrate slowly. It does not flood the roots. |
+| **P2: maintenance** | The controller gives a maintenance shot when VWC falls to your re-water point. | The maintenance shots keep the roots stable through the day. |
+| **P3: overnight dryback** | The usual shots stop before lights-off. The controller gives only a rescue shot when a zone becomes too dry. | Much of the steering occurs during the overnight dryback. |
+
+Targets can change with the growth stage and local evidence. Build a plan from reviewed endpoint profiles and calendar blocks, then verify the active targets. Library recipes and illustrated reference curves are starting points for review, not universally safe prescriptions or validated crop-response forecasts. The academy's planning lessons cover this in more depth.
+
 ## What the two modes actually do
 
 The legacy controller reads mode-specific morning dryback and P0/P1/P2 EC references. Switching vegetative/generative selects those references; it does not automatically create a complete recipe or calculate suitable targets from your pot size.
@@ -10,7 +40,7 @@ A more vegetative irrigation approach generally keeps water more available; gene
 
 ## Build a grow
 
-1. Select the room, then **Irrigation → Calendar**. Set each zone's grow start date.
+1. Select the room, then **Irrigation › Grow plan & presets**. Set each zone's grow start date.
 2. Open **Endpoint profiles**. Review both endpoint columns; duplicate a profile when a zone needs different bounds. A shared profile affects every schedule block referencing it.
 3. In **Schedule & curve**, select a zone row and week. Set its profile and steering slider. Switch to **Days** for exceptions. Editing a range splits existing blocks and preserves surrounding days.
 4. Review the combined planning curve and hydraulic estimates below. The same selected date, zone and interpolated parameters drive both the curve and preview.
@@ -60,7 +90,7 @@ are skipped.
 
 Change a slider, profile value or supported graph handle and the preview updates immediately. Graph handles edit the selected profile's endpoints as explained in the UI; check shared profile references. Editing the graph does not directly write irrigation hardware.
 
-This is a projection from setpoints and a dry-down rate. It does not predict uptake, runoff or salt balance, and the engine fires on the probe, not on these times. **Insights** plots each zone's recorded VWC and EC using HA Recorder data, with independent units/axes and explicit missing-data states.
+This is a projection from setpoints and a dry-down rate. It does not predict uptake, runoff or salt balance, and the engine fires on the probe, not on these times. **History › Explorer** plots each zone's recorded VWC and EC using HA Recorder data, with independent units/axes and explicit missing-data states.
 
 ## See changes while editing manual setpoints
 
@@ -90,10 +120,20 @@ For 42 plants with one 4 L/hour dripper each, 120 seconds is about **133 mL/plan
 
 The P1 maximum-shot budget is conditional. P2 maintenance and P3 emergency shots depend on sensor feedback, so a guaranteed whole-day total cannot be inferred from target values alone. Historical controller totals are preserved; new shot accounting uses effective duration after caps and minimum timing.
 
-**Insights** provides a local catch-test calculator, probe coverage/freshness diagnostics and an equipment map. These tools expose assumptions instead of claiming to tune a crop automatically.
+**Equipment › Setup: pumps & valves** provides a local catch-test calculator, and **Equipment › Probes & offsets** shows probe coverage and freshness. These tools expose assumptions instead of claiming to tune a crop automatically.
+
+## Recipe library
+
+The library stores copies of plans you author. Live room libraries start empty and do not contain publisher-endorsed or guide-derived numerical recipes. The isolated demo seeds clearly labelled synthetic examples only when a demo room has no stored library; existing libraries are preserved.
+
+Open **Irrigation › Grow plan & presets › Advanced › Recipes** to save a named copy of the current plan, inspect stored copies, or load one into the local draft. Loading a recipe retains the current zone start dates and requires compatible zone assignments. Existing unsaved work requires an explicit replacement review. Active plans remain protected by the normal draft/arm workflow.
+
+Library storage belongs to this browser and this site, separated by room and demo/live mode. It is not an HA backup or shared multi-user database. Export important plans using the existing JSON export; use Import to bring an exported plan into the reviewed workflow. Clearing browser storage can remove local library entries. An unavailable or malformed library must be recovered explicitly rather than silently overwritten.
+
+Loading or saving a local library item never calls an irrigation service. The normal **Review & save** action persists the draft in HA, and arming remains a separate action. Inspect the graph, assignments, dates and parameter validation before using a loaded draft.
 
 ## Current boundaries
 
-For reusable copies of your own schedules, use **Recipe library**. It stores named plans in the current browser and room, supports export/import and loads only into the local draft while retaining current zone start dates. See the [library guide and reference sources](RECIPE_LIBRARY.md).
+For reusable copies of your own schedules, use **Recipe library**. It stores named plans in the current browser and room, supports export/import and loads only into the local draft while retaining current zone start dates. See [Recipe library](#recipe-library) and its [reference sources](REFERENCES.md#plan-library-reference-sources).
 
 Plans steer irrigation targets, not tank dosing or environmental equipment. Closed-loop crop-response learning, measured flow reconciliation and automatic recipe optimisation remain future work. See the [feature matrix](FEATURE_MATRIX.md).

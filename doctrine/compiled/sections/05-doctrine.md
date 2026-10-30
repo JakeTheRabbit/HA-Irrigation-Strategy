@@ -106,7 +106,7 @@ SUB-06 [grower-practice] One dripper per plant is a single point of failure: one
 SUB-08 [grower-practice] Warm, persistently wet substrate starves roots of oxygen; root-zone temperature (about 20-26 C) matters alongside moisture. (GL-SLAB, GL-LAW)
 SUB-09 [vendor] Smaller substrate volumes dry back faster, which makes pore EC easier to steer. (VND-IRRIGATION)
 ### Feed and source water
-FEED-01 [product-rule] Read feed EC from a live or recent mapped sensor. Without that measurement, the dilution comparison uses declared recipe EC where available, otherwise the fallback 3.0 mS/cm. These are assumptions, not measurements: mark the feed unchecked and do not claim a measured feed strength. (CTRL, ENGINE, SKILL-CONCEPTS)
+FEED-01 [product-rule] Read feed EC from a live or recent mapped sensor. Without that measurement, the dilution comparison uses declared recipe EC where available; otherwise the feed EC is unknown and the engine takes no EC flush and no feed-based high-EC hold. A recipe EC is an assumption, not a measurement: mark the feed unchecked and do not claim a measured feed strength. (CTRL, ENGINE, SKILL-CONCEPTS)
 FEED-02 [research] EC measures ionic load, not full water quality: uncharged compounds escape it, and alkalinity (bicarbonate) can dominate pH behaviour. (USU)
 FEED-03 [research] Softening that swaps calcium and magnesium for sodium makes water worse for plants; verify reverse-osmosis output rather than assuming it. (USU)
 FEED-04 [research] Visual deficiency symptoms are late and non-specific; confirm root-zone pH and EC (and tissue tests where possible) before blaming the feed. (USU)

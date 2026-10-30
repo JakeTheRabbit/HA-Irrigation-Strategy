@@ -24,6 +24,7 @@ import logging
 
 from . import setpoint_log
 from .const import DOMAIN
+from .journal_api import attribution, note
 from .notify_api import KEEP, UNDO
 from .room import room_prefix
 
@@ -142,7 +143,14 @@ class Overlays:
             log = setpoint_log.log_for(self.hass, self.entry.entry_id)
             # Running out (no caller): the change log records the AI's change going back.
             if context is None and log is not None:
-                log.claim({"entity_id": entity_id, "value": row["old"], "who": "brain"})
+                log.claim(
+                    {
+                        "entity_id": entity_id,
+                        "value": row["old"],
+                        "who": "brain",
+                        "reason": "overlay ran out",
+                    }
+                )
             await self.hass.services.async_call(
                 "number",
                 "set_value",
@@ -151,6 +159,37 @@ class Overlays:
                 context=context,
             )
         return row
+
+    def journal(self, row, call, *, undone):
+        """Keep or Undo on an overlay -> a `target.changed` on the overlay layer that says the overlay is gone
+        (`new` is None). It is not a value change: Undo's put-back is the base layer's own row (setpoint_log),
+        and Keep moves no value."""
+        try:
+            who = attribution(self.hass, call)
+            zone = row.get("zone")
+            note(
+                self.hass,
+                self.room_id,
+                "target.changed",
+                zone=zone,
+                actor=who["actor"],
+                user_id=who["user_id"],
+                client=who["client"],
+                correlation={"proposal_token": who["proposal_token"]},
+                data={
+                    "key": row.get("field"),
+                    "scope": "room" if zone is None else f"zone:{zone}",
+                    "layer": "overlay",
+                    "old": row["new"],
+                    "new": None,
+                    "expires": row.get("expires"),
+                    "reason": "undone" if undone else "kept",
+                    "expected": None,
+                    "entity_id": row["entity_id"],
+                },
+            )
+        except Exception as err:  # the journal never undoes a keep or an undo
+            _LOGGER.debug("Overlay journal event not recorded: %s", err)
 
     async def _ran_out(self, entity_id, _now):
         from homeassistant.util import dt as dt_util
@@ -186,6 +225,7 @@ async def async_setup_overlays(hass, entry):
     from homeassistant.exceptions import HomeAssistantError
 
     from .admin import async_require_admin
+    from .api_v2 import fields, wrap
 
     held = Overlays(hass, entry)
     await held.async_init()
@@ -206,21 +246,30 @@ async def async_setup_overlays(hass, entry):
 
     async def keep(call):
         await async_require_admin(hass, call, f"{DOMAIN}.{call.service}")
-        if await room(call).end(call.data["entity_id"]) is None:
+        held = room(call)
+        ended = await held.end(call.data["entity_id"])
+        if ended is None:
             raise HomeAssistantError(f"No AI overlay on {call.data['entity_id']}")
+        held.journal(ended, call, undone=False)
 
     async def undo(call):
         await async_require_admin(hass, call, f"{DOMAIN}.{call.service}")
-        ended = await room(call).end(
+        held = room(call)
+        ended = await held.end(
             call.data["entity_id"], put_back=True, context=call.context
         )
         if ended is None:
             raise HomeAssistantError(f"No AI overlay on {call.data['entity_id']}")
+        held.journal(ended, call, undone=True)
 
-    one = vol.Schema({vol.Required("room_id"): str})
+    one = vol.Schema(fields({vol.Required("room_id"): str}))
     each = vol.Schema({vol.Required("room_id"): str, vol.Required("entity_id"): str})
     hass.services.async_register(
-        DOMAIN, "overlay_get", get, schema=one, supports_response=SupportsResponse.ONLY
+        DOMAIN,
+        "overlay_get",
+        wrap(get),
+        schema=one,
+        supports_response=SupportsResponse.ONLY,
     )
     hass.services.async_register(DOMAIN, "overlay_keep", keep, schema=each)
     hass.services.async_register(DOMAIN, "overlay_undo", undo, schema=each)

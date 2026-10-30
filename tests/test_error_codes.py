@@ -52,8 +52,11 @@ SHIPPED = {
 # CS-701 to CS-707 are the brain's today and are never reused.
 RESERVED = {
     "CS-210": ("fix/missing-hold-entity", "a hold entity Home Assistant does not have"),
+    "CS-214": ("feat/parity-system", "reserved by the parity plan, not used yet"),
     "CS-312": ("feat/max-run-latch", "a pump or valve on past its longest allowed run"),
     "CS-313": ("feat/actuator-domains", "an actuator the controller cannot switch"),
+    "CS-318": ("feat/parity-system", "reserved by the parity plan, not used yet"),
+    "CS-319": ("feat/parity-system", "reserved by the parity plan, not used yet"),
     "CS-315": ("feat/p2-safety-ops", "rescue shots that do not raise the moisture"),
     "CS-316": ("feat/p2-safety-ops", "a waste valve that is not closed for a shot"),
     "CS-317": ("feat/p2-safety-ops", "a pump that runs with every valve shut"),
@@ -65,6 +68,17 @@ RESERVED = {
     "CS-609": ("feat/duplicate-controller-guard", "two controllers on one room"),
     "CS-610": ("fix/one-kill-switch-rule", "a room switch that does not stop water"),
     "CS-611": ("feat/caps-scale-with-zone", "a setting held above its zone's limit"),
+    "CS-612": ("feat/parity-system", "a feed probe calibration due"),
+    "CS-613": (
+        "fix/deprecate-the-unused-recipe-system",
+        "a deprecated service or select in use",
+    ),
+    "CS-614": (
+        "fix/one-source-for-derived-watering-values",
+        "a retired entity an automation or script still uses",
+    ),
+    "CS-615": ("feat/parity-system", "probe offsets that cannot be read"),
+    "CS-616": ("feat/parity-backend", "the room's 3.18 upgrade report"),
     "CS-708": ("feat/claude-haiku-brain", "the brain"),
     "CS-709": ("feat/claude-haiku-brain", "the brain"),
     "CS-710": ("feat/brain-channel", "the brain: water finding a channel"),
@@ -76,6 +90,10 @@ RESERVED = {
     ),
     "CS-808": ("feat/mix-check", "a batch's mix off its EC or pH band"),
     "CS-211": ("feat/p6-dosing-ph-autocorrect", "a zone's shots held for too long"),
+    "CS-212": (
+        "fix/one-room-error-does-not-stop-the-others",
+        "a room whose pass raised an error",
+    ),
     "CS-809": ("feat/p6-dosing-ph-autocorrect", "the batch tank's pH not corrected"),
     "CS-810": ("feat/p6-dosing-ph-autocorrect", "the light dimmed on dry substrate"),
     "CS-811": ("feat/p6-dosing-ph-autocorrect", "the light dimmed too long"),
@@ -110,8 +128,10 @@ def _defined_twice(catalog: dict, *repairs: dict[str, str]) -> set[str]:
 
 
 def _bundled_codes(html: str) -> Counter:
-    """How often each code is an entry (`code:"CS-101"`) in a built dashboard."""
-    return Counter(re.findall(r"\bcode\"?:\s*[\"'`](CS-\d{3})[\"'`]", html))
+    """How often each code is an entry (`code:"CS-101",title:"…",source:"…"`) in a built dashboard.
+    An event or alert that only carries a code (the demo's Journal) is not an entry."""
+    entry = r"\bcode\"?:\s*[\"'`](CS-\d{3})[\"'`],\s*\"?title\"?:\s*([\"'`])(?:(?!\2).)*\2,\s*\"?source\"?:"
+    return Counter(match[1] for match in re.finditer(entry, html))
 
 
 def _unreserved(codes) -> set[str]:
@@ -268,8 +288,17 @@ def test_the_guard_catches_a_second_definition_and_an_unreserved_code():
     assert _defined_twice({"codes": []}, {"a": "CS-601"}, cards) == {"CS-601"}
     with pytest.raises(AssertionError, match=r"defined twice: \['a'\]"):
         _strict_json('{"issues": {"a": {}, "a": {}}}')
-    assert _bundled_codes('codes:[{code:`CS-101`},{"code":"CS-101"}]') == {"CS-101": 2}
-    assert _unreserved(["CS-105", "CS-319", "CS-609", "CS-901", "CS-207"]) == {
+    assert _bundled_codes(
+        'codes:[{code:`CS-101`,title:`A`,source:`repairs`},{"code":"CS-101","title":"A","source":"x"}]'
+    ) == {"CS-101": 2}
+    # An event or alert that carries a code (the demo's Journal) is not a definition.
+    assert (
+        _bundled_codes(
+            "{zone:2,code:`CS-102`,outcome:`partial`},{code:`CS-102`,title:`Back sensor`,zone:2}"
+        )
+        == {}
+    )
+    assert _unreserved(["CS-105", "CS-320", "CS-609", "CS-901", "CS-207"]) == {
         "CS-105",
-        "CS-319",
+        "CS-320",
     }

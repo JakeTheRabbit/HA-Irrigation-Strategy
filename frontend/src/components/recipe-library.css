@@ -134,3 +134,42 @@
     padding: 14px;
   }
 }
+
+/* Recipes › Import as presets: the preview table and a receipt per row. */
+.recipe-import {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 16px 20px;
+}
+.recipe-import h3 {
+  margin: 0;
+  font-size: var(--text-md);
+}
+.recipe-import p {
+  margin: 0;
+}
+.recipe-import-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+.recipe-import-table th,
+.recipe-import-table td {
+  padding: 6px 8px;
+  border-top: 1px solid var(--border);
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.recipe-import-table tr[data-exists] td {
+  color: var(--muted-foreground);
+}
+.recipe-import-receipts {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-sm);
+}
+.recipe-import-receipts li[data-receipt="refused"] {
+  color: var(--destructive);
+}

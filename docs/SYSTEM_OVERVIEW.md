@@ -10,4 +10,15 @@ P1 ends in one of three ways. At the target it gives one more shot, and ends onc
 
 The live loop applies source-water, sensor, enable/interlock, volume and duration gates before hardware sequencing. Readback failures latch shared equipment out. Local tests exercise these branches with fake HA; production hardware behavior still requires site verification.
 
+From 3.18 the integration also keeps one event journal for the site (`<config>/crop_steering/journal.db`): shots, holds, phase changes, alerts, doses, AI actions and setting changes from both the integration and the controller. The Timeline, Explorer, Changes and the alerts inbox read it. Watering never depends on it: if it fails, the controller keeps watering ([history and changes](features/history-and-changes.md)). The site-wide stores (supply, alert rules, presets) and the per-room stores (timer programs, display, calibration) are each saved against a revision, so a save that crossed another one is refused rather than lost.
+
+## How a decision is made
+
+1. Each minute, the controller reads the probes of each zone.
+2. It compares the readings with your targets. It finds the phase of each zone and decides if a shot is necessary. These are the rules of the controller.
+3. When a decision needs judgement, the controller can ask the AI assistant a question in the background. Examples: "Is the substrate full?" and "Is this probe stuck?".
+4. The controller sends the facts with the question, for example "VWC increased 3.1 points after the 10:40 shot". It does not wait for the answer.
+5. Code compares each answer with hard limits. These limits are the **envelope**. When the envelope accepts the answer, the controller does the action. When the envelope refuses it, nothing changes, and the log records the reason.
+6. Later, code measures the result of the action. The dashboard shows a tick or a cross. The AI assistant sees its own record the next time.
+
 See [repository map](REPOSITORY_MAP.md), [installation](INSTALL.md), [grow plans](GROW_PLANS.md) and [validated feature matrix](FEATURE_MATRIX.md).

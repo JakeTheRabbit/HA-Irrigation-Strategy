@@ -8,6 +8,7 @@ import re
 from datetime import date
 
 from .const import MOISTURE_RANGES
+from .generated.shot_length import raw_seconds, shot_seconds, valid_cap
 
 SCHEMA_VERSION = 1
 REQUIRED_PARAMETERS = (
@@ -380,17 +381,20 @@ def hydraulic_preview(sizing, parameters):
         * values["dripper_flow_lph"]
         / 3600
     )
+    # The controller's own rule (shot_length.py): a cap that is not one (under 5 s) runs no shot.
+    cap = valid_cap(values["max_shot_duration"])
     shots = {}
     for key in ("p1_initial_shot_size", "p2_shot_size", "p3_emergency_shot_size"):
         if key not in parameters:
             continue
-        volume = finite(parameters[key], key) / 100 * substrate
-        duration = volume / flow
+        size = finite(parameters[key], key)
+        volume = size / 100 * substrate
+        duration = raw_seconds(size, substrate, flow)
         shots[key] = {
             "volume_l": round(volume, 6),
             "duration_s": round(duration, 6),
-            "capped_duration_s": max(
-                5, min(int(values["max_shot_duration"]), int(duration))
+            "capped_duration_s": (
+                shot_seconds(duration, cap) if cap is not None else None
             ),
         }
     return {

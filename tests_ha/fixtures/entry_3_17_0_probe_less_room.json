@@ -1,0 +1,820 @@
+{
+ "_about": "A pumped two-zone named room ('Flower room', prefix flower_room_) as the 3.17.0 integration and controller left it, recorded by running that release's own wizard, services and controller (git archive v3.17.0, 81140bd5) in the tests_ha Docker image's real Home Assistant, not written by hand (recorder: migration-report.md). Pump + main line + two valves, declared plumbing 'pump_mainline_valves', a uS/cm EC probe on zone 2, a feed pH probe and NO feed EC probe (so 3.17.0 assumed a 3.0 mS/cm feed), the zones' ladders and two room numbers set by the operator, the recipe's Bulk stage edited and made active, two phones in the notify store, a dosing setup with a nutrient pump and a pH-down pump, and the display option show_camera on. 'stores' are the Home Assistant Store documents 3.17.0 wrote (key with <entry_id> for the entry id); 'controller_saved' is the /data/state.json the 3.17.0 controller saved after adopting the room and one armed pass.",
+ "entry_id": "01M5KD6ZM367J5R7869G5SRGPM",
+ "unique_id": "room_flower_room",
+ "title": "Flower room",
+ "version": 1,
+ "minor_version": 1,
+ "data": {
+  "installation_mode": "manual",
+  "config_method": "manual",
+  "name": "Flower room",
+  "room_name": "Flower room",
+  "room_prefix": "flower_room_",
+  "room_slug": "flower_room",
+  "drainage": "unknown",
+  "num_zones": 2,
+  "zones": {
+   "1": {
+    "zone_number": 1,
+    "active": true,
+    "name": "Bench 1",
+    "zone_switch": "switch.zone_1_valve",
+    "vwc_sensors": [
+     "sensor.zone_1_vwc"
+    ],
+    "ec_sensors": [
+     "sensor.zone_1_ec"
+    ],
+    "vwc_front": "sensor.zone_1_vwc",
+    "vwc_back": "",
+    "ec_front": "sensor.zone_1_ec",
+    "ec_back": "",
+    "plant_count": 12,
+    "max_daily_volume": 20.0
+   },
+   "2": {
+    "zone_number": 2,
+    "active": true,
+    "name": "Bench 2",
+    "zone_switch": "switch.zone_2_valve",
+    "vwc_sensors": [
+     "sensor.zone_2_vwc"
+    ],
+    "ec_sensors": [
+     "sensor.zone_2_ec"
+    ],
+    "vwc_front": "sensor.zone_2_vwc",
+    "vwc_back": "",
+    "ec_front": "sensor.zone_2_ec",
+    "ec_back": "",
+    "plant_count": 12,
+    "max_daily_volume": 20.0
+   }
+  },
+  "hardware": {
+   "pump_switch": "switch.irrigation_pump",
+   "main_line_switch": "switch.irrigation_main_line",
+   "waste_switch": "",
+   "feed_ec_sensor": "",
+   "feed_ph_sensor": "sensor.feed_ph",
+   "light_entity": "",
+   "temperature_sensor": "",
+   "humidity_sensor": "",
+   "vpd_sensor": "",
+   "leaf_temperature_sensor": "",
+   "water_level_sensor": "",
+   "tank_temperature_sensor": "",
+   "tank_ec_sensor": "",
+   "tank_ph_sensor": "",
+   "tank_last_fill_sensor": "",
+   "tank_fill_entity": "",
+   "notification_service": ""
+  },
+  "parameters": {
+   "substrate_volume": 10.0,
+   "dripper_flow_rate": 1.2,
+   "drippers_per_plant": 2,
+   "field_capacity": 70.0,
+   "max_ec": 9.0,
+   "lights_on_hour": 12,
+   "lights_off_hour": 0
+  },
+  "features": {
+   "ec_stacking": false,
+   "analytics": true,
+   "ml_features": false
+  },
+  "enable_flag": "switch.crop_steering_flower_room_engine_enabled",
+  "max_run_latch": true,
+  "plumbing": "pump_mainline_valves",
+  "active": true,
+  "setup_revision": 1,
+  "p0_additional_dryback": 3.0,
+  "commissioning": {
+   "done": false
+  }
+ },
+ "options": {},
+ "states": {
+  "switch.irrigation_pump": [
+   "off",
+   {}
+  ],
+  "switch.irrigation_main_line": [
+   "off",
+   {}
+  ],
+  "switch.zone_1_valve": [
+   "off",
+   {}
+  ],
+  "switch.zone_2_valve": [
+   "off",
+   {}
+  ],
+  "sensor.zone_1_vwc": [
+   "52",
+   {
+    "unit_of_measurement": "%"
+   }
+  ],
+  "sensor.zone_2_vwc": [
+   "49",
+   {
+    "unit_of_measurement": "%"
+   }
+  ],
+  "sensor.zone_1_ec": [
+   "4.2",
+   {
+    "unit_of_measurement": "mS/cm"
+   }
+  ],
+  "sensor.zone_2_ec": [
+   "3900",
+   {
+    "unit_of_measurement": "µS/cm"
+   }
+  ],
+  "sensor.feed_ph": [
+   "5.9",
+   {}
+  ],
+  "number.doser_a_volume": [
+   "25",
+   {}
+  ],
+  "button.doser_a_start": [
+   "unknown",
+   {}
+  ],
+  "binary_sensor.doser_a_dosing": [
+   "off",
+   {}
+  ],
+  "switch.doser_a_power": [
+   "off",
+   {}
+  ],
+  "number.doser_a_flow": [
+   "11.06",
+   {}
+  ],
+  "number.doser_ph_volume": [
+   "25",
+   {}
+  ],
+  "button.doser_ph_start": [
+   "unknown",
+   {}
+  ],
+  "binary_sensor.doser_ph_dosing": [
+   "off",
+   {}
+  ],
+  "switch.doser_ph_power": [
+   "off",
+   {}
+  ],
+  "number.doser_ph_flow": [
+   "9.8",
+   {}
+  ],
+  "switch.tank_fill": [
+   "off",
+   {}
+  ],
+  "binary_sensor.tank_full": [
+   "off",
+   {}
+  ],
+  "switch.tank_mixer": [
+   "off",
+   {}
+  ]
+ },
+ "operator_tuned_numbers": {
+  "number.crop_steering_flower_room_zone_1_p2_vwc_threshold": "44.0",
+  "number.crop_steering_flower_room_zone_1_p1_target_vwc": "58.5",
+  "number.crop_steering_flower_room_zone_2_p2_vwc_threshold": "43.5",
+  "number.crop_steering_flower_room_zone_2_p1_target_vwc": "57.0",
+  "number.crop_steering_flower_room_p2_shot_size": "4.5",
+  "number.crop_steering_flower_room_maximum_ec": "8.0"
+ },
+ "registry": {
+  "switch.crop_steering_flower_room_room_active": "room_active",
+  "switch.crop_steering_flower_room_auto_setpoints": "auto_setpoints",
+  "switch.crop_steering_flower_room_max_run_latch": "max_run_latch",
+  "switch.crop_steering_flower_room_p0_stall_exit": "p0_stall_exit",
+  "switch.crop_steering_flower_room_use_p2_ec_thresholds": "use_p2_ec_thresholds",
+  "switch.crop_steering_flower_room_ec_stacking_enabled": "ec_stacking_enabled",
+  "switch.crop_steering_flower_room_notify_predictions": "notify_predictions",
+  "switch.crop_steering_flower_room_manual_hardware_enabled": "manual_hardware_enabled",
+  "switch.crop_steering_flower_room_record_grow_days": "record_grow_days",
+  "switch.crop_steering_flower_room_system_enabled": "system_enabled",
+  "switch.crop_steering_flower_room_auto_irrigation_enabled": "auto_irrigation_enabled",
+  "switch.crop_steering_flower_room_water_vpd_insight": "water_vpd_insight",
+  "switch.crop_steering_flower_room_plant_stress_card": "plant_stress_card",
+  "switch.crop_steering_flower_room_ph_auto_correct": "ph_auto_correct",
+  "switch.crop_steering_flower_room_dry_dim": "dry_dim",
+  "switch.crop_steering_flower_room_ai_power_advance_phase": "ai_power_advance_phase",
+  "switch.crop_steering_flower_room_ai_power_ramp_control": "ai_power_ramp_control",
+  "switch.crop_steering_flower_room_ai_power_set_probe_aside": "ai_power_set_probe_aside",
+  "switch.crop_steering_flower_room_ai_power_ec_mode": "ai_power_ec_mode",
+  "switch.crop_steering_flower_room_ai_power_nudge_setpoints": "ai_power_nudge_setpoints",
+  "switch.crop_steering_flower_room_ai_power_plan_catch_up": "ai_power_plan_catch_up",
+  "switch.crop_steering_flower_room_ai_power_set_targets_from_achievable": "ai_power_set_targets_from_achievable",
+  "switch.crop_steering_flower_room_ai_power_tune_shot_sizes": "ai_power_tune_shot_sizes",
+  "switch.crop_steering_flower_room_rescue_past_dead_feed_probe": "rescue_past_dead_feed_probe",
+  "switch.crop_steering_flower_room_engine_enabled": "engine_enabled",
+  "switch.crop_steering_flower_room_zone_1_enabled": "zone_1_enabled",
+  "switch.crop_steering_flower_room_zone_1_manual_override": "zone_1_manual_override",
+  "switch.crop_steering_flower_room_zone_1_p3_dryback_hold": "zone_1_p3_dryback_hold",
+  "switch.crop_steering_flower_room_zone_2_enabled": "zone_2_enabled",
+  "switch.crop_steering_flower_room_zone_2_manual_override": "zone_2_manual_override",
+  "switch.crop_steering_flower_room_zone_2_p3_dryback_hold": "zone_2_p3_dryback_hold",
+  "select.crop_steering_flower_room_growth_stage": "growth_stage",
+  "select.crop_steering_flower_room_steering_mode": "steering_mode",
+  "select.crop_steering_flower_room_irrigation_phase": "irrigation_phase",
+  "select.crop_steering_flower_room_recipe_stage": "recipe_stage",
+  "select.crop_steering_flower_room_water_today_view": "water_today_view",
+  "select.crop_steering_flower_room_drainage": "drainage",
+  "select.crop_steering_flower_room_substrate": "substrate",
+  "select.crop_steering_flower_room_setpoint_step_limit_applies_to": "setpoint_step_limit_applies_to",
+  "select.crop_steering_flower_room_ai_no_touch": "ai_no_touch",
+  "select.crop_steering_flower_room_runoff_estimator": "runoff_estimator",
+  "select.crop_steering_flower_room_shot_check": "shot_check",
+  "select.crop_steering_flower_room_rescue_miss_action": "rescue_miss_action",
+  "select.crop_steering_flower_room_waste_valve_rule": "waste_valve_rule",
+  "select.crop_steering_flower_room_zone_1_steering_mode": "zone_1_steering_mode",
+  "select.crop_steering_flower_room_zone_1_p2_mode": "zone_1_p2_mode",
+  "select.crop_steering_flower_room_zone_1_set_phase": "zone_1_set_phase",
+  "select.crop_steering_flower_room_zone_1_vwc_method": "zone_1_vwc_method",
+  "select.crop_steering_flower_room_zone_1_ec_method": "zone_1_ec_method",
+  "select.crop_steering_flower_room_ec_type_zone_1_ec": "ec_type_zone_1_ec",
+  "select.crop_steering_flower_room_zone_2_steering_mode": "zone_2_steering_mode",
+  "select.crop_steering_flower_room_zone_2_p2_mode": "zone_2_p2_mode",
+  "select.crop_steering_flower_room_zone_2_set_phase": "zone_2_set_phase",
+  "select.crop_steering_flower_room_zone_2_vwc_method": "zone_2_vwc_method",
+  "select.crop_steering_flower_room_zone_2_ec_method": "zone_2_ec_method",
+  "select.crop_steering_flower_room_ec_type_zone_2_ec": "ec_type_zone_2_ec",
+  "sensor.crop_steering_flower_room_current_phase": "current_phase",
+  "sensor.crop_steering_flower_room_p1_shot_duration_seconds": "p1_shot_duration_seconds",
+  "sensor.crop_steering_flower_room_p2_shot_duration_seconds": "p2_shot_duration_seconds",
+  "sensor.crop_steering_flower_room_p3_shot_duration_seconds": "p3_shot_duration_seconds",
+  "sensor.crop_steering_flower_room_ec_ratio": "ec_ratio",
+  "sensor.crop_steering_flower_room_p2_vwc_threshold_adjusted": "p2_vwc_threshold_adjusted",
+  "sensor.crop_steering_flower_room_configured_avg_vwc": "configured_avg_vwc",
+  "sensor.crop_steering_flower_room_configured_avg_ec": "configured_avg_ec",
+  "sensor.crop_steering_flower_room_vwc_zone_1": "vwc_zone_1",
+  "sensor.crop_steering_flower_room_ec_zone_1": "ec_zone_1",
+  "sensor.crop_steering_flower_room_zone_1_status": "zone_1_status",
+  "sensor.crop_steering_flower_room_zone_1_last_irrigation": "zone_1_last_irrigation",
+  "sensor.crop_steering_flower_room_zone_1_daily_water_usage": "zone_1_daily_water_usage",
+  "sensor.crop_steering_flower_room_zone_1_weekly_water_usage": "zone_1_weekly_water_usage",
+  "sensor.crop_steering_flower_room_zone_1_irrigation_count_today": "zone_1_irrigation_count_today",
+  "sensor.crop_steering_flower_room_vwc_zone_2": "vwc_zone_2",
+  "sensor.crop_steering_flower_room_ec_zone_2": "ec_zone_2",
+  "sensor.crop_steering_flower_room_zone_2_status": "zone_2_status",
+  "sensor.crop_steering_flower_room_zone_2_last_irrigation": "zone_2_last_irrigation",
+  "sensor.crop_steering_flower_room_zone_2_daily_water_usage": "zone_2_daily_water_usage",
+  "sensor.crop_steering_flower_room_zone_2_weekly_water_usage": "zone_2_weekly_water_usage",
+  "sensor.crop_steering_flower_room_zone_2_irrigation_count_today": "zone_2_irrigation_count_today",
+  "sensor.crop_steering_flower_room_engine_config": "engine_config",
+  "sensor.crop_steering_flower_room_stock_low": "stock_low",
+  "sensor.crop_steering_flower_room_dosing_config": "dosing_config",
+  "sensor.crop_steering_flower_room_brain_questions": "brain_questions",
+  "sensor.crop_steering_flower_room_brain_prompt_config": "brain_prompt_config",
+  "sensor.crop_steering_flower_room_display": "display",
+  "number.crop_steering_flower_room_max_shot_duration": "max_shot_duration",
+  "number.crop_steering_flower_room_pump_prime_time": "pump_prime_time",
+  "number.crop_steering_flower_room_main_line_lead_time": "main_line_lead_time",
+  "number.crop_steering_flower_room_substrate_volume": "substrate_volume",
+  "number.crop_steering_flower_room_dripper_flow_rate": "dripper_flow_rate",
+  "number.crop_steering_flower_room_drippers_per_plant": "drippers_per_plant",
+  "number.crop_steering_flower_room_field_capacity": "field_capacity",
+  "number.crop_steering_flower_room_maximum_ec": "maximum_ec",
+  "number.crop_steering_flower_room_watchdog_hours": "watchdog_hours",
+  "number.crop_steering_flower_room_vegetative_dryback_target": "vegetative_dryback_target",
+  "number.crop_steering_flower_room_generative_dryback_target": "generative_dryback_target",
+  "number.crop_steering_flower_room_p1_target_vwc": "p1_target_vwc",
+  "number.crop_steering_flower_room_p2_vwc_threshold": "p2_vwc_threshold",
+  "number.crop_steering_flower_room_p0_maximum_wait_time": "p0_maximum_wait_time",
+  "number.crop_steering_flower_room_p0_dryback_drop_percent": "p0_dryback_drop_percent",
+  "number.crop_steering_flower_room_p0_minimum_wait": "p0_minimum_wait",
+  "number.crop_steering_flower_room_p1_initial_shot_size": "p1_initial_shot_size",
+  "number.crop_steering_flower_room_p1_shot_size_increment": "p1_shot_size_increment",
+  "number.crop_steering_flower_room_p1_time_between_shots": "p1_time_between_shots",
+  "number.crop_steering_flower_room_p1_maximum_shots": "p1_maximum_shots",
+  "number.crop_steering_flower_room_p1_minimum_shots": "p1_minimum_shots",
+  "number.crop_steering_flower_room_p1_rise_pts": "p1_rise_pts",
+  "number.crop_steering_flower_room_p1_maximum_extra_shots": "p1_maximum_extra_shots",
+  "number.crop_steering_flower_room_p2_shot_size": "p2_shot_size",
+  "number.crop_steering_flower_room_p2_time_between_shots": "p2_time_between_shots",
+  "number.crop_steering_flower_room_ec_min_interval": "ec_min_interval",
+  "number.crop_steering_flower_room_ec_flush_target": "ec_flush_target",
+  "number.crop_steering_flower_room_p2_timed_interval_min": "p2_timed_interval_min",
+  "number.crop_steering_flower_room_p2_timed_shot_size": "p2_timed_shot_size",
+  "number.crop_steering_flower_room_p2_timed_first_hours": "p2_timed_first_hours",
+  "number.crop_steering_flower_room_p2_end_hours_before_off": "p2_end_hours_before_off",
+  "number.crop_steering_flower_room_p2_dilute_ratio": "p2_dilute_ratio",
+  "number.crop_steering_flower_room_p2_ec_high_threshold": "p2_ec_high_threshold",
+  "number.crop_steering_flower_room_p2_ec_low_threshold": "p2_ec_low_threshold",
+  "number.crop_steering_flower_room_p3_emergency_vwc_threshold": "p3_emergency_vwc_threshold",
+  "number.crop_steering_flower_room_p3_emergency_shot_size": "p3_emergency_shot_size",
+  "number.crop_steering_flower_room_p3_time_between_shots": "p3_time_between_shots",
+  "number.crop_steering_flower_room_ec_target_veg_p0": "ec_target_veg_p0",
+  "number.crop_steering_flower_room_ec_target_veg_p1": "ec_target_veg_p1",
+  "number.crop_steering_flower_room_ec_target_veg_p2": "ec_target_veg_p2",
+  "number.crop_steering_flower_room_ec_target_veg_p3": "ec_target_veg_p3",
+  "number.crop_steering_flower_room_ec_target_gen_p0": "ec_target_gen_p0",
+  "number.crop_steering_flower_room_ec_target_gen_p1": "ec_target_gen_p1",
+  "number.crop_steering_flower_room_ec_target_gen_p2": "ec_target_gen_p2",
+  "number.crop_steering_flower_room_ec_target_gen_p3": "ec_target_gen_p3",
+  "number.crop_steering_flower_room_irrigation_ph_min": "irrigation_ph_min",
+  "number.crop_steering_flower_room_irrigation_ph_max": "irrigation_ph_max",
+  "number.crop_steering_flower_room_irrigation_ec_min": "irrigation_ec_min",
+  "number.crop_steering_flower_room_irrigation_ec_max": "irrigation_ec_max",
+  "number.crop_steering_flower_room_lights_on_hour": "lights_on_hour",
+  "number.crop_steering_flower_room_lights_off_hour": "lights_off_hour",
+  "number.crop_steering_flower_room_setpoint_max_step_per_day": "setpoint_max_step_per_day",
+  "number.crop_steering_flower_room_sump_power_threshold_w": "sump_power_threshold_w",
+  "number.crop_steering_flower_room_sump_litres_per_run": "sump_litres_per_run",
+  "number.crop_steering_flower_room_sump_pump_flow_lpm": "sump_pump_flow_lpm",
+  "number.crop_steering_flower_room_runoff_attribution_min": "runoff_attribution_min",
+  "number.crop_steering_flower_room_hvac_run_power_w": "hvac_run_power_w",
+  "number.crop_steering_flower_room_cwsi_lower_baseline": "cwsi_lower_baseline",
+  "number.crop_steering_flower_room_cwsi_upper_baseline": "cwsi_upper_baseline",
+  "number.crop_steering_flower_room_zone_1_plant_count": "zone_1_plant_count",
+  "number.crop_steering_flower_room_zone_1_max_daily_volume": "zone_1_max_daily_volume",
+  "number.crop_steering_flower_room_zone_1_min_daily_ml_per_plant": "zone_1_min_daily_ml_per_plant",
+  "number.crop_steering_flower_room_zone_1_vegetative_dryback_target": "zone_1_vegetative_dryback_target",
+  "number.crop_steering_flower_room_zone_1_generative_dryback_target": "zone_1_generative_dryback_target",
+  "number.crop_steering_flower_room_zone_1_p0_maximum_wait_time": "zone_1_p0_maximum_wait_time",
+  "number.crop_steering_flower_room_zone_1_p0_dryback_drop_percent": "zone_1_p0_dryback_drop_percent",
+  "number.crop_steering_flower_room_zone_1_p0_minimum_wait": "zone_1_p0_minimum_wait",
+  "number.crop_steering_flower_room_zone_1_p1_target_vwc": "zone_1_p1_target_vwc",
+  "number.crop_steering_flower_room_zone_1_p1_initial_shot_size": "zone_1_p1_initial_shot_size",
+  "number.crop_steering_flower_room_zone_1_p1_shot_size_increment": "zone_1_p1_shot_size_increment",
+  "number.crop_steering_flower_room_zone_1_p1_time_between_shots": "zone_1_p1_time_between_shots",
+  "number.crop_steering_flower_room_zone_1_p1_maximum_shots": "zone_1_p1_maximum_shots",
+  "number.crop_steering_flower_room_zone_1_p1_minimum_shots": "zone_1_p1_minimum_shots",
+  "number.crop_steering_flower_room_zone_1_p1_rise_pts": "zone_1_p1_rise_pts",
+  "number.crop_steering_flower_room_zone_1_p1_maximum_extra_shots": "zone_1_p1_maximum_extra_shots",
+  "number.crop_steering_flower_room_zone_1_p2_vwc_threshold": "zone_1_p2_vwc_threshold",
+  "number.crop_steering_flower_room_zone_1_p2_shot_size": "zone_1_p2_shot_size",
+  "number.crop_steering_flower_room_zone_1_p2_time_between_shots": "zone_1_p2_time_between_shots",
+  "number.crop_steering_flower_room_zone_1_ec_min_interval": "zone_1_ec_min_interval",
+  "number.crop_steering_flower_room_zone_1_ec_flush_target": "zone_1_ec_flush_target",
+  "number.crop_steering_flower_room_zone_1_p2_dilute_ratio": "zone_1_p2_dilute_ratio",
+  "number.crop_steering_flower_room_zone_1_p2_timed_interval_min": "zone_1_p2_timed_interval_min",
+  "number.crop_steering_flower_room_zone_1_p2_timed_shot_size": "zone_1_p2_timed_shot_size",
+  "number.crop_steering_flower_room_zone_1_p2_timed_first_hours": "zone_1_p2_timed_first_hours",
+  "number.crop_steering_flower_room_zone_1_p2_end_hours_before_off": "zone_1_p2_end_hours_before_off",
+  "number.crop_steering_flower_room_zone_1_p3_emergency_vwc_threshold": "zone_1_p3_emergency_vwc_threshold",
+  "number.crop_steering_flower_room_zone_1_p3_emergency_shot_size": "zone_1_p3_emergency_shot_size",
+  "number.crop_steering_flower_room_zone_1_p3_time_between_shots": "zone_1_p3_time_between_shots",
+  "number.crop_steering_flower_room_zone_1_ec_target_veg_p0": "zone_1_ec_target_veg_p0",
+  "number.crop_steering_flower_room_zone_1_ec_target_veg_p1": "zone_1_ec_target_veg_p1",
+  "number.crop_steering_flower_room_zone_1_ec_target_veg_p2": "zone_1_ec_target_veg_p2",
+  "number.crop_steering_flower_room_zone_1_ec_target_gen_p0": "zone_1_ec_target_gen_p0",
+  "number.crop_steering_flower_room_zone_1_ec_target_gen_p1": "zone_1_ec_target_gen_p1",
+  "number.crop_steering_flower_room_zone_1_ec_target_gen_p2": "zone_1_ec_target_gen_p2",
+  "number.crop_steering_flower_room_zone_1_field_capacity": "zone_1_field_capacity",
+  "number.crop_steering_flower_room_zone_1_maximum_ec": "zone_1_maximum_ec",
+  "number.crop_steering_flower_room_zone_1_watchdog_hours": "zone_1_watchdog_hours",
+  "number.crop_steering_flower_room_zone_1_p0_additional_dryback": "zone_1_p0_additional_dryback",
+  "number.crop_steering_flower_room_zone_2_plant_count": "zone_2_plant_count",
+  "number.crop_steering_flower_room_zone_2_max_daily_volume": "zone_2_max_daily_volume",
+  "number.crop_steering_flower_room_zone_2_min_daily_ml_per_plant": "zone_2_min_daily_ml_per_plant",
+  "number.crop_steering_flower_room_zone_2_vegetative_dryback_target": "zone_2_vegetative_dryback_target",
+  "number.crop_steering_flower_room_zone_2_generative_dryback_target": "zone_2_generative_dryback_target",
+  "number.crop_steering_flower_room_zone_2_p0_maximum_wait_time": "zone_2_p0_maximum_wait_time",
+  "number.crop_steering_flower_room_zone_2_p0_dryback_drop_percent": "zone_2_p0_dryback_drop_percent",
+  "number.crop_steering_flower_room_zone_2_p0_minimum_wait": "zone_2_p0_minimum_wait",
+  "number.crop_steering_flower_room_zone_2_p1_target_vwc": "zone_2_p1_target_vwc",
+  "number.crop_steering_flower_room_zone_2_p1_initial_shot_size": "zone_2_p1_initial_shot_size",
+  "number.crop_steering_flower_room_zone_2_p1_shot_size_increment": "zone_2_p1_shot_size_increment",
+  "number.crop_steering_flower_room_zone_2_p1_time_between_shots": "zone_2_p1_time_between_shots",
+  "number.crop_steering_flower_room_zone_2_p1_maximum_shots": "zone_2_p1_maximum_shots",
+  "number.crop_steering_flower_room_zone_2_p1_minimum_shots": "zone_2_p1_minimum_shots",
+  "number.crop_steering_flower_room_zone_2_p1_rise_pts": "zone_2_p1_rise_pts",
+  "number.crop_steering_flower_room_zone_2_p1_maximum_extra_shots": "zone_2_p1_maximum_extra_shots",
+  "number.crop_steering_flower_room_zone_2_p2_vwc_threshold": "zone_2_p2_vwc_threshold",
+  "number.crop_steering_flower_room_zone_2_p2_shot_size": "zone_2_p2_shot_size",
+  "number.crop_steering_flower_room_zone_2_p2_time_between_shots": "zone_2_p2_time_between_shots",
+  "number.crop_steering_flower_room_zone_2_ec_min_interval": "zone_2_ec_min_interval",
+  "number.crop_steering_flower_room_zone_2_ec_flush_target": "zone_2_ec_flush_target",
+  "number.crop_steering_flower_room_zone_2_p2_dilute_ratio": "zone_2_p2_dilute_ratio",
+  "number.crop_steering_flower_room_zone_2_p2_timed_interval_min": "zone_2_p2_timed_interval_min",
+  "number.crop_steering_flower_room_zone_2_p2_timed_shot_size": "zone_2_p2_timed_shot_size",
+  "number.crop_steering_flower_room_zone_2_p2_timed_first_hours": "zone_2_p2_timed_first_hours",
+  "number.crop_steering_flower_room_zone_2_p2_end_hours_before_off": "zone_2_p2_end_hours_before_off",
+  "number.crop_steering_flower_room_zone_2_p3_emergency_vwc_threshold": "zone_2_p3_emergency_vwc_threshold",
+  "number.crop_steering_flower_room_zone_2_p3_emergency_shot_size": "zone_2_p3_emergency_shot_size",
+  "number.crop_steering_flower_room_zone_2_p3_time_between_shots": "zone_2_p3_time_between_shots",
+  "number.crop_steering_flower_room_zone_2_ec_target_veg_p0": "zone_2_ec_target_veg_p0",
+  "number.crop_steering_flower_room_zone_2_ec_target_veg_p1": "zone_2_ec_target_veg_p1",
+  "number.crop_steering_flower_room_zone_2_ec_target_veg_p2": "zone_2_ec_target_veg_p2",
+  "number.crop_steering_flower_room_zone_2_ec_target_gen_p0": "zone_2_ec_target_gen_p0",
+  "number.crop_steering_flower_room_zone_2_ec_target_gen_p1": "zone_2_ec_target_gen_p1",
+  "number.crop_steering_flower_room_zone_2_ec_target_gen_p2": "zone_2_ec_target_gen_p2",
+  "number.crop_steering_flower_room_zone_2_field_capacity": "zone_2_field_capacity",
+  "number.crop_steering_flower_room_zone_2_maximum_ec": "zone_2_maximum_ec",
+  "number.crop_steering_flower_room_zone_2_watchdog_hours": "zone_2_watchdog_hours",
+  "number.crop_steering_flower_room_zone_2_p0_additional_dryback": "zone_2_p0_additional_dryback",
+  "number.crop_steering_flower_room_ph_correct_dose_s": "ph_correct_dose_s",
+  "number.crop_steering_flower_room_ph_correct_max_tries": "ph_correct_max_tries",
+  "number.crop_steering_flower_room_ph_correct_mix_min": "ph_correct_mix_min",
+  "number.crop_steering_flower_room_ph_correct_daily_max": "ph_correct_daily_max",
+  "number.crop_steering_flower_room_ph_correct_margin": "ph_correct_margin",
+  "number.crop_steering_flower_room_dry_dim_floor_vwc": "dry_dim_floor_vwc",
+  "number.crop_steering_flower_room_dry_dim_level_pct": "dry_dim_level_pct",
+  "number.crop_steering_flower_room_dry_dim_after_min": "dry_dim_after_min",
+  "number.crop_steering_flower_room_dry_dim_max_h": "dry_dim_max_h",
+  "number.crop_steering_flower_room_held_alert_hours": "held_alert_hours",
+  "number.crop_steering_flower_room_rescue_miss_count": "rescue_miss_count",
+  "number.crop_steering_flower_room_tank_size_l": "tank_size_l",
+  "number.crop_steering_flower_room_tank_estimate_low_pct": "tank_estimate_low_pct",
+  "number.crop_steering_flower_room_pump_deadhead_watts": "pump_deadhead_watts",
+  "number.crop_steering_flower_room_zone_1_manual_shot_seconds": "zone_1_manual_shot_seconds",
+  "number.crop_steering_flower_room_zone_2_manual_shot_seconds": "zone_2_manual_shot_seconds",
+  "button.crop_steering_flower_room_zone_1_test_shot": "zone_1_test_shot",
+  "button.crop_steering_flower_room_zone_2_test_shot": "zone_2_test_shot",
+  "button.crop_steering_flower_room_stop_all": "stop_all",
+  "button.crop_steering_flower_room_tank_filled": "tank_filled"
+ },
+ "stores": {
+  "crop_steering_recipes_<entry_id>": {
+   "version": 1,
+   "active_stage": "Bulk",
+   "stages": {
+    "Veg": {
+     "p1_target_vwc": 70.0,
+     "p2_vwc_threshold": 60.0,
+     "generative_dryback_target": 15.0,
+     "p0_dryback_drop_percent": 12.0,
+     "ec_target_gen_p1": 2.0,
+     "ec_target_gen_p2": 2.5,
+     "maximum_ec": 7.0,
+     "p2_shot_size": 5.0
+    },
+    "Transition": {
+     "p1_target_vwc": 66.0,
+     "p2_vwc_threshold": 56.0,
+     "generative_dryback_target": 22.0,
+     "p0_dryback_drop_percent": 18.0,
+     "ec_target_gen_p1": 2.6,
+     "ec_target_gen_p2": 3.0,
+     "maximum_ec": 8.0,
+     "p2_shot_size": 5.0
+    },
+    "Bulk": {
+     "p1_target_vwc": 60.0,
+     "p2_vwc_threshold": 47.0,
+     "generative_dryback_target": 32.0,
+     "p0_dryback_drop_percent": 24.0,
+     "ec_target_gen_p1": 3.0,
+     "ec_target_gen_p2": 3.5,
+     "maximum_ec": 9.5,
+     "p2_shot_size": 6.0
+    },
+    "Ripen": {
+     "p1_target_vwc": 58.0,
+     "p2_vwc_threshold": 46.0,
+     "generative_dryback_target": 42.0,
+     "p0_dryback_drop_percent": 30.0,
+     "ec_target_gen_p1": 3.4,
+     "ec_target_gen_p2": 4.0,
+     "maximum_ec": 10.0,
+     "p2_shot_size": 6.0
+    },
+    "Custom": {
+     "p1_target_vwc": 62.0,
+     "p2_vwc_threshold": 50.0,
+     "generative_dryback_target": 32.0,
+     "p0_dryback_drop_percent": 24.0,
+     "ec_target_gen_p1": 3.0,
+     "ec_target_gen_p2": 3.5,
+     "maximum_ec": 9.0,
+     "p2_shot_size": 6.0
+    }
+   }
+  },
+  "crop_steering.notify": {
+   "revision": 1,
+   "idle_hours": 3,
+   "recipients": [
+    {
+     "service": "notify.mobile_app_grower_phone",
+     "name": "Grower phone",
+     "user_id": null,
+     "kinds": [
+      "emergency",
+      "hardware",
+      "watering"
+     ],
+     "rooms": [],
+     "urgent_high_priority": true,
+     "digest": false
+    },
+    {
+     "service": "notify.mobile_app_office_tablet",
+     "name": "Office tablet",
+     "user_id": null,
+     "kinds": [
+      "emergency",
+      "stock"
+     ],
+     "rooms": [
+      "flower_room_"
+     ],
+     "urgent_high_priority": false,
+     "digest": true
+    }
+   ],
+   "digest_hours": 4,
+   "mutes": {}
+  },
+  "crop_steering.dosing.<entry_id>": {
+   "revision": 1,
+   "pumps": [
+    {
+     "id": "part_a",
+     "name": "Part A",
+     "volume_entity": "number.doser_a_volume",
+     "start_entity": "button.doser_a_start",
+     "dosing_entity": "binary_sensor.doser_a_dosing",
+     "dosing_prefix": "Dosing",
+     "power_entity": "switch.doser_a_power",
+     "flow_entity": "number.doser_a_flow",
+     "max_ml": 2000,
+     "restore_volume": true,
+     "stock_tank": null
+    },
+    {
+     "id": "ph_down",
+     "name": "pH down",
+     "volume_entity": "number.doser_ph_volume",
+     "start_entity": "button.doser_ph_start",
+     "dosing_entity": "binary_sensor.doser_ph_dosing",
+     "dosing_prefix": "Dosing",
+     "power_entity": "switch.doser_ph_power",
+     "flow_entity": "number.doser_ph_flow",
+     "max_ml": 200,
+     "restore_volume": true,
+     "stock_tank": null,
+     "ph_role": "ph_down"
+    }
+   ],
+   "batch": {
+    "fill_valve": "switch.tank_fill",
+    "full_entity": "binary_sensor.tank_full",
+    "full_state": "on",
+    "fill_timeout_min": 20,
+    "mix_pump": "switch.tank_mixer",
+    "mix_valves": [],
+    "mix_power_sensor": null,
+    "mix_min_w": 0,
+    "premix_min": 2,
+    "postmix_min": 5,
+    "close_entities": [],
+    "hold_entity": null,
+    "filled_at_entity": null,
+    "name": "",
+    "level_entity": null,
+    "remind_pct": 0,
+    "recipe": [
+     {
+      "pump": "part_a",
+      "ml": 400,
+      "ml_entity": null
+     }
+    ]
+   },
+   "feed": {
+    "recipes": [],
+    "schedule": {
+     "start": null,
+     "weeks": []
+    },
+    "stage": null,
+    "held_until": null
+   },
+   "profile": {
+    "hold_wait_s": 600,
+    "fill_open_s": 10,
+    "full_blind_s": 15,
+    "mix_power_s": 20,
+    "min_flow_ml_s": 0.05,
+    "max_dose_s": 1200
+   },
+   "request": null,
+   "updated_at": "2026-10-23T03:34:59.218077+00:00"
+  },
+  "crop_steering.display.<entry_id>": {
+   "revision": 1,
+   "options": {
+    "show_camera": true
+   }
+  },
+  "crop_steering.whats_new": {
+   "seen": "3.17.0"
+  }
+ },
+ "controller_saved": {
+  "default": {
+   "_room_active": true
+  },
+  "flower_room": {
+   "1": {
+    "phase": "P2",
+    "peak": 52.0,
+    "peak_prev": null,
+    "fc_follow": {
+     "peak": 52.0,
+     "day": null,
+     "used": {}
+    },
+    "p1_reached": false,
+    "p1_peak_before": null,
+    "p1_extra": 0,
+    "capped_in_a_row": 1,
+    "max_run_latch": null,
+    "p1_settled_before": null,
+    "p1_expected_rise": null,
+    "p1_flat": 0,
+    "p1_stall": null,
+    "ec_flushing": false,
+    "shots": 1,
+    "daily_vol": 7.199999999999998,
+    "water_history": [
+     {
+      "grow_day": "2026-10-21",
+      "litres": 0.0,
+      "complete": false
+     }
+    ],
+    "water_history_legacy_excluded_l": 0.0,
+    "learn": {
+     "peak_adj": 0.0,
+     "jev": {
+      "day": null,
+      "nudged": [],
+      "asked": null,
+      "last": null,
+      "changed": null
+     },
+     "peak": null,
+     "gain": null,
+     "day_rate": null,
+     "night_rate": null,
+     "day_n": 0,
+     "night_n": 0,
+     "day_acc": [
+      0.0,
+      0
+     ],
+     "night_acc": [
+      0.0,
+      0
+     ],
+     "hold_days": 0,
+     "day": "2026-10-21",
+     "ramp_start": 52.0,
+     "ramp": [],
+     "pending": {
+      "t": 1792726499.230059,
+      "pre": 52.0,
+      "pct": 7.5,
+      "ramp": false
+     },
+     "outcome": "pending",
+     "stalled_at": null,
+     "last_change": "",
+     "prev_peak": null,
+     "prev_hold": 0,
+     "veto": null
+    },
+    "ec_smooth": 4.2,
+    "ec_settled": 4.2,
+    "ec_settled_at": "2026-10-21T13:00:00",
+    "ec_offset": 0.0,
+    "last_shot": "2026-10-23T03:34:59.230059",
+    "last_shot_is_anchor": false,
+    "last_phase_change": "2026-10-23T03:34:59.221546",
+    "last_ec_steer": null,
+    "last_daily_reset": null,
+    "plateau_hist": [],
+    "night_hist": [],
+    "night": null,
+    "vmax_wetup": [],
+    "rescue_misses": 0,
+    "rescue_check": null,
+    "water_vpd": null,
+    "day_hist": [],
+    "day_acc": null,
+    "day_out": []
+   },
+   "2": {
+    "phase": "P2",
+    "peak": 49.0,
+    "peak_prev": null,
+    "fc_follow": {
+     "peak": 49.0,
+     "day": null,
+     "used": {}
+    },
+    "p1_reached": false,
+    "p1_peak_before": null,
+    "p1_extra": 0,
+    "capped_in_a_row": 1,
+    "max_run_latch": null,
+    "p1_settled_before": null,
+    "p1_expected_rise": null,
+    "p1_flat": 0,
+    "p1_stall": null,
+    "ec_flushing": false,
+    "shots": 1,
+    "daily_vol": 7.199999999999998,
+    "water_history": [
+     {
+      "grow_day": "2026-10-21",
+      "litres": 0.0,
+      "complete": false
+     }
+    ],
+    "water_history_legacy_excluded_l": 0.0,
+    "learn": {
+     "peak_adj": 0.0,
+     "jev": {
+      "day": null,
+      "nudged": [],
+      "asked": null,
+      "last": null,
+      "changed": null
+     },
+     "peak": null,
+     "gain": null,
+     "day_rate": null,
+     "night_rate": null,
+     "day_n": 0,
+     "night_n": 0,
+     "day_acc": [
+      0.0,
+      0
+     ],
+     "night_acc": [
+      0.0,
+      0
+     ],
+     "hold_days": 0,
+     "day": "2026-10-21",
+     "ramp_start": 49.0,
+     "ramp": [],
+     "pending": {
+      "t": 1792726499.242514,
+      "pre": 49.0,
+      "pct": 7.5,
+      "ramp": false
+     },
+     "outcome": "pending",
+     "stalled_at": null,
+     "last_change": "",
+     "prev_peak": null,
+     "prev_hold": 0,
+     "veto": null
+    },
+    "ec_smooth": 3.9,
+    "ec_settled": 3.9,
+    "ec_settled_at": "2026-10-21T13:00:00",
+    "ec_offset": 0.0,
+    "last_shot": "2026-10-23T03:34:59.242514",
+    "last_shot_is_anchor": false,
+    "last_phase_change": "2026-10-23T03:34:59.221562",
+    "last_ec_steer": null,
+    "last_daily_reset": null,
+    "plateau_hist": [],
+    "night_hist": [],
+    "night": null,
+    "vmax_wetup": [],
+    "rescue_misses": 0,
+    "rescue_check": null,
+    "water_vpd": null,
+    "day_hist": [],
+    "day_acc": null,
+    "day_out": []
+   },
+   "_setup": {
+    "revision": 1,
+    "fingerprint": "{\"active\": true, \"enable_flag\": \"switch.crop_steering_flower_room_engine_enabled\", \"feed_ec_sensor\": \"\", \"feed_ph_sensor\": \"sensor.feed_ph\", \"mainline\": \"switch.irrigation_main_line\", \"plumbing\": \"pump_mainline_valves\", \"pump\": \"switch.irrigation_pump\", \"valves\": {\"1\": \"switch.zone_1_valve\", \"2\": \"switch.zone_2_valve\"}, \"zones\": [1, 2]}",
+    "entry_id": "01M5KD6ZM367J5R7869G5SRGPM"
+   },
+   "_room_active": true
+  }
+ },
+ "addon_options": {
+  "enable_flag": "switch.crop_steering_flower_room_engine_enabled"
+ }
+}

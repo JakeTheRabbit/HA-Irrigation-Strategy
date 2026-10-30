@@ -41,14 +41,42 @@ def dryback(peak, vwc, rate, minutes_since_shot):
     if not peak or peak <= 0 or vwc is None:
         return "unknown", {"unit_of_measurement": "%", "peak_vwc": None, "dryback_points": None,
                            "rate_points_per_h": None, "drying_back": False}
-    rate = _number(rate) or 0.0
+    rate = _number(rate)  # None = the controller has no rate: published as null, never as a 0.0 that reads "steady"
     return (peak - vwc) / peak * 100.0, {
         "unit_of_measurement": "%",
         "peak_vwc": peak,
         "dryback_points": peak - vwc,
         "rate_points_per_h": rate,
-        "drying_back": rate > 0 and (_number(minutes_since_shot) or 0.0) >= SETTLE_MIN,
+        "drying_back": rate is not None and rate > 0 and (_number(minutes_since_shot) or 0.0) >= SETTLE_MIN,
     }
+
+
+def post_shot_rate(window, last_shot):
+    """The zone's dryback rate in VWC points an hour from its readings taken after its last shot, or None until
+    there are three (the window is not cleared on a shot, and a window holding the shot's rise measures the shot,
+    not the drying). Never negative, as the snapshot's rate."""
+    pts = [(t, v) for t, v in window if last_shot is None or t > last_shot]
+    if len(pts) < 3:
+        return None
+    dt_h = (pts[-1][0] - pts[0][0]).total_seconds() / 3600.0
+    return max(0.0, (pts[0][1] - pts[-1][1]) / dt_h) if dt_h > 0 else None
+
+
+def next_irrigation(phase, vwc, threshold, rate, after_shot):
+    """(hours, reason) to the zone's next P2 top-up: hours is None, with the reason, whenever the controller has no
+    current estimate. 0.0 = due now."""
+    if vwc is None:
+        return None, "the controller has no VWC reading for this zone"
+    if phase != "P2":
+        return None, "the controller estimates the next shot only in P2"
+    if vwc <= threshold:
+        return 0.0, None
+    if rate is None:
+        return None, ("no dryback rate yet since the last shot" if after_shot
+                      else "no dryback rate yet")
+    if rate <= 0:
+        return None, "VWC is not falling, so there is no time to the next shot"
+    return round(min((vwc - threshold) / rate, 48.0), 2), None
 
 
 DRYBACK_NOTE = ("Relative dryback: (peak - VWC) / peak x 100, the % the controller steers on. The peak is the "

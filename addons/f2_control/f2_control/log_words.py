@@ -106,6 +106,10 @@ _TRANSITIONS = [
         lambda m: "a new grow-day began before this zone finished the last one",
     ),
     (
+        r"P0 emergency bypass VWC (\S+)<=floor (\S+)",
+        lambda m: f"VWC {m[1]}% is at or under the rescue floor ({m[2]}%), too dry to wait for the morning dryback",
+    ),
+    (  # before #195: P0 ended at the re-water point. Kept for the phase changes recorded then.
         r"P0 bypass VWC (\S+)<=rewater (\S+)",
         lambda m: f"VWC {m[1]}% is at or under the maintenance trigger ({m[2]}%), "
         "no morning dryback needed",

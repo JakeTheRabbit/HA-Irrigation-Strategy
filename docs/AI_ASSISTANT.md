@@ -4,7 +4,7 @@ The AI assistant is optional. It judges the decisions of the controller that nee
 
 The AI assistant uses Claude from Anthropic, with your own API key. Anthropic bills you for each question. Without the AI assistant, the controller uses its rules, and the rules are always safe.
 
-This page tells how the AI assistant works, which options control it, and what it can change. The [README](../README.md#the-ai-assistant) gives the short procedure to start it.
+This page tells how the AI assistant works, which options control it, and what it can change. [INSTALL.md](INSTALL.md#optional-ai-assistant) gives the short procedure to start it.
 
 ## How the AI assistant works
 
@@ -15,6 +15,8 @@ This page tells how the AI assistant works, which options control it, and what i
 5. The controller asks each judge in two phrasings. An answer acts only when the two phrasings agree.
 6. The code then admits or refuses the answer against the safety limits. The dashboard shows the answer, the confidence and what the controller did.
 7. Later, the code measures the result. The AI assistant sees its own record the next time that it answers.
+
+**What the controller sends.** Each question has the readings and the settings of the zone, and the stage of the day. It also has the room and zone names that you typed. It never sends an entity ID, a key or personal data.
 
 ## Start the AI assistant
 
@@ -30,6 +32,14 @@ For the app:
 The log then shows `brain: claude_haiku`, the model, the budget, `key set` and the judges. It never shows the key.
 
 For a container, set `F2_OPT_BRAIN_PROVIDER=claude_haiku`. Give the key in `F2_OPT_ANTHROPIC_API_KEY_FILE` (a Docker secret) or in `F2_OPT_ANTHROPIC_API_KEY`. When neither is set, the controller also reads the usual `ANTHROPIC_API_KEY` variable.
+
+For a container with a Docker secret:
+
+1. Put the key in a file next to `docker-compose.yml`, for example `anthropic_key.txt`.
+2. Add the file as a Docker secret.
+3. Set `F2_OPT_BRAIN_PROVIDER=claude_haiku`.
+4. Set `F2_OPT_ANTHROPIC_API_KEY_FILE=/run/secrets/anthropic_key`.
+5. Run `docker compose up -d`. The log shows `anthropic_api_key=<set>`.
 
 > **CAUTION:** Set `brain_dry_run` to on for the first grow-days with a new AI assistant. Then read its decisions before you let it act. A judgement that you did not examine can change when the shots start and stop.
 
@@ -68,6 +78,7 @@ With `anthropic_base_url`, the controller sends each question to an Anthropic-co
 - The controller sends the key in `anthropic_api_key` to the router. Use the key that the router needs.
 - With a router, `anthropic_model` can have a router prefix before the model name, for example `cc/claude-haiku-5-5`. The AI budget uses the price of the model after the prefix.
 - The address must start with `http://` or `https://`. With another address, the controller uses its rules and the AI assistant panel tells why.
+- If the router does not answer, the controller uses its rules.
 
 > **WARNING:** Use only a router that you control. The controller sends your API key to the address in `anthropic_base_url`. A router that another person controls can read and use your key.
 
@@ -108,7 +119,7 @@ A judge is one question about one decision of one zone. A task is a question abo
 | --- | --- | --- |
 | Feed (`feed`) | One time each grow-day, 1 h after lights-on, in a room with a feed EC sensor | Sends proposal CS-711 when the two questions agree firmly. It never writes a feed, a dose or a setting. |
 | Report (`report`) | One time each grow-day, 3 h after lights-off | Publishes the daily report on `sensor.crop_steering_<prefix>brain_report`. |
-| Why (`why`) | When a person asks with the `crop_steering.brain_ask` action, a maximum of 20 questions for each room each day | Publishes the answer on `sensor.crop_steering_<prefix>brain_answers`. It never changes a setting. |
+| Why (`why`) | When an administrator (or an automation) asks with the `crop_steering.brain_ask` action, a maximum of 20 questions for each room each day | Publishes the answer on `sensor.crop_steering_<prefix>brain_answers`. It never changes a setting. |
 | Plan (`plan`) | When the room differs from its grow plan, a maximum of 4 times each photoperiod | Selects the suggestion that the plan line shows. When a stale probe holds the plan day, it can apply the targets of the plan day. |
 
 Eight judges can act: `dawn`, `ramp`, `salt`, `dusk`, `probe`, `setpoints`, `targets` and `shotsize`, each only with its power on. The other judges and the tasks give alerts or advice. The plan task can only apply the targets that the grow plan already has for today.
@@ -217,6 +228,25 @@ When the Setpoints judge does not run, the learner also writes the re-water poin
 
 Each zone has `sensor.crop_steering_<prefix>zone_N_auto_setpoints`. Its `managed` attribute lists these setpoints, and `managed_by` names the writer of each one.
 
+## The AI assistant and your setpoints
+
+- **Auto setpoints is off until you set it to on.** Use **Turn auto on…** in **Irrigation › Current day**. There is one switch for each room.
+- **One time each night**, in the first three hours after lights-off, the Setpoints judge selects one answer. The answers are smaller shots, bigger shots, a later re-water, a sooner re-water, or no change.
+- **One small step**: the P2 shot size changes by 0.5%, or the re-water point changes by 0.5 points. A zone gets a maximum of one change each night.
+- **The change ends**: at the next lights-on, each change returns to your value. The exception is when the judge moves it again. **Keep** stops the return. **Undo** puts your value back now.
+
+## Stop or limit the AI assistant
+
+| To do this | Do this |
+| --- | --- |
+| Stop setpoint changes | Use **Turn auto off…** in **Irrigation › Current day**. The values stay until you change them. |
+| Change a value that the AI assistant controls | Type your value in **Irrigation › Current day**. It becomes the new centre of the range. |
+| Stop one action | Turn off its switch in the AI powers list of the room. To stop a judge that has no power, list the other judges in the app option `ai_judges`. |
+| Pause the AI assistant in one room | Set **Pause AI Changes** to 1 h, until lights-on, or 24 h. The rules continue. |
+| Stop the AI assistant | Set `brain_provider` to `rules`, then restart the app. |
+| Limit the cost | Set `anthropic_daily_budget_usd`. |
+| Test it without changes | Set `brain_dry_run` to on. |
+
 ## Alerts
 
 | Code | Name |
@@ -238,7 +268,7 @@ The code raises CS-713 (room differs from grow plan) with each brain, also with 
 
 ## What the dashboard and Home Assistant show
 
-The dashboard shows the decisions of the AI assistant in each zone’s **Why / next action** panel, on **Irrigation › Current day**, in **History › Timeline**, and on **Equipment › Probes**. Room-level automation permissions live in **Settings › AI assistant**. A room without the AI assistant shows none of it. The [README](../README.md#daily-use) shows each page.
+The dashboard shows the decisions of the AI assistant in each zone’s **Why / next action** panel, on **Irrigation › Current day**, in **History › Explorer**, and on **Equipment › Probes & offsets**. Room-level automation permissions live in **Settings › AI assistant**. A room without the AI assistant shows none of it. The [user guide](USER_GUIDE.md) shows each page.
 
 - `sensor.crop_steering_<prefix>jev`: the AI assistant panel of the room. It shows the brain, the model, the mode (acting or dry run), the calls, the cost and the budget of today, the last error and the judges. It also shows the stage of today.
 - `sensor.crop_steering_<prefix>zone_N_jev`: the judges that act on the zone, the setpoint range, and the last answers of each judge with what the code did.

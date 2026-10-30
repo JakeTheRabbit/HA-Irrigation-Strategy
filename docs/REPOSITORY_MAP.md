@@ -14,6 +14,8 @@
 | doctrine | The crop-steering doctrine pack for the optional AI brain: hand-edited rules, outputs generated and checked against the code by doctrine/tools/build_doctrine.py; nothing reads it yet |
 | tests | Integration and repository contract tests |
 | docs | Install, operation, architecture and release process |
+| docs/README.md | The documentation index |
+| docs/features | One page per 3.18 feature area: supply, timers, presets, history, alerts, calibration, system status, dashboards |
 | docs/dev | Working notes for developers: design specs, implementation plans and review write-ups. Not operator documentation |
 | docs/TESTING.md / docs/ENTITIES.md | Development checks and entity reference |
 | docs/DOSING.md | The batch-tank dosing contract between the integration, the controller app and the dashboard: configuration, services, requests, the batch sequence, restart recovery and status |

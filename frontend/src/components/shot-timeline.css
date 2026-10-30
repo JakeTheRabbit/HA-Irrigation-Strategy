@@ -1,0 +1,458 @@
+/* ShotTimeline (shot-timeline.tsx): rows of shot blocks on one time axis (mockups I1, P2). */
+.shot-timeline {
+  --st-label: 180px;
+  --st-row: 64px;
+  --st-hour: 84px;
+  --st-done: color-mix(in srgb, var(--muted-foreground) 75%, var(--surface));
+  container-type: inline-size;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+.shot-timeline[data-mode="preview"] {
+  --st-row: 40px;
+}
+.shot-timeline[data-mode="strip"] {
+  --st-row: 28px;
+}
+.st-note {
+  margin: 0;
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+}
+
+/* Horizontal: a label column and a track column every row shares (subgrid). */
+.st-grid {
+  display: grid;
+  grid-template-columns: var(--st-label) minmax(0, 1fr);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  overflow: hidden;
+}
+.shot-timeline[data-mode="strip"] .st-grid {
+  grid-template-columns: minmax(0, 1fr);
+  border: 0;
+  border-radius: 6px;
+}
+.st-row {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+  min-height: var(--st-row);
+  border-bottom: 1px solid var(--border);
+}
+@supports not (grid-template-columns: subgrid) {
+  .st-row {
+    grid-template-columns: var(--st-label) minmax(0, 1fr);
+  }
+  .shot-timeline[data-mode="strip"] .st-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.st-row:last-child {
+  border-bottom: 0;
+}
+.st-head {
+  min-height: 30px;
+}
+.st-head .st-label {
+  overflow: hidden;
+  white-space: nowrap;
+}
+.st-row[data-kind="room"] {
+  background: color-mix(in srgb, var(--foreground) 3%, transparent);
+}
+.st-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 0 8px 0 16px;
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+.st-row[data-kind="zone"] .st-label {
+  padding-left: 54px;
+}
+.st-name {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  color: var(--foreground);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  white-space: nowrap;
+}
+.st-name b {
+  font-size: 15px;
+  font-weight: 600;
+}
+.st-name small {
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+  font-weight: 400;
+}
+.st-row[data-kind="zone"][data-tone="bad"] .st-name small {
+  color: var(--destructive);
+}
+.st-row[data-kind="zone"][data-tone="warn"] .st-name small {
+  color: var(--warning);
+}
+.st-short {
+  display: none;
+}
+.st-toggle {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--foreground);
+  cursor: pointer;
+}
+.st-toggle:focus-visible,
+.st-block:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+.st-track {
+  position: relative;
+  min-width: 0;
+  margin-right: 16px;
+}
+.shot-timeline[data-mode="strip"] .st-track {
+  margin: 0;
+}
+
+/* Positions: --o offset and --s size, in % of the span. */
+.st-lights,
+.st-now,
+.st-tick,
+.st-now-chip,
+.st-block {
+  position: absolute;
+}
+.st-track .st-lights {
+  top: 0;
+  bottom: 0;
+  left: var(--o);
+  width: var(--s);
+  background: color-mix(in srgb, var(--warning) 10%, transparent);
+}
+.st-lights-label {
+  position: absolute;
+  top: 6px;
+  left: 8px;
+  color: var(--warning);
+  font-size: var(--text-xs);
+  white-space: nowrap;
+}
+.st-track .st-now {
+  top: 0;
+  bottom: 0;
+  left: var(--o);
+  width: 2px;
+  margin-left: -1px;
+  background: var(--primary);
+  pointer-events: none;
+}
+.st-axis .st-tick {
+  top: 8px;
+  left: var(--o);
+  transform: translateX(-50%);
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+  white-space: nowrap;
+}
+.st-axis .st-now-chip {
+  z-index: 1;
+  top: 5px;
+  left: var(--o);
+  transform: translateX(-50%);
+  padding: 1px 7px;
+  border-radius: 4px;
+  background: var(--primary);
+  color: var(--primary-foreground);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* Blocks: bar height (horizontal) or width (vertical) is the water, --w of the largest. */
+.st-block {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: var(--st-done);
+  cursor: pointer;
+}
+.st-track .st-block {
+  top: 50%;
+  left: var(--o);
+  width: max(var(--s), 8px);
+  height: calc(var(--st-row) * (0.18 + 0.6 * var(--w)));
+  transform: translateY(-50%);
+}
+.st-block[data-glyph="planned"],
+.st-block[data-glyph="expected"] {
+  border: 1.5px dashed var(--primary);
+  background: color-mix(in srgb, var(--primary) 14%, transparent);
+}
+.st-block[data-glyph="expected"] {
+  border-style: dotted;
+}
+.st-block[data-glyph="failed"] {
+  background: var(--destructive);
+}
+.st-block[data-glyph="warning"] {
+  background: var(--warning);
+}
+.st-block[data-glyph="queued"] {
+  border: 1px solid var(--warning);
+  background: repeating-linear-gradient(
+    45deg,
+    color-mix(in srgb, var(--warning) 55%, transparent) 0 3px,
+    transparent 3px 7px
+  );
+}
+.st-block[data-skipped] {
+  opacity: 0.45;
+  background: linear-gradient(
+    to top right,
+    transparent calc(50% - 1px),
+    var(--muted-foreground) 50%,
+    transparent calc(50% + 1px)
+  );
+}
+.st-block[data-stale] {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    color-mix(in srgb, var(--muted-foreground) 50%, transparent) 0 2px,
+    transparent 2px 6px
+  );
+}
+/* A skipped future slot while stale keeps its strike-through over the hatching. */
+.st-block[data-skipped][data-stale] {
+  background-image:
+    linear-gradient(
+      to top right,
+      transparent calc(50% - 1px),
+      var(--muted-foreground) 50%,
+      transparent calc(50% + 1px)
+    ),
+    repeating-linear-gradient(
+      -45deg,
+      color-mix(in srgb, var(--muted-foreground) 50%, transparent) 0 2px,
+      transparent 2px 6px
+    );
+}
+.st-block[data-focus] {
+  box-shadow:
+    0 0 0 2px var(--surface),
+    0 0 0 4px var(--foreground);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .st-block[data-running] {
+    animation: st-running 1.6s ease-in-out infinite;
+  }
+}
+@keyframes st-running {
+  50% {
+    background: var(--primary);
+  }
+}
+
+/* Vertical: time runs down; rooms are columns that scroll sideways, a snap point per room. */
+.st-vgrid {
+  display: flex;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+}
+.st-vaxis {
+  flex: none;
+  width: 56px;
+}
+.st-vhead {
+  height: 28px;
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  text-align: center;
+  line-height: 28px;
+}
+.st-vroom-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 40px;
+  padding: 0 8px;
+}
+.st-vaxis .st-vhead {
+  height: 68px;
+}
+.st-vtrack {
+  position: relative;
+  height: calc(var(--hours) * var(--st-hour));
+}
+.st-vscroll {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+}
+.st-vroom {
+  flex: none;
+  scroll-snap-align: start;
+  border-left: 1px solid var(--border);
+}
+.st-vcols {
+  display: flex;
+}
+.st-vcol {
+  width: 92px;
+}
+.st-vcol + .st-vcol {
+  border-left: 1px solid color-mix(in srgb, var(--border) 50%, transparent);
+}
+.st-vtrack .st-lights {
+  left: 0;
+  right: 0;
+  top: var(--o);
+  height: var(--s);
+  background: color-mix(in srgb, var(--warning) 10%, transparent);
+}
+.st-vtrack .st-now {
+  left: 0;
+  right: 0;
+  top: var(--o);
+  height: 2px;
+  margin-top: -1px;
+  background: var(--primary);
+  pointer-events: none;
+}
+.st-vaxis .st-tick {
+  left: 8px;
+  top: var(--o);
+  transform: translateY(-50%);
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+}
+.st-vaxis .st-now-chip {
+  z-index: 1;
+  left: 2px;
+  top: var(--o);
+  transform: translateY(-50%);
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: var(--primary);
+  color: var(--primary-foreground);
+  font-size: var(--text-xs);
+  font-weight: 700;
+}
+.st-vaxis .st-now-chip .st-long {
+  display: none;
+}
+.st-vtrack .st-block {
+  left: 50%;
+  top: var(--o);
+  height: max(var(--s), 8px);
+  width: calc(14px + 56px * var(--w));
+  transform: translateX(-50%);
+}
+
+.st-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+}
+.st-legend [data-glyph] {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.st-legend [data-glyph]::before {
+  content: "";
+  box-sizing: border-box;
+  width: 12px;
+  height: 16px;
+  border-radius: 3px;
+  background: var(--st-done);
+}
+.st-legend [data-glyph="planned"]::before,
+.st-legend [data-glyph="expected"]::before {
+  border: 1.5px dashed var(--primary);
+  background: color-mix(in srgb, var(--primary) 14%, transparent);
+}
+.st-legend [data-glyph="expected"]::before {
+  border-style: dotted;
+}
+.st-legend [data-glyph="failed"]::before {
+  background: var(--destructive);
+}
+.st-legend [data-glyph="warning"]::before {
+  background: var(--warning);
+}
+.st-legend [data-glyph="queued"]::before {
+  width: 16px;
+  border: 1px solid var(--warning);
+  background: repeating-linear-gradient(
+    45deg,
+    color-mix(in srgb, var(--warning) 55%, transparent) 0 3px,
+    transparent 3px 7px
+  );
+}
+.st-legend [data-glyph="lights"]::before {
+  width: 16px;
+  background: color-mix(in srgb, var(--warning) 16%, transparent);
+}
+
+/* Narrow containers: short labels, a slimmer label column, no lights text. */
+@container (max-width: 479px) {
+  .st-grid {
+    --st-label: 56px;
+  }
+  .st-long,
+  .st-lights-label,
+  .st-name small,
+  .st-axis .st-tick:nth-of-type(even) {
+    display: none;
+  }
+  .st-short {
+    display: inline;
+  }
+  .st-head .st-label {
+    visibility: hidden;
+  }
+  .st-label,
+  .st-row[data-kind="zone"] .st-label {
+    padding-left: 8px;
+  }
+  .st-toggle {
+    width: 24px;
+    height: 24px;
+  }
+}
+
+/* On a phone a whole grow-day fits in about 250 px, so shots 20 min apart sit 3-4 px apart: an
+   8 px minimum piled them into one blob. There a shot is a thin tick, so each one stays visible. */
+@media (max-width: 720px) {
+  .st-track .st-block {
+    width: max(var(--s), 3px);
+    border-radius: 1.5px;
+  }
+}

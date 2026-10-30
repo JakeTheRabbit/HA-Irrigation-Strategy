@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Heading, type Page } from "@/components/dashboard";
+import { featureOf, roomOnlyFeature, useHashFeature } from "@/lib/feature-focus";
 import type { Controller } from "@/lib/types";
 import { Strategy, type Drafts } from "./strategy";
 import { GrowPlanner } from "./grow-planner";
@@ -25,8 +26,18 @@ export function Irrigation({
 }) {
   const [view, setView] = useState(initialView);
   const [zone, setZone] = useState(zoneId ?? controller.room.zones[0]?.id ?? 1);
-  const [roomScope, setRoomScope] = useState(false);
+  const [roomScope, setRoomScope] = useState(() =>
+    roomOnlyFeature(featureOf(window.location.hash)),
+  );
+  // A `?feature=` link opens the room for a room-only feature, the zone for any other.
+  const feature = useHashFeature();
+  useEffect(() => {
+    if (!feature) return;
+    setRoomScope(roomOnlyFeature(feature));
+    if (roomOnlyFeature(feature)) setView("current");
+  }, [feature]);
   const [canvas, setCanvas] = useState<HTMLDivElement | null>(null);
+  const [reviewSlot, setReviewSlot] = useState<HTMLDivElement | null>(null);
   const [scheduleDirty, setScheduleDirty] = useState(false);
   const [canonicalDirty, setCanonicalDirty] = useState(false);
   useEffect(() => setView(initialView), [initialView]);
@@ -49,6 +60,11 @@ export function Irrigation({
   const currentCurve = useCallback(
     (curve: ReactNode) => (canvas && view === "current" ? createPortal(curve, canvas) : null),
     [canvas, view],
+  );
+  // Current day's Review & apply bar spans the canvas and the table.
+  const currentReview = useCallback(
+    (bar: ReactNode) => (reviewSlot && view === "current" ? createPortal(bar, reviewSlot) : null),
+    [reviewSlot, view],
   );
   const calendarCurve = useCallback(
     (curve: ReactNode) => (canvas && view === "calendar" ? createPortal(curve, canvas) : null),
@@ -131,6 +147,7 @@ export function Irrigation({
             embedded
             active={view === "current"}
             renderCurve={currentCurve}
+            renderReview={currentReview}
             onCanonicalDirtyChange={setCanonicalDirty}
           />
         </div>
@@ -146,6 +163,7 @@ export function Irrigation({
           />
         </div>
       </div>
+      <div className="irrigation-review" ref={setReviewSlot} />
     </div>
   );
 }

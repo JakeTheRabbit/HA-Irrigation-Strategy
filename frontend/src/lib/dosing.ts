@@ -2,8 +2,11 @@ import type { PillTone } from "@/components/mini-visuals";
 import { parseControllerTime, readHeartbeat } from "./controller-health";
 import { numeric } from "./model";
 import type { SetupCandidate } from "./operator-types";
-import { batchesLeft } from "./stock";
+import { formatVolume } from "./display-units";
+import { reservoirView, tankLevelId, tankMarks } from "./reservoir";
+import { batchesLeft, type StockDocument } from "./stock";
 import type { EntityState, States } from "./types";
+import { unreadableState } from "./utils";
 
 /** Batch-tank dosing (docs/DOSING.md): a room's dosing configuration as the integration publishes
  * it, the controller's live status, and what Equipment › Dosing works out from the two. Nothing
@@ -65,18 +68,52 @@ export interface DosingRequest {
   at: string | null;
   by: string | null;
 }
+/** The room's dosing limits the controller works to (the `profile` the integration publishes). */
+export interface DosingProfile {
+  min_flow_ml_s: number;
+  max_dose_s: number;
+}
 export interface DosingConfig {
   revision: number;
   pumps: DosingPump[];
   batch: DosingBatch;
+  profile: DosingProfile;
   request: DosingRequest | null;
   updated_at: string | null;
+}
+/** A feed recipe of the room (dosing.py clean_feed): what a batch doses while it is in use, and the
+ * feed EC it mixes to (mS/cm), when declared. */
+export interface FeedRecipe {
+  id: string;
+  name: string;
+  doses: RecipeLine[];
+  ec: number | null;
+}
+/** The room's feed recipes and the schedule of them by week, as `dosing_get` holds them. */
+export interface FeedSetup {
+  recipes: FeedRecipe[];
+  schedule: { start: string | null; weeks: string[] };
+  stage: string | null;
+  held_until: string | null;
+}
+/** Which recipe the room doses today and why (dosing.py feed_now). */
+export interface FeedNow {
+  recipe: string | null;
+  recipe_id: string | null;
+  ec: number | null;
+  week: number | null;
+  weeks: number;
+  start: string | null;
+  held_until: string | null;
+  source: "schedule" | "held" | "hand" | "batch";
 }
 /** What `dosing_get` and `dosing_save` answer. */
 export interface DosingDocument {
   schema_version: number;
   room_id: string;
-  config: DosingConfig | null;
+  /** `feed`: the recipes and their schedule; absent from an integration from before them. */
+  config: (DosingConfig & { feed?: FeedSetup | null }) | null;
+  feed_now?: FeedNow | null;
   candidates: SetupCandidate[];
   /** The user is an administrator; absent from an integration from before it. */
   can_edit?: boolean | null;
@@ -135,6 +172,21 @@ export interface HistoryEntry {
   doses: Record<string, number>;
   by: string | null;
 }
+/** The controller's check of a finished batch's tank, read 5 min after its mix stops
+ * (dosing_runner._judge_mix): its EC and pH as read, against the room's feed bands. */
+export interface MixCheck {
+  batch: string | null;
+  due: string | null;
+  verdict: "good" | "off target" | "not read" | null;
+  checked_at: string | null;
+  why: string | null;
+  gave_up_at: string | null;
+  ec: number | null;
+  ph: number | null;
+  /** The probes the check covered: _judge_mix sets a key only for a probe that is mapped and has a
+   * band, so a probe missing here was never part of the check (a null one read nothing). */
+  probes: ("ec" | "ph")[];
+}
 /** `sensor.crop_steering_<prefix>dosing`, the controller's report. */
 export interface DosingStatus {
   state: "idle" | "dosing" | "batch" | "unavailable";
@@ -143,6 +195,8 @@ export interface DosingStatus {
   handled: string | null;
   handled_result: string | null;
   history: HistoryEntry[];
+  /** The last batch's mix check; absent or null from a controller from before it, or with none. */
+  mix?: MixCheck | null;
   /** The controller's last publish, refreshed at least every 60 s; null from a controller from
    * before it. */
   updated_at: string | null;
@@ -154,7 +208,6 @@ export const dosingStatusId = (prefix: string) => `sensor.crop_steering_${prefix
 // Reading what Home Assistant holds: anything missing or garbled falls back, never throws.
 type Raw = Record<string, unknown>;
 const ENTITY = /^[a-z_]+\.[a-z0-9_]+$/;
-const UNREADABLE = ["unknown", "unavailable", ""];
 const record = (value: unknown): Raw =>
   value && typeof value === "object" && !Array.isArray(value) ? (value as Raw) : {};
 const text = (value: unknown): string | null =>
@@ -250,13 +303,36 @@ export function parseConfig(value: unknown): DosingConfig | null {
     revision: count(raw.revision) ?? 0,
     pumps: pumps.slice(0, MAX_PUMPS),
     batch: parseBatch(raw.batch),
+    profile: parseProfile(raw.profile),
     request: parseRequest(raw.request),
     updated_at: text(raw.updated_at),
   };
 }
+/** What every room used before it could set its profile (`PROFILE` in dosing.py, `PROFILE` in the
+ * controller's dosing_runner.py). A value that is not a positive number takes its default, as the
+ * controller does. */
+export const PROFILE_DEFAULTS: DosingProfile = { min_flow_ml_s: 0.05, max_dose_s: 1200 };
+export function parseProfile(value: unknown): DosingProfile {
+  const raw = (value && typeof value === "object" ? value : {}) as Raw;
+  const limit = (key: keyof DosingProfile) => {
+    const number = raw[key];
+    return typeof number === "number" && Number.isFinite(number) && number > 0
+      ? number
+      : PROFILE_DEFAULTS[key];
+  };
+  return { min_flow_ml_s: limit("min_flow_ml_s"), max_dose_s: limit("max_dose_s") };
+}
+/** A pump's calibrated flow in mL/s: its flow entity's number in its own unit, converted as the
+ * controller does (mL/min, L/h); a unit it does not know is read as mL/s, as the controller does. */
+export function flowMlS(entity: EntityState | undefined): number | null {
+  const flow = numeric(entity);
+  if (flow === null) return null;
+  const unit = String(entity?.attributes?.unit_of_measurement ?? "").trim().toLowerCase();
+  return unit === "ml/min" ? flow / 60 : unit === "l/h" ? (flow * 1000) / 3600 : flow;
+}
 /** The integration's `dosing_config` sensor: its state is the revision. */
 export function readConfig(entity: EntityState | undefined): DosingConfig | null {
-  if (!entity || UNREADABLE.includes(entity.state)) return null;
+  if (!entity || unreadableState(entity.state)) return null;
   return parseConfig({ ...entity.attributes, revision: entity.state });
 }
 /** The controller's `dosing` sensor; null when the controller has never posted it. */
@@ -323,7 +399,24 @@ export function readStatus(entity: EntityState | undefined): DosingStatus | null
     handled: text(raw.handled),
     handled_result: text(raw.handled_result),
     history: history.slice(0, 20),
+    mix: readMix(raw.mix),
     updated_at: text(raw.updated_at),
+  };
+}
+function readMix(value: unknown): MixCheck | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const raw = record(value);
+  const verdict = (["good", "off target", "not read"] as const).find((v) => v === raw.verdict);
+  return {
+    batch: text(raw.batch),
+    due: text(raw.due),
+    verdict: verdict ?? null,
+    checked_at: text(raw.checked_at),
+    why: text(raw.why),
+    gave_up_at: text(raw.gave_up_at),
+    ec: count(raw.ec),
+    ph: count(raw.ph),
+    probes: (["ec", "ph"] as const).filter((key) => key in raw),
   };
 }
 
@@ -369,7 +462,7 @@ export function controllerReach(
 /** The pump's own report: dosing, not dosing, or null when it reports nothing. */
 export function deviceDosing(pump: DosingPump, states: States): boolean | null {
   const entity = states[pump.dosing_entity];
-  if (!entity || UNREADABLE.includes(entity.state)) return null;
+  if (!entity || unreadableState(entity.state)) return null;
   return pump.dosing_entity.startsWith("binary_sensor.")
     ? entity.state === "on"
     : entity.state.startsWith(pump.dosing_prefix || "Dosing");
@@ -406,12 +499,12 @@ export function doseProgress(runtime: PumpRuntime | null, now: number): DoseProg
   return { target, elapsed, expected, share, ml: target * share, overdue: elapsed > expected };
 }
 /** When the controller switches a pump off that is still dosing: expected × 1.25 + 20 s. */
-/** The controller's limits (DOSING.md): the least flow it trusts, the longest dose it runs, and
- * the latest it lets one go before cutting the power. */
-export const MIN_FLOW_ML_S = 0.05;
-export const MAX_DOSE_S = 20 * 60;
-export const MAX_DEADLINE_S = MAX_DOSE_S + 60;
-export const doseDeadline = (expected: number) => Math.min(expected * 1.25 + 20, MAX_DEADLINE_S);
+/** The latest the controller lets a dose go before cutting the power, from the room's longest dose. */
+/** Whether a dose expected to take this long is longer than the room lets the controller run one. */
+export const exceedsDoseLimit = (expected: number, profile: DosingProfile) =>
+  expected > profile.max_dose_s;
+export const doseDeadline = (expected: number, maxDoseS: number) =>
+  Math.min(expected * 1.25 + 20, maxDoseS + 60);
 
 export interface PumpView {
   pump: DosingPump;
@@ -432,10 +525,11 @@ export function pumpView(
   reach: Reach,
   states: States,
   now: number,
+  profile: DosingProfile,
 ): PumpView {
   const runtime = status?.pumps[pump.id] ?? null;
   const flowEntity = states[pump.flow_entity];
-  const flow = flowEntity ? numeric(flowEntity) : (runtime?.flow_ml_s ?? null);
+  const flow = flowEntity ? flowMlS(flowEntity) : (runtime?.flow_ml_s ?? null);
   const view = (state: PumpState, reason: string | null = null): PumpView => ({
     pump,
     state,
@@ -462,7 +556,7 @@ export function pumpView(
   }
   if (deviceDosing(pump, states) === null)
     return view("unavailable", `${pump.dosing_entity} reports nothing.`);
-  if (!(flow !== null && flow >= MIN_FLOW_ML_S))
+  if (!(flow !== null && flow >= profile.min_flow_ml_s))
     return view(
       "uncalibrated",
       flow === null
@@ -522,7 +616,8 @@ export function stockTanks(states: States, prefix: string): StockTankReading[] {
   });
 }
 /** A pump's stock tank, by the Stock tanks page's own rule: amber within half again of its low
- * mark, red at or under it. */
+ * mark, red at or under it. Only "very low" is the integration's (stock.py: a tank at or under its
+ * low mark is in its stock_low list); the amber step is the dashboard's own heuristic. */
 export type StockState = "ok" | "low" | "very-low";
 export function stockState(tank: Pick<StockTankReading, "level_l" | "low_l">): StockState {
   if (tank.level_l <= tank.low_l) return "very-low";
@@ -611,7 +706,7 @@ export function recipeRows(config: DosingConfig, states: States): RecipeRow[] {
     const reading = line.ml_entity ? numeric(states[line.ml_entity]) : null;
     const unreadable = !!line.ml_entity && reading === null;
     const ml = unreadable ? 0 : Math.max(0, reading ?? line.ml);
-    const flow = pump ? numeric(states[pump.flow_entity]) : null;
+    const flow = pump ? flowMlS(states[pump.flow_entity]) : null;
     return {
       pump: line.pump,
       name: pump?.name ?? line.pump,
@@ -621,7 +716,7 @@ export function recipeRows(config: DosingConfig, states: States): RecipeRow[] {
       fromEntity: reading !== null,
       unreadable,
       flow,
-      seconds: ml > 0 && flow !== null && flow >= MIN_FLOW_ML_S ? ml / flow : null,
+      seconds: ml > 0 && flow !== null && flow >= config.profile.min_flow_ml_s ? ml / flow : null,
       skipped: !unreadable && ml <= 0,
       unknown: !pump,
     };
@@ -1081,4 +1176,222 @@ export function setupChanges(
   ] as const)
     add(FIELD_LABELS[field], batch[field], after.batch[field]);
   return changes;
+}
+
+// ------------------------------------------------------------------ Feed & dosing page
+
+/** The controller reads a finished batch's tank this long after its mix stops (MIX_SETTLE_S). */
+export const MIX_SETTLE_MIN = 5;
+const readable = (entity: EntityState | undefined) => !!entity && !unreadableState(entity.state);
+
+/** The guards around the batch tank, each armed or not: every dose read back (the controller reads
+ * the pump's power switch back, and the pump's dosing state), the overfill cut and the minimum on the controller's tank level, the mix pump's
+ * power read back, and the fill's timeout. The page counts how many are armed. */
+export function protections(doc: DosingDocument, states: States): { label: string; ok: boolean }[] {
+  const config = doc.config;
+  const prefix = doc.room_id.startsWith("room:") ? doc.room_id.slice(5) : "";
+  const pumps = config?.pumps ?? [];
+  const batch = config?.batch ?? parseBatch({});
+  const level = states[tankLevelId(prefix)];
+  const levelRead = readable(level) && Number.isFinite(Number(level!.state));
+  // The marks the controller publishes on its tank level; the dashboard keeps no copy of its numbers.
+  const marks = tankMarks(level?.attributes ?? {});
+  const mixOn = batch.mix_pump ? states[batch.mix_pump]?.state === "on" : false;
+  const watts = batch.mix_power_sensor ? numeric(states[batch.mix_power_sensor]) : null;
+  const kw = watts === null || !mixOn ? "" : ` · ${Number((watts / 1000).toFixed(3))} kW`;
+  return [
+    {
+      label: "Read-back on every dose",
+      ok:
+        pumps.length > 0 &&
+        pumps.every(
+          (pump) => readable(states[pump.power_entity]) && readable(states[pump.dosing_entity]),
+        ),
+    },
+    { label: marks.over === null ? "Overfill cut" : `Overfill cut ${marks.over}%`, ok: levelRead },
+    { label: marks.minimum === null ? "Minimum" : `Minimum ${marks.minimum}%`, ok: levelRead },
+    {
+      label: batch.mix_pump ? `Mix pump ${mixOn ? "on" : "off"}${kw}` : "Mix pump on",
+      ok:
+        !!batch.mix_pump &&
+        !!batch.mix_power_sensor &&
+        readable(states[batch.mix_power_sensor]) &&
+        batch.mix_min_w > 0,
+    },
+    { label: `Timeout ${batch.fill_timeout_min} min`, ok: !!batch.fill_valve },
+  ];
+}
+
+/** Whether the controller checks a finished batch's mix (dosing_runner._mix_bands): a feed EC or pH
+ * probe mapped (engine_config `feed_<q>_sensor`) whose band has a bound above 0, or a band that can't
+ * be read (the check is planned and waits for it). A band setting the room does not have is no bound. */
+export function mixChecked(
+  states: States,
+  prefix: string,
+  engine: Record<string, unknown>,
+): boolean {
+  return (["ec", "ph"] as const).some(
+    (quantity) =>
+      !!engine[`feed_${quantity}_sensor`] &&
+      (["min", "max"] as const).some((end) => {
+        const setting = states[`number.crop_steering_${prefix}irrigation_${quantity}_${end}`];
+        if (!setting) return false;
+        const value = Number(setting.state);
+        return !readable(setting) || !Number.isFinite(value) || value > 0;
+      }),
+  );
+}
+
+/** The recipe the room doses today: the feed recipe in use, else the batch's own. */
+export function recipeInUse(doc: DosingDocument): { name: string | null; lines: RecipeLine[] } {
+  const config = doc.config;
+  const id = doc.feed_now?.recipe_id ?? null;
+  const recipe = id ? config?.feed?.recipes.find((item) => item.id === id) : undefined;
+  return recipe
+    ? { name: recipe.name, lines: recipe.doses }
+    : { name: null, lines: config?.batch.recipe ?? [] };
+}
+
+/** What the page knows of the tank for the next batch: its level, the litres in 1 %, how fast it
+ * falls (from its recorded level), the level the next batch is made at, and whether the controller
+ * checks the mix after it (a feed probe with a band). */
+export interface NextBatchInput {
+  states: States;
+  levelPct: number | null;
+  litresPerPct: number | null;
+  pctPerHour: number | null;
+  /** Null when the controller publishes no minimum on its tank level: nothing is guessed. */
+  atPct: number | null;
+  checks: boolean;
+}
+export interface NextBatch {
+  /** When the tank reaches `atPct` at its present fall; null when that is not known. */
+  at: number | null;
+  /** About how many litres the fill adds, from `atPct` to full; null until the litres in 1 % are
+   * learned. */
+  litres: number | null;
+  doses: { name: string; ml: number }[];
+  steps: { name: "premix" | "dose" | "postmix" | "check"; min: number }[];
+  stockWarning: string | null;
+}
+/** The next batch: when, how much water, what it doses and how long its steps take, and the stock
+ * tank that one batch takes below its low line. Nothing is guessed: what is not known is null. */
+export function nextBatch(
+  doc: DosingDocument,
+  stock: StockDocument | null,
+  now: number,
+  input: NextBatchInput,
+): NextBatch {
+  const config = doc.config;
+  const { levelPct, pctPerHour, litresPerPct, atPct } = input;
+  const at =
+    levelPct === null || atPct === null
+      ? null
+      : levelPct <= atPct
+        ? now
+        : pctPerHour !== null && pctPerHour > 0
+          ? now + ((levelPct - atPct) / pctPerHour) * 3_600_000
+          : null;
+  const litres =
+    atPct !== null && litresPerPct !== null && litresPerPct > 0
+      ? Math.round((100 - atPct) * litresPerPct * 10) / 10
+      : null;
+  const rows = config
+    ? recipeRows(
+        { ...config, batch: { ...config.batch, recipe: recipeInUse(doc).lines } },
+        input.states,
+      ).filter((row) => !row.skipped && !row.unreadable)
+    : [];
+  const doseS = recipeTotals(rows).seconds;
+  const steps: NextBatch["steps"] = [];
+  if (config) {
+    if (config.batch.premix_min > 0) steps.push({ name: "premix", min: config.batch.premix_min });
+    if (doseS !== null && rows.length) steps.push({ name: "dose", min: Math.ceil(doseS / 60) });
+    if (config.batch.postmix_min > 0)
+      steps.push({ name: "postmix", min: config.batch.postmix_min });
+    if (input.checks) steps.push({ name: "check", min: MIX_SETTLE_MIN });
+  }
+  let stockWarning: string | null = null;
+  for (const tank of stock?.tanks ?? []) {
+    const dose = stock?.doses[tank.id] ?? tank.dose_ml;
+    if (!(dose > 0)) continue;
+    const after = Math.max(0, tank.level_l - dose / 1000);
+    if (after >= tank.low_l) continue;
+    const left = batchesLeft({ level_l: after }, dose) ?? 0;
+    stockWarning = `${tank.name} after this batch: ${formatVolume(after, 1)}, ${left} ${left === 1 ? "batch" : "batches"} left`;
+    break;
+  }
+  return {
+    at,
+    litres,
+    doses: rows.map((row) => ({ name: row.name, ml: row.ml })),
+    steps,
+    stockWarning,
+  };
+}
+
+/** A rise of the recorded level smaller than this (%) is the level sensor's jitter, not a fill. */
+const LEVEL_JITTER_PCT = 1;
+/** Where the newest run of the recorded level that does not rise (past jitter) starts. */
+function fallStart(points: readonly { time: number; value: number }[]): number {
+  let start = points.length - 1;
+  while (start > 0 && points[start - 1].value >= points[start].value - LEVEL_JITTER_PCT) start--;
+  return start;
+}
+
+/** How fast the tank's level falls, % per hour, since its last rise (a fill): the newest run of the
+ * recorded level that does not rise past jitter, from the last reading at its peak. Null with under
+ * an hour of it, or a level that is not falling. */
+export function levelFall(points: readonly { time: number; value: number }[]): number | null {
+  if (points.length < 2) return null;
+  let start = fallStart(points);
+  // A tank that sat full is not falling yet: the run starts where it last left its peak (within
+  // jitter of it).
+  const peak = Math.max(...points.slice(start).map((point) => point.value));
+  while (start < points.length - 1 && points[start + 1].value >= peak - LEVEL_JITTER_PCT) start++;
+  const first = points[start],
+    last = points[points.length - 1];
+  const hours = (last.time - first.time) / 3_600_000;
+  if (hours < 1 || !(first.value > last.value)) return null;
+  return (first.value - last.value) / hours;
+}
+
+/** Why the next batch has no time: no level read, the recorded level still loading or not
+ * loaded, less than an hour of it, a fall under an hour old, or an hour and more that does not fall.
+ * `points` are the recorded level then the reading now. */
+export function levelFallUnknown(
+  levelKnown: boolean,
+  history: "loading" | "failed" | "loaded",
+  points: readonly { time: number; value: number }[],
+): string {
+  if (!levelKnown) return "Not known: no tank level is read";
+  if (history === "loading") return "Not known yet: the recorded tank level is still loading";
+  if (history === "failed") return "Not known: the recorded tank level could not be loaded";
+  const span = points.length ? points[points.length - 1].time - points[0].time : 0;
+  if (span < 3_600_000) return "Not known yet: less than an hour of tank level is recorded";
+  // The last run that does not rise, as levelFall walks it: below its start, the tank is falling.
+  const start = fallStart(points);
+  return points[start].value > points[points.length - 1].value
+    ? "Not known yet: the tank has been falling for less than an hour"
+    : "Not known yet: the tank level is not falling";
+}
+
+/** The level the next batch is made at, and the reading that says when: the refill reminder on its
+ * own level entity (`batch.level_entity`, dosing_runner), else the minimum on the controller's tank
+ * level (`sensor.crop_steering_<prefix>tank_level`). The time is worked out from the same entity as
+ * the mark. */
+export function batchLevel(
+  states: States,
+  prefix: string,
+): { atPct: number | null; entityId: string; pct: number | null } {
+  const batch = record(record(states[dosingConfigId(prefix)]?.attributes).batch);
+  const remind = count(batch.remind_pct);
+  const own = entityId(batch.level_entity);
+  if (remind !== null && remind > 0 && own) {
+    const entity = states[own];
+    const pct = readable(entity) ? count(entity!.state) : null;
+    return { atPct: remind, entityId: own, pct };
+  }
+  const guard = reservoirView(states, prefix);
+  return { atPct: guard.minimum, entityId: tankLevelId(prefix), pct: guard.level };
 }

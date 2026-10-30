@@ -99,3 +99,13 @@ describe("setting words", () => {
       expect(GROUP_HELP[name]).toBeTruthy();
   });
 });
+
+describe("the P0 words follow the rescue-floor bypass (#195)", () => {
+  it("never say P0 waits for the P3 dryback target", () => {
+    for (const key of ["p0_maximum_wait_time", "p0_additional_dryback"]) {
+      const words = settingWords(key)!;
+      const text = [words.help, words.detail?.what, words.detail?.when, words.detail?.practice].join(" ");
+      expect(text, key).not.toMatch(/P3 dryback target/);
+    }
+  });
+});
