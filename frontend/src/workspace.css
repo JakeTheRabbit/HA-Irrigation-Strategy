@@ -208,6 +208,10 @@
   font-weight: 600;
   overflow-wrap: anywhere;
 }
+/* The stage's values, read on the tinted cell: full text colour keeps contrast on a selected week. */
+.calendar-cell-summary small {
+  color: var(--foreground);
+}
 .calendar-cell.selected {
   border-color: var(--primary-strong);
   background: color-mix(in srgb, var(--primary) 28%, var(--card));
