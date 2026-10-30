@@ -34,7 +34,7 @@ jobs:
           fetch-depth: 1
 
       - name: Setup Python ${{ matrix.python-version }}
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: ${{ matrix.python-version }}
           # no pip cache: the repo intentionally has no requirements.txt/pyproject
@@ -116,7 +116,7 @@ jobs:
           PYTHONPATH=crop-steering-engine/src python -m pytest crop-steering-engine/tests -q
 
       - name: Hassfest
-        uses: home-assistant/actions/hassfest@cd6f3635a740c84d8a14f6121a90068b8ece6bf6 # master, 2026-10-17 (no releases)
+        uses: home-assistant/actions/hassfest@86d4564712fa02543c808e3a693dd04f9d3f8361 # master, 2026-10-17 (no releases)
 
       - name: HACS Validation (integration)
         uses: hacs/action@d556e736723344f83838d08488c983a15381059a # 22.5.0
@@ -165,7 +165,7 @@ jobs:
           fetch-depth: 1
 
       - name: Setup Python
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: '3.12'
 
@@ -335,7 +335,7 @@ jobs:
             suffix: ' - oldest supported Home Assistant'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: ${{ matrix.python }}
       - name: Install Home Assistant ${{ matrix.homeassistant }} and its pytest plugin
