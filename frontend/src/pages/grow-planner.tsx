@@ -89,6 +89,35 @@ const moves: Record<string, [number, number]> = {
   ArrowRight: [0, 1],
 };
 
+/** Under a grid cell's balance: the profile's name and, in week view, the dryback, re-water point
+ * and P2 EC the engine will run at that balance. */
+function CellSummary({
+  profile,
+  bias,
+  limits,
+  detail,
+}: {
+  profile: SteeringProfile | undefined;
+  bias: number;
+  limits: Parameters<typeof interpolate>[2];
+  detail: boolean;
+}) {
+  if (!profile) return <small>Missing profile</small>;
+  const v = interpolate(profile, bias, limits);
+  return (
+    <span className="calendar-cell-summary">
+      <strong>{profile.name}</strong>
+      {detail && (
+        <>
+          {v.dryback_target !== undefined && <small>Dryback {v.dryback_target}%</small>}
+          {v.p2_vwc_threshold !== undefined && <small>Re-water {v.p2_vwc_threshold}%</small>}
+          {v.ec_target_p2 !== undefined && <small>EC {v.ec_target_p2}</small>}
+        </>
+      )}
+    </span>
+  );
+}
+
 export function GrowPlanner({
   controller,
   onDirtyChange,
@@ -925,7 +954,16 @@ export function GrowPlanner({
                                         onKeyDown={(e) => cellKey(e, row, i)}
                                         onBlur={leaveCell}
                                       />
-                                      <small>{b ? "G" : "No plan"}</small>
+                                      {b ? (
+                                        <CellSummary
+                                          profile={plan?.profiles.find((p) => p.id === b.profile_id)}
+                                          bias={b.bias}
+                                          limits={document?.catalog[String(z.zone_id)]}
+                                          detail={granularity === "week" && !mixed}
+                                        />
+                                      ) : (
+                                        <small>No plan</small>
+                                      )}
                                     </label>
                                   );
                                 })}

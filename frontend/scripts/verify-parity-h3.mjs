@@ -65,7 +65,7 @@ await runParity({
     const other = cards.nth(1);
     const otherId = await other.getAttribute("data-run-card");
     const otherName = (await other.locator(".rc-tick-run").innerText()).trim();
-    assert.match(await other.locator(".rc-result").innerText(), /^Harvested \w{3} \d{1,2} \w{3} · [\d.]+ kg dry/, `${label}: harvested`);
+    assert.match(await other.locator(".rc-result").innerText(), /^Harvested \w{3} \d{1,2} \w{3,4} · [\d.]+ kg dry/, `${label}: harvested`);
     region("run cards");
 
     // Four small multiples, each with both runs' lines.
@@ -133,7 +133,7 @@ await runParity({
     const receipt = review.getByRole("status");
     await receipt.waitFor();
     assert.match(await receipt.innerText(), new RegExp(`Written and read back ${HHMM}`), `${label}: receipt`);
-    assert.match(await card.locator(".rc-result").innerText(), /^Ended \w{3} \d{1,2} \w{3} · 38\.4 kg dry$/, `${label}: card result`);
+    assert.match(await card.locator(".rc-result").innerText(), /^Ended \w{3} \d{1,2} \w{3,4} · 38\.4 kg dry$/, `${label}: card result`);
     await review.getByRole("button", { name: "Undo: write back the previous values", exact: true }).click();
     await review.getByText(/^Previous values written back/).waitFor();
     assert.equal((await card.locator(".rc-result").innerText()).trim(), "No harvest result recorded", `${label}: undone`);

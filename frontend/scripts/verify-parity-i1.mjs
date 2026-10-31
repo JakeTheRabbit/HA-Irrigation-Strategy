@@ -68,7 +68,7 @@ await runParity({
     if (phone) {
       const day = main.locator("[data-watering-day]");
       await page.waitForFunction(() => /failed|warning|No problems/.test(document.querySelector("[data-watering-day] span")?.textContent ?? ""));
-      assert.match(await day.locator("strong").innerText(), /^Today, \w{3} \d{1,2} \w{3}$/, `${label}: today line`);
+      assert.match(await day.locator("strong").innerText(), /^Today, \w{3} \d{1,2} \w{3,4}$/, `${label}: today line`);
       // At 14:10: Room A zone 1's aborted shot; Room A zone 2's short shot and Room B's sensor alert.
       assert.equal(await day.locator("span").innerText(), "1 failed · 2 warnings", `${label}: problems line`);
       assert.equal(await timeline.getAttribute("data-orientation"), "vertical", `${label}: vertical`);
