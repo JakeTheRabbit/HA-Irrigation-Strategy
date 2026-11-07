@@ -366,7 +366,8 @@ function ZoneCard({
             </span>
             <span className="facility-mode" data-mode={mode}>
               {mode === "paused" && <Pause size={12} aria-hidden="true" />}
-              {ZONE_MODE[mode]}
+              {/* Paused is the zone's scheduling switch, as the dashboard names it. */}
+              {mode === "paused" ? "Scheduling paused" : ZONE_MODE[mode]}
             </span>
           </span>
           <ShotDots shots={zone.shots.value === null ? null : Math.round(zone.shots.value)} />
@@ -640,7 +641,7 @@ function PhoneRoom({ r, offline, open }: { r: FacilityRoom; offline: boolean; op
                   </span>
                 </span>
                 <span className="facility-mode" data-mode={mode}>
-                  {mode === "watering" ? "Watering" : ZONE_MODE[mode]}
+                  {mode === "watering" ? "Watering" : mode === "paused" ? "Scheduling paused" : ZONE_MODE[mode]}
                 </span>
                 {z.queued && (
                   <span className="facility-tile-line" data-facility-queued>

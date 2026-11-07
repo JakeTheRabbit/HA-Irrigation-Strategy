@@ -97,6 +97,13 @@
   --text-lg: 16px;
   --text-xl: 20px;
   --text-2xl: 24px;
+  /* An overview's primary reading (All rooms: a zone's VWC, dryback, pore EC, root): 20/28,
+     weight 600, its unit beside it at 14. The zone illustration stays smaller than the reading. */
+  --text-overview: 20px;
+  --leading-overview: 28px;
+  --text-unit: 14px;
+  --slab-overview: 48px;
+  --slab-tile: 36px;
   --space-2: 8px;
   --space-3: 12px;
   --space-4: 16px;

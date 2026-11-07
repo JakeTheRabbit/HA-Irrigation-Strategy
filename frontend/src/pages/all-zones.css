@@ -40,8 +40,8 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(260px, 320px);
   align-items: start;
-  gap: var(--space-4) var(--space-5);
-  padding: var(--space-4) var(--space-5) var(--space-5);
+  gap: var(--space-3) var(--space-5);
+  padding: var(--space-4) var(--space-5);
   min-width: 0;
 }
 .facility-room[data-problem] {
@@ -156,7 +156,7 @@
 }
 .facility-room-facts dt {
   color: var(--muted-foreground);
-  font-size: var(--text-xs);
+  font-size: var(--text-label);
 }
 .facility-room-facts dd {
   margin: 0;
@@ -265,18 +265,31 @@
     fill-opacity: 0.95;
   }
 }
-/* Not part of the automation right now: greyed, so it reads as out of play. */
-.facility-zone[data-mode="room-off"],
-.facility-zone[data-mode="offline"],
-.facility-zone[data-mode="paused"],
-.facility-zone[data-mode="watering-off"] {
+/* Not part of the automation right now: a hatched strip along the top and a greyed slab, so it
+   reads as out of play; the readings stay on a solid surface at full contrast. */
+.facility-zone[data-mode="room-off"]::before,
+.facility-zone[data-mode="offline"]::before,
+.facility-zone[data-mode="paused"]::before,
+.facility-zone[data-mode="watering-off"]::before,
+.facility-tile-body[data-mode="room-off"]::before,
+.facility-tile-body[data-mode="offline"]::before,
+.facility-tile-body[data-mode="paused"]::before,
+.facility-tile-body[data-mode="watering-off"]::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 6px;
+  border-radius: var(--radius) var(--radius) 0 0;
   background: repeating-linear-gradient(
     -45deg,
-    var(--background),
-    var(--background) 8px,
-    color-mix(in srgb, var(--muted-foreground) 8%, var(--background)) 8px,
-    color-mix(in srgb, var(--muted-foreground) 8%, var(--background)) 16px
+    transparent,
+    transparent 4px,
+    color-mix(in srgb, var(--muted-foreground) 45%, transparent) 4px,
+    color-mix(in srgb, var(--muted-foreground) 45%, transparent) 8px
   );
+  pointer-events: none;
 }
 .facility-zone[data-mode="room-off"] .zone-slab,
 .facility-zone[data-mode="offline"] .zone-slab,
@@ -291,7 +304,7 @@
   gap: var(--space-3);
 }
 .facility-zone-top .zone-slab {
-  width: 64px;
+  width: var(--slab-overview);
   flex: none;
 }
 .facility-zone-head {
@@ -612,8 +625,8 @@
   grid-template-columns: subgrid;
 }
 .facility-gauges .mini-gauge-value {
-  font-size: 18px;
-  line-height: 24px;
+  font-size: var(--text-overview);
+  line-height: var(--leading-overview);
 }
 
 /* Phone (P1): the room's head, its zones as three tiles, and one feed line. */
@@ -655,6 +668,7 @@
   text-decoration: none;
 }
 .facility-tile-body {
+  position: relative;
   display: grid;
   align-content: start;
   gap: 4px;
@@ -672,18 +686,6 @@
 .facility-tile-body[data-mode="watering"] {
   border-color: var(--primary);
 }
-.facility-tile-body[data-mode="room-off"],
-.facility-tile-body[data-mode="offline"],
-.facility-tile-body[data-mode="paused"],
-.facility-tile-body[data-mode="watering-off"] {
-  background: repeating-linear-gradient(
-    -45deg,
-    var(--background),
-    var(--background) 8px,
-    color-mix(in srgb, var(--muted-foreground) 8%, var(--background)) 8px,
-    color-mix(in srgb, var(--muted-foreground) 8%, var(--background)) 16px
-  );
-}
 .facility-tile-body[data-mode="paused"] .zone-slab,
 .facility-tile-body[data-mode="offline"] .zone-slab,
 .facility-tile-body[data-mode="room-off"] .zone-slab,
@@ -698,7 +700,7 @@
   gap: 4px;
 }
 .facility-tile-body {
-  grid-template-columns: 44px minmax(0, 1fr);
+  grid-template-columns: var(--slab-tile) minmax(0, 1fr);
   column-gap: var(--space-3);
   padding: var(--space-3);
 }
@@ -708,7 +710,7 @@
 .facility-tile .zone-slab {
   grid-column: 1;
   grid-row: 1 / span 3;
-  width: 44px;
+  width: var(--slab-tile);
   align-self: start;
 }
 .facility-tile-reading {
@@ -722,10 +724,10 @@
 }
 .facility-tile-reading small {
   color: var(--muted-foreground);
-  font-size: var(--text-xs);
+  font-size: var(--text-label);
 }
 .facility-tile-reading strong {
-  font-size: 18px;
+  font-size: var(--text-overview);
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }

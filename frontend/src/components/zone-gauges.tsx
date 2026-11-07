@@ -54,7 +54,14 @@ export function MiniGauge({
         {value !== null && <span className="mini-gauge-tick" style={{ left: at(value) }} />}
       </span>
       <span className="mini-gauge-value" aria-hidden="true">
-        {value === null ? "—" : `${number(value, digits)}${unit}`}
+        {value === null ? (
+          "—"
+        ) : (
+          <>
+            {number(value, digits)}
+            {unit && <span className="mini-gauge-unit">{unit}</span>}
+          </>
+        )}
         {(state === "low" || state === "high") && (
           <>
             {" "}

@@ -39,6 +39,10 @@
   font-weight: 600;
   white-space: nowrap;
 }
+.mini-gauge-unit {
+  font-size: var(--text-unit);
+  font-weight: 500;
+}
 /* Severity, one rule everywhere: in band reads in the default text; out of band (either way) is
    a warning with its arrow. Brand blue never marks a value's state. */
 .drink-bar[data-state="low"] .drink-bar-fill {
