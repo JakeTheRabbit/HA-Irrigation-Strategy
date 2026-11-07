@@ -432,3 +432,71 @@
   width: 140px;
   height: auto;
 }
+/* The zones whose water did not arrive as asked, first, each with a jump to its card. */
+.wf-faults {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 16px;
+  padding: 12px 16px;
+  border: 1px solid color-mix(in srgb, var(--warning-mark) 55%, var(--border));
+  border-radius: var(--radius);
+  background: var(--warning-bg);
+  list-style: none;
+  font-size: var(--text-label);
+  line-height: var(--leading-label);
+}
+.wf-faults li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px 12px;
+}
+.wf-faults span {
+  font-weight: 600;
+}
+.wf-faults .wf-link {
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+}
+/* A phone: a zone on target is one line until opened. */
+.wf-zone-fold {
+  min-width: 0;
+  border: 1px solid color-mix(in srgb, var(--border) 75%, transparent);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.wf-zone-fold > summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  min-height: 48px;
+  padding: 12px 16px;
+  color: var(--muted-foreground);
+  font-size: var(--text-label);
+  line-height: var(--leading-label);
+  cursor: pointer;
+}
+.wf-zone-fold > summary b {
+  color: var(--foreground);
+  font-size: var(--text-reading);
+}
+.wf-zone-fold[open] > summary {
+  border-bottom: 1px solid var(--border);
+}
+.wf-zone-fold > .panel {
+  border: 0;
+  box-shadow: none;
+}
+.wf-zone-fold > summary::after {
+  content: "Show";
+  margin-left: auto;
+  color: var(--primary-strong);
+  font-weight: 600;
+}
+.wf-zone-fold[open] > summary::after {
+  content: "Hide";
+}

@@ -8,7 +8,7 @@
  *
  * Interactions asserted, at 1440 and 390 on both backends:
  * - 3.18: the header "Water & flow" and the meter line; "Did the water reach the plants?";
- *   one card per zone, zone 2 "Blocked line?" and the others "On target";
+ *   one card per zone, zone 2 "Low delivery · possible blockage" and the others "On target";
  * - zone 2's gauge aria-label says 62%; the blocked card sits inside zone 2, and only there,
  *   naming the 14:14 shot;
  * - a short tap on the test-shot button sends nothing; a 1.6 s hold sends test_shot, the demo
@@ -68,7 +68,7 @@ await runParity({
     const zone = (n) => page.locator(`[data-flow-zone="${n}"]`);
     await zone(2).locator("[data-flow-chip]").waitFor();
     assert.equal(await page.locator("[data-flow-zone]").count(), 3, `${label}: one card per zone`);
-    for (const [n, chip] of [[1, "On target"], [2, "Blocked line?"], [3, "On target"]])
+    for (const [n, chip] of [[1, "On target"], [2, "Low delivery · possible blockage"], [3, "On target"]])
       assert.equal((await zone(n).locator("[data-flow-chip]").innerText()).trim(), chip, `${label}: zone ${n} chip`);
     const gauge = zone(2).locator("svg.arc-gauge");
     assert.match(await gauge.getAttribute("aria-label"), /62%/, `${label}: zone 2 gauge`);
