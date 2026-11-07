@@ -390,12 +390,13 @@ function BandGauge({
   return (
     <div className="mix-gauge" data-mix-gauge={name} data-off={off || undefined}>
       <span className="mix-gauge-name">
-        {name} <b>{value === null ? "not read" : text(value)}</b>
+        {/* The batch's sample, not the tank now. */}
+        Sample {name} <b>{value === null ? "not read" : text(value)}</b>
       </span>
       <span
         className="mix-gauge-track"
         role="img"
-        aria-label={`${name} ${value === null ? "not read" : text(value)}, band ${low ? text(low) : "no minimum"} to ${high ? text(high) : "no maximum"}`}
+        aria-label={`Sample ${name} ${value === null ? "not read" : text(value)}, band ${low ? text(low) : "no minimum"} to ${high ? text(high) : "no maximum"}`}
       >
         {ends.length > 0 && (
           <>
@@ -567,10 +568,10 @@ export function MixCheckCard({
         {Number.isFinite(checked) && ` ${at(checked, now, tz)}`}
       </h3>
       {mix.probes.includes("ec") && (
-        <BandGauge name="Sample EC" value={mix.ec} low={ec.low} high={ec.high} text={ecText} />
+        <BandGauge name="EC" value={mix.ec} low={ec.low} high={ec.high} text={ecText} />
       )}
       {mix.probes.includes("ph") && (
-        <BandGauge name="Sample pH" value={mix.ph} low={ph.low} high={ph.high} text={PH} />
+        <BandGauge name="pH" value={mix.ph} low={ph.low} high={ph.high} text={PH} />
       )}
       <p className="plumb-mix-why">
         {[
