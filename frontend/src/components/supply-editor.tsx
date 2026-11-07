@@ -64,6 +64,8 @@ export function SupplyEditor({ controller, onDirtyChange }: { controller: Contro
   // Why a dripper flow was not written, by zone; editing that zone's field clears it.
   const [dripperReason, setDripperReason] = useState<Record<string, string>>({});
   const [last, setLast] = useState<SupplyUndo | null>(null);
+  // A phone shows each zone as one line until it is opened to edit.
+  const [opened, setOpened] = useState<number[]>([]);
 
   const readSetup = useCallback(async () => {
     try {
@@ -455,14 +457,39 @@ export function SupplyEditor({ controller, onDirtyChange }: { controller: Contro
                       const shown = base === null ? "" : flowValue(base, dripperDigits(base));
                       const reason = dripperReason[String(z.id)];
                       const errorId = `supply-dripper-error-${z.id}`;
+                      const drippers = z.plant_count * (z.drippers_per_plant ?? 1);
+                      // An edited or refused row stays open: its change and its reason must show.
+                      const open = opened.includes(z.id) || changed || invalid || !!reason;
                       return (
-                        <tr key={z.id} data-zone={z.id}>
+                        <tr key={z.id} data-zone={z.id} data-open={open || undefined}>
                           <th scope="row">
                             <span className="supply-dot" data-tone={tone(z.id)} aria-hidden />
                             {z.name}
+                            <span className="supply-zone-summary">
+                              {[
+                                `${drippers} drippers`,
+                                shown ? `${shown} ${unit} each` : null,
+                                flow === undefined ? null : lphText(flow),
+                                share === null ? null : `${pct(share)} pump`,
+                              ]
+                                .filter(Boolean)
+                                .join(" · ")}
+                            </span>
+                            <button
+                              type="button"
+                              className="supply-zone-toggle"
+                              aria-expanded={open}
+                              aria-label={`${open ? "Close" : "Edit"} ${z.name}`}
+                              disabled={open && !opened.includes(z.id)}
+                              onClick={() =>
+                                setOpened((list) => (list.includes(z.id) ? list.filter((id) => id !== z.id) : [...list, z.id]))
+                              }
+                            >
+                              {open ? "Close" : "Edit"}
+                            </button>
                           </th>
                           <td data-label="Drippers">
-                            {z.plant_count * (z.drippers_per_plant ?? 1)}
+                            {drippers}
                             <small className="muted">
                               {z.plant_count} plants × {z.drippers_per_plant ?? 1}
                             </small>
@@ -552,6 +579,25 @@ export function SupplyEditor({ controller, onDirtyChange }: { controller: Contro
           ) : null}
         </div>
 
+        {/* A phone with changes keeps them in reach above the bottom bar. */}
+        {rows.length > 0 && (
+          <div className="supply-pending-bar" role="status">
+            <span>
+              {rows.length} unsaved {rows.length === 1 ? "change" : "changes"}
+            </span>
+            <button
+              type="button"
+              className="inline-action"
+              onClick={() =>
+                document
+                  .querySelector('[data-supply-editor] [aria-label="Review and apply"]')
+                  ?.scrollIntoView({ behavior: "smooth", block: "start" })
+              }
+            >
+              Review &amp; apply
+            </button>
+          </div>
+        )}
         <ReviewApply
           layout="panel"
           rows={rows}

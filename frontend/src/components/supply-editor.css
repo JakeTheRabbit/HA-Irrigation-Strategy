@@ -271,9 +271,72 @@
     width: 90px;
   }
 }
-/* A phone: each zone is a card, its facts in a two-column label/value grid, the unit beside its
-   input and every control at least 44 px. */
+/* The one-line zone summary, its Edit toggle and the pending bar are a phone's. */
+.supply-zone-summary,
+.supply-zone-toggle,
+.supply-pending-bar {
+  display: none;
+}
+/* A phone: each zone is one line ("36 drippers · 4.0 L/h each · 144 L/h · 12% pump") that opens
+   to edit, its facts then in a two-column label/value grid, the unit beside its input and every
+   control at least 44 px. */
 @media (max-width: 640px) {
+  .supply-table th[scope="row"] {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: 8px;
+  }
+  .supply-zone-summary {
+    display: block;
+    grid-column: 1 / 3;
+    color: var(--muted-foreground);
+    font-size: var(--text-label);
+    font-weight: 400;
+    line-height: var(--leading-label);
+  }
+  .supply-zone-toggle {
+    display: inline-flex;
+    grid-column: 3;
+    grid-row: 1 / span 2;
+    align-items: center;
+    min-height: 44px;
+    padding: 0 14px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface);
+    color: var(--foreground);
+    font-weight: 600;
+  }
+  .supply-zone-toggle:disabled {
+    color: var(--muted-foreground);
+  }
+  .supply-table tr:not([data-open]) > td {
+    display: none;
+  }
+  .supply-table tr:not([data-open]) {
+    gap: 0;
+  }
+  .supply-pending-bar {
+    position: sticky;
+    bottom: calc(68px + env(safe-area-inset-bottom));
+    z-index: 30;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 52px;
+    margin: 12px 0;
+    padding: 4px 16px;
+    border: 1px solid color-mix(in srgb, var(--primary) 45%, var(--border));
+    border-radius: var(--radius);
+    background: var(--surface);
+    box-shadow: 0 4px 16px rgb(0 0 0 / 0.2);
+    font-weight: 600;
+  }
+  .supply-pending-bar .inline-action {
+    min-height: 44px;
+  }
   .supply-table-wrap {
     overflow: visible;
   }
