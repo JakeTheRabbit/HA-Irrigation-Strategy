@@ -88,11 +88,11 @@
     .targets-table
     tr:not(.targets-phase):not(.targets-note)
     > th:first-child {
-    width: 40%;
+    width: 34%;
     overflow-wrap: normal;
   }
   .irrigation-workspace[data-view="current"] .targets-input {
-    width: 32%;
+    width: 28%;
     white-space: normal;
   }
   .irrigation-workspace[data-view="current"] .targets-input input {
@@ -104,11 +104,11 @@
     margin-left: 4px;
   }
   .irrigation-workspace[data-view="current"] .targets-other {
-    width: 18%;
+    width: 16%;
     white-space: normal;
   }
   .irrigation-workspace[data-view="current"] .targets-chip {
-    width: 10%;
+    width: 22%;
     white-space: normal;
   }
   .irrigation-workspace[data-view="current"] .targets-chip .auto-badge {
@@ -119,21 +119,35 @@
 }
 @media (min-width: 1150px) {
   .irrigation-workspace[data-view="current"] .targets-table thead th:first-child {
-    width: 40%;
+    width: 34%;
   }
   .irrigation-workspace[data-view="current"] .targets-table thead th:nth-child(2) {
-    width: 32%;
+    width: 28%;
   }
   .irrigation-workspace[data-view="current"] .targets-table thead th:nth-child(3) {
-    width: 18%;
+    width: 16%;
   }
   .irrigation-workspace[data-view="current"] .targets-table thead th:nth-child(4) {
-    width: 10%;
+    width: 22%;
   }
 }
 @media (min-width: 1150px) {
   .irrigation-workspace[data-view="current"] .targets-table td.targets-chip {
     padding-left: 2px;
-    padding-right: 6px;
+    padding-right: 16px;
   }
+}
+/* Current day: the Auto and AI assistant chips stack in their own column and wrap inside it,
+   never past the panel's edge. */
+.irrigation-workspace[data-view="current"] .targets-chip .jev-chip {
+  display: block;
+  width: fit-content;
+  max-width: 100%;
+  margin: 2px 0;
+  white-space: normal;
+  text-align: center;
+}
+.irrigation-workspace[data-view="current"] .targets-chip .auto-badge {
+  margin: 2px 0;
+  white-space: nowrap;
 }

@@ -80,6 +80,10 @@
   --zone-4: #0e7490;
   --zone-5: #be185d;
   --zone-6: #78716c;
+  /* Chart series, apart from severity: VWC in the brand blue (as on the zone's day chart), pore EC
+     in the steering green the zone's day chart draws it in. */
+  --series-vwc: var(--primary);
+  --series-ec: #16a34a;
   /* Type: 12 is the floor, kept for chips, units, axis ticks and footnotes. What an operator reads
      from across the room is a label (sensor and setting names, target ranges, descriptions,
      helper text: 14/20) or a reading (16/24, weight 600). Space: a 4 px grid. */
@@ -112,6 +116,7 @@
   --native-warning-default: #ffca5b;
   --native-warning-mark-default: #ffca5b;
   --phase-p3: #4a5a85;
+  --series-ec: #4ade80;
   --warning-bg: color-mix(in srgb, var(--warning) 8%, var(--surface));
   --native-error-default: #f28b82;
   --native-success-default: #81c995;
@@ -1596,17 +1601,43 @@ select option:disabled {
   width: 18px;
   border-top: 2px solid var(--foreground);
 }
+.planning-legend .key-recorded {
+  border-top: 2.5px solid var(--series-vwc);
+}
 .planning-legend .key-target {
-  border-top: 2px dashed var(--muted-foreground);
+  border-top: 2px dashed var(--series-vwc);
 }
 .planning-legend .key-draft {
   border-top: 2px dashed var(--primary);
 }
 .planning-legend .key-earlier {
-  opacity: 0.3;
+  border-top-color: var(--muted-foreground);
+  opacity: 0.6;
 }
 .planning-legend .key-ec {
-  border-top: 2px dotted var(--muted-foreground);
+  border-top: 2px solid var(--series-ec);
+}
+.planning-axis-title {
+  fill: var(--muted-foreground);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+.planning-phase-chip rect {
+  fill: var(--phase-p0);
+}
+.planning-phase-chip[data-phase="P1"] rect {
+  fill: var(--phase-p1);
+}
+.planning-phase-chip[data-phase="P2"] rect {
+  fill: var(--phase-p2);
+}
+.planning-phase-chip[data-phase="P3"] rect {
+  fill: var(--phase-p3);
+}
+.planning-phase-chip text {
+  fill: #ffffff;
+  font-size: var(--text-xs);
+  font-weight: 600;
 }
 .planning-legend-toggles {
   margin-left: auto;

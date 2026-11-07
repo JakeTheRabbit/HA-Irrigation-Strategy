@@ -582,20 +582,31 @@ export function PlanningCurve({
                 fill="var(--muted-foreground)"
                 fillOpacity={selectedPhase === phase.id ? 0.14 : index % 2 ? 0.07 : 0.025}
               />
+              {/* The phase chip as everywhere else: its own hue, white text. */}
               {x(phase.end) - x(phase.start) > 20 && (
-                <text
-                  x={(x(phase.start) + x(phase.end)) / 2}
-                  y={TOP - 8}
-                  textAnchor="middle"
-                  fill="var(--muted-foreground)"
-                  fontSize="12"
-                  fontWeight="600"
-                >
-                  {phase.id}
-                </text>
+                <g className="planning-phase-chip" data-phase={phase.id}>
+                  <rect
+                    x={(x(phase.start) + x(phase.end)) / 2 - 11}
+                    y={TOP - 22}
+                    width={22}
+                    height={17}
+                    rx={4}
+                  />
+                  <text x={(x(phase.start) + x(phase.end)) / 2} y={TOP - 9} textAnchor="middle">
+                    {phase.id}
+                  </text>
+                </g>
               )}
             </g>
           ))}
+          <text x={left - 7} y={TOP - 9} textAnchor="end" className="planning-axis-title">
+            VWC %
+          </text>
+          {showEc && (
+            <text x={width - 2} y={TOP - 9} textAnchor="end" className="planning-axis-title">
+              EC mS/cm
+            </text>
+          )}
           {[0, 25, 50, 75, 100].map((tick) => {
             const line = TOP + HEIGHT * (1 - tick / 100);
             return (
@@ -660,9 +671,9 @@ export function PlanningCurve({
               d={recordedPath(previousDay, y)}
               display={showEarlier ? undefined : "none"}
               fill="none"
-              stroke="var(--foreground)"
+              stroke="var(--muted-foreground)"
               strokeWidth="1.25"
-              opacity="0.22"
+              opacity="0.45"
             >
               <title>Recorded VWC, previous grow-day</title>
             </path>
@@ -757,8 +768,9 @@ export function PlanningCurve({
                   data-planning-values={plottedValues(targetPoints)}
                   d={targetPath}
                   fill="none"
-                  stroke={dirty ? "var(--primary)" : "var(--muted-foreground)"}
-                  strokeWidth={dirty ? 2.25 : 2}
+                  stroke="var(--series-vwc)"
+                  strokeWidth={dirty ? 2.25 : 1.5}
+                  strokeOpacity={dirty ? 1 : 0.85}
                   strokeDasharray="6 4"
                 />
               )}
@@ -848,9 +860,8 @@ export function PlanningCurve({
                     data-planning-line="recorded-ec"
                     d={recordedPath(ecToday, ey)}
                     fill="none"
-                    stroke="var(--foreground)"
-                    strokeWidth="1"
-                    strokeOpacity="0.55"
+                    stroke="var(--series-ec)"
+                    strokeWidth="1.5"
                   >
                     <title>Recorded pore EC, this grow-day</title>
                   </path>
@@ -860,7 +871,7 @@ export function PlanningCurve({
                     data-planning-line="ec"
                     d={ecPath(plan.ec)}
                     fill="none"
-                    stroke="var(--muted-foreground)"
+                    stroke="var(--series-ec)"
                     strokeWidth="1.5"
                     strokeDasharray="1 4"
                     strokeLinecap="round"
@@ -877,7 +888,7 @@ export function PlanningCurve({
                   data-planning-line="recorded-vwc"
                   d={recordedPath(vwcRecorded.today, y)}
                   fill="none"
-                  stroke="var(--foreground)"
+                  stroke="var(--series-vwc)"
                   strokeWidth="2.5"
                 >
                   <title>Recorded VWC, this grow-day (lights-on to lights-on)</title>
@@ -889,7 +900,7 @@ export function PlanningCurve({
                   cx={x(nowVwc.hour)}
                   cy={y(nowVwc.value)}
                   r="3.5"
-                  fill="var(--foreground)"
+                  fill="var(--series-vwc)"
                 >
                   <title>{`Now ${trim(nowVwc.value)}%`}</title>
                 </circle>
