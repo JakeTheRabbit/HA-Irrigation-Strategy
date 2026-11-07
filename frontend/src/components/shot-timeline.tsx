@@ -178,7 +178,11 @@ export function ShotTimeline({
     </span>
   );
   const step = hours <= 12 ? 1 : hours <= 24 ? 2 : 4;
-  const tickMarks = hourTicks(span.start, span.end, step, timeZone).map((t) => (
+  // A preview's track is narrow: a time under or beside the Now chip is left out, not half-covered.
+  const clear = mode === "preview" && nowShown ? (span.end - span.start) * 0.12 : 0;
+  const tickMarks = hourTicks(span.start, span.end, step, timeZone)
+    .filter((t) => Math.abs(t - now) >= clear)
+    .map((t) => (
     <span
       key={t}
       className="st-tick"

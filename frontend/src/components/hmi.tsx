@@ -120,8 +120,15 @@ export function Gauge({
             : model.target !== null
               ? `target ${unit(model.target)}${model.basis ? ` ${model.basis}` : ""}`
               : ""}
-          {model.reference &&
-            ` · ref ${fix(model.reference[0], 0)}–${fix(model.reference[1], 0)}${model.unit}`}
+          {model.reference && (
+            <>
+              {" · "}
+              <span className="whitespace-nowrap">
+                ref {fix(model.reference[0], 0)}–{fix(model.reference[1], 0)}
+                {model.unit}
+              </span>
+            </>
+          )}
         </span>
         <span className="hmi-gauge-words">{model.words}</span>
       </div>

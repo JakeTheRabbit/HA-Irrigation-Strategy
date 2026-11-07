@@ -143,6 +143,11 @@
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
+/* A long target line ("target 8% of peak · ref 16–23%") wraps inside its gauge, never into the next. */
+.hmi-gauge-foot > span:first-child {
+  min-width: 0;
+  white-space: normal;
+}
 .hmi-gauge-words {
   margin-left: auto;
 }
