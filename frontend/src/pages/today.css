@@ -254,6 +254,18 @@
   border: 1.5px dashed var(--primary);
   background: color-mix(in srgb, var(--primary) 14%, transparent);
 }
+.today-strip-legend [data-glyph="failed"]::before {
+  background: var(--destructive);
+}
+.today-strip-legend [data-glyph="warning"]::before {
+  background: var(--warning-mark);
+}
+.today-strip-window {
+  margin-left: 4px;
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
 .today-strip-legend [data-glyph="lights"]::before {
   width: 14px;
   background: color-mix(in srgb, var(--warning-mark) 25%, transparent);

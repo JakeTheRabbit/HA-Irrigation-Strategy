@@ -461,20 +461,30 @@ function TodayStrip({
         ),
       ]
     : [];
-  // The ticks, less any the "now" label would sit on.
-  const ticks = [...hourTicks(start, end, 6, timeZone), end].filter(
-    (time) => !(now >= start && now < end) || Math.abs(time - now) > (end - start) * 0.18,
+  // The window's start and end, the hours between, less any the "Now" label would sit on.
+  const ticks = [start, ...hourTicks(start, end, 6, timeZone).filter((t) => t > start && t < end), end].filter(
+    (time) => !(now >= start && now < end) || Math.abs(time - now) > (end - start) * 0.12,
   );
+  // The window in words: a grow-day runs lights-on to the next lights-on, often into tomorrow.
+  const overnight = startOfDay(end - 1, timeZone) !== startOfDay(start, timeZone);
   const at = (time: number) => `${(((time - start) / (end - start)) * 100).toFixed(2)}%`;
   return (
     <section className="panel today-strip" aria-labelledby="today-strip-title" data-today-strip>
       <div className="today-strip-head">
-        <h2 id="today-strip-title">Today</h2>
+        <h2 id="today-strip-title">
+          Today{" "}
+          <span className="today-strip-window">
+            {clock(start, timeZone)} → {overnight ? "tomorrow " : ""}
+            {clock(end, timeZone)}
+          </span>
+        </h2>
         {timeline.state !== "missing" && (
           <ul className="today-strip-legend" aria-label="Legend">
             <li data-glyph="done">Shot done</li>
             <li data-glyph="planned">Planned</li>
             <li data-glyph="lights">Lights on</li>
+            <li data-glyph="failed">Failed</li>
+            <li data-glyph="warning">Warning</li>
           </ul>
         )}
         <button
@@ -512,7 +522,7 @@ function TodayStrip({
             ))}
             {now >= start && now < end && (
               <span className="today-strip-now" style={{ left: at(now) }}>
-                now {clock(now, timeZone)}
+                Now {clock(now, timeZone)}
               </span>
             )}
           </div>
