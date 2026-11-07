@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Empty, number, type Page } from "@/components/dashboard";
 import { RoomOffBanner } from "@/components/room-controls";
 import { BrainCard } from "@/components/brain";
+import { NeedsAttention } from "@/components/needs-attention";
 import { NeedsIntegration } from "@/components/needs-integration";
 import { PlanAndFeed } from "@/components/run-progress";
 import { PlantStressStrip } from "@/components/sensing";
@@ -15,7 +16,7 @@ import { zoneAttention, type AttentionLevel, type AttentionReason, type ZoneFact
 import { growDay, type GrowDay } from "@/lib/day-timeline";
 import { formatTemp, formatVolume } from "@/lib/display-units";
 import { pickKey } from "@/lib/facility";
-import { drinkLine, excludedProbes, isRescue, readingIssue, ZONE_MODE, zoneHref } from "@/lib/facility-view";
+import { drinkLine, excludedProbes, isRescue, readingIssue, roomAttention, ZONE_MODE, zoneHref } from "@/lib/facility-view";
 import type { GaugeModel } from "@/lib/hmi";
 import { probeGaps } from "@/lib/hmi";
 import { jevIds, parseJevSetpoints, readJev } from "@/lib/jev";
@@ -258,6 +259,10 @@ function RoomHead({
           </p>
         )}
       </div>
+      <NeedsAttention
+        items={roomAttention(r)}
+        open={(item) => (item.page === "zone" ? navigate("zone", item.zone) : navigate(item.page))}
+      />
       {grow?.of != null && (
         <div className="today-run" data-today-run>
           <span className="today-run-track" aria-hidden="true">
@@ -535,10 +540,18 @@ function TodayStrip({
 }
 
 /** One gauge as its row reads it: the name and its target, a bar with the band and a tick, the value. */
-function RoomGauge({ model, value }: { model: GaugeModel; value: string }) {
+function RoomGauge({ model, value, phase }: { model: GaugeModel; value: string; phase?: string }) {
   const at = (v: number) =>
     `${(Math.min(1, Math.max(0, (v - model.min) / (model.max - model.min || 1))) * 100).toFixed(1)}%`;
-  const target = targetText(model);
+  // VWC is held in its band only in P2: before then it is ramping to it, after it dries back from
+  // it, so outside P2 its target says so and a value outside it is not a warning.
+  const band = targetText(model);
+  const target =
+    phase === undefined || phase === "P2" || !band
+      ? band
+      : phase === "P1"
+        ? band.replace(/^target /, "ramping to ")
+        : band.replace(/^target /, "P2 band ");
   return (
     <div className="today-gauge" data-state={model.state}>
       <span className="today-gauge-label">
@@ -718,7 +731,11 @@ function ZoneRow({
         )}
       </div>
       <div className="today-zone-gauges" role="group" aria-label={`${zone.name} readings`}>
-        <RoomGauge model={row.gauges[0]} value={zone.vwc.value === null ? "—" : `${number(zone.vwc.value, 1)}%`} />
+        <RoomGauge
+          model={row.gauges[0]}
+          value={zone.vwc.value === null ? "—" : `${number(zone.vwc.value, 1)}%`}
+          phase={zone.phase}
+        />
         <RoomGauge
           model={row.gauges[1]}
           value={z.drybackPoints === null ? "—" : `${number(z.drybackPoints, 1)} pt`}

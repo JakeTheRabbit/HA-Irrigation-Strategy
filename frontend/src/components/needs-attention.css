@@ -1,0 +1,21 @@
+/* The room's exceptions, under its heading (needs-attention.tsx). */
+.needs-attention {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  margin: 0;
+  font-size: var(--text-label);
+  line-height: var(--leading-label);
+}
+.needs-attention > svg {
+  flex: none;
+  color: var(--warning-mark);
+}
+.needs-attention > strong {
+  color: var(--warning);
+  font-weight: 600;
+}
+.needs-attention .inline-action {
+  min-height: 24px;
+}

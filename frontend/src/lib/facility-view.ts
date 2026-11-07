@@ -403,3 +403,31 @@ export function facilityView(
     };
   });
 }
+
+/** What in the room needs a look, for the line under its heading: each zone with a problem, a
+ * troubled sensor, a short last shot or an open alert, then the feed's failed mix check, a held
+ * tank and low stock. Each opens where it is fixed. */
+export function roomAttention(
+  r: FacilityRoom,
+): { key: string; text: string; zone?: number; page: "zone" | "equipment/dosing" | "equipment/stock" }[] {
+  const zones = r.zones
+    .filter(
+      (z) =>
+        z.problem !== null ||
+        z.attention.length > 0 ||
+        z.lastShotHollow ||
+        z.sensors.some((s) => s.health !== "ok" && s.health !== "not-counted"),
+    )
+    .map((z) => ({ key: `zone-${z.zone.id}`, text: z.zone.name, zone: z.zone.id, page: "zone" as const }));
+  const low = r.stock.filter((tank) => tank.state !== "ok");
+  return [
+    ...zones,
+    ...(r.mixFailed ? [{ key: "mix", text: r.mixFailed.title, page: "equipment/dosing" as const }] : []),
+    ...(r.reservoir.state === "held"
+      ? [{ key: "reservoir", text: r.reservoir.label, page: "equipment/dosing" as const }]
+      : []),
+    ...(low.length
+      ? [{ key: "stock", text: low.map((tank) => `${tank.name} low`).join(", "), page: "equipment/stock" as const }]
+      : []),
+  ];
+}

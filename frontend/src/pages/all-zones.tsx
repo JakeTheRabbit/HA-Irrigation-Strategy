@@ -5,11 +5,13 @@ import { Empty, number, time as clock } from "@/components/dashboard";
 import { FeedTankDrawing, ZoneSlab } from "@/components/zone-slab";
 import { DrinkBar, MiniGauge, ShotDots } from "@/components/zone-gauges";
 import { StockBottle } from "@/components/stock-bottle";
+import { NeedsAttention } from "@/components/needs-attention";
 import { STOCK_STATES } from "@/lib/dosing";
 import { formatEc, formatTemp, formatVolume } from "@/lib/display-units";
 import {
   drinkLine,
   facilityView,
+  roomAttention,
   zoneHref,
   ZONE_MODE,
   type FacilityRoom,
@@ -159,6 +161,10 @@ function RoomCard({ r, offline, open }: { r: FacilityRoom; offline: boolean; ope
               </span>
             )}
           </div>
+          <NeedsAttention
+            items={roomAttention(r)}
+            open={(item) => open(room.id, item.page, item.zone)}
+          />
           {problem && !stale && (
             <p className="facility-flag" data-level="critical" role="status">
               <TriangleAlert size={15} aria-hidden="true" /> {status.text}: {status.detail}
@@ -576,10 +582,11 @@ function PhoneRoom({ r, offline, open }: { r: FacilityRoom; offline: boolean; op
           </span>
         )}
       </div>
+      <NeedsAttention items={roomAttention(r)} open={(item) => open(room.id, item.page, item.zone)} />
       <RunBar r={r} />
       {drink && (
         <p className="facility-phone-drink">
-          Drunk today <DrinkText drink={drink} />
+          {deliveredLabel(r)} <DrinkText drink={drink} />
         </p>
       )}
       <div className="facility-tiles">
