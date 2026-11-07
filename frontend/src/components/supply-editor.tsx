@@ -461,13 +461,13 @@ export function SupplyEditor({ controller, onDirtyChange }: { controller: Contro
                             <span className="supply-dot" data-tone={tone(z.id)} aria-hidden />
                             {z.name}
                           </th>
-                          <td>
+                          <td data-label="Drippers">
                             {z.plant_count * (z.drippers_per_plant ?? 1)}
                             <small className="muted">
                               {z.plant_count} plants × {z.drippers_per_plant ?? 1}
                             </small>
                           </td>
-                          <td>
+                          <td data-label="Dripper flow">
                             <span className="supply-input is-small">
                               <input
                                 inputMode="decimal"
@@ -491,8 +491,8 @@ export function SupplyEditor({ controller, onDirtyChange }: { controller: Contro
                               </small>
                             )}
                           </td>
-                          <td className="supply-num">{flow === undefined ? <span className="muted">not set</span> : lphText(flow)}</td>
-                          <td>
+                          <td className="supply-num" data-label="Zone flow">{flow === undefined ? <span className="muted">not set</span> : lphText(flow)}</td>
+                          <td data-label="Share of pump">
                             {share === null ? (
                               <span className="muted">{flow === undefined ? "Set dripper flow" : "Set max flow"}</span>
                             ) : (
@@ -505,7 +505,7 @@ export function SupplyEditor({ controller, onDirtyChange }: { controller: Contro
                               </span>
                             )}
                           </td>
-                          <td>
+                          <td data-label="Exclusive group">
                             <div className="supply-seg" role="group" aria-label={`${z.name} exclusive group`}>
                               {[...new Set([...GROUPS, groupOf(z.id)])].map((g) => (
                                 <button

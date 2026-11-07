@@ -648,9 +648,10 @@
   font-size: var(--text-lg);
   font-weight: 600;
 }
+/* One full-width row per zone: a small slab on the left, the labelled readings beside it. */
 .facility-tiles {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-2);
 }
 .facility-tile {
@@ -702,17 +703,32 @@
   justify-content: space-between;
   gap: 4px;
 }
+.facility-tile-body {
+  grid-template-columns: 44px minmax(0, 1fr);
+  column-gap: var(--space-3);
+  padding: var(--space-3);
+}
+.facility-tile-body > * {
+  grid-column: 2;
+}
 .facility-tile .zone-slab {
-  width: 100%;
-  max-width: 96px;
-  justify-self: center;
+  grid-column: 1;
+  grid-row: 1 / span 3;
+  width: 44px;
+  align-self: start;
 }
 .facility-tile-reading {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 0 4px;
+  display: grid;
+  grid-template-columns: repeat(3, auto);
+  justify-content: start;
+  gap: 0 20px;
+}
+.facility-tile-reading > span {
+  display: grid;
+}
+.facility-tile-reading small {
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
 }
 .facility-tile-reading strong {
   font-size: var(--text-md);

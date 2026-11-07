@@ -616,10 +616,19 @@ function PhoneRoom({ r, offline, open }: { r: FacilityRoom; offline: boolean; op
                   label=""
                   sensors={z.sensors.map((s) => ({ health: s.health, label: s.name }))}
                 />
+                {/* Each reading says what it is: VWC, pore EC, and the water each plant had today. */}
                 <span className="facility-tile-reading">
-                  <strong>{z.zone.vwc.value === null ? "—" : `${number(z.zone.vwc.value)}%`}</strong>
-                  <span className="muted">
-                    EC {z.zone.ec.value === null ? "—" : ec(z.zone.ec.value)}
+                  <span>
+                    <small>VWC</small>
+                    <strong>{z.zone.vwc.value === null ? "—" : `${number(z.zone.vwc.value)}%`}</strong>
+                  </span>
+                  <span>
+                    <small>Pore EC</small>
+                    <strong>{z.zone.ec.value === null ? "—" : ec(z.zone.ec.value)}</strong>
+                  </span>
+                  <span>
+                    <small>Water</small>
+                    <strong>{z.mlPerPlant === null ? "—" : `${perPlant(z.mlPerPlant)}/plant`}</strong>
                   </span>
                 </span>
                 <span className="facility-mode" data-mode={mode}>

@@ -271,3 +271,64 @@
     width: 90px;
   }
 }
+/* A phone: each zone is a card, its facts in a two-column label/value grid, the unit beside its
+   input and every control at least 44 px. */
+@media (max-width: 640px) {
+  .supply-table-wrap {
+    overflow: visible;
+  }
+  .supply-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+  .supply-table,
+  .supply-table tbody {
+    display: block;
+  }
+  .supply-table tr {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    margin-bottom: 12px;
+    padding: 16px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+  .supply-table th,
+  .supply-table td {
+    padding: 0;
+    border-bottom: 0;
+    white-space: normal;
+  }
+  .supply-table th[scope="row"] {
+    grid-column: 1 / -1;
+    font-size: var(--text-md);
+  }
+  .supply-table td::before {
+    content: attr(data-label);
+    display: block;
+    margin-bottom: 4px;
+    color: var(--muted-foreground);
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .supply-table td[data-label="Share of pump"],
+  .supply-table td[data-label="Exclusive group"] {
+    grid-column: 1 / -1;
+  }
+  .supply-input {
+    flex-wrap: nowrap;
+  }
+  .supply-input.is-small input {
+    height: 44px;
+  }
+  .supply-seg button {
+    min-height: 44px;
+  }
+  .supply-share-bar {
+    width: 140px;
+  }
+}

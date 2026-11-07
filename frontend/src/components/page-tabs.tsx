@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { NAV_TREE } from "@/lib/nav-tree";
 import { sectionOf, type Page, type Section } from "@/lib/routes";
 import "./page-tabs.css";
@@ -41,9 +42,19 @@ export function PageTabs({
 }) {
   const section = sectionOf(page);
   const tabs = TABS[section];
+  const row = useRef<HTMLElement>(null);
+  // On a phone the row scrolls sideways: the open page's tab is brought into view, never left
+  // cut off at the edge.
+  useEffect(() => {
+    const nav = row.current;
+    const active = nav?.querySelector<HTMLElement>('[aria-current="page"]');
+    if (!nav || !active || nav.scrollWidth <= nav.clientWidth) return;
+    nav.scrollLeft = active.offsetLeft - (nav.clientWidth - active.offsetWidth) / 2;
+  }, [page]);
   if (tabs.length < 2) return null;
   return (
     <nav
+      ref={row}
       className="page-tabs"
       data-section={section}
       aria-label={`${SECTION_LABELS[section]} pages`}

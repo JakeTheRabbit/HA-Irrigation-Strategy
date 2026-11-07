@@ -577,3 +577,55 @@
     grid-row: 2;
   }
 }
+
+/* A phase segment names itself only when it has room (48 px); narrower, just its P0–P3. */
+.explorer-phase {
+  container-type: inline-size;
+}
+.explorer-phase-short {
+  display: none;
+}
+/* The query reads the content box: 48 px less the 7 px padding each side. */
+@container (max-width: 33px) {
+  .explorer-phase-long {
+    display: none;
+  }
+  .explorer-phase-short {
+    display: inline;
+  }
+}
+/* A phone: the series toggles fold under one line. */
+.explorer-series > summary {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-weight: 600;
+  cursor: pointer;
+  list-style: none;
+}
+.explorer-series > summary::-webkit-details-marker {
+  display: none;
+}
+.explorer-series > summary::after {
+  content: "▸";
+  margin-left: auto;
+  color: var(--muted-foreground);
+}
+.explorer-series[open] > summary::after {
+  content: "▾";
+}
+.explorer-series[open] > .explorer-chips {
+  margin-top: 8px;
+}
+.explorer-phase-legend p {
+  margin: 4px 0 0;
+}
+/* Too narrow even for its P0–P3: the colour and the legend carry it. */
+@container (max-width: 13px) {
+  .explorer-phase-short {
+    display: none;
+  }
+}

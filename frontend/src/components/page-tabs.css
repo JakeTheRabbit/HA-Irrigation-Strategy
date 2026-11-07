@@ -42,9 +42,13 @@
   /* One row that scrolls sideways: a section can hold six pages. */
   .page-tabs {
     gap: 2px 16px;
+    position: relative;
     flex-wrap: nowrap;
     overflow-x: auto;
     scrollbar-width: none;
+    /* The right edge fades: more tabs lie that way. The padding lets the last tab clear it. */
+    padding-right: 32px;
+    mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent);
   }
   .page-tabs button {
     flex-shrink: 0;

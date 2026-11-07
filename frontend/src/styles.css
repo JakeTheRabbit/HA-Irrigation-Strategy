@@ -1832,6 +1832,18 @@ nav button.active > svg {
     display: none;
   }
 }
+/* A phone names the page in its header and again in the tab row: a page heading under those tabs
+   would say it a third time, so it stays for screen readers only. */
+@media (max-width: 720px) {
+  .main-inner:has(> .page-tabs) .page-heading h1 {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+}
 /* A phone is read close up and is short: the small sizes stay a step smaller there. */
 @media (max-width: 720px) {
   :root {

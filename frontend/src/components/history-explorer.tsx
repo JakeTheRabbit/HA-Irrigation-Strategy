@@ -1,5 +1,5 @@
 import { useProbeComparisons } from "@/lib/probe-history";
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { Check, CircleAlert, Download, LoaderCircle, Plus, SlidersHorizontal } from "lucide-react";
 import {
   Area,
@@ -1045,6 +1045,16 @@ function localInput(time: number) {
 // History › Explorer (H1, mockup 09): the room's readings, chart by measure, under its PHASE and
 // SHOTS lanes, with notes where something happened and one crosshair across every chart.
 
+/** On a phone the series toggles fold under one line that says how many are charted. */
+function SeriesDisclosure({ narrow, count, children }: { narrow: boolean; count: number; children: ReactNode }) {
+  if (!narrow) return <>{children}</>;
+  return (
+    <details className="explorer-series">
+      <summary>Series · {count} selected</summary>
+      {children}
+    </details>
+  );
+}
 const PHASE_WORDS: Record<string, string> = { P0: "P0", P1: "P1 ramp", P2: "P2 maintain", P3: "P3 dryback" };
 const HOUR = 3_600_000;
 const DAY = 86_400_000;
@@ -1502,6 +1512,7 @@ export function RoomExplorer({ controller, zone }: { controller: Controller; zon
           </Button>
         </form>
       )}
+      <SeriesDisclosure narrow={narrow} count={shown.length}>
       <div className="explorer-chips">
         {groups.map(({ group, series }) => (
           <div className="explorer-chip-group" role="group" aria-label={series[0].groupLabel} key={group}>
@@ -1527,6 +1538,7 @@ export function RoomExplorer({ controller, zone }: { controller: Controller; zon
           </div>
         ))}
       </div>
+      </SeriesDisclosure>
       {!connected ? (
         <p className="muted small">Recorded history loads while Home Assistant is connected.</p>
       ) : !data || !axis ? (
@@ -1546,11 +1558,23 @@ export function RoomExplorer({ controller, zone }: { controller: Controller; zon
                   style={{ left: `${pctOf(axis, segment.from)}%`, width: `${pctOf(axis, segment.to) - pctOf(axis, segment.from)}%` }}
                   title={`${segment.phase} ${clock(segment.from, timeZone)} to ${clock(segment.to, timeZone)}${segment.planned ? " (planned)" : ""}`}
                 >
-                  {segment.planned ? `${segment.phase} planned` : PHASE_WORDS[segment.phase] ?? segment.phase}
+                  {/* A segment narrower than 48 px shows only its P0–P3; the legend names them. */}
+                  <span className="explorer-phase-long">
+                    {segment.planned ? `${segment.phase} planned` : PHASE_WORDS[segment.phase] ?? segment.phase}
+                  </span>
+                  <span className="explorer-phase-short" aria-hidden="true">
+                    {segment.phase}
+                  </span>
                 </span>
               ))}
             </div>
           </div>
+          {narrow && (
+            <div className="explorer-row explorer-phase-legend">
+              <span />
+              <p className="muted small">P0 morning dryback · P1 ramp · P2 maintain · P3 dryback</p>
+            </div>
+          )}
           <div className="explorer-row explorer-lane">
             <span className="explorer-lane-name">Shots</span>
             <div className="explorer-shots" data-shot-lane>
