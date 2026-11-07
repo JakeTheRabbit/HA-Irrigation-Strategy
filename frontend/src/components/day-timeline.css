@@ -156,6 +156,9 @@
 .day-timeline .axis-title {
   font-weight: 600;
 }
+.day-timeline .axis-unit {
+  font-weight: 500;
+}
 .day-timeline .ref-label {
   paint-order: stroke;
   stroke: var(--surface);
@@ -206,8 +209,8 @@
 .day-timeline .yesterday-line {
   fill: none;
   stroke: var(--muted-foreground);
-  stroke-opacity: 0.75;
-  stroke-width: 1.6;
+  stroke-opacity: 0.5;
+  stroke-width: 1;
   stroke-linejoin: round;
 }
 .day-timeline .ec-line {
@@ -475,7 +478,7 @@
   transform: rotate(45deg);
 }
 .day-timeline .key-compare {
-  border-top: 2px solid color-mix(in srgb, var(--muted-foreground) 60%, transparent);
+  border-top: 1px solid color-mix(in srgb, var(--muted-foreground) 50%, transparent);
 }
 
 .day-timeline .timeline-events {

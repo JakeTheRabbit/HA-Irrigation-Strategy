@@ -1171,7 +1171,7 @@ function Legend({
 }) {
   const kind: Steering = steering ?? "vegetative";
   const entry = (layer: ChartLayer, title: string | undefined, children: ReactNode) => (
-    <li>
+    <li key={layer}>
       <button
         type="button"
         title={title}
@@ -1183,85 +1183,121 @@ function Legend({
       </button>
     </li>
   );
-  // Three layers lead; the rest wait behind "More layers", each still a switch.
-  return (
-    <ul className="grow-legend" aria-label="Chart key">
-      {entry(
+  const entries: [ChartLayer, ReactNode][] = [
+    [
+      "vwc",
+      entry(
         "vwc",
         "Solid: recorded today. Dotted: projected for the rest of the day, an estimate.",
         <>
           <i className="key-vwc" aria-hidden="true" />
           VWC
         </>,
-      )}
-      {entry(
+      ),
+    ],
+    [
+      "band",
+      entry(
         "band",
         "From the re-water point up to the peak target, in the ramp and maintenance hours. Below the re-water point, P2 gives a maintenance shot.",
         <>
           <i className="key-band" aria-hidden="true" />
           Maintenance band
         </>,
-      )}
-      {entry(
+      ),
+    ],
+    [
+      "ec",
+      entry(
         "ec",
         "Right-hand axis, mS/cm. Green while steering vegetative, purple while generative.",
         <>
           <i className="key-ec" data-steering={kind} aria-hidden="true" />
           Pore EC
         </>,
+      ),
+    ],
+    [
+      "shots",
+      entry(
+        "shots",
+        undefined,
+        <>
+          <i className="key-shot" aria-hidden="true" />
+          Shot
+          <i className="key-held" aria-hidden="true" />
+          held
+        </>,
+      ),
+    ],
+    [
+      "fc",
+      entry(
+        "fc",
+        "Field capacity, with a thin runoff band: just above it for vegetative steering, just under it for generative.",
+        <>
+          <i className="key-fc" aria-hidden="true" />
+          <i className="key-runoff" data-steering={kind} aria-hidden="true" />
+          FC · runoff
+        </>,
+      ),
+    ],
+    [
+      "rescue",
+      entry(
+        "rescue",
+        "Overnight, the controller waters only below this level.",
+        <>
+          <i className="key-rescue" aria-hidden="true" />
+          Rescue floor
+        </>,
+      ),
+    ],
+    ...(jev
+      ? ([
+          [
+            "jev",
+            entry(
+              "jev",
+              "Filled: code acted on it. Outline: advice, no action, or refused.",
+              <>
+                <i className="key-jev" aria-hidden="true" />
+                AI assistant decision
+              </>,
+            ),
+          ],
+        ] as [ChartLayer, ReactNode][])
+      : []),
+    ...(compare
+      ? ([
+          [
+            "compare",
+            entry(
+              "compare",
+              "Drawn on today’s scale: an earlier day beyond it runs off the edge.",
+              <>
+                <i className="key-compare" aria-hidden="true" />
+                {compare}
+              </>,
+            ),
+          ],
+        ] as [ChartLayer, ReactNode][])
+      : []),
+  ];
+  // Every layer drawn has its entry in the key; only the layers switched off wait behind "More
+  // layers", each still a switch to turn it back on.
+  const off = entries.filter(([layer]) => hidden.has(layer));
+  return (
+    <ul className="grow-legend" aria-label="Chart key">
+      {entries.filter(([layer]) => !hidden.has(layer)).map(([, item]) => item)}
+      {off.length > 0 && (
+        <li className="grow-legend-more">
+          <details>
+            <summary>More layers ({off.length} off)</summary>
+            <ul>{off.map(([, item]) => item)}</ul>
+          </details>
+        </li>
       )}
-      <li className="grow-legend-more">
-        <details>
-          <summary>More layers</summary>
-          <ul>
-            {entry(
-              "shots",
-              undefined,
-              <>
-                <i className="key-shot" aria-hidden="true" />
-                Shot
-                <i className="key-held" aria-hidden="true" />
-                held
-              </>,
-            )}
-            {entry(
-              "fc",
-              "Field capacity, with a thin runoff band: just above it for vegetative steering, just under it for generative.",
-              <>
-                <i className="key-fc" aria-hidden="true" />
-                <i className="key-runoff" data-steering={kind} aria-hidden="true" />
-                FC · runoff
-              </>,
-            )}
-            {entry(
-              "rescue",
-              "Overnight, the controller waters only below this level.",
-              <>
-                <i className="key-rescue" aria-hidden="true" />
-                Rescue floor
-              </>,
-            )}
-            {jev &&
-              entry(
-                "jev",
-                "Filled: code acted on it. Outline: advice, no action, or refused.",
-                <>
-                  <i className="key-jev" aria-hidden="true" />
-                  AI assistant decision
-                </>,
-              )}
-            {compare &&
-              entry(
-                "compare",
-                "Drawn on today’s scale: an earlier day beyond it runs off the edge.",
-                <>
-                  <i className="key-compare" aria-hidden="true" />
-                  {compare}
-                </>,
-              )}
-          </ul>
-        </details>
-      </li>
     </ul>
   );
 }
@@ -1595,8 +1631,12 @@ function Chart({
       ))}
       {show("ec") && ecAxis && lane.ec.length > 0 && (
         <g className="ec-axis" data-steering={lane.steering ?? undefined}>
+          {/* The right axis's title, its unit under it: "EC · mS/cm" would not fit the margin. */}
           <text x={L + plotW + 7} y={10} className="axis-title">
             EC
+            <tspan x={L + plotW + R} dy={12} textAnchor="end" className="axis-unit">
+              mS/cm
+            </tspan>
           </text>
           {lane.ecBand && (
             <rect

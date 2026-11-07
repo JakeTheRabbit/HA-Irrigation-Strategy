@@ -702,7 +702,9 @@ try {
         "P3",
       ]);
       const key = day.getByRole("list", { name: "Chart key" });
-      assert.ok((await key.locator(":scope > li").count()) <= 4, "the key stays small: three layers and More layers");
+      // Every layer drawn has its key entry in view; with every layer on there is no "More layers".
+      assert.equal(await key.locator(".grow-legend-more").count(), 0, "every layer is on, so none waits behind More layers");
+      assert.equal(await key.locator('[data-layer-toggle][aria-pressed="false"]').count(), 0);
       // Pointing at a shot says what it was, under the chart rather than over it, and a bar up the
       // plot marks where the reading is taken.
       const svg = day.locator(".grow-svg");
@@ -745,7 +747,6 @@ try {
       await page.mouse.move(plot.x + plot.width / 2, box.y + box.height / 2);
       assert.doesNotMatch(await readout.innerText(), /pore EC/);
       await page.mouse.move(0, 0);
-      await key.getByText("More layers").click();
       assert.equal(await key.getByRole("button").count(), await key.locator("li:not(.grow-legend-more)").count());
       // Compare with Off, Yesterday, the last run's day of the same number (mockup 04) or Typical.
       const compare = day.getByRole("group", { name: "Compare with" });
