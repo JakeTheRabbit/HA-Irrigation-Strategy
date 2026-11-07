@@ -449,11 +449,11 @@
   font-size: var(--text-sm);
 }
 .probe-placement:focus-visible {
-  outline: 2px solid var(--warning);
+  outline: 2px solid var(--warning-mark);
   outline-offset: 2px;
 }
 .probe-placement[data-warning] {
-  border-color: var(--warning);
+  border-color: var(--warning-mark);
 }
 .probe-placement-warning {
   display: flex;
@@ -461,7 +461,7 @@
   margin: 8px 0;
   padding: 10px 12px;
   border-radius: 8px;
-  background: color-mix(in srgb, var(--warning) 14%, transparent);
+  background: color-mix(in srgb, var(--warning-mark) 14%, transparent);
   font-size: var(--text-sm);
 }
 .probe-placement-warning svg {

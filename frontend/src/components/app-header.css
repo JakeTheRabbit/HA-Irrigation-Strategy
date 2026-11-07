@@ -113,7 +113,7 @@
 }
 .demo-pill {
   padding: 1px 9px;
-  border: 1px solid color-mix(in srgb, var(--warning) 40%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--warning-mark) 40%, var(--surface));
   border-radius: 999px;
   background: var(--warning-bg);
   color: var(--warning);
@@ -196,7 +196,7 @@
   align-items: flex-start;
   gap: 9px;
   padding: 9px 28px;
-  border-bottom: 1px solid color-mix(in srgb, var(--warning) 40%, var(--border));
+  border-bottom: 1px solid color-mix(in srgb, var(--warning-mark) 40%, var(--border));
   background: var(--warning-bg);
   color: var(--foreground);
   font-size: var(--text-sm);

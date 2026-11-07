@@ -41,7 +41,7 @@
   stroke: var(--destructive);
 }
 .tank-level .level-mark-remind {
-  stroke: var(--warning);
+  stroke: var(--warning-mark);
 }
 .tank-level .level-mark-label {
   paint-order: stroke;

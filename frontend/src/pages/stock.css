@@ -140,7 +140,7 @@
   text-align: center;
 }
 .stock-card[data-stock-next] {
-  border-color: var(--warning);
+  border-color: var(--warning-mark);
 }
 .stock-card h2 {
   margin: 8px 0 0;

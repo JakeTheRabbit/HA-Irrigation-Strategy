@@ -18,7 +18,7 @@
   margin: 0;
   padding: 6px 10px;
   border-radius: 8px;
-  background: color-mix(in srgb, var(--warning) 14%, var(--surface));
+  background: color-mix(in srgb, var(--warning-mark) 14%, var(--surface));
   color: var(--foreground);
   font-size: var(--text-sm);
   line-height: 1.4;
@@ -247,7 +247,7 @@
   border-radius: inherit;
 }
 .facility-zone[data-level="warning"] {
-  border-color: var(--warning);
+  border-color: var(--warning-mark);
 }
 .facility-zone[data-level="critical"] {
   border-color: var(--destructive);
@@ -339,7 +339,7 @@
   margin-left: 6px;
   padding: 0 6px;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--warning) 18%, var(--surface));
+  background: color-mix(in srgb, var(--warning-mark) 18%, var(--surface));
   color: var(--foreground);
   font-size: var(--text-xs);
   font-weight: 600;
@@ -472,7 +472,7 @@
 .facility-sensor[data-health="stale"] .facility-sensor-dot,
 .facility-sensor[data-health="stuck"] .facility-sensor-dot,
 .facility-sensor[data-health="left-out"] .facility-sensor-dot {
-  background: var(--warning);
+  background: var(--warning-mark);
 }
 .facility-sensor[data-health="no-reading"] .facility-sensor-dot,
 .facility-sensor[data-health="out-of-range"] .facility-sensor-dot {
@@ -654,7 +654,7 @@
   font-variant-numeric: tabular-nums;
 }
 .facility-tile-body[data-level="warning"] {
-  border-color: var(--warning);
+  border-color: var(--warning-mark);
 }
 .facility-tile-body[data-mode="watering"] {
   border-color: var(--primary);

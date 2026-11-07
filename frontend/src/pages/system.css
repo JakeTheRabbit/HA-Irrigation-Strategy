@@ -167,7 +167,7 @@
 }
 .system-strip span[data-missed] {
   height: 35%;
-  background: var(--warning);
+  background: var(--warning-mark);
 }
 .system-beat-note {
   margin: 0;
@@ -258,7 +258,7 @@
   background: var(--success);
 }
 .system-bar[data-low] span {
-  background: var(--warning);
+  background: var(--warning-mark);
 }
 .system-row-pct {
   color: var(--muted-foreground);

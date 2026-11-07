@@ -144,7 +144,7 @@
   bottom: 0;
   left: var(--o);
   width: var(--s);
-  background: color-mix(in srgb, var(--warning) 10%, transparent);
+  background: color-mix(in srgb, var(--warning-mark) 10%, transparent);
 }
 .st-lights-label {
   position: absolute;
@@ -214,13 +214,13 @@
   background: var(--destructive);
 }
 .st-block[data-glyph="warning"] {
-  background: var(--warning);
+  background: var(--warning-mark);
 }
 .st-block[data-glyph="queued"] {
-  border: 1px solid var(--warning);
+  border: 1px solid var(--warning-mark);
   background: repeating-linear-gradient(
     45deg,
-    color-mix(in srgb, var(--warning) 55%, transparent) 0 3px,
+    color-mix(in srgb, var(--warning-mark) 55%, transparent) 0 3px,
     transparent 3px 7px
   );
 }
@@ -331,7 +331,7 @@
   right: 0;
   top: var(--o);
   height: var(--s);
-  background: color-mix(in srgb, var(--warning) 10%, transparent);
+  background: color-mix(in srgb, var(--warning-mark) 10%, transparent);
 }
 .st-vtrack .st-now {
   left: 0;
@@ -405,20 +405,20 @@
   background: var(--destructive);
 }
 .st-legend [data-glyph="warning"]::before {
-  background: var(--warning);
+  background: var(--warning-mark);
 }
 .st-legend [data-glyph="queued"]::before {
   width: 16px;
-  border: 1px solid var(--warning);
+  border: 1px solid var(--warning-mark);
   background: repeating-linear-gradient(
     45deg,
-    color-mix(in srgb, var(--warning) 55%, transparent) 0 3px,
+    color-mix(in srgb, var(--warning-mark) 55%, transparent) 0 3px,
     transparent 3px 7px
   );
 }
 .st-legend [data-glyph="lights"]::before {
   width: 16px;
-  background: color-mix(in srgb, var(--warning) 16%, transparent);
+  background: color-mix(in srgb, var(--warning-mark) 16%, transparent);
 }
 
 /* Narrow containers: short labels, a slimmer label column, no lights text. */

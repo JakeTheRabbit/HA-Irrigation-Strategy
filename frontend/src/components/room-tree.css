@@ -95,7 +95,7 @@ nav.room-tree .room-tree-row[aria-current="page"] {
   height: 8px;
   flex: none;
   border-radius: 50%;
-  background: var(--warning);
+  background: var(--warning-mark);
 }
 .room-tree-zone[data-flag="stale"] .room-tree-flag {
   background: var(--destructive);
@@ -105,7 +105,7 @@ nav.room-tree .room-tree-row[aria-current="page"] {
   background: #5c6670;
 }
 .room-tree-row[data-alerts] .room-tree-flag {
-  background: var(--warning);
+  background: var(--warning-mark);
 }
 
 /* Pick mode: every row a checkbox, Done and Cancel at the foot. */

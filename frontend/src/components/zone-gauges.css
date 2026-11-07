@@ -44,7 +44,7 @@
 }
 .mini-gauge[data-state="high"] .mini-gauge-tick,
 .drink-bar[data-state="high"] .drink-bar-fill {
-  background: var(--warning);
+  background: var(--warning-mark);
 }
 .mini-gauge[data-state="low"] .mini-gauge-value {
   color: color-mix(in srgb, var(--primary) 80%, var(--foreground));

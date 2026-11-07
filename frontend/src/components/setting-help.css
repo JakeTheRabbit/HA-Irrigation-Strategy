@@ -63,7 +63,7 @@
 .info-tip-notice {
   margin: 0 0 8px;
   padding: 6px 10px;
-  border-left: 3px solid var(--warning);
+  border-left: 3px solid var(--warning-mark);
   border-radius: var(--radius-sm, 4px);
   background: var(--warning-bg);
 }

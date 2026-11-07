@@ -159,7 +159,7 @@
   display: grid;
   gap: 10px;
   padding: 14px 18px;
-  border: 1px solid var(--warning);
+  border: 1px solid var(--warning-mark);
   border-radius: 10px;
   font-size: var(--text-sm);
 }
@@ -245,7 +245,7 @@
   color: var(--success);
 }
 .feed-cal-grades li[aria-current][data-grade="drifting"] {
-  border-color: var(--warning);
+  border-color: var(--warning-mark);
   color: var(--warning);
 }
 .feed-cal-grades li[aria-current][data-grade="fail"] {

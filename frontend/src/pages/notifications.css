@@ -630,7 +630,7 @@
   /* A tick not saved yet. */
   .notify-chip[data-changed] {
     border-style: dashed;
-    border-color: var(--warning);
+    border-color: var(--warning-mark);
   }
   .notify-card-rooms {
     display: flex;

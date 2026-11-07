@@ -254,7 +254,7 @@
 }
 .wt-pop-status[data-glyph="warning"],
 .wt-pop-status[data-glyph="queued"] {
-  border-color: var(--warning);
+  border-color: var(--warning-mark);
   color: var(--foreground);
 }
 .wt-pop-status[data-glyph="done"]:not([data-running]) {

@@ -743,7 +743,7 @@ export function PlanningCurve({
                   y1={y(plan.emergencyFloor)}
                   y2={y(plan.emergencyFloor)}
                   stroke={
-                    plan.emergencyReferenceActive ? "var(--warning)" : "var(--muted-foreground)"
+                    plan.emergencyReferenceActive ? "var(--warning-mark)" : "var(--muted-foreground)"
                   }
                   strokeDasharray="2 4"
                 >
@@ -829,7 +829,7 @@ export function PlanningCurve({
                     x2={x(shot.hour)}
                     y1={SHOT_Y - 6}
                     y2={SHOT_Y + 6}
-                    stroke={shot.emergency ? "var(--warning)" : "var(--muted-foreground)"}
+                    stroke={shot.emergency ? "var(--warning-mark)" : "var(--muted-foreground)"}
                     strokeWidth="2"
                   >
                     <title>

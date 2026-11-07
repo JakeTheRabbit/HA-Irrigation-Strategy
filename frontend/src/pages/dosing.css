@@ -642,7 +642,7 @@
   align-items: center;
   gap: 6px 10px;
   padding: 10px 12px;
-  border-left: 3px solid var(--warning);
+  border-left: 3px solid var(--warning-mark);
   border-radius: 8px;
   background: var(--warning-bg);
   font-size: var(--text-sm);

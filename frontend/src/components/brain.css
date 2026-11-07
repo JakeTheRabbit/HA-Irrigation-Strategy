@@ -28,7 +28,7 @@
   background: var(--primary);
 }
 .brain-chip[data-tone="warning"] .brain-chip-dot {
-  background: var(--warning);
+  background: var(--warning-mark);
 }
 /* Today's card: one screen of Today holds it. */
 [data-brain-card] {
@@ -349,7 +349,7 @@
   background: var(--success);
 }
 .ai-bar[data-warn="true"] > span {
-  background: var(--warning);
+  background: var(--warning-mark);
 }
 .ai-bar-legend {
   display: flex;
@@ -362,9 +362,9 @@
 .ai-warning {
   margin: 0;
   padding: 5px 10px;
-  border-left: 3px solid var(--warning);
+  border-left: 3px solid var(--warning-mark);
   border-radius: 8px;
-  background: color-mix(in srgb, var(--warning) 10%, var(--surface));
+  background: color-mix(in srgb, var(--warning-mark) 10%, var(--surface));
   font-size: var(--text-sm);
 }
 .ai-budget-set {

@@ -62,7 +62,11 @@
   --radius: var(--ha-native-radius, 12px);
   --canvas: var(--background);
   --warning: var(--native-warning-default);
-  --warning-bg: color-mix(in srgb, var(--warning) 8%, var(--surface));
+  /* --warning is for TEXT (dark enough to read on a light card). Fills, borders, bars and dots
+     use the brighter mark, so a warning shot or edge never reads as a grey "done" one. */
+  --native-warning-mark-default: #d97706;
+  --warning-mark: var(--native-warning-mark-default);
+  --warning-bg: color-mix(in srgb, #f59e0b 18%, var(--surface));
   /* Type: 12 is the floor. Space: a 4 px grid. */
   --text-xs: 12px;
   --text-sm: 14px;
@@ -87,6 +91,8 @@
   --native-border-default: #333333;
   --native-input-default: #323232;
   --native-warning-default: #ffca5b;
+  --native-warning-mark-default: #ffca5b;
+  --warning-bg: color-mix(in srgb, var(--warning) 8%, var(--surface));
   --native-error-default: #f28b82;
   --native-success-default: #81c995;
   --native-primary-default: #03a9f4;
@@ -364,7 +370,7 @@ nav button.nav-separated {
   align-items: center;
   gap: 20px;
   background: var(--warning-bg);
-  border: 1px solid color-mix(in srgb, var(--warning) 28%, transparent);
+  border: 1px solid color-mix(in srgb, var(--warning-mark) 28%, transparent);
   border-radius: 7px;
   padding: 16px;
   margin: 14px 0;
@@ -431,7 +437,7 @@ nav button.nav-separated {
   gap: 12px;
   align-items: center;
   padding: 13px 16px;
-  border: 1px solid color-mix(in srgb, var(--warning) 25%, transparent);
+  border: 1px solid color-mix(in srgb, var(--warning-mark) 25%, transparent);
   background: var(--warning-bg);
   border-radius: 7px;
   color: var(--warning);
@@ -684,11 +690,11 @@ nav button.nav-separated {
   width: 5px;
   height: 5px;
   display: inline-block;
-  background: var(--warning);
+  background: var(--warning-mark);
   border-radius: 50%;
 }
 .is-draft input {
-  border-color: var(--warning);
+  border-color: var(--warning-mark);
 }
 .field-error {
   color: var(--destructive) !important;

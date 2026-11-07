@@ -26,7 +26,7 @@
   background: var(--foreground);
 }
 .meter-fill[data-tone="high"] {
-  background: var(--warning);
+  background: var(--warning-mark);
 }
 .meter-fill[data-tone="over"] {
   background: var(--destructive);

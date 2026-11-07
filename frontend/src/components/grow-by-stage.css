@@ -3,7 +3,7 @@
 .grow-stages {
   --stage-vegetative: color-mix(in srgb, var(--success) 70%, var(--surface));
   --stage-generative: color-mix(in srgb, #7c4dbc 70%, var(--surface));
-  --stage-ripening: color-mix(in srgb, var(--warning) 75%, var(--surface));
+  --stage-ripening: color-mix(in srgb, var(--warning-mark) 75%, var(--surface));
   margin-bottom: 16px;
 }
 .grow-stages .panel-heading {

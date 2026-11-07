@@ -68,8 +68,8 @@
   min-width: 0;
 }
 .wf-zone[data-flow-verdict="low"] {
-  border-color: var(--warning);
-  box-shadow: 0 0 0 1px var(--warning);
+  border-color: var(--warning-mark);
+  box-shadow: 0 0 0 1px var(--warning-mark);
 }
 .wf-zone-head,
 .wf-card-head {
@@ -163,7 +163,7 @@
   fill: var(--primary);
 }
 .wf-bar-metered[data-short] {
-  fill: var(--warning);
+  fill: var(--warning-mark);
 }
 .wf-bars-top {
   stroke: var(--border);
@@ -204,17 +204,17 @@
   fill: var(--primary);
 }
 .wf-zone[data-flow-verdict="low"] .wf-weekline polyline {
-  stroke: var(--warning);
+  stroke: var(--warning-mark);
 }
 .wf-zone[data-flow-verdict="low"] .wf-weekline circle {
-  fill: var(--warning);
+  fill: var(--warning-mark);
 }
 .wf-blocked,
 .wf-high,
 .wf-plant-note {
   margin: 0;
   padding: 12px 14px;
-  border: 1px solid color-mix(in srgb, var(--warning) 28%, transparent);
+  border: 1px solid color-mix(in srgb, var(--warning-mark) 28%, transparent);
   border-radius: 10px;
   background: var(--warning-bg);
   font-size: var(--text-sm);
@@ -336,8 +336,8 @@
   background: color-mix(in srgb, var(--muted-foreground) 14%, var(--surface));
 }
 .wf-days li[data-hit] i {
-  background: color-mix(in srgb, var(--warning) 45%, var(--surface));
-  outline: 1px solid var(--warning);
+  background: color-mix(in srgb, var(--warning-mark) 45%, var(--surface));
+  outline: 1px solid var(--warning-mark);
 }
 .wf-days p {
   flex: 1 1 220px;
@@ -378,7 +378,7 @@
   background: var(--primary);
 }
 .wf-plant-fill[data-tone="warn"] {
-  background: var(--warning);
+  background: var(--warning-mark);
 }
 .wf-plant-asked,
 .wf-plant-median {

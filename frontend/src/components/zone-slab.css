@@ -43,7 +43,7 @@
   stroke-width: 1.5;
 }
 .zone-slab[data-level="warning"] .zone-slab-edge {
-  stroke: var(--warning);
+  stroke: var(--warning-mark);
   stroke-width: 3;
 }
 .zone-slab[data-level="critical"] .zone-slab-edge {
@@ -76,7 +76,7 @@
   fill-opacity: 0.65;
 }
 .feed-tank[data-low] .feed-tank-liquid {
-  fill: var(--warning);
+  fill: var(--warning-mark);
 }
 .feed-tank-edge {
   fill: none;
@@ -114,7 +114,7 @@
 .zone-slab-sensor[data-health="stale"],
 .zone-slab-sensor[data-health="stuck"],
 .zone-slab-sensor[data-health="left-out"] {
-  fill: var(--warning);
+  fill: var(--warning-mark);
 }
 .zone-slab-sensor[data-health="no-reading"],
 .zone-slab-sensor[data-health="out-of-range"] {

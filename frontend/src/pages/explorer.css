@@ -437,7 +437,7 @@
   padding: 2px 8px;
   overflow: hidden;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--warning) 16%, var(--surface));
+  background: color-mix(in srgb, var(--warning-mark) 16%, var(--surface));
   color: color-mix(in srgb, var(--warning) 60%, var(--foreground));
   text-overflow: ellipsis;
 }

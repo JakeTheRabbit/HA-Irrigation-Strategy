@@ -143,8 +143,8 @@
   align-items: center;
   gap: 12px 14px;
   padding: 16px 18px;
-  border-color: color-mix(in srgb, var(--warning) 55%, var(--border));
-  background: color-mix(in srgb, var(--warning) 8%, var(--surface));
+  border-color: color-mix(in srgb, var(--warning-mark) 55%, var(--border));
+  background: color-mix(in srgb, var(--warning-mark) 8%, var(--surface));
 }
 .zone-suggestion-icon {
   color: var(--warning);

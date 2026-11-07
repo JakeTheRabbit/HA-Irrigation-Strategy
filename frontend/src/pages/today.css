@@ -161,7 +161,7 @@
   gap: 9px;
   margin: 0;
   padding: 9px 13px;
-  border: 1px solid color-mix(in srgb, var(--warning) 28%, transparent);
+  border: 1px solid color-mix(in srgb, var(--warning-mark) 28%, transparent);
   border-radius: 7px;
   background: var(--warning-bg);
   color: var(--foreground);
@@ -256,7 +256,7 @@
 }
 .today-strip-legend [data-glyph="lights"]::before {
   width: 14px;
-  background: color-mix(in srgb, var(--warning) 25%, transparent);
+  background: color-mix(in srgb, var(--warning-mark) 25%, transparent);
 }
 .today-strip-open {
   margin-left: auto;
@@ -333,7 +333,7 @@
   box-shadow: var(--ha-native-shadow, 0 1px 2px rgb(0 0 0 / 4%));
 }
 .today-zone[data-attention="warning"] {
-  border-color: color-mix(in srgb, var(--warning) 70%, var(--border));
+  border-color: color-mix(in srgb, var(--warning-mark) 70%, var(--border));
 }
 .today-zone[data-attention="critical"] {
   border-color: color-mix(in srgb, var(--destructive) 65%, var(--border));
@@ -429,7 +429,7 @@
   color: var(--warning);
 }
 .today-gauge[data-state="abnormal"] .mini-gauge-tick {
-  background: var(--warning);
+  background: var(--warning-mark);
 }
 .today-paused {
   display: flex;
@@ -496,11 +496,11 @@
   font-variant-numeric: tabular-nums;
 }
 .today-sensors li:not([data-health="ok"]):not([data-health="not-counted"]) {
-  border-color: var(--warning);
+  border-color: var(--warning-mark);
   background: var(--warning-bg);
 }
 .today-sensors li:not([data-health="ok"]):not([data-health="not-counted"]) i {
-  background: var(--warning);
+  background: var(--warning-mark);
 }
 .today-sensors li:not([data-health="ok"]):not([data-health="not-counted"]) .today-sensor-reading {
   color: var(--warning);
