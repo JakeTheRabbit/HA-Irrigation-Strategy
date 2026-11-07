@@ -611,7 +611,8 @@ function ZoneRow({
     null,
   );
   const troubled = row.sensors.some((s) => s.health !== "ok" && s.health !== "not-counted");
-  const phase = /^P[0-3]$/.test(zone.phase) ? zone.phase : null;
+  // A timer zone is not steered: no phase, as the room list says.
+  const phase = !z.timer && /^P[0-3]$/.test(zone.phase) ? zone.phase : null;
   const shots = zone.shots.value === null ? null : Math.round(zone.shots.value);
   const name = /^zone\b/i.test(zone.name) ? zone.name.charAt(0).toLowerCase() + zone.name.slice(1) : zone.name;
   // Problems in place: a probe's trouble is on its sensor, pore EC on its gauge, the zone's open

@@ -315,13 +315,14 @@ function ZoneCard({
   // Moisture is held between the re-water point and the peak only in P2; overnight (P3) it is
   // meant to dry back and is out of band only under the rescue floor; P0 and P1 are moving to it.
   const band: [number, number] | null =
-    zone.phase === "P2" && z.rewater !== null && z.target !== null
+    !z.timer && zone.phase === "P2" && z.rewater !== null && z.target !== null
       ? [z.rewater, z.target]
-      : zone.phase === "P3" && z.rescue !== null
+      : !z.timer && zone.phase === "P3" && z.rescue !== null
         ? [z.rescue, Number.POSITIVE_INFINITY]
         : null;
   const poreEc = r.stage?.poreEc ?? null;
-  const phase = /^P[0-3]$/.test(zone.phase) ? zone.phase : null;
+  // A timer zone is not steered: no phase, as the room list says.
+  const phase = !z.timer && /^P[0-3]$/.test(zone.phase) ? zone.phase : null;
   const context = [r.room.name, zone.name];
   // A sensor the zone's open alert already names ("Back sensor silent 3 h…") is said once, there.
   const troubled = z.sensors.filter(
@@ -593,7 +594,7 @@ function PhoneRoom({ r, offline, open }: { r: FacilityRoom; offline: boolean; op
       <div className="facility-tiles">
         {r.zones.map((z) => {
           const mode = stale && z.mode !== "room-off" ? "offline" : z.mode;
-          const phase = /^P[0-3]$/.test(z.zone.phase) ? z.zone.phase : null;
+          const phase = !z.timer && /^P[0-3]$/.test(z.zone.phase) ? z.zone.phase : null;
           // The phone has no sensor rows: a sensor's trouble is the tile's problem when it has no other.
           const sensor = z.sensors.find((s) => s.health !== "ok" && s.health !== "not-counted");
           const problem =

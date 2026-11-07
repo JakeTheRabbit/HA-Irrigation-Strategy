@@ -655,3 +655,7 @@
     display: none;
   }
 }
+/* Watered by timer programs: no steering, so no green "automated" dot. */
+.today-mode[data-mode="timer"] i {
+  background: var(--muted-foreground);
+}

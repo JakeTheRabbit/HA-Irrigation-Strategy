@@ -1,3 +1,4 @@
+import { irrigationMode } from "./facility";
 import { zoneAttention, type AttentionReason, type ZoneFacts } from "./attention";
 import { formatEc, formatTemp, formatVolume } from "./display-units";
 import { readJev, jevIds, parseJevSetpoints, type JevStage } from "./jev";
@@ -75,13 +76,14 @@ export function zoneSensors(probes: readonly Probe[]): ZoneSensor[] {
 }
 
 /** Where a zone stands with the automation, the most limiting first. */
-export type ZoneMode = "room-off" | "offline" | "paused" | "watering-off" | "watering" | "automated";
+export type ZoneMode = "room-off" | "offline" | "paused" | "watering-off" | "watering" | "timer" | "automated";
 export const ZONE_MODE: Record<ZoneMode, string> = {
   "room-off": "Room off",
   offline: "Offline",
   paused: "Paused",
   "watering-off": "Watering off",
   watering: "Watering now",
+  timer: "Timer",
   automated: "Automated",
 };
 
@@ -134,6 +136,8 @@ export interface FacilityZone {
   /** Water delivered to the zone today, in litres. */
   waterL: number | null;
   mode: ZoneMode;
+  /** Watered by the room's timer programs (its irrigation mode), not steered: it has no phase. */
+  timer: boolean;
   sensors: ZoneSensor[];
   attention: AttentionReason[];
   /** Waiting for the pump: its place in line, 1 = next (`position` counts the zones ahead). From the
@@ -334,7 +338,10 @@ export function facilityView(
                   ? "watering-off"
                   : zone.valveOn === true
                     ? "watering"
-                    : "automated") as ZoneMode,
+                    : irrigationMode(states, room, zone.id) === "timer"
+                      ? "timer"
+                      : "automated") as ZoneMode,
+          timer: irrigationMode(states, room, zone.id) === "timer",
           sensors: zoneSensors(zoneProbes(zone, states, now)),
           attention: [] as AttentionReason[],
           queued: ahead === null || ahead < 0 ? null : { place: ahead + 1 },
