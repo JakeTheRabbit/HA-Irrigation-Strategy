@@ -541,7 +541,18 @@ function TodayStrip({
 }
 
 /** One gauge as its row reads it: the name and its target, a bar with the band and a tick, the value. */
-function RoomGauge({ model, value, phase }: { model: GaugeModel; value: string; phase?: string }) {
+function RoomGauge({
+  model,
+  value,
+  phase,
+  timer = false,
+}: {
+  model: GaugeModel;
+  value: string;
+  phase?: string;
+  /** A timer zone: watered by its programs, its moisture never held to the band. */
+  timer?: boolean;
+}) {
   const at = (v: number) =>
     `${(Math.min(1, Math.max(0, (v - model.min) / (model.max - model.min || 1))) * 100).toFixed(1)}%`;
   // VWC is held in its band only in P2: before then it is ramping to it, after it dries back from
@@ -553,6 +564,21 @@ function RoomGauge({ model, value, phase }: { model: GaugeModel; value: string; 
       : phase === "P1"
         ? band.replace(/^target /, "ramping to ")
         : band.replace(/^target /, "P2 band ");
+  const outside =
+    model.band !== null && model.value !== null && (model.value < model.band[0] || model.value > model.band[1]);
+  const low = outside && model.value! < model.band![0];
+  // Every value not plainly in range says why: out of band is a warning (Low/High); a timer zone's
+  // moisture is not held to the band; outside P2 moisture is ramping to it (P1) or drying back.
+  const note =
+    model.state === "abnormal" && outside
+      ? null
+      : phase !== undefined && timer && model.band
+        ? "Not held · Timer"
+        : phase === "P1" && outside
+          ? "Ramping"
+          : phase !== undefined && phase !== "P2" && outside
+            ? "Drying back"
+            : null;
   return (
     <div className="today-gauge" data-state={model.state}>
       <span className="today-gauge-label">
@@ -574,12 +600,20 @@ function RoomGauge({ model, value, phase }: { model: GaugeModel; value: string; 
         {model.state === "abnormal" &&
           model.band &&
           model.value !== null &&
-          (model.value < model.band[0] || model.value > model.band[1]) && (
+          outside && (
             <span aria-hidden="true">
               {" "}
-              <small className="band-tag">{model.value < model.band[0] ? "Low" : "High"}</small>
+              <small className="band-tag">{low ? "Low" : "High"}</small>
             </span>
           )}
+        {note && (
+          <>
+            {" "}
+            <small className="band-tag" data-tone="neutral">
+              {note}
+            </small>
+          </>
+        )}
         {model.state === "abnormal" && <span className="sr-only">, {model.words}</span>}
       </span>
     </div>
@@ -741,6 +775,7 @@ function ZoneRow({
           model={row.gauges[0]}
           value={zone.vwc.value === null ? "—" : `${number(zone.vwc.value, 1)}%`}
           phase={zone.phase}
+          timer={z.timer}
         />
         <RoomGauge
           model={row.gauges[1]}

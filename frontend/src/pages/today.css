@@ -459,6 +459,15 @@
 .today-gauge[data-state="abnormal"] .mini-gauge-tick {
   background: var(--warning-mark);
 }
+.today-gauge[data-state="abnormal"] .today-gauge-label {
+  color: var(--warning);
+}
+/* A state that is not a warning (Ramping, Drying back, Not held · Timer): said, in muted ink. */
+.today-gauge .band-tag[data-tone="neutral"] {
+  border-color: var(--border);
+  color: var(--muted-foreground);
+  font-weight: 500;
+}
 .today-paused {
   display: flex;
   flex-wrap: wrap;

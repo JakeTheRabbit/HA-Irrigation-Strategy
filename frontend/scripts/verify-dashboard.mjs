@@ -525,7 +525,7 @@ try {
     for (const index of [0, 1, 2]) {
       const row = rows.nth(index);
       assert.equal(await row.locator(".today-gauge").count(), 3);
-      assert.match(await row.locator(".today-gauge").nth(0).innerText(), /^VWC\s+(target|ramping to|P2 band) [\d.]+–[\d.]+%\s+[\d.]+%( (Low|High))?(\s*, [\d.]+ points (under|over))?$/);
+      assert.match(await row.locator(".today-gauge").nth(0).innerText(), /^VWC\s+(target|ramping to|P2 band) [\d.]+–[\d.]+%\s+[\d.]+%( (Low|High|Ramping|Drying back|Not held · Timer))?(\s*, [\d.]+ points (under|over))?$/);
       assert.match(await row.locator(".today-gauge").nth(2).innerText(), /^Pore EC\s+target 3\.5–6(\.0)?\s+[\d.]+( (Low|High))?(\s*, [\d.]+ mS\/cm (under|over))?$/);
       assert.match(await row.locator("[data-today-delta]").innerText(), /^[+−±]\d+ mL vs median \d+ mL$/);
       assert.equal(await row.locator(".today-sensors li").count(), 2, "front and back sensors");
