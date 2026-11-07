@@ -26,13 +26,31 @@
 .facility-flag svg {
   flex: none;
   margin-top: 2px;
-  color: var(--warning);
+  color: var(--warning-mark);
 }
 .facility-flag[data-level="critical"] {
   background: color-mix(in srgb, var(--destructive) 14%, var(--surface));
 }
 .facility-flag[data-level="critical"] svg {
   color: var(--destructive);
+}
+/* The room's open alerts, beside its name. */
+.facility-alerts {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  align-self: center;
+  padding: 1px 8px;
+  border: 1px solid var(--warning-mark);
+  border-radius: 999px;
+  background: var(--warning-bg);
+  color: var(--warning);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.facility-alerts svg {
+  color: var(--warning-mark);
 }
 
 /* The room: name, state and run on the left, its feed tank on the right. */

@@ -6,7 +6,15 @@ import { newestFirst, openAlerts } from "./open-alerts";
 import { reservoirView, type ReservoirView } from "./reservoir";
 import { routeHash } from "./routes";
 import { buildSetpointPreview } from "./setpoint-preview";
-import { stockTanks, stockState, type StockState, type StockTankReading } from "./dosing";
+import {
+  dosingStatusId,
+  readStatus,
+  stockTanks,
+  stockState,
+  type DosingStatus,
+  type StockState,
+  type StockTankReading,
+} from "./dosing";
 import { tankTelemetry } from "./tank-telemetry";
 import { eventTimes } from "./timeline";
 import type { CsEvent } from "./parity-types";
@@ -160,6 +168,25 @@ export interface FacilityRoom {
   growDay: { day: number; of: number | null; daysLeft: number | null; stage: string } | null;
   /** binary_sensor.crop_steering_<prefix>calibration_due: a feed probe is due. */
   feedCalibrationDue: boolean;
+  /** The room's open alerts, counted once each. */
+  alertCount: number;
+  /** The last batch's mix check when it did not pass (and no batch is running): what it was and
+   * when, else null. */
+  mixFailed: { title: string; at: string | null } | null;
+}
+
+/** The mix check's failure, as Feed & dosing names it; null when it passed or a batch runs. */
+function mixFailed(status: DosingStatus | null): FacilityRoom["mixFailed"] {
+  const mix = status?.mix;
+  if (!mix || status.batch.step !== "idle") return null;
+  const title = mix.gave_up_at
+    ? "Mix check not done"
+    : mix.verdict === "off target"
+      ? "Mix check failed"
+      : mix.verdict === "not read"
+        ? "Mix check could not read the tank"
+        : null;
+  return title ? { title, at: mix.checked_at ?? mix.gave_up_at } : null;
 }
 
 /** An entity's state, with "unknown" and "unavailable" read as absent. */
@@ -371,6 +398,8 @@ export function facilityView(
       litresPerPlant: plantCount > 0 ? plantL / plantCount : null,
       growDay,
       feedCalibrationDue: states[`binary_sensor.crop_steering_${prefix}calibration_due`]?.state === "on",
+      alertCount: alerts.filter((alert) => alert.roomId === room.id).length,
+      mixFailed: mixFailed(readStatus(states[dosingStatusId(prefix)])),
     };
   });
 }

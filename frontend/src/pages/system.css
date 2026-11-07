@@ -221,7 +221,7 @@
   color: var(--success);
 }
 .system-row[data-tone="warn"] .system-dot {
-  color: var(--warning);
+  color: var(--warning-mark);
 }
 .system-row[data-tone="bad"] .system-dot,
 .system-row[data-tone="bad"] .system-row-seen {
@@ -232,8 +232,46 @@
 }
 .system-row-entity {
   display: block;
+  overflow: hidden;
   color: var(--muted-foreground);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: var(--text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Healthy rows fold under the exceptions. */
+.system-healthy > summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  list-style: none;
+}
+.system-healthy > summary::-webkit-details-marker {
+  display: none;
+}
+.system-healthy > summary::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--success);
+}
+.system-healthy > summary::after {
+  content: "▸";
+}
+.system-healthy[open] > summary::after {
+  content: "▾";
+}
+/* The attention summary's list: one line per problem. */
+.system-attention {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding-left: 18px;
 }
 .system-poll-error {
   margin: 8px 0 0;

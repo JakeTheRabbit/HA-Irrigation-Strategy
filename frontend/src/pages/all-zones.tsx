@@ -45,6 +45,19 @@ const ROOT_BAND: [number, number] = [19, 23];
 
 type Open = (room: string, page: Page, zone?: number) => void;
 
+const mixText = (mix: NonNullable<FacilityRoom["mixFailed"]>) =>
+  `${mix.title}${mix.at ? ` ${clock(mix.at)}` : ""}`;
+
+/** The room's open alerts, beside its name: a count, never colour alone. */
+function AlertChip({ count }: { count: number }) {
+  if (!count) return null;
+  return (
+    <span className="facility-alerts" data-facility-alerts={count}>
+      <TriangleAlert size={13} aria-hidden="true" /> {count} {count === 1 ? "alert" : "alerts"}
+    </span>
+  );
+}
+
 /** The facility as rooms, each room's zones, each zone's sensors. A problem shows where it is: on
  * the room, the zone, the sensor or the tank, never in a separate list. */
 export function AllZones({ controller, open }: { controller: Controller; open: Open }) {
@@ -134,6 +147,7 @@ function RoomCard({ r, offline, open }: { r: FacilityRoom; offline: boolean; ope
               {stale ? "Last reported" : !view.roomActive ? "Room not in use" : status.text}
               {stageName(r) ? ` · ${capital(stageName(r))}` : ""}
             </span>
+            <AlertChip count={r.alertCount} />
             {growDay && (
               <span className="facility-room-day">
                 Day <strong>{growDay.day}</strong>
@@ -486,6 +500,11 @@ function TankCard({ r, open }: { r: FacilityRoom; open: Open }) {
           Pump {tank.pump.on === null ? "unknown" : tank.pump.on ? "on" : "off"}
           {tank.lastFill.timestamp ? ` · filled ${clock(tank.lastFill.timestamp)}` : ""}
         </span>
+        {r.mixFailed && (
+          <span className="facility-flag" data-level="critical" data-facility-mix>
+            <TriangleAlert size={13} aria-hidden="true" /> {mixText(r.mixFailed)}
+          </span>
+        )}
         {held && (
           <span className="facility-flag" data-level="critical">
             <Pause size={13} aria-hidden="true" /> {reservoir.label}
@@ -548,6 +567,7 @@ function PhoneRoom({ r, offline, open }: { r: FacilityRoom; offline: boolean; op
           {stale ? "Last reported" : !view.roomActive ? "Room not in use" : status.text}
           {stageName(r) ? ` · ${capital(stageName(r))}` : ""}
         </span>
+        <AlertChip count={r.alertCount} />
         {growDay && (
           <span className="facility-room-day">
             Day <strong>{growDay.day}</strong>
@@ -662,6 +682,11 @@ function PhoneRoom({ r, offline, open }: { r: FacilityRoom; offline: boolean; op
             </>
           )}
         </span>
+        {r.mixFailed && (
+          <span className="facility-flag" data-level="critical" data-facility-mix>
+            <TriangleAlert size={13} aria-hidden="true" /> {mixText(r.mixFailed)}
+          </span>
+        )}
         {low.length > 0 && (
           <span className="facility-phone-low">
             {low.map((t) => `${t.name} ${STOCK_STATES[t.state].toLowerCase()}`).join(" · ")}

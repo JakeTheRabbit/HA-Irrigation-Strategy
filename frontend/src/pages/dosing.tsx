@@ -23,7 +23,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Empty, Heading, number, type Page } from "@/components/dashboard";
+import { Empty, FaultSummary, Heading, number, type Page } from "@/components/dashboard";
 import { UiTip } from "@/components/info-tip";
 import { Pill } from "@/components/mini-visuals";
 import { PeristalticPump } from "@/components/peristaltic-pump";
@@ -419,6 +419,79 @@ const MIX_TITLE = {
   "not read": "Mix check could not read the tank",
 };
 const PROBE_NAMES = { ec: "EC", ph: "pH" } as const;
+type Band = { low: number | null; high: number | null };
+const mixBands = (states: States, prefix: string) => {
+  const band = (quantity: "ec" | "ph", end: "min" | "max") =>
+    numeric(states[`number.crop_steering_${prefix}irrigation_${quantity}_${end}`]);
+  return {
+    ec: { low: band("ec", "min"), high: band("ec", "max") },
+    ph: { low: band("ph", "min"), high: band("ph", "max") },
+  };
+};
+const mixEc = (v: number) => formatEc(v, 2);
+const outsideBand = (v: number | null, b: Band) =>
+  v !== null &&
+  ((b.low !== null && b.low > 0 && v < b.low) || (b.high !== null && b.high > 0 && v > b.high));
+const bandRange = (b: Band, text: (v: number) => string) =>
+  b.low && b.low > 0 && b.high && b.high > 0
+    ? `${text(b.low).replace(/ \S+$/, "")}–${text(b.high)}`
+    : b.low && b.low > 0
+      ? `at least ${text(b.low)}`
+      : `at most ${text(b.high ?? 0)}`;
+const mixTitle = (mix: MixCheck) =>
+  mix.gave_up_at ? "Mix check not done" : MIX_TITLE[mix.verdict as keyof typeof MIX_TITLE];
+
+/** The failed mix check, summarised at the top of the page: the reading against its band, what it
+ * costs, and a jump to the card on the tank that holds the way out. */
+export function MixFaultSummary({
+  mix,
+  states,
+  prefix,
+  now,
+  tz,
+  onShow,
+}: {
+  mix: MixCheck;
+  states: States;
+  prefix: string;
+  now: number;
+  tz: string;
+  onShow: () => void;
+}) {
+  const bands = mixBands(states, prefix);
+  const checked = Date.parse(mix.checked_at ?? mix.gave_up_at ?? "");
+  const title = `${mixTitle(mix)}${Number.isFinite(checked) ? ` · ${at(checked, now, tz)}` : ""}`;
+  // The first probe behind the failure: one off its band, else one that read nothing.
+  const quantity =
+    mix.probes.find((q) => outsideBand(mix[q], bands[q])) ??
+    mix.probes.find((q) => mix[q] === null);
+  const text = quantity === "ph" ? PH : mixEc;
+  const reading = quantity ? mix[quantity] : null;
+  return (
+    <FaultSummary
+      tone="fault"
+      title={title}
+      value={
+        quantity
+          ? `${PROBE_NAMES[quantity]} ${reading === null ? "not read" : text(reading)}`
+          : undefined
+      }
+      allowed={
+        quantity && (bands[quantity].low || bands[quantity].high)
+          ? `allowed ${bandRange(bands[quantity], text)}`
+          : undefined
+      }
+      action={
+        <Button variant="outline" onClick={onShow}>
+          Top up and re-check ↓
+        </Button>
+      }
+    >
+      The controller refuses a batch an automation asks for until a batch made by hand passes this
+      check. The shots continue.
+    </FaultSummary>
+  );
+}
 
 /** The last batch's mix check, in place beside the tank, when it did not pass: both readings on
  * their bands, why, and a hold to make a batch that fills, mixes and checks again. Making a batch is
@@ -452,20 +525,10 @@ export function MixCheckCard({
   error: string;
 }) {
   const id = useId();
-  const band = (quantity: "ec" | "ph", end: "min" | "max") =>
-    numeric(states[`number.crop_steering_${prefix}irrigation_${quantity}_${end}`]);
-  const ec = { low: band("ec", "min"), high: band("ec", "max") };
-  const ph = { low: band("ph", "min"), high: band("ph", "max") };
-  const ecText = (v: number) => formatEc(v, 2);
-  const outside = (v: number | null, b: { low: number | null; high: number | null }) =>
-    v !== null &&
-    ((b.low !== null && b.low > 0 && v < b.low) || (b.high !== null && b.high > 0 && v > b.high));
-  const range = (b: { low: number | null; high: number | null }, text: (v: number) => string) =>
-    b.low && b.low > 0 && b.high && b.high > 0
-      ? `${text(b.low).replace(/ \S+$/, "")}–${text(b.high)}`
-      : b.low && b.low > 0
-        ? `at least ${text(b.low)}`
-        : `at most ${text(b.high ?? 0)}`;
+  const { ec, ph } = mixBands(states, prefix);
+  const ecText = mixEc;
+  const outside = outsideBand;
+  const range = bandRange;
   const wanted = [
     outside(mix.ec, ec) && `Want EC ${range(ec, ecText)}; it read ${ecText(mix.ec!)}.`,
     outside(mix.ph, ph) && `Want pH ${range(ph, PH)}; it read ${PH(mix.ph!)}.`,
@@ -488,9 +551,7 @@ export function MixCheckCard({
       : outside(value, quantity === "ec" ? ec : ph);
   });
   const checked = Date.parse(mix.checked_at ?? mix.gave_up_at ?? "");
-  const title = mix.gave_up_at
-    ? "Mix check not done"
-    : MIX_TITLE[mix.verdict as keyof typeof MIX_TITLE];
+  const title = mixTitle(mix);
   const ago = (ms: number) => {
     const days = Math.floor((now - ms) / 86_400_000);
     return days === 0 ? "today" : `${days} ${days === 1 ? "day" : "days"} ago`;
@@ -1185,7 +1246,7 @@ export function Dosing({
         title={`Feed & dosing · ${room.room.name}`}
         description={
           config
-            ? `Batch tank, ${views.length} dosing ${views.length === 1 ? "pump" : "pumps"}, ${room.zones.length} ${room.zones.length === 1 ? "zone" : "zones"}${armed.length ? ` · protections armed ${armedCount} of ${armed.length}` : ""}`
+            ? `Batch tank, ${views.length} dosing ${views.length === 1 ? "pump" : "pumps"}, ${room.zones.length} ${room.zones.length === 1 ? "zone" : "zones"}${armed.length && !failed ? ` · protections armed ${armedCount} of ${armed.length}` : ""}`
             : undefined
         }
         action={
@@ -1196,6 +1257,20 @@ export function Dosing({
           )
         }
       />
+      {config && failed && mix && (
+        <MixFaultSummary
+          mix={mix}
+          states={states}
+          prefix={prefix}
+          now={now}
+          tz={tz}
+          onShow={() =>
+            document
+              .querySelector("[data-mix-check]")
+              ?.scrollIntoView({ behavior: "smooth", block: "center" })
+          }
+        />
+      )}
       <CanonicalControls
         controller={controller}
         owner="dosing"
