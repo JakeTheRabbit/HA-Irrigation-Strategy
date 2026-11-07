@@ -67,6 +67,19 @@
   padding: 16px 18px;
   min-width: 0;
 }
+/* Side by side, the cards share their rows: a chip that wraps under one zone's title moves every
+   zone's gauge and chart down with it, so they stay level. A phone folds them instead. */
+@media (min-width: 721px) {
+  .wf-zones > .wf-zone {
+    display: grid;
+    grid-row: span 5;
+    grid-template-rows: subgrid;
+    row-gap: 12px;
+  }
+  .wf-zones > .wf-zone > .wf-zone-head {
+    align-self: start;
+  }
+}
 .wf-zone[data-flow-verdict="low"] {
   border-color: var(--warning-mark);
   box-shadow: 0 0 0 1px var(--warning-mark);

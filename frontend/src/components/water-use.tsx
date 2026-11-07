@@ -187,7 +187,7 @@ export function WaterUsePanel({
         <div>
           <h2 id="water-use-title">{title}</h2>
           <p>
-            Litres per zone, all plants
+            The controller’s recorded litres, not the meter: per zone, all plants
             {lightsOn !== undefined && lightsOn !== null
               ? `. A grow-day runs from lights-on (${clock(lightsOn)}) to the next lights-on.`
               : "."}
@@ -311,7 +311,7 @@ function WaterUseBody({
                   <UiTip copyKey="zone" />
                 </span>
               </th>
-              <th scope="col">Today · zone total</th>
+              <th scope="col">Today · zone total (estimate)</th>
               <th scope="col">Today · average per plant</th>
               <th scope="col">
                 <span className="wu-th">

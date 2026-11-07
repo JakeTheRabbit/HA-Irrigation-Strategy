@@ -260,6 +260,7 @@ function FlowCheck({
               metered={!!meters[i]}
               shots={shotsToday(zone.id)}
               days={dailyRatios(events, zone.id, now, tz)}
+              since={dayStart}
             />
           );
           // A phone folds a zone whose water arrived as asked to one line; the order stays.
@@ -287,7 +288,7 @@ function FlowCheck({
           now={now}
           dayStart={dayStart}
         />
-        <WaterPerPlant controller={controller} flows={flows} />
+        <WaterPerPlant controller={controller} flows={flows} since={dayStart} />
       </div>
     </>
   );
@@ -302,6 +303,7 @@ function ZoneCard({
   metered,
   shots,
   days,
+  since,
 }: {
   controller: Controller;
   zone: Zone;
@@ -309,6 +311,8 @@ function ZoneCard({
   metered: boolean;
   shots: number;
   days: (number | null)[];
+  /** Where "today" starts for the metered figures: local midnight. */
+  since: number;
 }) {
   const plants = zonePlants(controller, zone.id);
   const facts = [plants ? `${plants} plants` : null, `${shots} ${shots === 1 ? "shot" : "shots"}`].filter(Boolean).join(" · ");
@@ -347,7 +351,8 @@ function ZoneCard({
               <span>metered vs asked, last 3 shots</span>
               {flow.todayPct !== null && (
                 <span className="wf-today">
-                  <b>Today {pct(flow.todayPct)}</b> · {formatVolume(got, 1).replace(/\s\S+$/, "")} of {formatVolume(asked, 1)}
+                  <b>Today {pct(flow.todayPct)}</b> · metered {formatVolume(got, 1).replace(/\s\S+$/, "")} of {formatVolume(asked, 1)} ·
+                  from {clock(since, controller.timeZone)}
                 </span>
               )}
             </div>
@@ -670,7 +675,7 @@ function LeakCheck({
 const perPlant = (ml: number) => formatVolume(ml / 1000, 3);
 
 /** Metered water per plant today, zone against zone, the room's median marked. */
-function WaterPerPlant({ controller, flows }: { controller: Controller; flows: ZoneFlow[] }) {
+function WaterPerPlant({ controller, flows, since }: { controller: Controller; flows: ZoneFlow[]; since: number }) {
   const rows = controller.room.zones.flatMap((zone, i) => {
     const plants = zonePlants(controller, zone.id);
     const shots = flows[i].shots;
@@ -690,7 +695,7 @@ function WaterPerPlant({ controller, flows }: { controller: Controller; flows: Z
     <section className="panel wf-plant" data-water-per-plant aria-labelledby="wf-plant-title">
       <header className="wf-card-head">
         <h3 id="wf-plant-title">
-          Water per plant <small>metered today, against the room median</small>
+          Water per plant <small>metered from {clock(since, controller.timeZone)}, against the room median</small>
         </h3>
       </header>
       <ul className="wf-plant-rows">
