@@ -1638,6 +1638,7 @@ export function RoomExplorer({ controller, zone }: { controller: Controller; zon
               markerLabels={chartIndex === 0 && short}
               last={chartIndex === charts.length - 1}
               phase={hover === null ? null : segmentAt(lane, hover)}
+              timeTicks={ticks}
             />
           ))}
           {charts.length > 0 && (
@@ -1704,6 +1705,7 @@ function ExplorerChart({
   markerLabels,
   last,
   phase,
+  timeTicks,
 }: {
   title: string;
   caption: string | null;
@@ -1725,6 +1727,8 @@ function ExplorerChart({
   markerLabels: boolean;
   last: boolean;
   phase: string | null;
+  /** The time axis's labels, repeated under each chart on a phone. */
+  timeTicks: { t: number; label: string }[];
 }) {
   const { ref, width } = useWidth();
   const height = 180;
@@ -1803,6 +1807,20 @@ function ExplorerChart({
           ))}
         </ul>
       </div>
+      <div className="explorer-plot-box">
+      {/* The scale in its own 48 px gutter, so no line, band or numbered mark sits under it. The
+          unit is in the legend beside the chart. */}
+      <div className="explorer-y-axis" aria-hidden="true">
+        {ticks.map((v, i) => (
+          <span
+            key={i}
+            className={`explorer-y${i === 0 ? " explorer-y-low" : i === ticks.length - 1 ? " explorer-y-high" : ""}`}
+            style={i > 0 && i < ticks.length - 1 ? { top: `${y(v) - 9}px` } : undefined}
+          >
+            {shownValue(series[0], v).replace(/\s+[A-Za-z/]{3,}$/, "")}
+          </span>
+        ))}
+      </div>
       <div
         ref={ref}
         className="explorer-plot"
@@ -1820,15 +1838,6 @@ function ExplorerChart({
           onHover((hover ?? data.end) + by);
         }}
       >
-        {ticks.map((v, i) => (
-          <span
-            key={i}
-            className={`explorer-y${i === 0 ? " explorer-y-low" : i === ticks.length - 1 ? " explorer-y-high" : ""}`}
-            style={i > 0 && i < ticks.length - 1 ? { top: `${y(v) - 9}px` } : undefined}
-          >
-            {shownValue(series[0], v)}
-          </span>
-        ))}
         {width > 0 && (
           <svg width={width} height={height} aria-hidden="true">
             {ticks.map((v, i) => (
@@ -1881,7 +1890,9 @@ function ExplorerChart({
           </svg>
         )}
         {axis.end > data.end && (
-          <span className="explorer-ahead" style={{ left: `${pctOf(axis, data.end)}%` }} aria-hidden="true" />
+          <span className="explorer-ahead" style={{ left: `${pctOf(axis, data.end)}%` }} aria-hidden="true">
+            Future
+          </span>
         )}
         {markerLabels &&
           markers
@@ -1915,6 +1926,19 @@ function ExplorerChart({
           </span>
         )}
       </div>
+      </div>
+      {/* A phone reads one chart at a time: each carries its own few times. */}
+      {!last && (
+        <div className="explorer-chart-ticks" aria-hidden="true">
+          {timeTicks
+            .filter((_, i, list) => list.length <= 4 || (i > 0 && i < list.length - 1))
+            .map((tick) => (
+              <span key={tick.t} style={{ left: `${pctOf(axis, tick.t)}%` }}>
+                {tick.label}
+              </span>
+            ))}
+        </div>
+      )}
       {notes.length > 0 && (
         <ol className="explorer-notes">
           {notes.map((note, i) => (

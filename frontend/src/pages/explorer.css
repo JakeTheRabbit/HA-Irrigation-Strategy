@@ -360,16 +360,22 @@
   stroke: var(--border);
   stroke-dasharray: 4 4;
 }
+/* What is still ahead: a sparse, quiet hatch and the plain word. */
 .explorer-ahead {
   position: absolute;
   top: 0;
   right: 0;
   bottom: 0;
+  padding: 4px 6px;
+  overflow: hidden;
   background: repeating-linear-gradient(
     -45deg,
-    color-mix(in srgb, var(--muted-foreground) 14%, transparent) 0 2px,
-    transparent 2px 9px
+    color-mix(in srgb, var(--muted-foreground) 9%, transparent) 0 1px,
+    transparent 1px 14px
   );
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+  text-align: right;
   pointer-events: none;
 }
 .explorer-marker {
@@ -396,10 +402,26 @@
   stroke: var(--primary);
   stroke-width: 1.2;
 }
+/* The lanes over the charts share their time axis: they start past the scale's gutter. */
+.explorer-lane > :last-child {
+  margin-left: 48px;
+}
+/* The scale's own gutter beside the plot. */
+.explorer-plot-box {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  min-width: 0;
+}
+.explorer-y-axis {
+  position: relative;
+  height: 180px;
+}
 .explorer-y {
   position: absolute;
-  left: 8px;
+  right: 6px;
   z-index: 1;
+  text-align: right;
+  white-space: nowrap;
   color: var(--muted-foreground);
   font-size: var(--text-xs);
   pointer-events: none;
@@ -495,7 +517,11 @@
 .explorer-ticks {
   position: relative;
   height: 20px;
-  margin: 0 18px 0 0;
+  margin: 0 18px 0 48px;
+}
+/* Under each chart, a phone's few times (the wide layout has one axis under them all). */
+.explorer-chart-ticks {
+  display: none;
 }
 .explorer-ticks span {
   position: absolute;
@@ -540,6 +566,20 @@
   }
   .explorer-notes {
     grid-column: 1;
+  }
+  .explorer-chart-ticks {
+    position: relative;
+    display: block;
+    height: 18px;
+    margin: 2px 0 0 48px;
+  }
+  .explorer-chart-ticks span {
+    position: absolute;
+    top: 0;
+    color: var(--muted-foreground);
+    font-size: var(--text-xs);
+    transform: translateX(-50%);
+    white-space: nowrap;
   }
   .explorer-legend ul {
     grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
