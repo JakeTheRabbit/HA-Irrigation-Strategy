@@ -38,6 +38,7 @@ import {
 } from "@/lib/today-room";
 import type { Controller, Notice, Zone } from "@/lib/types";
 import { offerUndo } from "@/lib/undo";
+import { useNarrow } from "@/lib/use-narrow";
 import { useRecentHistory } from "@/lib/use-recent-moisture";
 import { dailyWater } from "@/lib/water-delivery";
 import { plantAmount, roomPlants } from "@/lib/water-view";
@@ -467,15 +468,31 @@ function TodayStrip({
         ),
       ]
     : [];
+  // A phone draws 4 h before now to 2 h after it, so the shots spread out; "Full day" shows it all.
+  const narrow = useNarrow(720);
+  const [fullDay, setFullDay] = useState(false);
+  const nowIn = now >= start && now < end;
+  const windowed = narrow && nowIn && !fullDay;
+  const from = windowed ? Math.max(start, now - 4 * H) : start;
+  const to = windowed ? Math.min(end, now + 2 * H) : end;
+  // What the drawn tracks show that went wrong, counted.
+  const drawn = rows.filter((row) => row.zone !== null).flatMap((row) => row.blocks.filter((b) => b.start < to && b.end >= from));
+  const failed = drawn.filter((b) => b.glyph === "failed").length;
+  const warned = drawn.filter((b) => b.glyph === "warning").length;
   // The window's start and end, the hours between, less any the "Now" label would sit on.
-  const ticks = [start, ...hourTicks(start, end, 6, timeZone).filter((t) => t > start && t < end), end].filter(
-    (time) => !(now >= start && now < end) || Math.abs(time - now) > (end - start) * 0.12,
+  const ticks = [from, ...hourTicks(from, to, windowed ? 2 : 6, timeZone).filter((t) => t > from && t < to), to].filter(
+    (time) => !nowIn || Math.abs(time - now) > (to - from) * 0.12,
   );
   // The window in words: a grow-day runs lights-on to the next lights-on, often into tomorrow.
   const overnight = startOfDay(end - 1, timeZone) !== startOfDay(start, timeZone);
-  const at = (time: number) => `${(((time - start) / (end - start)) * 100).toFixed(2)}%`;
+  const at = (time: number) => `${(((time - from) / (to - from)) * 100).toFixed(2)}%`;
   return (
-    <section className="panel today-strip" aria-labelledby="today-strip-title" data-today-strip>
+    <section
+      className="panel today-strip"
+      aria-labelledby="today-strip-title"
+      data-today-strip
+      data-windowed={windowed || undefined}
+    >
       <div className="today-strip-head">
         <h2 id="today-strip-title">
           Today{" "}
@@ -508,31 +525,54 @@ function TodayStrip({
           Today's shots did not load: {timeline.error}
         </p>
       ) : rows.length ? (
+        <>
+        {narrow && (
+          <div className="today-strip-phone">
+            {nowIn && (
+              <div className="history-toggle" role="group" aria-label="Strip window">
+                <button type="button" aria-pressed={!fullDay} onClick={() => setFullDay(false)}>
+                  Around now
+                </button>
+                <button type="button" aria-pressed={fullDay} onClick={() => setFullDay(true)}>
+                  Full day
+                </button>
+              </div>
+            )}
+            <p className="today-strip-counts" data-today-strip-counts>
+              {failed || warned
+                ? [failed ? `${failed} failed` : null, warned ? `${warned} ${warned === 1 ? "warning" : "warnings"}` : null]
+                    .filter(Boolean)
+                    .join(" · ")
+                : "No failed or warning shots"}
+            </p>
+          </div>
+        )}
         <div className="today-strip-body">
           <ul className="today-strip-labels" aria-hidden="true">
             {room.zones.map((zone) => (
               <li key={zone.id}>{zone.name}</li>
             ))}
           </ul>
-          <ShotTimeline rows={rows} span={{ start, end }} now={now} mode="strip" timeZone={timeZone} />
+          <ShotTimeline rows={rows} span={{ start: from, end: to }} now={now} mode="strip" timeZone={timeZone} />
           <div className="today-strip-axis" aria-hidden="true">
             {ticks.map((time, index) => (
               <span
                 key={time}
                 style={{ left: at(time) }}
-                data-end={time === end || undefined}
+                data-end={time === to || undefined}
                 data-odd={index % 2 === 1 || undefined}
               >
                 {time === end && !day ? "24:00" : clock(time, timeZone)}
               </span>
             ))}
-            {now >= start && now < end && (
+            {nowIn && (
               <span className="today-strip-now" style={{ left: at(now) }}>
                 Now {clock(now, timeZone)}
               </span>
             )}
           </div>
         </div>
+        </>
       ) : (
         <p className="today-strip-note">Loading today's shots…</p>
       )}

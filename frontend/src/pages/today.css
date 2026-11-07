@@ -646,6 +646,30 @@
     grid-template-columns: 52px minmax(0, 1fr);
     column-gap: 8px;
   }
+  /* Rows a thumb can tell apart. */
+  .today-strip .shot-timeline[data-mode="strip"] {
+    --st-row: 32px;
+  }
+  .today-strip-labels li {
+    height: 33px;
+  }
+  /* Around now the shots have room: each mark is at least 8 px wide. */
+  .today-strip[data-windowed] .st-track .st-block {
+    width: max(var(--s), 8px);
+    border-radius: 3px;
+  }
+  .today-strip-phone {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px 12px;
+  }
+  .today-strip-counts {
+    color: var(--muted-foreground);
+    font-size: var(--text-sm);
+    font-weight: 500;
+  }
   .today-strip-axis [data-odd] {
     display: none;
   }
