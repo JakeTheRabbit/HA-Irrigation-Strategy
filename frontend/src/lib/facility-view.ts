@@ -152,6 +152,8 @@ export interface FacilityZone {
   lastShotText: string | null;
   /** The zone's newest open alert, else why its reading is not usable. */
   problem: string | null;
+  /** `problem` is an open alert (an alarm), not the dashboard's own advisory. */
+  problemIsAlert: boolean;
 }
 export interface FacilityRoom {
   room: Controller["rooms"][number];
@@ -347,6 +349,7 @@ export function facilityView(
           queued: ahead === null || ahead < 0 ? null : { place: ahead + 1 },
           ...lastShot(states[`sensor.crop_steering_${prefix}zone_${zone.id}_flow_ratio`]),
           // Worded as the attention rule words a probe, so the card says it once.
+          problemIsAlert: alerts.some((alert) => alert.roomId === room.id && alert.zone === zone.id),
           problem:
             alerts.find((alert) => alert.roomId === room.id && alert.zone === zone.id)?.title ??
             (vwcIssue
@@ -430,6 +433,8 @@ export function roomAttention(r: FacilityRoom): {
   /** "<place>: <problem>": the zone, tank or stock, then what is wrong there. */
   text: string;
   level: AttentionLevel;
+  /** An open alert (an alarm) rather than an advisory the dashboard reads from the room. */
+  alert: boolean;
   zone?: number;
   page: "zone" | "equipment/dosing" | "equipment/stock";
 }[] {
@@ -450,6 +455,7 @@ export function roomAttention(r: FacilityRoom): {
         key: `zone-${z.zone.id}`,
         text: `${z.zone.name}: ${why}`,
         level: (critical ? "critical" : "warning") as AttentionLevel,
+        alert: z.problemIsAlert,
         zone: z.zone.id,
         page: "zone" as const,
       },
@@ -459,13 +465,13 @@ export function roomAttention(r: FacilityRoom): {
   const items = [
     ...zones,
     ...(r.mixFailed
-      ? [{ key: "mix", text: `Feed tank: ${r.mixFailed.title}`, level: "critical" as const, page: "equipment/dosing" as const }]
+      ? [{ key: "mix", text: `Feed tank: ${r.mixFailed.title}`, level: "critical" as const, alert: false, page: "equipment/dosing" as const }]
       : []),
     ...(r.reservoir.state === "held"
-      ? [{ key: "reservoir", text: `Feed tank: ${r.reservoir.label}`, level: "warning" as const, page: "equipment/dosing" as const }]
+      ? [{ key: "reservoir", text: `Feed tank: ${r.reservoir.label}`, level: "warning" as const, alert: false, page: "equipment/dosing" as const }]
       : []),
     ...(low.length
-      ? [{ key: "stock", text: `Stock: ${low.map((tank) => `${tank.name} low`).join(", ")}`, level: "warning" as const, page: "equipment/stock" as const }]
+      ? [{ key: "stock", text: `Stock: ${low.map((tank) => `${tank.name} low`).join(", ")}`, level: "warning" as const, alert: false, page: "equipment/stock" as const }]
       : []),
   ];
   // The worst first; the order within a level stays.

@@ -261,6 +261,7 @@ function RoomHead({
       </div>
       <NeedsAttention
         items={roomAttention(r)}
+        alerts={r.alertCount}
         open={(item) => (item.page === "zone" ? navigate("zone", item.zone) : navigate(item.page))}
       />
       {grow?.of != null && (

@@ -1,6 +1,47 @@
-/* The room's exceptions, under its heading (needs-attention.tsx): each "<place>: <problem>" in its
-   severity's colour, underlined as the link it is. */
+/* The room's exceptions, under its heading (needs-attention.tsx): a count by severity with the
+   room's open alerts said apart, a 44 px disclosure; under it the worst item (all of them when
+   open), each "<place>: <problem>" in its severity's colour, underlined as the link it is. */
 .needs-attention {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 16px;
+  font-size: var(--text-label);
+  line-height: var(--leading-label);
+}
+.needs-attention-summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--foreground);
+  font-weight: 600;
+  text-align: left;
+}
+.needs-attention-summary > svg:first-child {
+  flex: none;
+  color: var(--warning-mark);
+}
+.needs-attention[data-level="critical"] .needs-attention-summary > svg:first-child {
+  color: var(--destructive);
+}
+.needs-attention-alerts {
+  color: var(--muted-foreground);
+  font-weight: 500;
+}
+.needs-attention-chevron {
+  flex: none;
+  color: var(--muted-foreground);
+  transition: transform 0.15s;
+}
+.needs-attention[data-open] .needs-attention-chevron {
+  transform: rotate(180deg);
+}
+.needs-attention ul {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -8,8 +49,18 @@
   margin: 0;
   padding: 0;
   list-style: none;
-  font-size: var(--text-label);
-  line-height: var(--leading-label);
+}
+/* Open, the list takes its own lines under the count. */
+.needs-attention[data-open] ul {
+  flex-basis: 100%;
+  flex-direction: column;
+  align-items: flex-start;
+  padding-bottom: 4px;
+}
+.needs-attention li {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 .needs-attention .inline-action {
   min-height: 24px;
@@ -25,27 +76,18 @@
   flex: none;
   color: var(--warning-mark);
 }
-.needs-attention [data-level="critical"] .inline-action,
-.needs-attention [data-level="critical"] .inline-action > svg {
+.needs-attention li[data-level="critical"] .inline-action,
+.needs-attention li[data-level="critical"] .inline-action > svg {
   color: var(--destructive);
 }
-.needs-attention .needs-attention-more {
-  color: var(--primary-strong);
-}
-/* The room's open alerts, counted: a tag, not a link. */
-.needs-attention-alerts {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 1px 8px;
-  border: 1px solid var(--warning-mark);
+/* An item that is an open alert (an alarm), not an advisory. */
+.needs-attention-tag {
+  flex: none;
+  padding: 0 6px;
+  border: 1px solid currentColor;
   border-radius: 999px;
-  background: var(--warning-bg);
-  color: var(--warning);
+  color: var(--muted-foreground);
   font-size: var(--text-xs);
-  font-weight: 600;
+  line-height: 18px;
   white-space: nowrap;
-}
-.needs-attention-alerts svg {
-  color: var(--warning-mark);
 }
