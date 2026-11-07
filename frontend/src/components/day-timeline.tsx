@@ -1183,41 +1183,15 @@ function Legend({
       </button>
     </li>
   );
+  // Three layers lead; the rest wait behind "More layers", each still a switch.
   return (
     <ul className="grow-legend" aria-label="Chart key">
       {entry(
         "vwc",
-        "Solid: recorded today. Dashed: what is expected for the rest of the day, an estimate.",
+        "Solid: recorded today. Dotted: projected for the rest of the day, an estimate.",
         <>
           <i className="key-vwc" aria-hidden="true" />
           VWC
-        </>,
-      )}
-      {entry(
-        "ec",
-        "Right-hand axis, mS/cm. Green while steering vegetative, purple while generative.",
-        <>
-          <i className="key-ec" data-steering={kind} aria-hidden="true" />
-          Pore EC
-        </>,
-      )}
-      {entry(
-        "shots",
-        undefined,
-        <>
-          <i className="key-shot" aria-hidden="true" />
-          Shot
-          <i className="key-held" aria-hidden="true" />
-          held
-        </>,
-      )}
-      {entry(
-        "fc",
-        "Field capacity, with a thin runoff band: just above it for vegetative steering, just under it for generative.",
-        <>
-          <i className="key-fc" aria-hidden="true" />
-          <i className="key-runoff" data-steering={kind} aria-hidden="true" />
-          FC · runoff
         </>,
       )}
       {entry(
@@ -1229,31 +1203,65 @@ function Legend({
         </>,
       )}
       {entry(
-        "rescue",
-        "Overnight, the controller waters only below this level.",
+        "ec",
+        "Right-hand axis, mS/cm. Green while steering vegetative, purple while generative.",
         <>
-          <i className="key-rescue" aria-hidden="true" />
-          Rescue floor
+          <i className="key-ec" data-steering={kind} aria-hidden="true" />
+          Pore EC
         </>,
       )}
-      {jev &&
-        entry(
-          "jev",
-          "Filled: code acted on it. Outline: advice, no action, or refused.",
-          <>
-            <i className="key-jev" aria-hidden="true" />
-            AI assistant decision
-          </>,
-        )}
-      {compare &&
-        entry(
-          "compare",
-          "Drawn on today’s scale: an earlier day beyond it runs off the edge.",
-          <>
-            <i className="key-compare" aria-hidden="true" />
-            {compare}
-          </>,
-        )}
+      <li className="grow-legend-more">
+        <details>
+          <summary>More layers</summary>
+          <ul>
+            {entry(
+              "shots",
+              undefined,
+              <>
+                <i className="key-shot" aria-hidden="true" />
+                Shot
+                <i className="key-held" aria-hidden="true" />
+                held
+              </>,
+            )}
+            {entry(
+              "fc",
+              "Field capacity, with a thin runoff band: just above it for vegetative steering, just under it for generative.",
+              <>
+                <i className="key-fc" aria-hidden="true" />
+                <i className="key-runoff" data-steering={kind} aria-hidden="true" />
+                FC · runoff
+              </>,
+            )}
+            {entry(
+              "rescue",
+              "Overnight, the controller waters only below this level.",
+              <>
+                <i className="key-rescue" aria-hidden="true" />
+                Rescue floor
+              </>,
+            )}
+            {jev &&
+              entry(
+                "jev",
+                "Filled: code acted on it. Outline: advice, no action, or refused.",
+                <>
+                  <i className="key-jev" aria-hidden="true" />
+                  AI assistant decision
+                </>,
+              )}
+            {compare &&
+              entry(
+                "compare",
+                "Drawn on today’s scale: an earlier day beyond it runs off the edge.",
+                <>
+                  <i className="key-compare" aria-hidden="true" />
+                  {compare}
+                </>,
+              )}
+          </ul>
+        </details>
+      </li>
     </ul>
   );
 }
@@ -1693,6 +1701,18 @@ function Chart({
         )}
         {show("vwc") && <path d={linePath(points, x, y)} className="vwc-line" data-layer="vwc" />}
       </g>
+      {/* The estimate named where it starts, over its first crest so it clears the measured line. */}
+      {show("vwc") &&
+        projection &&
+        projection.points.length > 1 &&
+        (() => {
+          const crest = projection.points.reduce((top, point) => (point.value > top.value ? point : top));
+          return (
+            <text x={x(crest.time)} y={y(crest.value) - 8} className="ref-label projection-label">
+              Projected
+            </text>
+          );
+        })()}
       {show("fc") && fcNow !== null && vwcAxis && (
         <text
           x={L + plotW - 4}

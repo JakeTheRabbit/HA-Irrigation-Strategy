@@ -702,7 +702,7 @@ try {
         "P3",
       ]);
       const key = day.getByRole("list", { name: "Chart key" });
-      assert.ok((await key.locator("li").count()) <= 8, "the key stays small");
+      assert.ok((await key.locator(":scope > li").count()) <= 4, "the key stays small: three layers and More layers");
       // Pointing at a shot says what it was, under the chart rather than over it, and a bar up the
       // plot marks where the reading is taken.
       const svg = day.locator(".grow-svg");
@@ -745,7 +745,8 @@ try {
       await page.mouse.move(plot.x + plot.width / 2, box.y + box.height / 2);
       assert.doesNotMatch(await readout.innerText(), /pore EC/);
       await page.mouse.move(0, 0);
-      assert.equal(await key.getByRole("button").count(), await key.locator("li").count());
+      await key.getByText("More layers").click();
+      assert.equal(await key.getByRole("button").count(), await key.locator("li:not(.grow-legend-more)").count());
       // Compare with Off, Yesterday, the last run's day of the same number (mockup 04) or Typical.
       const compare = day.getByRole("group", { name: "Compare with" });
       const choice = (name) => compare.getByRole("button", { name, exact: true });

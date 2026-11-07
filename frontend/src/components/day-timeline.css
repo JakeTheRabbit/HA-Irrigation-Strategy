@@ -240,16 +240,22 @@
 .day-timeline .vwc-line {
   fill: none;
   stroke: var(--primary);
-  stroke-width: 2.5;
+  stroke-width: 2;
   stroke-linejoin: round;
 }
+/* The estimate: dotted, so it reads apart from the measured line and the dashed targets. */
 .day-timeline .projection {
   fill: none;
   stroke: var(--primary);
   stroke-width: 2;
-  stroke-dasharray: 5 4;
+  stroke-dasharray: 0.1 5;
+  stroke-linecap: round;
   stroke-linejoin: round;
   opacity: 0.85;
+}
+.day-timeline .projection-label {
+  fill: var(--primary);
+  font-size: var(--text-xs);
 }
 .day-timeline .shot-dot {
   fill: var(--gd-ink);
@@ -360,6 +366,30 @@
   outline: 2px solid var(--ring, var(--primary));
   outline-offset: 2px;
 }
+/* The rest of the key, one switch each, opened on request. */
+.day-timeline .grow-legend-more:has(details[open]) {
+  flex-basis: 100%;
+}
+.day-timeline .grow-legend-more details[open] {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+}
+.day-timeline .grow-legend-more summary {
+  cursor: pointer;
+  color: var(--primary-strong);
+  font-weight: 600;
+  line-height: 24px;
+}
+.day-timeline .grow-legend-more ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
 .day-timeline .grow-legend button[aria-pressed="false"] {
   opacity: 0.45;
   text-decoration: line-through;
@@ -383,7 +413,7 @@
   width: 16px;
   height: 0;
 }
-/* Solid, then dashed: today, then what is expected. */
+/* Solid, then dotted: today, then the projection. */
 .day-timeline .key-vwc {
   width: 24px !important;
   height: 2px !important;
@@ -391,9 +421,10 @@
     90deg,
     var(--primary) 0 11px,
     transparent 11px 14px,
-    var(--primary) 14px 18px,
-    transparent 18px 20px,
-    var(--primary) 20px 24px
+    var(--primary) 14px 16px,
+    transparent 16px 19px,
+    var(--primary) 19px 21px,
+    transparent 21px 24px
   );
 }
 .day-timeline .key-ec {
