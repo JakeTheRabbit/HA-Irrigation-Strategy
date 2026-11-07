@@ -16,7 +16,7 @@ import { addDays, midnight } from "@/lib/comparison";
 import type { RunsDocument } from "@/lib/comparison-types";
 import { rangeText, steeringOf } from "@/lib/day-chart";
 import { growDay, type DayTrace, type GrowDay } from "@/lib/day-timeline";
-import { formatEc, formatVolume, getDisplayUnits } from "@/lib/display-units";
+import { formatEc, formatState, formatVolume, getDisplayUnits, readingDigits } from "@/lib/display-units";
 import { ZONE_MODE } from "@/lib/facility-view";
 import type { GaugeModel } from "@/lib/hmi";
 import {
@@ -487,9 +487,6 @@ function PoreEcChart({
   );
 }
 
-/** Settings shown with as many decimals as they were written with. */
-const digitsOf = (value: number) => (String(value).split(".")[1] ?? "").length;
-
 /** The AI assistant's change to a pore EC setting, on the pore EC chart: the problem it answers,
  * what it set against the grower's own, Apply (keep it as the grower's) with Undo, or Dismiss. */
 function EcSuggestion({
@@ -511,7 +508,7 @@ function EcSuggestion({
   latest.current = controller;
   const tz = controller.timeZone;
   const label = overlayLabel(overlay);
-  const ec = (value: number) => formatEc(value, digitsOf(value));
+  const ec = (value: number) => formatEc(value, readingDigits(value, 2));
   const over =
     gauge?.band && gauge.value !== null && (gauge.deviation ?? 0) > 0
       ? `Pore EC ${number(gauge.value, gauge.digits)} is over the ${number(gauge.band[0], 1)}–${number(gauge.band[1], 1)} band.`
@@ -1109,7 +1106,7 @@ function ZoneProbes({
                       <code>{probe.id}</code>
                     </span>
                     <span className="numeric">
-                      {probe.value === null ? "—" : `${probe.value} ${probe.unit}`.trim()}
+                      {probe.value === null ? "—" : `${formatState(String(probe.value))} ${probe.unit}`.trim()}
                     </span>
                     <Pill dot tone={PROBE_TONE[probe.health]} data-probe-health={probe.health}>
                       {probe.health !== "ok"

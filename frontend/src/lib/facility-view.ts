@@ -1,5 +1,5 @@
 import { zoneAttention, type AttentionReason, type ZoneFacts } from "./attention";
-import { formatVolume } from "./display-units";
+import { formatEc, formatTemp, formatVolume } from "./display-units";
 import { readJev, jevIds, parseJevSetpoints, type JevStage } from "./jev";
 import { buildRoom, numeric, readable, roomStatus } from "./model";
 import { newestFirst, openAlerts } from "./open-alerts";
@@ -402,6 +402,17 @@ export function facilityView(
       mixFailed: mixFailed(readStatus(states[dosingStatusId(prefix)])),
     };
   });
+}
+
+/** The feed tank's live readings as the room cards print them: pH to at most 2 decimals, EC to 1 (beside
+ * the zones' "EC 3.0"; its unit only when it is not mS/cm), the temperature to 1 decimal. Home
+ * Assistant's raw floats (3.06599998474121) never reach the page. */
+export function tankReadingText(tank: { ph: number | null; ec: number | null; temperature: number | null }) {
+  return {
+    ph: tank.ph === null ? null : tank.ph.toLocaleString(undefined, { maximumFractionDigits: 2 }),
+    ec: tank.ec === null ? null : formatEc(tank.ec, 1).replace(/ mS\/cm$/, ""),
+    temperature: tank.temperature === null ? null : formatTemp(tank.temperature, 1),
+  };
 }
 
 /** What in the room needs a look, for the line under its heading: each zone with a problem, a

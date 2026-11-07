@@ -232,8 +232,10 @@ export function feedValue(value: number, kind: FeedKind, digits: number): string
 /** A buffer's name: pH buffers by their two places ("7.00"), EC ones in the display unit. */
 export const bufferName = (reference: number, kind: FeedKind) =>
   kind === "ph" ? reference.toFixed(2) : formatEc(reference, Math.max(2, (String(reference).split(".")[1] ?? "").length));
-/** How many decimals a state's text carries. */
-export const digitsOf = (text: string | undefined) => (text?.split(".")[1] ?? "").replace(/\D.*$/, "").length;
+/** The digits a raw state came with, at most 2: a float Home Assistant passes on whole
+ * (6.15000009536743) shows as the probe reads it, not to 14 places. */
+export const digitsOf = (text: string | undefined) =>
+  Math.min(2, (text?.split(".")[1] ?? "").replace(/\D.*$/, "").length);
 
 /** The room's corrected sensor (sensor.crop_steering_<prefix>feed_ph_corrected) in the second buffer,
  * once it uses this calibration: ticked within 0.1 of the buffer (the backend's offset pass). Null

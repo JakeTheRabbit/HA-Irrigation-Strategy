@@ -7,11 +7,12 @@ import { DrinkBar, MiniGauge, ShotDots } from "@/components/zone-gauges";
 import { StockBottle } from "@/components/stock-bottle";
 import { NeedsAttention } from "@/components/needs-attention";
 import { STOCK_STATES } from "@/lib/dosing";
-import { formatEc, formatTemp, formatVolume } from "@/lib/display-units";
+import { formatEc, formatVolume } from "@/lib/display-units";
 import {
   drinkLine,
   facilityView,
   roomAttention,
+  tankReadingText,
   zoneHref,
   ZONE_MODE,
   type FacilityRoom,
@@ -33,8 +34,6 @@ const perPlant = (ml: number) => {
 const capital = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 /** The grow plan's stage, else the stage arc's name. */
 const stageName = (r: FacilityRoom) => r.growDay?.stage || r.stage?.name || "";
-/** The digits a reading came with: a display never shows more. */
-const digitsOf = (value: number) => (String(value).split(".")[1] ?? "").length;
 /** EC after its label, always to one decimal ("EC 3.0" beside "EC 2.7"): the unit only when it is
  * not mS/cm ("EC 2.4", "EC 1200 ppm"). */
 const ec = (ms: number) => formatEc(ms, 1).replace(/ mS\/cm$/, "");
@@ -452,6 +451,7 @@ function ZoneCard({
 function TankCard({ r, open }: { r: FacilityRoom; open: Open }) {
   const { tank, reservoir } = r;
   const level = tank.level.value;
+  const readings = tankReadingText({ ph: tank.ph.value, ec: tank.ec.value, temperature: tank.temperature.value });
   const held = reservoir.state === "held";
   return (
     <button
@@ -481,7 +481,7 @@ function TankCard({ r, open }: { r: FacilityRoom; open: Open }) {
         </span>
         <span className="facility-tank-readings">
           {/* Spaces between the parts: the line may wrap before any reading, never inside one. */}
-          <span>pH {tank.ph.value === null ? "—" : number(tank.ph.value, 2)}</span>
+          <span>pH {readings.ph ?? "—"}</span>
           {r.feedCalibrationDue && (
             <>
               {" "}
@@ -491,14 +491,14 @@ function TankCard({ r, open }: { r: FacilityRoom; open: Open }) {
             </>
           )}{" "}
           <span>
-            <span aria-hidden="true">·</span> EC {tank.ec.value === null ? "—" : ec(tank.ec.value)}
+            <span aria-hidden="true">·</span> EC {readings.ec ?? "—"}
           </span>
           {tank.temperature.value !== null && (
             <>
               {" "}
               <span>
                 <span aria-hidden="true">·</span>{" "}
-                {formatTemp(tank.temperature.value, digitsOf(tank.temperature.value))}
+                {readings.temperature}
               </span>
             </>
           )}
@@ -558,6 +558,7 @@ function PhoneRoom({ r, offline, open }: { r: FacilityRoom; offline: boolean; op
   const stale = status.tone === "stale" || offline;
   const drink = drinkLine(r.waterL, r.litresPerPlant);
   const level = tank.level.value;
+  const readings = tankReadingText({ ph: tank.ph.value, ec: tank.ec.value, temperature: tank.temperature.value });
   const low = r.stock.filter((t) => t.state !== "ok");
   return (
     <section
@@ -684,7 +685,7 @@ function PhoneRoom({ r, offline, open }: { r: FacilityRoom; offline: boolean; op
           {tank.ph.value !== null && (
             <>
               {" · "}
-              <span className="facility-nowrap">pH {number(tank.ph.value, 2)}</span>
+              <span className="facility-nowrap">pH {readings.ph}</span>
             </>
           )}
           {r.feedCalibrationDue && (
@@ -695,7 +696,7 @@ function PhoneRoom({ r, offline, open }: { r: FacilityRoom; offline: boolean; op
           {tank.ec.value !== null && (
             <>
               {" · "}
-              <span className="facility-nowrap">EC {ec(tank.ec.value)}</span>
+              <span className="facility-nowrap">EC {readings.ec}</span>
             </>
           )}
         </span>

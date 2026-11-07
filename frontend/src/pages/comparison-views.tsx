@@ -1,4 +1,5 @@
 import type { ComparisonTarget } from "@/lib/comparison-target";
+import { formatState } from "@/lib/display-units";
 import { Empty } from "@/components/dashboard";
 import { UiTip } from "@/components/info-tip";
 import { Meter } from "@/components/mini-visuals";
@@ -217,7 +218,7 @@ export function ComparisonChart({
                   fill={line.color}
                 >
                   <title>
-                    {line.name}: isolated retained reading {point.value}
+                    {line.name}: isolated retained reading {formatState(String(point.value))}
                   </title>
                 </circle>
               ) : null;

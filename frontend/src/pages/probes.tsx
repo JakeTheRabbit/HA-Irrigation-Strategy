@@ -10,7 +10,7 @@ import { Pill, Sparkline } from "@/components/mini-visuals";
 import { NeedsIntegration } from "@/components/needs-integration";
 import { ReviewApply, type ReviewRow } from "@/components/review-apply";
 import { ageText, readHeartbeat } from "@/lib/controller-health";
-import { formatEc, formatTemp } from "@/lib/display-units";
+import { formatEc, formatState, formatTemp } from "@/lib/display-units";
 import { recentReadings } from "@/lib/dryback";
 import { brainWords, readJev } from "@/lib/jev";
 import { descriptor, numeric } from "@/lib/model";
@@ -333,7 +333,7 @@ export function Probes({
                   </span>
                   <span className="numeric">
                     {entity
-                      ? `${entity.state} ${String(entity.attributes.unit_of_measurement ?? "")}`.trim()
+                      ? `${formatState(entity.state)} ${String(entity.attributes.unit_of_measurement ?? "")}`.trim()
                       : "Not in Home Assistant"}
                   </span>
                   <span className="muted small">
@@ -514,7 +514,7 @@ function RoomRows({
                   )}
                 </td>
                 <td className="numeric probes-vwc" data-label="VWC" data-tone={row.vwc.health === "out-of-range" ? "bad" : undefined}>
-                  {row.vwc.value === null ? "—" : `${row.vwc.value}${row.vwc.unit === "%" ? "%" : ` ${row.vwc.unit}`}`}
+                  {row.vwc.value === null ? "—" : `${formatState(String(row.vwc.value), 1)}${row.vwc.unit === "%" ? "%" : ` ${row.vwc.unit}`}`}
                 </td>
                 <td className="numeric" data-label={temp ? "EC · Temp" : "EC"} data-probe-ec={row.ec?.id}>
                   {row.ec ? <EcCell probe={row.ec} now={now} /> : "—"}
@@ -967,7 +967,7 @@ function RoomMap({
         {entityId && <code>{entityId}</code>}
         <small>
           {entity
-            ? `Last reported: ${entity.state} ${entity.attributes.unit_of_measurement || ""} · ${time(entity.last_updated)}`
+            ? `Last reported: ${formatState(entity.state)} ${entity.attributes.unit_of_measurement || ""} · ${time(entity.last_updated)}`
             : "Unavailable"}
         </small>
       </div>
@@ -1163,7 +1163,7 @@ function ControllerInternals({ controller }: { controller: Controller }) {
                           </td>
                           <td className="numeric">
                             {isAvailable(sensor)
-                              ? `${sensor.state} ${sensor.attributes.unit_of_measurement || ""}`
+                              ? `${formatState(sensor.state)} ${sensor.attributes.unit_of_measurement || ""}`
                               : "Unavailable"}
                           </td>
                           <td data-sensor-trend={sensor.entity_id}>
