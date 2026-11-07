@@ -1389,8 +1389,8 @@ export function Dosing({
             </div>
           )}
           <div className="plumb-tank">
-            {armed[1] && <Mark item={armed[1]} />}
             <TankStatus controller={controller} onConfigure={configure} />
+            {armed[1] && <Mark item={armed[1]} />}
             <GuardMark
               guard={guard}
               item={armed[2] ?? { label: guard.minimum === null ? "Minimum" : `Minimum ${guard.minimum}%`, ok: guard.level !== null }}

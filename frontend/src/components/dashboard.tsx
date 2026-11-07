@@ -80,13 +80,16 @@ export function FaultSummary({
     <section className="fault-summary" data-tone={tone} aria-label={title}>
       <AlertTriangle className="fault-summary-icon" size={22} aria-hidden="true" />
       <div className="fault-summary-body">
-        <h2>{title}</h2>
-        {value && (
-          <p className="fault-summary-value">
-            <b>{value}</b>
-            {allowed && <span>{allowed}</span>}
-          </p>
-        )}
+        {/* The reading shares the title's line when there is room. */}
+        <div className="fault-summary-head">
+          <h2>{title}</h2>
+          {value && (
+            <p className="fault-summary-value">
+              <b>{value}</b>
+              {allowed && <span>{allowed}</span>}
+            </p>
+          )}
+        </div>
         <div className="fault-summary-detail">{children}</div>
       </div>
       {action && <div className="fault-summary-action">{action}</div>}

@@ -146,8 +146,7 @@ export function TankStatus({
           </div>
         </dl>
         <p className="tank-note">
-          Pump is the switch’s report, not measured flow. Last fill is a recorded fill, not a sensor
-          update.
+          Pump: the switch’s report, not measured flow. Last fill: a recorded fill.
         </p>
       </div>
     </section>
