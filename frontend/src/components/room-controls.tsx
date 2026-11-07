@@ -180,8 +180,8 @@ export function SafetySwitches({ controller }: { controller: Controller }) {
         data-state={wateringState}
         aria-label={
           watering === null
-            ? `${wateringWords}: ${room.room.name}: the switch is unavailable`
-            : `${wateringWords}: ${room.room.name}: ${watering ? "switch watering off…" : "switch watering on…"}`
+            ? `${wateringWords}: the switch is unavailable`
+            : `${wateringWords}: ${watering ? "switch watering off…" : "switch watering on…"}`
         }
         title={
           watering === null
