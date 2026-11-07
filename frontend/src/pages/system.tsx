@@ -157,6 +157,7 @@ export function SystemStatus({ controller }: PageProps) {
       const row = rows.find((r) => r.entity_id === placeAlert(alert, rows.filter((x) => x.roomId === alert.roomId)));
       return {
         key: alert.eventId ?? `${alert.roomId}:${alert.code}:${alert.zone}`,
+        alert,
         text: `${alert.code ? `${alert.code} · ` : ""}${row ? `${row.label}, ${seenText(row, controller.states[row.entity_id]?.state, controller.timeZone, now)}: ` : `${roomName(alert.roomId)}: `}${alert.title}`,
       };
     }),
@@ -164,6 +165,7 @@ export function SystemStatus({ controller }: PageProps) {
       .filter((row) => !alerts.some((alert) => placeAlert(alert, rows.filter((x) => x.roomId === alert.roomId)) === row.entity_id))
       .map((row) => ({
         key: row.entity_id,
+        alert: null as OpenAlert | null,
         text: `${row.label} offline, last seen ${seenText(row, controller.states[row.entity_id]?.state, controller.timeZone, now)}`,
       })),
   ];
@@ -187,8 +189,26 @@ export function SystemStatus({ controller }: PageProps) {
         <FaultSummary tone={fault ? "fault" : "warning"} title={attentionTitle}>
           {attention.length > 0 && (
             <ul className="system-attention">
+              {/* Each affected device with its own actions, right under the warning. */}
               {attention.map((item) => (
-                <li key={item.key}>{item.text}</li>
+                <li key={item.key}>
+                  <span>{item.text}</span>
+                  {item.alert && (
+                    <span className="system-attention-actions">
+                      <a href={item.alert.code ? `#/help?code=${item.alert.code}` : "#/help"}>What to do →</a>
+                      {item.alert.eventId && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={acks[item.alert.eventId]?.busy}
+                          onClick={() => acknowledge(item.alert!)}
+                        >
+                          {acks[item.alert.eventId]?.busy ? "Acknowledging…" : "Acknowledge"}
+                        </Button>
+                      )}
+                    </span>
+                  )}
+                </li>
               ))}
             </ul>
           )}
@@ -196,7 +216,7 @@ export function SystemStatus({ controller }: PageProps) {
       )}
       <section className="panel system-health" aria-label="System health">
         <div className="system-health-line">
-          {status.pct_online !== null && <HealthRing pct={status.pct_online} label="System health" tone={ringTone} />}
+          {status.pct_online !== null && <HealthRing pct={status.pct_online} label="Devices online" tone={ringTone} />}
           <p>
             <strong>{healthSentence(status, alerts)}</strong>
             {checked !== null && (

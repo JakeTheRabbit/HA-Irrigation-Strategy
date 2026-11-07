@@ -55,13 +55,17 @@ const CONTROLLER_WORDS: Record<ControllerState, string> = {
   absent: "no controller heartbeat",
 };
 
-/** "System health 94%: 34 of 35 devices online, controller running, 3 open alerts, each shown below
- * where it happens." */
+/** "Devices online 34/35 (97.1%): controller running, 3 open alerts, each shown below where it
+ * happens." The percentage is the share of mapped devices online, so it says so. */
 export function healthSentence(s: SystemStatus, alerts: OpenAlert[]): string {
   const rows = s.rooms.flatMap((room) => room.entities);
   const online = rows.filter((row) => row.ok).length;
-  const health = s.pct_online === null ? "System health not known" : `System health ${percent(s.pct_online)}%`;
-  const devices = rows.length ? `${online} of ${rows.length} devices online` : "no mapped devices";
+  const health =
+    rows.length && s.pct_online !== null
+      ? `Devices online ${online}/${rows.length} (${percent(s.pct_online)}%)`
+      : rows.length
+        ? `Devices online ${online}/${rows.length}`
+        : "No mapped devices";
   const open =
     alerts.length === 0
       ? "no open alerts"
@@ -75,7 +79,7 @@ export function healthSentence(s: SystemStatus, alerts: OpenAlert[]): string {
     s.controller === "running" && down
       ? `controller not reporting in ${down} of ${beats.length} rooms`
       : CONTROLLER_WORDS[s.controller];
-  return `${health}: ${devices}, ${controller}, ${open}.`;
+  return `${health}: ${controller}, ${open}.`;
 }
 
 const NOUN: Record<StatusEntity["kind"], string> = {

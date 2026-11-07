@@ -370,3 +370,24 @@
     margin-left: 0;
   }
 }
+/* An affected device's own actions, under the warning: 44 px targets. */
+.system-attention li {
+  display: grid;
+  gap: 4px;
+}
+.system-attention-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 16px;
+}
+.system-attention-actions a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--primary-strong);
+  font-weight: 600;
+}
+.system-attention-actions button {
+  min-height: 44px;
+}
