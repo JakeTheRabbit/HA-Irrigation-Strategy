@@ -934,3 +934,13 @@
     grid-column: 2 / -1;
   }
 }
+/* An entity id in a line of words: small monospace, cut with an ellipsis, the full id on hover. */
+.dosing-mono[title] {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  font-size: var(--text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+}

@@ -1458,7 +1458,7 @@ export function Dosing({
             >
               <div className="dosing-panel-head">
                 <span className="eyebrow">
-                  Dose by hand · <span className="dosing-mono">{hardwareLabel(view.pump)}</span>
+                  Dose by hand · <span className="dosing-mono" title={hardwareLabel(view.pump)}>{hardwareLabel(view.pump)}</span>
                 </span>
                 <h2 id={`${formId}-dose`}>Dose {view.pump.name}</h2>
               </div>

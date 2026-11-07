@@ -641,7 +641,7 @@ function ZoneRow({
     event.preventDefault();
     open();
   };
-  const ecText = (value: number | null) => (value === null ? "—" : number(value, 1));
+  const ecText = (value: number | null) => (value === null ? "—" : value.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 }));
   return (
     <article
       className="today-zone"

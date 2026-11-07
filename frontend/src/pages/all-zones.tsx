@@ -33,8 +33,9 @@ const capital = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 const stageName = (r: FacilityRoom) => r.growDay?.stage || r.stage?.name || "";
 /** The digits a reading came with: a display never shows more. */
 const digitsOf = (value: number) => (String(value).split(".")[1] ?? "").length;
-/** EC after its label: the unit only when it is not mS/cm ("EC 2.4", "EC 1200 ppm"). */
-const ec = (ms: number) => formatEc(ms, digitsOf(ms)).replace(/ mS\/cm$/, "");
+/** EC after its label, always to one decimal ("EC 3.0" beside "EC 2.7"): the unit only when it is
+ * not mS/cm ("EC 2.4", "EC 1200 ppm"). */
+const ec = (ms: number) => formatEc(ms, 1).replace(/ mS\/cm$/, "");
 const ordinal = (n: number) => {
   const tail = n % 100 >= 11 && n % 100 <= 13 ? "th" : (["th", "st", "nd", "rd"][n % 10] ?? "th");
   return `${n}${tail}`;
@@ -400,7 +401,7 @@ function ZoneCard({
           band={poreEc}
           scale={poreEc ? [0, poreEc[1] * 1.6] : [0, 10]}
         />
-        <MiniGauge label="Root" value={z.rootTemp} unit="°" band={ROOT_BAND} scale={[14, 30]} />
+        <MiniGauge label="Root" value={z.rootTemp} unit=" °C" band={ROOT_BAND} scale={[14, 30]} />
       </div>
       {z.queued && (
         <p className="facility-line" data-facility-queued>

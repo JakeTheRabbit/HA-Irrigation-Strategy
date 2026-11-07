@@ -302,7 +302,7 @@ function ZoneCard({
               <span>metered vs asked, last 3 shots</span>
               {flow.todayPct !== null && (
                 <span className="wf-today">
-                  <b>Today {pct(flow.todayPct)}</b> · {formatVolume(got, 3).replace(/\s\S+$/, "")} of {formatVolume(asked, 3)}
+                  <b>Today {pct(flow.todayPct)}</b> · {formatVolume(got, 1).replace(/\s\S+$/, "")} of {formatVolume(asked, 1)}
                 </span>
               )}
             </div>
