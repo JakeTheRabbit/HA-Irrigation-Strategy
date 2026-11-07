@@ -69,7 +69,8 @@ await runParity({
     await zone(2).locator("[data-flow-chip]").waitFor();
     assert.equal(await page.locator("[data-flow-zone]").count(), 3, `${label}: one card per zone`);
     for (const [n, chip] of [[1, "On target"], [2, "Low delivery · possible blockage"], [3, "On target"]])
-      assert.equal((await zone(n).locator("[data-flow-chip]").innerText()).trim(), chip, `${label}: zone ${n} chip`);
+      // textContent: on a phone a zone on target is folded, its chip in the closed card.
+      assert.equal((await zone(n).locator("[data-flow-chip]").textContent()).trim(), chip, `${label}: zone ${n} chip`);
     const gauge = zone(2).locator("svg.arc-gauge");
     assert.match(await gauge.getAttribute("aria-label"), /62%/, `${label}: zone 2 gauge`);
     assert.match(await zone(1).locator("svg.arc-gauge").getAttribute("aria-label"), /98%/, `${label}: zone 1 gauge`);

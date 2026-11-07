@@ -503,7 +503,7 @@ try {
     // The header, today's strip and every zone row within 1.35 windows; the plan line and the AI
     // assistant's card follow.
     const bottom = await rows.last().evaluate((el) => el.getBoundingClientRect().bottom + scrollY);
-    assert.ok(bottom <= 900 * 1.35, `the zone rows end ${bottom}px down a 900px window`);
+    assert.ok(bottom <= 900 * 1.37, `the zone rows end ${bottom}px down a 900px window`);
     // The whole page: measured 1357px at 1440 x 900 with the demo, plus 10%.
     const whole = await page.evaluate(() => document.documentElement.scrollHeight);
     assert.ok(whole <= 1357 * 1.1, `Today is ${whole}px tall in a 900px window`);
@@ -525,7 +525,7 @@ try {
     for (const index of [0, 1, 2]) {
       const row = rows.nth(index);
       assert.equal(await row.locator(".today-gauge").count(), 3);
-      assert.match(await row.locator(".today-gauge").nth(0).innerText(), /^VWC\s+target [\d.]+–[\d.]+%\s+[\d.]+%( [▲▼])?(\s*, [\d.]+ points (under|over))?$/);
+      assert.match(await row.locator(".today-gauge").nth(0).innerText(), /^VWC\s+(target|ramping to|P2 band) [\d.]+–[\d.]+%\s+[\d.]+%( [▲▼])?(\s*, [\d.]+ points (under|over))?$/);
       assert.match(await row.locator(".today-gauge").nth(2).innerText(), /^Pore EC\s+target 3\.5–6(\.0)?\s+[\d.]+( [▲▼])?(\s*, [\d.]+ mS\/cm (under|over))?$/);
       assert.match(await row.locator("[data-today-delta]").innerText(), /^[+−±]\d+ mL vs median \d+ mL$/);
       assert.equal(await row.locator(".today-sensors li").count(), 2, "front and back sensors");
@@ -565,9 +565,10 @@ try {
     await page.locator("[data-plan-feed]").waitFor();
     const height = await page.evaluate(() => document.documentElement.scrollHeight);
     // The bottom section bar is fixed chrome; the page pads itself clear of it. Each zone row
-    // carries its sensors in place, so the page is 2.85 phone screens at most (measured 2317px).
+    // carries its sensors in place, and the room's "Needs attention" line and 14 px labels sit
+    // over them, so the page is 2.95 phone screens at most (measured 2426px).
     const bar = await page.evaluate(() => document.querySelector(".bottom-nav")?.getBoundingClientRect().height ?? 0);
-    assert.ok(height - bar <= 2.85 * 844, `Today is ${height}px tall on a 844px phone`);
+    assert.ok(height - bar <= 2.95 * 844, `Today is ${height}px tall on a 844px phone`);
     // Each zone row fits a screen, one column wide.
     const rows = await page.locator("article.today-zone").evaluateAll((all) =>
       all.map((row) => row.getBoundingClientRect()),
@@ -588,13 +589,14 @@ try {
     };
     await page.setViewportSize({ width: 1440, height: 900 });
     await open();
-    // The tank readout joins the room's line; the zone rows still end within 1.35 windows.
+    // The tank readout joins the room's line; the zone rows still end within 1.37 windows (the
+    // room's "Needs attention" line sits under its name).
     await expectVisible(page.locator("[data-today-tank]"));
     const bottom = await page
       .locator("article.today-zone")
       .last()
       .evaluate((el) => el.getBoundingClientRect().bottom + scrollY);
-    assert.ok(bottom <= 900 * 1.35, `with every option on the zone rows end ${bottom}px down`);
+    assert.ok(bottom <= 900 * 1.37, `with every option on the zone rows end ${bottom}px down`);
     await page.setViewportSize({ width: 390, height: 844 });
     await open();
     const phone = await page.evaluate(() => document.documentElement.scrollHeight);
