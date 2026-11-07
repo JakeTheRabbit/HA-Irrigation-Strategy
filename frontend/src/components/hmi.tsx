@@ -118,7 +118,7 @@ export function Gauge({
           {model.band
             ? `${fix(model.band[0], model.digits)}–${unit(model.band[1])}`
             : model.target !== null
-              ? `target ${unit(model.target)}`
+              ? `target ${unit(model.target)}${model.basis ? ` ${model.basis}` : ""}`
               : ""}
           {model.reference &&
             ` · ref ${fix(model.reference[0], 0)}–${fix(model.reference[1], 0)}${model.unit}`}

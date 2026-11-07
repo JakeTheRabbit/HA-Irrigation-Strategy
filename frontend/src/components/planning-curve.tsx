@@ -381,6 +381,8 @@ export function PlanningCurve({
             reference: referenceDryback(drybackPoints, dryback?.peak),
             unit: "%",
             points: "pt",
+            // Dryback is a share of the peak ((peak − VWC) / peak), said once.
+            basis: "of peak",
             tolerance: 3,
             underIsNormal: true,
             quality: dryback?.reason ?? undefined,

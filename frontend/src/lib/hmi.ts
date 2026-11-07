@@ -68,6 +68,8 @@ export interface GaugeModel {
   reference: [number, number] | null;
   /** Named levels drawn as ticks on the bar, with a quiet key under it. */
   marks: { key: string; label: string; value: number }[];
+  /** What the unit is a share of, said once after the target ("of peak"). */
+  basis?: string;
 }
 const amount = (value: number, digits: number, points: string) =>
   `${fix(Math.abs(value), digits)}${points.startsWith("%") ? "" : " "}${points}`;
@@ -90,6 +92,7 @@ export function gauge(options: {
   scale?: [number, number];
   reference?: [number, number] | null;
   marks?: { key: string; label: string; value: number | null }[];
+  basis?: string;
 }): GaugeModel {
   const digits = options.digits ?? 1;
   const target = finite(options.target) ? options.target : null;
@@ -127,6 +130,7 @@ export function gauge(options: {
     quality: options.quality,
     reference,
     marks,
+    basis: options.basis,
   };
   if (value === null)
     return { ...base, deviation: null, state: "no-data", words: options.quality ?? "no reading" };

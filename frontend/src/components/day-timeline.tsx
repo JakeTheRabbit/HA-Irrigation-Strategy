@@ -893,6 +893,8 @@ function ZoneNumbers({
         unit: "%",
         // A difference of two percentages is in points ("4.5 pt over"), as dryback is elsewhere.
         points: "pt",
+        // Dryback is a share of the peak ((peak − VWC) / peak), said once.
+        basis: "of peak",
         tolerance: 3,
         underIsNormal: dryback?.night === "tonight",
       }),
