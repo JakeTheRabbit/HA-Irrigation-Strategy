@@ -143,7 +143,7 @@ describe("togetherRows", () => {
     expect(togetherVerdict(z12, groups, 2)).toBe("over the pump: will run one after another");
     expect(togetherVerdict(z13, groups, 2)).toBe("fits: can run together");
     expect(togetherVerdict(z23, groups, 2)).toBe("never together: exclusive group A");
-    expect(togetherVerdict(z13, groups, 1)).toBe("one at a time: Zones at once is 1");
+    expect(togetherVerdict(z13, groups, 1)).toBe("not allowed: max 1 zone at a time");
   });
 });
 

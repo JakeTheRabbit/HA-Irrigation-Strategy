@@ -556,17 +556,32 @@ export function SupplyEditor({ controller, onDirtyChange }: { controller: Contro
               </div>
             )}
             <p className="small muted">
-              Zones in the same exclusive group never water at the same time, e.g. two zones on one submain. Line at 2/3 of
-              each bar = 100% of the pump.
+              Zones in the same exclusive group never water at the same time, e.g. two zones on one submain.{" "}
+              <span className="supply-share-key">
+                <i aria-hidden /> 100% pump
+              </span>
             </p>
           </section>
 
           {together.length > 0 && maxLph ? (
             <section className="panel supply-card" aria-labelledby="supply-together">
               <h3 id="supply-together">What can run together</h3>
+              {/* The limit first: a set it blocks is muted, so its bar does not read as allowed. */}
+              <p className="supply-together-lead">
+                {together.some((r) => r.zones.length > conc) && (
+                  <b>
+                    Max {conc} zone{conc === 1 ? "" : "s"} at a time.{" "}
+                  </b>
+                )}
+                <span className="muted">Bars: combined pump demand.</span>
+              </p>
               <ul className="supply-together">
                 {together.map((r) => (
-                  <li key={r.zones.join("+")} data-muted={r.sameGroup || undefined} data-over={(!r.sameGroup && r.pct > 100) || undefined}>
+                  <li
+                    key={r.zones.join("+")}
+                    data-muted={r.sameGroup || r.zones.length > conc || undefined}
+                    data-over={(!r.sameGroup && r.pct > 100) || undefined}
+                  >
                     <b>{zonesText(r.zones)}</b>
                     <CapacityBar segments={segments(r.zones)} capacityLph={maxLph} caption={`${zonesText(r.zones)}: ${pct(r.pct)} of the pump`} />
                     <span className="supply-verdict">

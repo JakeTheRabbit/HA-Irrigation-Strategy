@@ -207,6 +207,22 @@
   width: 2px;
   background: var(--foreground);
 }
+.supply-together-lead {
+  margin: 0 0 12px;
+  font-size: var(--text-sm);
+}
+/* The share bars' 100% line, said once beside the note. */
+.supply-share-key {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+.supply-share-key > i {
+  width: 2px;
+  height: 14px;
+  background: var(--foreground);
+}
 .supply-together {
   display: flex;
   flex-direction: column;

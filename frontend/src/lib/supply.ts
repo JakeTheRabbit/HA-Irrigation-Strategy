@@ -140,7 +140,8 @@ export function togetherVerdict(row: TogetherRow, groups: Record<string, string>
     return `never together: exclusive group ${shared}`;
   }
   if (row.pct > 100) return "over the pump: will run one after another";
-  if (row.zones.length > maxConcurrent) return `one at a time: Zones at once is ${maxConcurrent}`;
+  if (row.zones.length > maxConcurrent)
+    return `not allowed: max ${maxConcurrent} zone${maxConcurrent === 1 ? "" : "s"} at a time`;
   return "fits: can run together";
 }
 
