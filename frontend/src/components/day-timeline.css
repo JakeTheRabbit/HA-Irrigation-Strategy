@@ -278,11 +278,19 @@
 .day-timeline .jev-mark[data-acted] {
   fill: var(--gd-ink);
 }
+/* Now: one solid line between what was recorded and what is expected after it. */
 .day-timeline .now-line {
   stroke: var(--foreground);
-  stroke-width: 1;
-  stroke-dasharray: 1 2.5;
-  opacity: 0.8;
+  stroke-width: 1.5;
+  opacity: 0.85;
+}
+.day-timeline .now-label {
+  fill: var(--foreground);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+.day-timeline .future-wash {
+  fill: color-mix(in srgb, var(--foreground) 4%, transparent);
 }
 .day-timeline .now-mark {
   fill: var(--foreground);

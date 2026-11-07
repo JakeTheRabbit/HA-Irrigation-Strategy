@@ -533,7 +533,8 @@
   }
   .zone-layout {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-areas: "charts" "numbers" "suggest" "why" "shots";
+    /* One column: the zone's condition and next action first, then the chart. */
+    grid-template-areas: "numbers" "charts" "suggest" "why" "shots";
     grid-template-rows: none;
   }
 }
@@ -544,6 +545,23 @@
   .zone-facts {
     flex-basis: 100%;
     margin-left: 0;
+  }
+  /* The comparison: a full-width selector, its choices sharing the row (wrapping if they must). */
+  .zone-day .zone-day-chart .timeline-heading-side {
+    width: 100%;
+  }
+  .zone-day-compare {
+    display: flex;
+    flex-wrap: wrap;
+    width: 100%;
+  }
+  .zone-day-compare .timeline-compare {
+    flex-basis: 100%;
+    padding: 4px 6px;
+  }
+  .zone-day-compare button {
+    flex: 1 1 auto;
+    min-height: 44px;
   }
   /* Phone (mockup 26): the charts side by side, one at a time, swiped. */
   .zone-day-slides {

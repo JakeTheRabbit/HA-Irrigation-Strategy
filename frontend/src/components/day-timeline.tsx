@@ -929,6 +929,12 @@ function ZoneNumbers({
         )}
       </StatusLine>
       <GaugeRow gauges={gauges} label={`${zone.name} key values`} />
+      {/* The next action right under the condition, before the day's tallies. */}
+      {next && (
+        <p className="zone-next" title={next.detail} data-tone={next.tone}>
+          <strong>Next:</strong> {next.text}
+        </p>
+      )}
       <dl className="zone-numbers" aria-label={`${zone.name} today in numbers`}>
         <div data-status={share !== null && share >= 80 ? "above" : undefined}>
           <dt>Water today</dt>
@@ -1015,11 +1021,6 @@ function ZoneNumbers({
           )}
         </div>
       </dl>
-      {next && (
-        <p className="zone-next" title={next.detail} data-tone={next.tone}>
-          <strong>Next:</strong> {next.text}
-        </p>
-      )}
     </div>
   );
 }
@@ -1566,6 +1567,10 @@ function Chart({
         </clipPath>
       </defs>
       <rect x={L} y={0} width={plotW} height={8} rx={4} fill={`url(#${id}-light)`} />
+      {/* After now the chart is what is expected, not what was recorded: a faint wash says so. */}
+      {nowX < L + plotW && (
+        <rect x={nowX} y={TOP} width={L + plotW - nowX} height={H} className="future-wash" />
+      )}
       <text x={L - 6} y={10} className="axis-title" textAnchor="end">
         VWC
       </text>
@@ -1780,6 +1785,11 @@ function Chart({
       )}
       <line x1={nowX} x2={nowX} y1={0} y2={bottom} className="now-line" />
       <path d={`M${nowX - 4} 9L${nowX + 4} 9L${nowX} 14Z`} className="now-mark" />
+      {nowX < L + plotW - 30 && (
+        <text x={nowX + 5} y={TOP + 12} className="now-label">
+          Now
+        </text>
+      )}
       {badges.map(({ column, cx, word }, index) => (
         <g key={index} className="phase-badge" data-future={column.future || undefined}>
           <circle cx={cx} cy={bottom + 12} r={BADGE / 2} />
