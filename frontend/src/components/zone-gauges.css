@@ -4,7 +4,8 @@
   grid-template-columns: 64px minmax(0, 1fr) 64px;
   align-items: center;
   gap: var(--space-2);
-  font-size: var(--text-xs);
+  font-size: var(--text-label);
+  line-height: var(--leading-label);
   font-variant-numeric: tabular-nums;
 }
 .mini-gauge-label {

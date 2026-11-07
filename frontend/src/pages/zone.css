@@ -253,9 +253,9 @@
 }
 .zone-numbers dd.zone-sub {
   color: var(--muted-foreground);
-  font-size: var(--text-xs);
+  font-size: var(--text-label);
+  line-height: var(--leading-label);
   font-weight: 500;
-  line-height: 1.5;
 }
 .zone-numbers [data-status="above"] dd.zone-sub {
   color: var(--warning);
@@ -341,7 +341,8 @@
 .zone-why {
   display: block;
   color: var(--muted-foreground);
-  font-size: var(--text-xs);
+  font-size: var(--text-label);
+  line-height: var(--leading-label);
 }
 .zone-jev-list {
   margin: 0;

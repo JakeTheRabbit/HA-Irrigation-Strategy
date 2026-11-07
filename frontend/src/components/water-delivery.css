@@ -24,8 +24,8 @@
 .wd-note,
 .wd-capacity small {
   color: var(--muted-foreground);
-  font-size: var(--text-xs);
-  line-height: 1.5;
+  font-size: var(--text-label);
+  line-height: var(--leading-label);
 }
 .wd-title p {
   margin: 0;

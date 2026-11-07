@@ -158,7 +158,8 @@
 }
 .insight-mapping-note {
   color: var(--muted-foreground);
-  font-size: var(--text-xs);
+  font-size: var(--text-label);
+  line-height: var(--leading-label);
   margin: 0 22px 22px;
   overflow-wrap: anywhere;
 }

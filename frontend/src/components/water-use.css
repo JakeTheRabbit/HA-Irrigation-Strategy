@@ -94,7 +94,8 @@
 .wu-caption {
   max-width: 100ch;
   color: var(--muted-foreground);
-  font-size: var(--text-xs);
+  font-size: var(--text-label);
+  line-height: var(--leading-label);
 }
 .wu-chart {
   padding: 16px 0 16px;

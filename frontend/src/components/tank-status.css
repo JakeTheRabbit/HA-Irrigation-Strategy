@@ -158,8 +158,8 @@
 .tank-note {
   grid-column: 1 / -1;
   margin: 0;
-  font-size: var(--text-xs);
-  line-height: 1.5;
+  font-size: var(--text-label);
+  line-height: var(--leading-label);
   color: var(--muted-foreground);
 }
 @media (max-width: 480px) {

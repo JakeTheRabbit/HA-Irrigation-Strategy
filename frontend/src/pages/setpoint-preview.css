@@ -36,8 +36,8 @@
 
 .setpoint-preview-note {
   color: var(--muted-foreground);
-  font-size: var(--text-xs);
-  line-height: 1.5;
+  font-size: var(--text-label);
+  line-height: var(--leading-label);
   margin: 12px 0;
 }
 .setpoint-preview-zone {

@@ -114,8 +114,8 @@
   align-items: center;
   gap: 8px 12px;
   color: var(--muted-foreground);
-  font-size: var(--text-xs);
-  line-height: 1.5;
+  font-size: var(--text-label);
+  line-height: var(--leading-label);
 }
 .tank-history-stale {
   color: var(--warning);

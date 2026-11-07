@@ -80,8 +80,14 @@
   --zone-4: #0e7490;
   --zone-5: #be185d;
   --zone-6: #78716c;
-  /* Type: 12 is the floor. Space: a 4 px grid. */
+  /* Type: 12 is the floor, kept for chips, units, axis ticks and footnotes. What an operator reads
+     from across the room is a label (sensor and setting names, target ranges, descriptions,
+     helper text: 14/20) or a reading (16/24, weight 600). Space: a 4 px grid. */
   --text-xs: 12px;
+  --text-label: 14px;
+  --leading-label: 20px;
+  --text-reading: 16px;
+  --leading-reading: 24px;
   --text-sm: 14px;
   --text-md: 15px;
   --text-lg: 16px;
@@ -120,6 +126,8 @@ body {
   margin: 0;
   font-size: 14px;
   line-height: 1.5;
+  /* Every number lines up with the one above it. */
+  font-variant-numeric: tabular-nums;
   color: var(--foreground);
   background: var(--canvas);
 }
@@ -675,7 +683,8 @@ nav.zone-switcher button[aria-current="page"] {
 .cell-subtext {
   display: block;
   color: var(--muted-foreground);
-  font-size: var(--text-xs);
+  font-size: var(--text-label);
+  line-height: var(--leading-label);
   margin-top: 5px;
 }
 
@@ -945,7 +954,8 @@ nav.zone-switcher button[aria-current="page"] {
 
 .footnote {
   color: var(--muted-foreground);
-  font-size: var(--text-xs);
+  font-size: var(--text-label);
+  line-height: var(--leading-label);
   max-width: 780px;
 }
 .settings-section {
@@ -956,7 +966,8 @@ nav.zone-switcher button[aria-current="page"] {
 }
 .settings-label p {
   color: var(--muted-foreground);
-  font-size: var(--text-xs);
+  font-size: var(--text-label);
+  line-height: var(--leading-label);
   margin-top: 8px;
   margin-bottom: 15px;
 }
@@ -1500,7 +1511,8 @@ select option:disabled {
 }
 .history-caption,
 .history-missing {
-  font-size: var(--text-xs);
+  font-size: var(--text-label);
+  line-height: var(--leading-label);
   color: var(--muted-foreground);
   padding: 6px 20px 16px;
 }
@@ -1531,7 +1543,8 @@ select option:disabled {
   .history-missing {
     padding-left: 16px;
     padding-right: 16px;
-    font-size: var(--text-xs);
+    font-size: var(--text-label);
+    line-height: var(--leading-label);
   }
   .chart-panel .panel-heading {
     align-items: flex-start;

@@ -279,7 +279,7 @@
   font-weight: 600;
 }
 .ai-judges-table tbody th {
-  max-width: 340px;
+  max-width: 380px;
   font-weight: 400;
 }
 .ai-judge-name {
@@ -293,12 +293,18 @@
   font-size: var(--text-xs);
   font-weight: 400;
 }
+/* A judge's description: up to two lines, then an ellipsis (the whole of it on hover). */
 .ai-judges-table tbody th span {
+  display: -webkit-box;
   overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   color: var(--muted-foreground);
-  font-size: var(--text-xs);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  font-size: var(--text-label);
+  line-height: var(--leading-label);
+}
+.ai-judges-table tbody th span.brain-line {
+  display: block;
 }
 .ai-judges-table .ai-room-col {
   width: 56px;
@@ -333,8 +339,8 @@
 .ai-note {
   display: inline-block;
   color: var(--muted-foreground);
-  font-size: var(--text-xs);
-  line-height: 1.2;
+  font-size: var(--text-label);
+  line-height: var(--leading-label);
 }
 .ai-bar {
   position: relative;
@@ -357,7 +363,8 @@
   justify-content: space-between;
   gap: 2px 12px;
   color: var(--muted-foreground);
-  font-size: var(--text-xs);
+  font-size: var(--text-label);
+  line-height: var(--leading-label);
 }
 .ai-warning {
   margin: 0;
@@ -497,9 +504,6 @@
 @media (max-width: 720px) {
   .ai-judges-table tbody th {
     max-width: 160px;
-  }
-  .ai-judges-table tbody th span {
-    white-space: normal;
   }
   .ai-outcomes > li {
     grid-template-columns: 48px minmax(0, 1fr);

@@ -448,7 +448,8 @@
 }
 .facility-zone-readings dt {
   color: var(--muted-foreground);
-  font-size: var(--text-xs);
+  font-size: var(--text-label);
+  line-height: var(--leading-label);
 }
 .facility-zone-readings dd {
   margin: 0;
@@ -582,7 +583,8 @@
 }
 .facility-note {
   margin: 0;
-  font-size: var(--text-xs);
+  font-size: var(--text-label);
+  line-height: var(--leading-label);
 }
 
 @media (prefers-reduced-motion: reduce) {

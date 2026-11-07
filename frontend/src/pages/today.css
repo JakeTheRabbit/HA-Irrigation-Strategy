@@ -438,12 +438,14 @@
 }
 .today-gauge-label small {
   color: var(--muted-foreground);
-  font-size: var(--text-xs);
+  font-size: var(--text-label);
+  line-height: var(--leading-label);
 }
 .today-gauge-value {
   min-width: 52px;
   text-align: right;
-  font-size: var(--text-lg);
+  font-size: var(--text-reading);
+  line-height: var(--leading-reading);
   font-weight: 600;
   white-space: nowrap;
 }

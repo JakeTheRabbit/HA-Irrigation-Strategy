@@ -231,7 +231,8 @@
 }
 .dosing-step-text span {
   color: var(--muted-foreground);
-  font-size: var(--text-xs);
+  font-size: var(--text-label);
+  line-height: var(--leading-label);
   overflow-wrap: anywhere;
 }
 .dosing-step-state {

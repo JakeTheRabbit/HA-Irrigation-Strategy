@@ -213,8 +213,8 @@
 .notify-kind-detail {
   margin-bottom: 8px;
   color: var(--muted-foreground);
-  font-size: var(--text-xs);
-  line-height: 1.5;
+  font-size: var(--text-label);
+  line-height: var(--leading-label);
 }
 .notify-kind-codes,
 .notify-kind-events {

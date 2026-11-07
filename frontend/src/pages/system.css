@@ -109,7 +109,8 @@
 }
 .system-note {
   grid-column: 1 / -1;
-  font-size: var(--text-xs);
+  font-size: var(--text-label);
+  line-height: var(--leading-label);
   color: var(--success);
 }
 .system-note::before,
@@ -172,7 +173,8 @@
 .system-beat-note {
   margin: 0;
   color: var(--muted-foreground);
-  font-size: var(--text-xs);
+  font-size: var(--text-label);
+  line-height: var(--leading-label);
 }
 
 /* Every mapped device. */

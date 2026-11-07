@@ -50,8 +50,8 @@
 .sensor-context-note {
   margin: 0 16px 16px;
   color: var(--muted-foreground);
-  font-size: var(--text-xs);
-  line-height: 1.5;
+  font-size: var(--text-label);
+  line-height: var(--leading-label);
 }
 .sensor-context-loading {
   min-height: 170px;
@@ -278,8 +278,8 @@
 .sensor-context-caption {
   margin: 10px 16px 16px;
   color: var(--muted-foreground);
-  font-size: var(--text-xs);
-  line-height: 1.5;
+  font-size: var(--text-label);
+  line-height: var(--leading-label);
 }
 /* A suggested value under a field, beside the button that copies it into the local draft. */
 .setting-suggestion {

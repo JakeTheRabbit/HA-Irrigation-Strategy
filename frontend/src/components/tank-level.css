@@ -75,8 +75,8 @@
 }
 .tank-level .tank-level-note {
   margin: 10px 0 0;
-  font-size: var(--text-xs);
-  line-height: 1.5;
+  font-size: var(--text-label);
+  line-height: var(--leading-label);
   color: var(--muted-foreground);
 }
 .tank-level .tank-history-note,

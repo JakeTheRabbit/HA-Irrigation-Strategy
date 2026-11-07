@@ -77,8 +77,8 @@
 .targets-note p {
   margin: 2px 0 0;
   color: var(--muted-foreground);
-  font-size: var(--text-xs);
-  line-height: 1.5;
+  font-size: var(--text-label);
+  line-height: var(--leading-label);
 }
 .targets-note .field-error {
   color: var(--destructive);
