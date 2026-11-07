@@ -138,7 +138,8 @@ await runParity({
     } else {
       assert.equal(await page.locator('[data-needs-integration="Uptime over 7 days"]').count(), 1, `${label}: uptime needs`);
       assert.equal(await page.locator('[data-needs-integration="Heartbeat history"]').count(), 1, `${label}: heartbeat needs`);
-      const pcts = await devices.locator(".system-row-pct").allInnerTexts();
+      // Text content: healthy rows fold away under "N healthy", where innerText reads empty.
+      const pcts = await devices.locator(".system-row-pct").allTextContents();
       assert.ok(pcts.every((t) => t === "—"), `${label}: uptime —`);
       assert.equal(await heartbeat.locator(".system-strip").count(), 0, `${label}: no strip`);
       assert.deepEqual(await heartbeat.locator(".system-beat-note").allInnerTexts(), ["—", "—"], `${label}: heartbeat —`);
