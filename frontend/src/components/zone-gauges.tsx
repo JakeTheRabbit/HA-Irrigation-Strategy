@@ -5,7 +5,7 @@ import "./zone-gauges.css";
 const clamp = (value: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, value));
 
 /** One reading as a short bar: the band it should sit in shaded, a tick where it is now. Calm in
- * band; out of band the tick sits outside the shading and the value carries ▲ or ▼. */
+ * band; out of band the tick sits outside the shading and the value carries a Low or High tag. */
 export function MiniGauge({
   label,
   value,
@@ -55,7 +55,12 @@ export function MiniGauge({
       </span>
       <span className="mini-gauge-value" aria-hidden="true">
         {value === null ? "—" : `${number(value, digits)}${unit}`}
-        {state === "low" ? " ▼" : state === "high" ? " ▲" : ""}
+        {(state === "low" || state === "high") && (
+          <>
+            {" "}
+            <small className="band-tag">{state === "low" ? "Low" : "High"}</small>
+          </>
+        )}
       </span>
     </div>
   );

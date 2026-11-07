@@ -55,16 +55,6 @@ const deliveredLabel = (r: FacilityRoom) =>
 const mixText = (mix: NonNullable<FacilityRoom["mixFailed"]>) =>
   `${mix.title}${mix.at ? ` ${clock(mix.at)}` : ""}`;
 
-/** The room's open alerts, beside its name: a count, never colour alone. */
-function AlertChip({ count }: { count: number }) {
-  if (!count) return null;
-  return (
-    <span className="facility-alerts" data-facility-alerts={count}>
-      <TriangleAlert size={13} aria-hidden="true" /> {count} {count === 1 ? "alert" : "alerts"}
-    </span>
-  );
-}
-
 /** The facility as rooms, each room's zones, each zone's sensors. A problem shows where it is: on
  * the room, the zone, the sensor or the tank, never in a separate list. */
 export function AllZones({ controller, open }: { controller: Controller; open: Open }) {
@@ -154,7 +144,6 @@ function RoomCard({ r, offline, open }: { r: FacilityRoom; offline: boolean; ope
               {stale ? "Last reported" : !view.roomActive ? "Room not in use" : status.text}
               {stageName(r) ? ` · ${capital(stageName(r))}` : ""}
             </span>
-            <AlertChip count={r.alertCount} />
             {growDay && (
               <span className="facility-room-day">
                 Day <strong>{growDay.day}</strong>
@@ -167,6 +156,7 @@ function RoomCard({ r, offline, open }: { r: FacilityRoom; offline: boolean; ope
           </div>
           <NeedsAttention
             items={roomAttention(r)}
+            alerts={r.alertCount}
             open={(item) => open(room.id, item.page, item.zone)}
           />
           {problem && !stale && (
@@ -581,7 +571,6 @@ function PhoneRoom({ r, offline, open }: { r: FacilityRoom; offline: boolean; op
           {stale ? "Last reported" : !view.roomActive ? "Room not in use" : status.text}
           {stageName(r) ? ` · ${capital(stageName(r))}` : ""}
         </span>
-        <AlertChip count={r.alertCount} />
         {growDay && (
           <span className="facility-room-day">
             Day <strong>{growDay.day}</strong>
@@ -589,7 +578,11 @@ function PhoneRoom({ r, offline, open }: { r: FacilityRoom; offline: boolean; op
           </span>
         )}
       </div>
-      <NeedsAttention items={roomAttention(r)} open={(item) => open(room.id, item.page, item.zone)} />
+      <NeedsAttention
+        items={roomAttention(r)}
+        alerts={r.alertCount}
+        open={(item) => open(room.id, item.page, item.zone)}
+      />
       <RunBar r={r} />
       {drink && (
         <p className="facility-phone-drink">

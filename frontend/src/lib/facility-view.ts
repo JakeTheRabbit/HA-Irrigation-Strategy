@@ -1,5 +1,5 @@
 import { irrigationMode } from "./facility";
-import { zoneAttention, type AttentionReason, type ZoneFacts } from "./attention";
+import { zoneAttention, type AttentionLevel, type AttentionReason, type ZoneFacts } from "./attention";
 import { formatEc, formatTemp, formatVolume } from "./display-units";
 import { readJev, jevIds, parseJevSetpoints, type JevStage } from "./jev";
 import { buildRoom, numeric, readable, roomStatus } from "./model";
@@ -23,7 +23,7 @@ import type { Controller, EntityState, LogEvent, Metric, States, Zone } from "./
 import { dailyWater } from "./water-delivery";
 import { roomPlants } from "./water-view";
 import { climateReadings, rootZoneSensor, type ClimateReading } from "./zone-extras";
-import { zoneProbes, type Probe, type ProbeHealth } from "./probes";
+import { PROBE_TONE, zoneProbes, type Probe, type ProbeHealth } from "./probes";
 
 /** A physical substrate sensor: its moisture and EC probes paired by entity id (sensor.f1_z1_front_vwc
  * and sensor.f1_z1_front_ec are one sensor), with the worse of their two healths. */
@@ -425,27 +425,49 @@ export function tankReadingText(tank: { ph: number | null; ec: number | null; te
 /** What in the room needs a look, for the line under its heading: each zone with a problem, a
  * troubled sensor, a short last shot or an open alert, then the feed's failed mix check, a held
  * tank and low stock. Each opens where it is fixed. */
-export function roomAttention(
-  r: FacilityRoom,
-): { key: string; text: string; zone?: number; page: "zone" | "equipment/dosing" | "equipment/stock" }[] {
-  const zones = r.zones
-    .filter(
-      (z) =>
-        z.problem !== null ||
-        z.attention.length > 0 ||
-        z.lastShotHollow ||
-        z.sensors.some((s) => s.health !== "ok" && s.health !== "not-counted"),
-    )
-    .map((z) => ({ key: `zone-${z.zone.id}`, text: z.zone.name, zone: z.zone.id, page: "zone" as const }));
+export function roomAttention(r: FacilityRoom): {
+  key: string;
+  /** "<place>: <problem>": the zone, tank or stock, then what is wrong there. */
+  text: string;
+  level: AttentionLevel;
+  zone?: number;
+  page: "zone" | "equipment/dosing" | "equipment/stock";
+}[] {
+  const zones = r.zones.flatMap((z) => {
+    const sensor = z.sensors.find((s) => s.health !== "ok" && s.health !== "not-counted");
+    const why =
+      z.problem ??
+      z.attention[0]?.text ??
+      (sensor ? `${sensor.name}: ${sensor.text}` : null) ??
+      (z.lastShotHollow ? "Last shot came up short" : null);
+    if (!why) return [];
+    const critical =
+      z.problem !== null ||
+      z.attention.some((a) => a.level === "critical") ||
+      (sensor !== undefined && PROBE_TONE[sensor.health] === "off");
+    return [
+      {
+        key: `zone-${z.zone.id}`,
+        text: `${z.zone.name}: ${why}`,
+        level: (critical ? "critical" : "warning") as AttentionLevel,
+        zone: z.zone.id,
+        page: "zone" as const,
+      },
+    ];
+  });
   const low = r.stock.filter((tank) => tank.state !== "ok");
-  return [
+  const items = [
     ...zones,
-    ...(r.mixFailed ? [{ key: "mix", text: r.mixFailed.title, page: "equipment/dosing" as const }] : []),
+    ...(r.mixFailed
+      ? [{ key: "mix", text: `Feed tank: ${r.mixFailed.title}`, level: "critical" as const, page: "equipment/dosing" as const }]
+      : []),
     ...(r.reservoir.state === "held"
-      ? [{ key: "reservoir", text: r.reservoir.label, page: "equipment/dosing" as const }]
+      ? [{ key: "reservoir", text: `Feed tank: ${r.reservoir.label}`, level: "warning" as const, page: "equipment/dosing" as const }]
       : []),
     ...(low.length
-      ? [{ key: "stock", text: low.map((tank) => `${tank.name} low`).join(", "), page: "equipment/stock" as const }]
+      ? [{ key: "stock", text: `Stock: ${low.map((tank) => `${tank.name} low`).join(", ")}`, level: "warning" as const, page: "equipment/stock" as const }]
       : []),
   ];
+  // The worst first; the order within a level stays.
+  return [...items.filter((i) => i.level === "critical"), ...items.filter((i) => i.level !== "critical")];
 }

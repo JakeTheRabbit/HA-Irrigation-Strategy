@@ -423,12 +423,15 @@
 }
 .today-zone-gauges {
   display: grid;
+  /* One set of columns for the zone's gauges: the bars line up, and a target never wraps. */
+  grid-template-columns: minmax(max-content, 1fr) minmax(48px, 1fr) auto;
   gap: 12px;
   min-width: 0;
 }
 .today-gauge {
   display: grid;
-  grid-template-columns: minmax(96px, 1fr) minmax(60px, 1fr) auto;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
   align-items: center;
   gap: 10px;
   font-variant-numeric: tabular-nums;
@@ -445,7 +448,7 @@
 .today-gauge-value {
   min-width: 52px;
   text-align: right;
-  font-size: var(--text-reading);
+  font-size: 18px;
   line-height: var(--leading-reading);
   font-weight: 600;
   white-space: nowrap;
@@ -624,6 +627,11 @@
   }
   .today-strip {
     padding: 12px 14px;
+  }
+  /* The key on one line. */
+  .today-strip-legend {
+    gap: 4px 10px;
+    font-size: var(--text-xs);
   }
   .today-strip-body {
     grid-template-columns: 52px minmax(0, 1fr);

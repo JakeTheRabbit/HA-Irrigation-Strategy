@@ -515,6 +515,18 @@ nav.zone-switcher button[aria-current="page"] {
 .phase-chip[data-phase="P3"] {
   background: var(--phase-p3);
 }
+/* A reading out of its band: which way, in words beside the value (an arrow read as a trend). */
+.band-tag {
+  display: inline-block;
+  padding: 0 4px;
+  border: 1px solid var(--warning-mark);
+  border-radius: 4px;
+  color: var(--warning);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  line-height: 16px;
+  vertical-align: 0.15em;
+}
 /* A timer zone has no phase: its mode, outlined, in the chip's place. */
 .phase-chip[data-mode="timer"] {
   border: 1px solid var(--border);

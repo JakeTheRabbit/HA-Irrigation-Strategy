@@ -569,12 +569,16 @@ function RoomGauge({ model, value, phase }: { model: GaugeModel; value: string; 
       </span>
       <span className="today-gauge-value">
         {value}
-        {/* Out of band: the arrow says which way, so colour is never the only cue. */}
-        {model.state === "abnormal" && model.band && model.value !== null && (
-          <span aria-hidden="true">
-            {model.value < model.band[0] ? " ▼" : model.value > model.band[1] ? " ▲" : ""}
-          </span>
-        )}
+        {/* Out of band: the tag says which way, so colour is never the only cue. */}
+        {model.state === "abnormal" &&
+          model.band &&
+          model.value !== null &&
+          (model.value < model.band[0] || model.value > model.band[1]) && (
+            <span aria-hidden="true">
+              {" "}
+              <small className="band-tag">{model.value < model.band[0] ? "Low" : "High"}</small>
+            </span>
+          )}
         {model.state === "abnormal" && <span className="sr-only">, {model.words}</span>}
       </span>
     </div>
