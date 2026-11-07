@@ -298,9 +298,20 @@
   }
   .safety-switch {
     flex: 1;
+    min-width: 0;
     justify-content: center;
-    height: 32px;
+    height: 44px;
     padding: 0 8px;
+  }
+  .safety-switch-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+/* Beside "Controls for <room>" the room need not ride in the watering switch's words. */
+@media (min-width: 721px) {
+  .safety-switch-room {
+    display: none;
   }
 }
 

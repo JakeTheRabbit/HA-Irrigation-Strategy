@@ -180,8 +180,8 @@ export function SafetySwitches({ controller }: { controller: Controller }) {
         data-state={wateringState}
         aria-label={
           watering === null
-            ? `${wateringWords}: the switch is unavailable`
-            : `${wateringWords}: ${watering ? "switch watering off…" : "switch watering on…"}`
+            ? `${wateringWords}: ${room.room.name}: the switch is unavailable`
+            : `${wateringWords}: ${room.room.name}: ${watering ? "switch watering off…" : "switch watering on…"}`
         }
         title={
           watering === null
@@ -199,19 +199,23 @@ export function SafetySwitches({ controller }: { controller: Controller }) {
       >
         <Droplets size={15} aria-hidden="true" />
         <span className="safety-switch-dot" aria-hidden="true" />
-        <span className="safety-switch-text">{wateringWords}</span>
+        <span className="safety-switch-text">
+          {wateringWords}
+          {/* A phone has no "Controls for" label beside the switches: the room rides in each. */}
+          <span className="safety-switch-room">: {room.room.name}</span>
+        </span>
       </button>
       <button
         type="button"
         className="safety-switch"
         data-safety="stop-all"
-        aria-label={`Stop all water in ${room.room.name}…`}
+        aria-label={`Stop ${room.room.name}: all water in this room…`}
         title="Sets the kill switch to off, then every pump and valve of this room to off. Works when the controller app is stopped."
         disabled={!["live", "demo"].includes(controller.connection)}
         onClick={() => setReview("stop")}
       >
         <OctagonX size={15} aria-hidden="true" />
-        <span className="safety-switch-text">Stop all</span>
+        <span className="safety-switch-text">Stop {room.room.name}</span>
       </button>
       <ReviewDialog
         open={review === "stop"}

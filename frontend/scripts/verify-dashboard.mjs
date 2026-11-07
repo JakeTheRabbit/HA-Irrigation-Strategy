@@ -2710,8 +2710,8 @@ try {
     assert.ok(await page.locator(".topbar-title").isVisible(), "phone header names the page");
     assert.equal(await page.getByRole("button", { name: /^Jump to…/ }).isVisible(), false);
     assert.deepEqual(await page.locator(".safety-switch-text").allInnerTexts(), [
-      "Watering on",
-      "Stop all",
+      "Watering on: Room A",
+      "Stop Room A",
     ]);
     // The five sections along the bottom of the phone.
     assert.deepEqual(
