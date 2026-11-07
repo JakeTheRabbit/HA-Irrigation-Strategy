@@ -74,7 +74,7 @@ await runParity({
     const gauge = zone(2).locator("svg.arc-gauge");
     assert.match(await gauge.getAttribute("aria-label"), /62%/, `${label}: zone 2 gauge`);
     assert.match(await zone(1).locator("svg.arc-gauge").getAttribute("aria-label"), /98%/, `${label}: zone 1 gauge`);
-    assert.match(await zone(2).innerText(), /Today \d+% · [\d.]+ of [\d.]+ L/, `${label}: zone 2 today`);
+    assert.match(await zone(2).innerText(), /Today \d+% · metered [\d.]+ of [\d.]+ L · from \d\d:\d\d/, `${label}: zone 2 today`);
     assert.ok((await zone(2).locator(".wf-bar-metered[data-short]").count()) >= 2, `${label}: zone 2 short bars`);
     region("zone cards");
 
