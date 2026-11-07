@@ -471,9 +471,10 @@ export function MixFaultSummary({
     <FaultSummary
       tone="fault"
       title={title}
+      // The batch's sample, not the tank now: Tank and pump below has the live reading.
       value={
         quantity
-          ? `${PROBE_NAMES[quantity]} ${reading === null ? "not read" : text(reading)}`
+          ? `Failed sample · ${PROBE_NAMES[quantity]} ${reading === null ? "not read" : text(reading)}`
           : undefined
       }
       allowed={
@@ -483,12 +484,11 @@ export function MixFaultSummary({
       }
       action={
         <Button variant="outline" onClick={onShow}>
-          Top up and re-check ↓
+          Details and re-check ↓
         </Button>
       }
     >
-      The controller refuses a batch an automation asks for until a batch made by hand passes this
-      check. The shots continue.
+      Automatic batches blocked until a batch made by hand passes; irrigation continues.
     </FaultSummary>
   );
 }
@@ -567,10 +567,10 @@ export function MixCheckCard({
         {Number.isFinite(checked) && ` ${at(checked, now, tz)}`}
       </h3>
       {mix.probes.includes("ec") && (
-        <BandGauge name="EC" value={mix.ec} low={ec.low} high={ec.high} text={ecText} />
+        <BandGauge name="Sample EC" value={mix.ec} low={ec.low} high={ec.high} text={ecText} />
       )}
       {mix.probes.includes("ph") && (
-        <BandGauge name="pH" value={mix.ph} low={ph.low} high={ph.high} text={PH} />
+        <BandGauge name="Sample pH" value={mix.ph} low={ph.low} high={ph.high} text={PH} />
       )}
       <p className="plumb-mix-why">
         {[

@@ -168,3 +168,9 @@
     gap: 16px;
   }
 }
+.tank-quality .tank-updated {
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+  font-weight: 400;
+  white-space: nowrap;
+}
