@@ -1,6 +1,7 @@
 import { useProbeComparisons } from "@/lib/probe-history";
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { Check, CircleAlert, Download, LoaderCircle, Plus, SlidersHorizontal } from "lucide-react";
+import { probeGaps } from "@/lib/hmi";
 import {
   Area,
   Brush,
@@ -1728,9 +1729,29 @@ function ExplorerChart({
   const { ref, width } = useWidth();
   const height = 180;
   const inset = 14;
-  const lines = series.map((item) => ({ item, values: values(item) ?? [], before: before?.get(item.key) ?? null }));
+  // A VWC dropout (and the part-dropped samples beside it) is a gap, never a value: it breaks the
+  // line and stays out of the axis range, so one dropout cannot squash the real traces.
+  const clean = (item: ExplorerSeries, list: (number | null)[] | null) => {
+    if (!list || item.kind !== "vwc") return list;
+    const { clean: kept } = probeGaps(
+      list.flatMap((value, time) => (value === null ? [] : [{ time, value }])),
+    );
+    const out: (number | null)[] = list.map(() => null);
+    for (const reading of kept) out[reading.time] = reading.value;
+    return out;
+  };
+  const lines = series.map((item) => ({
+    item,
+    values: clean(item, values(item)) ?? [],
+    before: clean(item, before?.get(item.key) ?? null),
+  }));
   const all = lines.flatMap((line) => [...line.values, ...(line.before ?? [])]).filter((v): v is number => v !== null);
-  const span = [...all, ...(band ?? [])];
+  // The range follows the bulk of the readings: the outer 2% each side (a dropout, a spike) is left
+  // off the scale and marked at the edge, so it cannot squash the real traces.
+  const sorted = [...all].sort((a, b) => a - b);
+  const quantile = (p: number) => sorted[Math.round(p * (sorted.length - 1))];
+  const bulk = sorted.length >= 50 ? [quantile(0.02), quantile(0.98)] : sorted;
+  const span = [...bulk, ...(band ?? [])];
   let low = span.length ? Math.min(...span) : 0,
     high = span.length ? Math.max(...span) : 1;
   if (high - low < 1e-9) {
@@ -1742,11 +1763,12 @@ function ExplorerChart({
   high += pad;
   const x = (t: number) => (pctOf(axis, t) / 100) * width;
   const y = (v: number) => inset + (1 - (v - low) / (high - low)) * (height - 2 * inset);
+  const offScale = (v: number) => v < low || v > high;
   const path = (list: readonly (number | null)[]) => {
     let d = "";
     let open = false;
     list.forEach((v, i) => {
-      if (v === null || times[i] === undefined) return void (open = false);
+      if (v === null || times[i] === undefined || offScale(v)) return void (open = false);
       d += `${open ? "L" : "M"}${x(times[i]).toFixed(1)},${y(v).toFixed(1)}`;
       open = true;
     });
@@ -1758,6 +1780,8 @@ function ExplorerChart({
     onHover(axis.start + ((event.clientX - box.left) / box.width) * (axis.end - axis.start));
   };
   const nowShown = now > axis.start && now < axis.end;
+  // Four labelled levels, the range's ends and two between.
+  const ticks = [0, 1, 2, 3].map((k) => low + pad + ((high - low - 2 * pad) * k) / 3);
   return (
     <div className="explorer-row explorer-chart" data-chart={title}>
       <div className="explorer-legend">
@@ -1796,10 +1820,20 @@ function ExplorerChart({
           onHover((hover ?? data.end) + by);
         }}
       >
-        <span className="explorer-y explorer-y-high">{shownValue(series[0], high - pad)}</span>
-        <span className="explorer-y explorer-y-low">{shownValue(series[0], low + pad)}</span>
+        {ticks.map((v, i) => (
+          <span
+            key={i}
+            className={`explorer-y${i === 0 ? " explorer-y-low" : i === ticks.length - 1 ? " explorer-y-high" : ""}`}
+            style={i > 0 && i < ticks.length - 1 ? { top: `${y(v) - 9}px` } : undefined}
+          >
+            {shownValue(series[0], v)}
+          </span>
+        ))}
         {width > 0 && (
           <svg width={width} height={height} aria-hidden="true">
+            {ticks.map((v, i) => (
+              <line key={i} className="explorer-grid" x1={0} x2={width} y1={y(v)} y2={y(v)} />
+            ))}
             {band && (
               <rect
                 className="explorer-band"
@@ -1821,6 +1855,27 @@ function ExplorerChart({
             {lines.map(({ item, values: list }) => (
               <path key={item.key} className="explorer-line" d={path(list)} stroke={item.color} data-series={item.key} />
             ))}
+            {/* A reading off the scale: a small mark on the edge it went past. */}
+            {lines.flatMap(({ item, values: list }) =>
+              list.flatMap((v, i) =>
+                v !== null && offScale(v) && times[i] !== undefined && (i === 0 || list[i - 1] === null || !offScale(list[i - 1]!))
+                  ? [
+                      <path
+                        key={`${item.key}-clip-${i}`}
+                        className="explorer-clipped"
+                        d={
+                          v < low
+                            ? `M${x(times[i]) - 4},${height - 7}L${x(times[i]) + 4},${height - 7}L${x(times[i])},${height - 1}Z`
+                            : `M${x(times[i]) - 4},7L${x(times[i]) + 4},7L${x(times[i])},1Z`
+                        }
+                        fill={item.color}
+                      >
+                        <title>Off the scale here</title>
+                      </path>,
+                    ]
+                  : [],
+              ),
+            )}
             {nowShown && <line className="explorer-now" x1={x(now)} x2={x(now)} y1={0} y2={height} />}
             {hover !== null && <line className="explorer-cross" x1={x(hover)} x2={x(hover)} y1={0} y2={height} />}
           </svg>
@@ -1837,16 +1892,15 @@ function ExplorerChart({
               {marker.phase} {clock(marker.from, timeZone)}
             </span>
           ))}
+        {/* In the plot, only a numbered mark at its time; the words sit under the plot. */}
         {notes.map((note, i) => (
           <span
             key={`${note.series}-${note.at}`}
-            className="explorer-note"
-            // One row each, so two notes near the same time never sit on each other.
-            style={{ left: `min(${pctOf(axis, note.at)}%, calc(100% - 16rem))`, top: `${30 + (i % 4) * 24}px` }}
-            data-chart-note
+            className="explorer-note-mark"
+            style={{ left: `clamp(10px, ${pctOf(axis, note.at)}%, calc(100% - 10px))`, top: `${6 + (i % 3) * 22}px` }}
+            aria-hidden="true"
           >
-            <CircleAlert size={13} aria-hidden="true" />
-            {note.text}
+            {i + 1}
           </span>
         ))}
         {last && nowShown && (
@@ -1861,6 +1915,17 @@ function ExplorerChart({
           </span>
         )}
       </div>
+      {notes.length > 0 && (
+        <ol className="explorer-notes">
+          {notes.map((note, i) => (
+            <li key={`${note.series}-${note.at}`} className="explorer-note" data-chart-note>
+              <b aria-hidden="true">{i + 1}</b>
+              <CircleAlert size={13} aria-hidden="true" />
+              {note.text}
+            </li>
+          ))}
+        </ol>
+      )}
     </div>
   );
 }

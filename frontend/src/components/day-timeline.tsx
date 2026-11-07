@@ -1714,7 +1714,7 @@ function Chart({
           y={onAxis(rescueNow.value) ? y(rescueNow.value) - 4 : bottom - 4}
           className="ref-label rescue"
         >
-          Rescue {number(rescueNow.value)}%{onAxis(rescueNow.value) ? "" : " ↓"}
+          Rescue {number(rescueNow.value)}%{onAxis(rescueNow.value) ? "" : " · below range ↓"}
         </text>
       )}
       {!points.length && (
@@ -1824,8 +1824,8 @@ function columnText(column: Column, lane: Lane, day: GrowDay, now: number): stri
 }
 
 /** A clock hour short enough for an axis: "4 PM", "16". */
-const hourLabel = (time: number) =>
-  formatDateTime(time, { hour: "numeric", minute: "2-digit" }).replace(/:00(?=\D|$)/, "");
+// Always a clock time ("10:00"), never a bare hour that could read as a value.
+const hourLabel = (time: number) => formatDateTime(time, { hour: "numeric", minute: "2-digit" });
 const diamond = (cx: number, cy: number) =>
   `M${cx} ${cy - 5}L${cx + 5} ${cy}L${cx} ${cy + 5}L${cx - 5} ${cy}Z`;
 /** The recorded VWC as one path, broken where readings stop for more than 20 minutes. */

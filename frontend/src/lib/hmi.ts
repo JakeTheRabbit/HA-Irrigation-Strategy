@@ -10,7 +10,9 @@ export interface ProbeGap {
   end: number;
 }
 /** Splits readings into the usable ones and the gaps, a gap being one run of readings at or under
- * `limit`. Each gap keeps the time of its first and its last bad reading. */
+ * `limit`. Each gap keeps the time of its first and its last bad reading. A reading right beside a
+ * dropout that is under half of the reading on its other side is the probe falling out or coming
+ * back (a part-dropped sample), so it belongs to the gap: a line never plunges into one. */
 export function probeGaps<T extends { time: number; value: number }>(
   readings: readonly T[],
   limit = PROBE_GAP_VWC,
@@ -18,10 +20,23 @@ export function probeGaps<T extends { time: number; value: number }>(
   const clean: T[] = [];
   const gaps: ProbeGap[] = [];
   let open: ProbeGap | null = null;
-  for (const reading of readings) {
+  const edge = (value: number, other: T | undefined) =>
+    other !== undefined && other.value > limit && value < other.value / 2;
+  for (const [index, reading] of readings.entries()) {
+    const after = readings[index + 1];
     if (reading.value <= limit) {
       if (open) open.end = reading.time;
-      else gaps.push((open = { start: reading.time, end: reading.time }));
+      else {
+        const before = clean.at(-1);
+        // The sample as it fell out joins the gap.
+        if (before && edge(before.value, clean.at(-2)) && readings[index - 1] === before) {
+          clean.pop();
+          gaps.push((open = { start: before.time, end: reading.time }));
+        } else gaps.push((open = { start: reading.time, end: reading.time }));
+      }
+    } else if (open && after && edge(reading.value, after)) {
+      // The sample as it came back joins the gap too.
+      open.end = reading.time;
     } else {
       open = null;
       clean.push(reading);

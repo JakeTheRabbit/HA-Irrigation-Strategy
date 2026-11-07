@@ -643,14 +643,14 @@ export function PlanningCurve({
                 <title>{`Probe gap ${at(gap.from)}–${at(gap.to)}: no usable reading`}</title>
               </rect>
               <text
-                x={x(gap.from)}
+                x={x(gap.to) + 4}
                 y={TOP + HEIGHT - 6}
-                textAnchor="middle"
+                textAnchor="start"
                 fill="var(--muted-foreground)"
                 fontSize="12"
                 fontStyle="italic"
               >
-                gap
+                No probe data
               </text>
             </g>
           ))}
@@ -758,7 +758,7 @@ export function PlanningCurve({
                   d={targetPath}
                   fill="none"
                   stroke={dirty ? "var(--primary)" : "var(--muted-foreground)"}
-                  strokeWidth={dirty ? 2.25 : 1.75}
+                  strokeWidth={dirty ? 2.25 : 2}
                   strokeDasharray="6 4"
                 />
               )}
@@ -878,7 +878,7 @@ export function PlanningCurve({
                   d={recordedPath(vwcRecorded.today, y)}
                   fill="none"
                   stroke="var(--foreground)"
-                  strokeWidth="1.75"
+                  strokeWidth="2.5"
                 >
                   <title>Recorded VWC, this grow-day (lights-on to lights-on)</title>
                 </path>

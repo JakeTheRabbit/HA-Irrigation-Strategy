@@ -102,7 +102,10 @@
 .day-timeline .grow-readout strong {
   font-weight: 600;
 }
+/* Until the chart is read, only a quiet hint: no empty box under the plot. */
 .day-timeline .grow-readout[data-empty] {
+  border-color: transparent;
+  background: none;
   color: var(--muted-foreground);
 }
 /* Where the reading is taken: a bar up the plot, a dot on each line it crosses. */
@@ -237,13 +240,13 @@
 .day-timeline .vwc-line {
   fill: none;
   stroke: var(--primary);
-  stroke-width: 2;
+  stroke-width: 2.5;
   stroke-linejoin: round;
 }
 .day-timeline .projection {
   fill: none;
   stroke: var(--primary);
-  stroke-width: 1.6;
+  stroke-width: 2;
   stroke-dasharray: 5 4;
   stroke-linejoin: round;
   opacity: 0.85;
@@ -310,11 +313,12 @@
   gap: 6px 18px;
   margin-top: 10px;
 }
+/* The key takes its own full row, so it reads as one line on a desktop. */
 .day-timeline .grow-legend {
   display: flex;
-  flex: 1 1 420px;
+  flex: 1 1 100%;
   flex-wrap: wrap;
-  gap: 6px 16px;
+  gap: 6px 14px;
   margin: 0;
   padding: 0;
   list-style: none;
