@@ -189,7 +189,10 @@ export function zoneAttention(input: AttentionInput): Map<number, AttentionReaso
         add(
           "water",
           "warning",
-          `${format.perPlant(zone.mlPerPlant)}/plant today, ${format.number(share)}× ${reference.name ?? "the room"}`,
+          // None at all is said plainly, not as "0 mL/plant today, 0× the room".
+          zone.mlPerPlant === 0
+            ? "No water today"
+            : `${format.perPlant(zone.mlPerPlant)}/plant today, ${format.number(share)}× ${reference.name ?? "the room"}`,
         );
     }
 
