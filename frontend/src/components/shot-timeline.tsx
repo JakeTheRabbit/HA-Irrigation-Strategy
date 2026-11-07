@@ -217,6 +217,10 @@ export function ShotTimeline({
           <small className="phase-chip" data-phase={row.sublabel}>
             {row.sublabel}
           </small>
+        ) : row.sublabel === "Timer" ? (
+          <small className="phase-chip" data-mode="timer">
+            Timer
+          </small>
         ) : (
           row.sublabel && <small>{row.sublabel}</small>
         )}

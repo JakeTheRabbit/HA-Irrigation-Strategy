@@ -107,6 +107,11 @@
   color: #ffffff;
   font-weight: 700;
 }
+.st-row[data-kind="zone"] .st-name small.phase-chip[data-mode] {
+  width: fit-content;
+  color: var(--muted-foreground);
+  font-weight: 600;
+}
 .st-short {
   display: none;
 }

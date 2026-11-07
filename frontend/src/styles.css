@@ -515,6 +515,14 @@ nav.zone-switcher button[aria-current="page"] {
 .phase-chip[data-phase="P3"] {
   background: var(--phase-p3);
 }
+/* A timer zone has no phase: its mode, outlined, in the chip's place. */
+.phase-chip[data-mode="timer"] {
+  border: 1px solid var(--border);
+  background: none;
+  color: var(--muted-foreground);
+  font-weight: 600;
+  line-height: 16px;
+}
 .help-actions {
   display: flex;
   flex-wrap: wrap;

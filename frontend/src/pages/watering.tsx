@@ -8,7 +8,7 @@ import { ShotTimeline } from "@/components/shot-timeline";
 import { Button } from "@/components/ui/button";
 import { formatVolume } from "@/lib/display-units";
 import { useCsEvents } from "@/lib/events";
-import { pickKey } from "@/lib/facility";
+import { irrigationMode, pickKey } from "@/lib/facility";
 import { zoneHref } from "@/lib/facility-view";
 import { buildRoom, resolveRequestedRoom } from "@/lib/model";
 import { useParity } from "@/lib/parity-api";
@@ -189,10 +189,18 @@ export function Watering({
     const scoped = { ...controller, room: buildRoom(controller.states, room), roomId: room.id };
     for (const [zone, count] of Object.entries(roomPlants(scoped))) plants[pickKey(room.id, Number(zone))] = count ?? 0;
   }
-  const all = useMemo(
-    () => (data ? toTimelineRows(data, plants, rooms.map((room) => roomMeta(controller, room))) : []),
-    [data, controller.states],
-  );
+  const all = useMemo(() => {
+    if (!data) return [];
+    // Each zone's chip is its phase or mode now, as the room list shows it, whatever day is drawn.
+    const built = new Map(rooms.map((room) => [room.id, { room, zones: buildRoom(controller.states, room).zones }]));
+    return toTimelineRows(data, plants, rooms.map((room) => roomMeta(controller, room))).map((row) => {
+      const at = built.get(row.roomId);
+      if (row.zone === null || !at) return row;
+      if (irrigationMode(controller.states, at.room, row.zone) === "timer") return { ...row, sublabel: "Timer" };
+      const phase = at.zones.find((zone) => zone.id === row.zone)?.phase ?? "";
+      return { ...row, sublabel: /^P[0-3]$/.test(phase) ? phase : "" };
+    });
+  }, [data, controller.states]);
   const rows = matchQuery(q.problemsOnly ? keepProblems(all) : all, q.q);
   const names = new Map(rooms.map((room) => [room.id, room.name]));
 
