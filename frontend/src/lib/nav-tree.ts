@@ -14,7 +14,8 @@ export interface NavSection {
   section: Section;
   label: string;
   icon: LucideIcon;
-  items: { page: Page; label: string }[];
+  /** `short`: the phone tab's word, where the label would be cut off in a row of six. */
+  items: { page: Page; label: string; short?: string }[];
 }
 
 export const NAV_TREE: readonly NavSection[] = [
@@ -31,8 +32,8 @@ export const NAV_TREE: readonly NavSection[] = [
     items: [
       { page: "plan/watering", label: "Timeline" },
       { page: "plan/targets", label: "Current day" },
-      { page: "plan/timers", label: "Timer programs" },
-      { page: "plan/schedule", label: "Grow plan & presets" },
+      { page: "plan/timers", label: "Timer programs", short: "Timers" },
+      { page: "plan/schedule", label: "Grow plan & presets", short: "Grow plan" },
     ],
   },
   {
@@ -41,8 +42,8 @@ export const NAV_TREE: readonly NavSection[] = [
     icon: History,
     items: [
       { page: "history/explorer", label: "Explorer" },
-      { page: "history/water", label: "Water & flow" },
-      { page: "history/compare", label: "Compare runs" },
+      { page: "history/water", label: "Water & flow", short: "Water" },
+      { page: "history/compare", label: "Compare runs", short: "Compare" },
       { page: "history/changes", label: "Changes" },
     ],
   },
@@ -51,12 +52,12 @@ export const NAV_TREE: readonly NavSection[] = [
     label: "Equipment",
     icon: Wrench,
     items: [
-      { page: "equipment/probes", label: "Probes & offsets" },
-      { page: "equipment/dosing", label: "Feed & dosing" },
+      { page: "equipment/probes", label: "Probes & offsets", short: "Probes" },
+      { page: "equipment/dosing", label: "Feed & dosing", short: "Dosing" },
       { page: "equipment/stock", label: "Stock" },
-      { page: "equipment/pump-calibration", label: "Prime & calibrate a pump" },
-      { page: "equipment/feed-calibration", label: "Feed pH/EC calibration" },
-      { page: "equipment/setup", label: "Setup: pumps & valves" },
+      { page: "equipment/pump-calibration", label: "Prime & calibrate a pump", short: "Pump cal." },
+      { page: "equipment/feed-calibration", label: "Feed pH/EC calibration", short: "Feed cal." },
+      { page: "equipment/setup", label: "Setup: pumps & valves", short: "Setup" },
     ],
   },
   {
@@ -64,11 +65,11 @@ export const NAV_TREE: readonly NavSection[] = [
     label: "Settings",
     icon: Settings2,
     items: [
-      { page: "settings/alerts", label: "Alert rules" },
+      { page: "settings/alerts", label: "Alert rules", short: "Alerts" },
       { page: "settings/notifications", label: "Notifications" },
-      { page: "settings/system", label: "System status" },
-      { page: "settings/ai", label: "AI assistant" },
-      { page: "settings", label: "Dashboards & display" },
+      { page: "settings/system", label: "System status", short: "System" },
+      { page: "settings/ai", label: "AI assistant", short: "AI" },
+      { page: "settings", label: "Dashboards & display", short: "Display" },
       { page: "help", label: "Help" },
     ],
   },

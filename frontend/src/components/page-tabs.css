@@ -41,20 +41,20 @@
 @media (max-width: 720px) {
   /* One row that scrolls sideways: a section can hold six pages. */
   .page-tabs {
-    gap: 2px 16px;
+    gap: 2px 12px;
     position: relative;
     flex-wrap: nowrap;
     overflow-x: auto;
     scrollbar-width: none;
     /* The right edge fades: more tabs lie that way. The padding lets the last tab clear it. */
-    padding-right: 32px;
-    mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent);
+    padding-right: 24px;
+    mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);
   }
   .page-tabs button {
     flex-shrink: 0;
     white-space: nowrap;
     font-size: var(--text-sm);
-    min-height: 40px;
+    min-height: 44px;
   }
 }
 /* Wider than a phone, the tree menu lists every page: the tabs would repeat it. */

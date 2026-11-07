@@ -11,7 +11,7 @@ export const SECTION_LABELS = Object.fromEntries(
 ) as Record<Section, string>;
 export const TABS = Object.fromEntries(
   NAV_TREE.map((group) => [group.section, group.items]),
-) as Record<Section, { page: Page; label: string }[]>;
+) as Record<Section, { page: Page; label: string; short?: string }[]>;
 /** Pages reached from another page rather than the menu. */
 const OFF_MENU_LABELS: Partial<Record<Page, string>> = {
   today: "Today",
@@ -64,9 +64,11 @@ export function PageTabs({
           type="button"
           key={tab.page}
           aria-current={tab.page === page ? "page" : undefined}
+          // The tabs show only on a phone: the short word, the page's full name to a screen reader.
+          aria-label={tab.short && `${tab.label}${badges[tab.page] ? ` ${badges[tab.page]}` : ""}`}
           onClick={() => navigate(tab.page)}
         >
-          {tab.label}
+          {tab.short ?? tab.label}
           {!!badges[tab.page] && <i className="page-tab-count">{badges[tab.page]}</i>}
         </button>
       ))}
