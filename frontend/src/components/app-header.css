@@ -309,3 +309,20 @@
   color: var(--muted-foreground);
   white-space: nowrap;
 }
+/* Wider than a phone: the room the safety controls act on reads as their label, grouped with
+   them, so Stop all is never taken for the whole facility. */
+@media (min-width: 721px) {
+  .header-safety-scope {
+    margin-left: 4px;
+    padding-left: 12px;
+    border-left: 1px solid var(--border);
+    color: var(--foreground);
+    font-size: var(--text-sm);
+    font-weight: 600;
+  }
+  .header-safety-scope::before {
+    content: "Controls for ";
+    color: var(--muted-foreground);
+    font-weight: 400;
+  }
+}
