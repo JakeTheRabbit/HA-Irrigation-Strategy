@@ -147,6 +147,82 @@
 .features-number input {
   max-width: 120px;
 }
+/* A page's own settings card (zone hold, watering by…): the Controls card pattern. The heading
+   sits over its help, rows run edge to edge with a rule between, the control on the right, and a
+   switch is drawn as a switch. */
+.panel.canonical-card {
+  padding: 0 20px 12px;
+}
+.panel.canonical-card .panel-heading {
+  display: block;
+  padding: 16px 0 8px;
+}
+.canonical-card .panel-heading h2 {
+  margin: 0;
+}
+.canonical-card .features-control {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+.canonical-card .features-control + .features-control {
+  margin-top: 12px;
+}
+.canonical-card .features-control legend {
+  padding: 8px 0 4px;
+  font-size: var(--text-sm);
+}
+.canonical-card .features-control tr {
+  border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+}
+.canonical-card .features-control th,
+.canonical-card .features-control td {
+  height: 52px;
+  padding: 4px 0;
+  vertical-align: middle;
+}
+.canonical-card .features-control td {
+  text-align: right;
+}
+.canonical-card .features-number {
+  justify-content: flex-end;
+}
+.features-control input[role="switch"] {
+  appearance: none;
+  position: relative;
+  width: 44px;
+  height: 24px;
+  margin: 0;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--foreground) 14%, var(--surface));
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.features-control input[role="switch"]::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--surface);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.3);
+  transition: transform 0.15s;
+}
+.features-control input[role="switch"]:checked {
+  border-color: var(--primary);
+  background: var(--primary);
+}
+.features-control input[role="switch"]:checked::after {
+  transform: translateX(20px);
+}
+.features-control input[role="switch"]:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
 .features-app-link {
   margin: 10px 16px 14px;
   font-size: var(--text-sm);

@@ -444,6 +444,38 @@ nav button.nav-separated {
     width: 100%;
   }
 }
+/* A row of views (Current day | Calendar, a zone picker): the same segmented control as the
+   explorer's ranges and the timer modes, not the menu's stacked links. */
+nav.zone-switcher {
+  display: inline-flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 0;
+  max-width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+nav.zone-switcher button {
+  flex: 1 1 auto;
+  justify-content: center;
+  min-width: 56px;
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 0;
+  background: var(--surface);
+  color: var(--foreground);
+  font-weight: 600;
+  white-space: nowrap;
+}
+nav.zone-switcher button + button {
+  border-left: 1px solid var(--border);
+}
+nav.zone-switcher button[aria-current="page"] {
+  background: color-mix(in srgb, var(--primary) 16%, var(--surface));
+  color: color-mix(in srgb, var(--primary) 70%, var(--foreground));
+  box-shadow: none;
+}
 /* The compact phase chip (P0–P3), in the phase family's fixed hues. */
 .phase-chip {
   display: inline-block;

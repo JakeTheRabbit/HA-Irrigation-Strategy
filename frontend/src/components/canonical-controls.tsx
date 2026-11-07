@@ -82,7 +82,7 @@ export function CanonicalControls({
         <section
           key={f.feature.id}
           id={`config-${f.feature.id}`}
-          className="panel workspace-card"
+          className="panel workspace-card canonical-card"
           tabIndex={-1}
         >
           <div className="panel-heading">
