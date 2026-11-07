@@ -380,7 +380,7 @@ export function PlanningCurve({
             target: parameters.dryback_target,
             reference: referenceDryback(drybackPoints, dryback?.peak),
             unit: "%",
-            points: "%",
+            points: "pt",
             tolerance: 3,
             underIsNormal: true,
             quality: dryback?.reason ?? undefined,

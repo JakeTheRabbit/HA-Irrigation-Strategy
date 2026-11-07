@@ -891,7 +891,8 @@ function ZoneNumbers({
         target: targets.dryback_target ?? null,
         reference: referenceDryback(stage?.drybackPoints, dryback?.value.peak),
         unit: "%",
-        points: "%",
+        // A difference of two percentages is in points ("4.5 pt over"), as dryback is elsewhere.
+        points: "pt",
         tolerance: 3,
         underIsNormal: dryback?.night === "tonight",
       }),

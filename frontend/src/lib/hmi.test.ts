@@ -100,12 +100,12 @@ describe("a reference band and named levels", () => {
       target: 8,
       reference: [10, 15],
       unit: "%",
-      points: "%",
+      points: "pt",
       tolerance: 3,
     });
     expect(model.reference).toEqual([10, 15]);
     expect(gaugeSpeech(model)).toBe(
-      "Last night’s dryback 12%, target 8%, 4% over, reference 10% to 15%",
+      "Last night’s dryback 12%, target 8%, 4 pt over, reference 10% to 15%",
     );
   });
   it("draws the rescue floor, the re-water point and the peak on the VWC bar", () => {

@@ -47,6 +47,11 @@ const ROOT_BAND: [number, number] = [19, 23];
 
 type Open = (room: string, page: Page, zone?: number) => void;
 
+/** Water the controller gave the room today: an estimate (shot time × the drippers' flow) unless a
+ * zone has a meter, which reports how much of each shot arrived. */
+const deliveredLabel = (r: FacilityRoom) =>
+  r.zones.some((z) => z.flowRatio !== null) ? "Delivered today" : "Delivered today · estimated";
+
 const mixText = (mix: NonNullable<FacilityRoom["mixFailed"]>) =>
   `${mix.title}${mix.at ? ` ${clock(mix.at)}` : ""}`;
 
@@ -173,7 +178,7 @@ function RoomCard({ r, offline, open }: { r: FacilityRoom; offline: boolean; ope
           <dl className="facility-room-facts">
             {drink && (
               <div className="facility-fact-lead">
-                <dt>Drunk today</dt>
+                <dt>{deliveredLabel(r)}</dt>
                 <dd>
                   <DrinkText drink={drink} />
                 </dd>
