@@ -83,10 +83,10 @@ import { useNarrow } from "@/lib/use-narrow";
 import "./history-explorer.css";
 
 const PHASE_FILL: Record<string, string> = {
-  P0: "#6b7580",
-  P1: "#2f6fb5",
-  P2: "#6450b0",
-  P3: "#34405a",
+  P0: "var(--phase-p0)",
+  P1: "var(--phase-p1)",
+  P2: "var(--phase-p2)",
+  P3: "var(--phase-p3)",
 };
 
 interface Loaded {

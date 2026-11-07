@@ -378,9 +378,19 @@
   font-weight: 600;
   line-height: 20px;
 }
+/* The one phase chip: fixed hue per phase, white text (as the menu, zone and history draw it). */
 .today-phase {
-  background: color-mix(in srgb, var(--primary) 18%, var(--surface));
-  color: var(--primary-strong);
+  background: var(--phase-p0);
+  color: #ffffff;
+}
+.today-phase[data-phase="P1"] {
+  background: var(--phase-p1);
+}
+.today-phase[data-phase="P2"] {
+  background: var(--phase-p2);
+}
+.today-phase[data-phase="P3"] {
+  background: var(--phase-p3);
 }
 .today-mode {
   border: 1px solid var(--border);

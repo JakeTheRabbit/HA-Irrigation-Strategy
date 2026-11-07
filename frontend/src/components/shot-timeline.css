@@ -101,6 +101,12 @@
 .st-row[data-kind="zone"][data-tone="warn"] .st-name small {
   color: var(--warning);
 }
+/* The phase chip keeps its own colours whatever the row's tone. */
+.st-row[data-kind="zone"] .st-name small.phase-chip[data-phase] {
+  width: fit-content;
+  color: #ffffff;
+  font-weight: 700;
+}
 .st-short {
   display: none;
 }

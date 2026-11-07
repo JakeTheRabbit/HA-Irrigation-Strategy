@@ -26,6 +26,7 @@ import { plantAmount } from "@/lib/water-view";
 import { Notice, UiTip } from "@/components/info-tip";
 import { Pill, type PillTone } from "./mini-visuals";
 import { DATE_TIME, formatClock, formatDateTime } from "@/lib/clock";
+import { ZONE_COLOURS } from "@/lib/zone-colours";
 
 export type { Page };
 export const number = (value: number | null, digits = 1) =>
@@ -198,7 +199,7 @@ export function HistoryChart({
       current = false;
     };
   }, [controller.roomId, controller.connection, key, hours, retry]);
-  const palette = ["#03a9f4", "#e5a43b", "#a57bf3", "#e97d98", "#43bdab"];
+  const palette = ZONE_COLOURS;
   const visibleZones = zones.filter((zone) => !hiddenZones.includes(zone.id));
   const lines = visibleZones.flatMap((zone) =>
     (["vwc", "ec"] as const).map((kind) => {

@@ -546,6 +546,12 @@ function RoomGauge({ model, value }: { model: GaugeModel; value: string }) {
       </span>
       <span className="today-gauge-value">
         {value}
+        {/* Out of band: the arrow says which way, so colour is never the only cue. */}
+        {model.state === "abnormal" && model.band && model.value !== null && (
+          <span aria-hidden="true">
+            {model.value < model.band[0] ? " ▼" : model.value > model.band[1] ? " ▲" : ""}
+          </span>
+        )}
         {model.state === "abnormal" && <span className="sr-only">, {model.words}</span>}
       </span>
     </div>
@@ -656,7 +662,7 @@ function ZoneRow({
         <p className="today-zone-chips">
           {phase && (
             <span className="today-phase" data-phase={phase}>
-              {phase} {PHASE_NAMES[phase]}
+              {phase} · {PHASE_NAMES[phase]}
             </span>
           )}
           <span className="today-mode" data-mode={z.mode}>

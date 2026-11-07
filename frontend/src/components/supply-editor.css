@@ -1,11 +1,5 @@
 /* Setup: pumps & valves (mockup 18). */
 .supply-editor {
-  --zone-0: #3b82c4;
-  --zone-1: #9a7ae0;
-  --zone-2: #d08a2c;
-  --zone-3: #3f9d6a;
-  --zone-4: #d0577a;
-  --zone-5: #2a9d9a;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -237,22 +231,22 @@
   margin-right: 6px;
 }
 .supply-editor [data-tone="z0"] {
-  background: var(--zone-0);
-}
-.supply-editor [data-tone="z1"] {
   background: var(--zone-1);
 }
-.supply-editor [data-tone="z2"] {
+.supply-editor [data-tone="z1"] {
   background: var(--zone-2);
 }
-.supply-editor [data-tone="z3"] {
+.supply-editor [data-tone="z2"] {
   background: var(--zone-3);
 }
-.supply-editor [data-tone="z4"] {
+.supply-editor [data-tone="z3"] {
   background: var(--zone-4);
 }
-.supply-editor [data-tone="z5"] {
+.supply-editor [data-tone="z4"] {
   background: var(--zone-5);
+}
+.supply-editor [data-tone="z5"] {
+  background: var(--zone-6);
 }
 .supply-editor-error,
 .supply-editor-loading {

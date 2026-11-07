@@ -38,17 +38,17 @@
   font-weight: 600;
   white-space: nowrap;
 }
-.mini-gauge[data-state="low"] .mini-gauge-tick,
+/* Severity, one rule everywhere: in band reads in the default text; out of band (either way) is
+   a warning with its arrow. Brand blue never marks a value's state. */
 .drink-bar[data-state="low"] .drink-bar-fill {
   background: color-mix(in srgb, var(--primary) 85%, var(--foreground));
 }
+.mini-gauge[data-state="low"] .mini-gauge-tick,
 .mini-gauge[data-state="high"] .mini-gauge-tick,
 .drink-bar[data-state="high"] .drink-bar-fill {
   background: var(--warning-mark);
 }
-.mini-gauge[data-state="low"] .mini-gauge-value {
-  color: color-mix(in srgb, var(--primary) 80%, var(--foreground));
-}
+.mini-gauge[data-state="low"] .mini-gauge-value,
 .mini-gauge[data-state="high"] .mini-gauge-value {
   color: var(--warning);
 }

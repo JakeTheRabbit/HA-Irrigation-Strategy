@@ -30,9 +30,10 @@ import {
   type ZoneWaterUse,
 } from "@/lib/water-use";
 import "./water-use.css";
+import { ZONE_COLOURS } from "@/lib/zone-colours";
 
 /** The zone colours of the history chart. */
-const palette = ["#03a9f4", "#e5a43b", "#a57bf3", "#e97d98", "#43bdab"];
+const palette = ZONE_COLOURS;
 const DAY = 86_400_000;
 /** How far back to look for the start of a grow that no grow plan dates. */
 const LOOKBACK_DAYS = 120;
@@ -232,7 +233,7 @@ export function WaterUsePanel({
       ) : (
         <WaterUseBody
           rows={shown}
-          colours={new Map(room.zones.map((zone, index) => [zone.id, palette[index % 5]]))}
+          colours={new Map(room.zones.map((zone, index) => [zone.id, palette[index % palette.length]]))}
           today={today}
           lightsOn={lightsOn!}
           source={loaded!.record.source}

@@ -69,26 +69,35 @@ nav.room-tree .room-tree-row[aria-current="page"] {
 .room-tree-row[data-tone="stale"] .room-tree-dot {
   background: var(--destructive);
 }
+.room-tree-mode {
+  flex: none;
+  padding: 0 5px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+  line-height: 16px;
+}
 /* Phase colours as the zone pages draw them. */
 .room-tree-phase {
   flex: none;
   min-width: 22px;
   padding: 1px 4px;
   border-radius: 4px;
-  background: #6b7580;
+  background: var(--phase-p0);
   color: #fff;
   font-size: var(--text-xs);
   font-weight: 700;
   text-align: center;
 }
 .room-tree-phase[data-phase="P1"] {
-  background: #2f6fb5;
+  background: var(--phase-p1);
 }
 .room-tree-phase[data-phase="P2"] {
-  background: #6450b0;
+  background: var(--phase-p2);
 }
 .room-tree-phase[data-phase="P3"] {
-  background: #34405a;
+  background: var(--phase-p3);
 }
 .room-tree-flag {
   width: 8px;

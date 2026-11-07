@@ -213,7 +213,13 @@ export function ShotTimeline({
       <span className="st-name">
         <span className="st-long">{row.label}</span>
         <span className="st-short">Z{row.zone}</span>
-        {row.sublabel && <small>{row.sublabel}</small>}
+        {/^P[0-3]$/.test(row.sublabel) ? (
+          <small className="phase-chip" data-phase={row.sublabel}>
+            {row.sublabel}
+          </small>
+        ) : (
+          row.sublabel && <small>{row.sublabel}</small>
+        )}
       </span>
     );
   const trackName = (row: TimelineRow) =>
