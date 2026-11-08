@@ -273,6 +273,8 @@ async def test_a_3_8_0_state_file_loads_with_its_history_empty_and_nothing_moves
         # no rescue counted yet, nothing to judge (CS-315): saved empty
         assert (written.pop("rescue_misses"), written.pop("rescue_check")) == (0, None)
         assert written.pop("ec_flushing") is False  # no EC flush episode: saved off
+        # no grow-day of peaks kept yet for the plan to follow the probe: saved empty
+        assert written.pop("plan_follow") == {"days": [], "step": False, "last": None, "gap": False, "checked": None}
         assert (written.pop("water_vpd"), written.pop("day_hist")) == (None, [])  # no water-and-VPD record
         assert (written.pop("day_acc"), written.pop("day_out")) == (None, [])  # no grow-day summary: saved empty
         old = {k: v for k, v in seed["default"][zone].items() if k not in PID_TERMS}

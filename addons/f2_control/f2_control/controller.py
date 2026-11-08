@@ -46,6 +46,7 @@ import journal_out
 import log_words
 import phase_options
 import plan_adherence
+import plan_follow
 import runoff_balance
 import runtime_env
 import safety_ops
@@ -810,7 +811,8 @@ CRITICAL_CODES = frozenset({"CS-201", "CS-202", "CS-203", "CS-204", "CS-207", "C
 # 8 hours; an info code once. Each episode starts the schedule again: an alert cleared (or not raised for
 # ALERT_EPISODE_GAP_S) and raised again, or raised under another code. Held in memory only: a restart pushes once.
 NOT_WATERING_CODES = frozenset({"CS-206", "CS-208", "CS-209", "CS-210", "CS-316", "CS-602"})
-INFO_CODES = frozenset({"CS-205", "CS-305", "CS-403", "CS-501", "CS-702", "CS-705", "CS-711", "CS-712", "CS-906"})
+INFO_CODES = frozenset({"CS-205", "CS-305", "CS-403", "CS-501", "CS-702", "CS-705", "CS-711", "CS-712", "CS-714",
+                        "CS-906"})
 WARNING_REPUSH_MIN = (15, 60, 120, 240, 480)
 ALERT_EPISODE_GAP_S = 3600
 # CS-310: a zone's moisture rising by BACKUP_RISE_PTS within BACKUP_WINDOW_MIN while no water went in, its valve
@@ -1646,6 +1648,8 @@ class Controller:
             # the follower's (_follow_fc): this grow-day's highest reading it counts (None: a CS-310 day, not counted)
             # and the points it has moved each setpoint on grow-day `day`
             "fc_follow": {"peak": 0.0, "day": None, "used": {}},
+            # the plan follows the probe (plan_follow): the last clean grow-days' peaks, and this grow-day's check
+            "plan_follow": plan_follow.fresh(),
             "p1_reached": False,  # the P1 rule (core.decide): this P1 has read at or over its target
             "p1_peak_before": None,  # ...the zone's peak right before its last P1 shot
             "p1_extra": 0,  # ...and the P1 shots fired since the target was reached
@@ -1675,6 +1679,7 @@ class Controller:
             return fresh
         s = fresh
         s["learn"] = auto_setpoints.restore(d.get("learn"))
+        s["plan_follow"] = plan_follow.restore(d.get("plan_follow"))  # absent before it: a fresh record
         for k in (
             "phase",
             "peak",
@@ -2174,6 +2179,7 @@ class Controller:
             "peak": s.get("peak"),
             "peak_prev": s.get("peak_prev"),
             "fc_follow": s.get("fc_follow"),
+            "plan_follow": s.get("plan_follow"),
             "p1_reached": bool(s.get("p1_reached")),
             "p1_peak_before": s.get("p1_peak_before"),
             "p1_extra": int(s.get("p1_extra") or 0),
@@ -3670,6 +3676,76 @@ class Controller:
         if wrote:
             self._save_state()
         return wrote
+
+    def _plan_follow(self, room, zone, st, now):
+        """The plan follows the probe (plan_follow.decide): once a grow-day after the zone's ramp, move its VWC offset
+        on the running plan (crop_steering.strategy_zone_offset), read the plan back and say so (CS-714).
+        -> True when an offset was set and read back. Only under the room's Auto setpoints switch or its
+        set_targets_from_achievable power, never while Pause AI changes runs, and never for a zone the plan holds on
+        an earlier day (its probe stale) or one with no trusted reading this pass (it never comes here)."""
+        rec = st.setdefault("plan_follow", plan_follow.fresh())
+        day = self._grow_day_start(room, now).isoformat()
+        if rec["checked"] == day or st.get("phase") not in ("P2", "P3"):
+            return False
+        state, attrs = getattr(room, "_strategy_raw", None) or (None, {})
+        if state != "active" or (getattr(room, "strategy_snapshot", None) or {}).get("error"):
+            return False
+        if not (self._on(f"switch.crop_steering_{room.prefix}auto_setpoints", False)
+                or self._on(f"switch.crop_steering_{room.prefix}ai_power_set_targets_from_achievable", False)):
+            return False
+        if self._no_touch_until(room, now) is not None:
+            return False
+        row = next((r for r in attrs.get("zones") or [] if isinstance(r, dict) and r.get("zone_id") == zone), None)
+        if (row is None or row.get("status") != "active" or row.get("held")
+                or row.get("applied_day", attrs.get("grow_day")) != attrs.get("grow_day")):
+            return False
+        params, base = row.get("parameters") or {}, row.get("vwc_base") or {}
+        try:
+            offset = float(row.get("vwc_offset") or 0.0)
+            p1 = float(params["p1_target_vwc"])
+            fc = float(params.get("field_capacity", p1))
+            base_fc = float(base.get("field_capacity", base.get("p1_target_vwc", fc - offset)))
+        except (KeyError, TypeError, ValueError):
+            return False
+        rec["checked"] = day
+        got = plan_follow.decide(rec["days"], p1, fc, base_fc, offset)
+        if got is None:
+            self._save_state()
+            return False
+        peaks = ", ".join(f"{x:g}" for x in got["peaks"])
+        reason = (("P1 target out of reach" if got["why"] == "unreachable" else "peaks over field capacity")
+                  + f": peaks {peaks}% on the last {plan_follow.DAYS} grow-days")
+        status, _answer = ha_service_response("crop_steering", "strategy_zone_offset", {
+            "room_id": f"room:{room.prefix}", "zone_id": zone, "offset": got["offset"], "reason": reason})
+        self._save_state()
+        landed = next((r for r in (ha_get(self._cs(room, "sensor", "strategy_plan"))[1] or {}).get("zones") or []
+                       if isinstance(r, dict) and r.get("zone_id") == zone), {})
+        try:
+            read_back = float(landed.get("vwc_offset") or 0.0)
+        except (TypeError, ValueError):
+            read_back = None
+        if not (status is not None and 200 <= status < 300) or read_back is None or abs(
+                read_back - got["offset"]) > 0.05:
+            log(f"[{room.slug}] Z{zone} plan offset {offset:g} -> {got['offset']:g} not applied (HTTP {status}, "
+                f"read back {read_back}): tried again next grow-day")
+            return False
+        log(f"[{room.slug}] Z{zone} plan offset {offset:g} -> {got['offset']:g}: {reason}")
+        new_p1 = (landed.get("parameters") or {}).get("p1_target_vwc")
+        words = (f"its P1 target was more than {plan_follow.UNREACHABLE_PTS:g} points over every peak"
+                 if got["why"] == "unreachable" else
+                 f"every peak was more than {plan_follow.OVERSHOOT_PTS:g} points over its field capacity")
+        self._alert(
+            f"plan_follow_{room.slug}_z{zone}", "CS-714", "plan moved to follow the probe",
+            f"The grow plan's VWC offset for this zone changed from {offset:+g} to {got['offset']:+g} points. "
+            f"On the last {plan_follow.DAYS} clean grow-days the zone peaked at {peaks}% (median {got['median']:g}%), "
+            f"and {words}. The offset moves field capacity, the P1 target, the P2 threshold and the P3 emergency "
+            f"floor together. It moves at most {plan_follow.STEP_MAX_PTS:g} points a grow-day, towards "
+            f"{got['goal']:+g} points, which puts field capacity {plan_follow.HEADROOM_PTS:g} point over the median "
+            "peak." + (f" The P1 target is now {new_p1:g}%." if isinstance(new_p1, (int, float)) else "")
+            + "\n\nThe plan itself does not change. If the probe was moved, check that it sits well in the "
+            "substrate. To undo the change, set the offset to 0 with crop_steering.strategy_zone_offset.",
+            room=room, zone=zone, quiet=False)
+        return True
 
     def _step_limit(self, room):
         """The room's Max setpoint move per day, in VWC points (inf: no limit); FC_STEP_MAX when it cannot be read
@@ -8183,6 +8259,9 @@ class Controller:
         self._record_phase(room, zone, st, was, new_phase, now, why, snap, p)
         if new_phase == "P0":
             self._close_grow_day(room, zone, st, now, p)
+            ended = st.get("last_daily_reset")
+            plan_follow.close_day(st.setdefault("plan_follow", plan_follow.fresh()), ended.isoformat() if isinstance(ended, date) else "",
+                                  (st.get("fc_follow") or {}).get("peak"))
             self._keep_day_peak(st)  # the grow-day ending: tomorrow's P1 target (_vwc_maxima)
             st["daily_vol"], st["shots"] = 0.0, 0
             st["peak"] = snap.vwc if snap is not None else 0.0
@@ -8639,6 +8718,7 @@ class Controller:
                     log("brain error", room.slug, zone, e)
                     jev_dirs = {}
             if snap is None:
+                plan_follow.blind(st.setdefault("plan_follow", plan_follow.fresh()))
                 room._blind_since.setdefault(zone, now)
                 blind.append((zone, p))
                 continue
@@ -8659,6 +8739,11 @@ class Controller:
             if stall is not None and st["phase"] in ("P2", "P3") and stall["rewater"] < p.p2_threshold:
                 p = params[zone] = dataclasses.replace(p, p2_threshold=stall["rewater"])
             self._count_peak(st, snap)
+            plan_follow.reading(st.setdefault("plan_follow", plan_follow.fresh()), snap.vwc, now.timestamp())
+            try:  # the plan follows the probe: once a grow-day after the ramp, never a reason to water or not
+                self._plan_follow(room, zone, st, now)
+            except Exception as e:
+                log("plan follow error", room.slug, zone, e)
             try:  # CS-315 only ever tells
                 self._watch_rescues(room, zone, snap, now)
             except Exception as e:
