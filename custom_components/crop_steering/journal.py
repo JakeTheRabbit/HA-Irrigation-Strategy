@@ -29,6 +29,7 @@ KINDS = frozenset(
         "plan.activated",
         "plan.disarmed",
         "plan.expired",
+        "plan.zone_offset",
         "calibration.started",
         "calibration.captured",
         "calibration.committed",

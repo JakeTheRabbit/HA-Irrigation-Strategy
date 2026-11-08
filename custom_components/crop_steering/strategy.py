@@ -19,9 +19,12 @@ from .room import room_prefix
 from .strategy_model import (
     ENGINE_BOUNDS,
     MODE_KEYS,
+    OFFSET_KEYS,
     PARAMETERS,
     REQUIRED_PARAMETERS,
     SCHEMA_VERSION,
+    apply_offset,
+    check_offset,
     hydraulic_preview,
     normalize_plan,
     preview_zone,
@@ -147,7 +150,17 @@ class StrategyManager:
             "disarm_at": None,
             "disarm_after": None,
             "release_legacy": False,
+            # {"<zone id>": points}: each zone's VWC offset on the armed or active plan (strategy_zone_offset).
+            # Never in the plan itself, so its revisions and the draft are untouched; a document from before it
+            # has none, which is 0 for every zone.
+            "offsets": {},
         }
+
+    def offset(self, zone):
+        try:
+            return float((self.document.get("offsets") or {}).get(str(zone), 0.0))
+        except (TypeError, ValueError):
+            return 0.0
 
     def _config(self):
         return self.hass.data.get(DOMAIN, {}).get(self.entry.entry_id, {})
@@ -316,6 +329,10 @@ class StrategyManager:
             "plan": copy.deepcopy(self.document["plan"]),
             "active": copy.deepcopy(self.document["active"]),
             "error": self.document["error"],
+            "offsets": {
+                str(z["zone_id"]): self.offset(z["zone_id"])
+                for z in (self.document["plan"] or {}).get("zones", [])
+            },
             "capabilities": {
                 "strategy_snapshot_version": 1,
                 "controller_supported": self.controller_supported(now),
@@ -357,17 +374,39 @@ class StrategyManager:
         )
         return values
 
-    def preview(self, plan=None, grow_day=None):
+    def preview(self, plan=None, grow_day=None, offsets=None):
+        """The plan's rows for `grow_day`. The stored plan (no `plan` given) has each zone's VWC offset
+        added to its moisture levels (`offsets`, else the stored ones); a plan being drafted has none.
+        """
         catalog = self.catalog()
+        stored = plan is None
         plan = normalize_plan(plan or self.document["plan"], self.zone_ids(), catalog)
         day = grow_day or _now().date().isoformat()
         date.fromisoformat(day)
         zones = []
         for assignment in plan["zones"]:
-            row = preview_zone(
-                plan, assignment["zone_id"], day, catalog.get(assignment["zone_id"])
-            )
+            zone_id = assignment["zone_id"]
+            row = preview_zone(plan, zone_id, day, catalog.get(zone_id))
             row["errors"] = []
+            if stored:
+                offset = (
+                    offsets.get(zone_id, 0.0)
+                    if offsets is not None
+                    else self.offset(zone_id)
+                )
+                row["vwc_offset"] = offset
+                if row["status"] == "active":
+                    row["vwc_base"] = {
+                        k: row["parameters"][k]
+                        for k in OFFSET_KEYS
+                        if k in row["parameters"]
+                    }
+                    try:
+                        row["parameters"] = apply_offset(
+                            row["parameters"], offset, catalog.get(zone_id)
+                        )
+                    except ValueError as error:
+                        row["errors"].append(str(error))
             try:
                 row["hydraulics"] = hydraulic_preview(
                     self._sizing(row["zone_id"]), row["parameters"]
@@ -426,6 +465,7 @@ class StrategyManager:
                 revision=prior["revision"] + 1,
                 error=None,
                 release_legacy=False,
+                offsets={},
             )
             try:
                 await self._persist()
@@ -523,6 +563,7 @@ class StrategyManager:
                 release_legacy=False,
                 armed_at=now.isoformat(),
                 armed_after=first.isoformat(),  # what a version before armed_at reads
+                offsets={},
             )
             try:
                 await self._persist()
@@ -563,6 +604,65 @@ class StrategyManager:
                 prior["status"] != "draft"
             ):  # disarming a plan that is already a draft changes nothing
                 self._journal("plan.disarmed", who)
+            return self.response(now)
+
+    async def set_zone_offset(self, zone_id, offset, reason, now=None, who=None):
+        """Set one zone's VWC offset on the armed or active plan. It is in force at once: the zone's
+        row in the active snapshot is resolved again for the day it is on, with the new offset.
+        """
+        now = now or _now()
+        async with self._lock:
+            if self.document["status"] not in ("armed", "active"):
+                raise ValueError("A zone offset needs an armed or active plan")
+            zones = [
+                z["zone_id"] for z in (self.document["plan"] or {}).get("zones", [])
+            ]
+            if zone_id not in zones:
+                raise ValueError(f"Zone {zone_id} is not in this room's plan")
+            offset = round(check_offset(offset), 6)
+            offsets = {z: self.offset(z) for z in zones}
+            previous, offsets[zone_id] = offsets[zone_id], offset
+            active = self.document["active"]
+            rows = list(active.get("zones") or [])
+            index = next(
+                (i for i, row in enumerate(rows) if row.get("zone_id") == zone_id), None
+            )
+            day = (
+                rows[index].get("applied_day") or active.get("grow_day")
+                if index is not None
+                else None
+            ) or self._boundary(now).date().isoformat()
+            fresh = next(
+                row
+                for row in self.preview(grow_day=day, offsets=offsets)["zones"]
+                if row["zone_id"] == zone_id
+            )
+            if fresh["errors"]:
+                raise ValueError("; ".join(fresh["errors"]))
+            prior = copy.deepcopy(self.document)
+            self.document["offsets"] = {str(z): v for z, v in offsets.items() if v}
+            if index is not None:
+                kept = {
+                    k: rows[index][k]
+                    for k in ("applied_day", "held")
+                    if k in rows[index]
+                }
+                rows[index] = {**fresh, **kept}
+                self.document["active"] = {**active, "zones": rows}
+            try:
+                await self._persist()
+            except Exception:
+                self.document = prior
+                raise
+            self._publish(now)
+            self._journal(
+                "plan.zone_offset",
+                who,
+                zone_id=zone_id,
+                offset=offset,
+                previous=previous,
+                reason=reason,
+            )
             return self.response(now)
 
     async def tick(self, now=None):

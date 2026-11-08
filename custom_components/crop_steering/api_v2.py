@@ -238,6 +238,7 @@ NEVER_ANSWERS_REFUSAL = frozenset(
         "strategy_get",
         "strategy_preview",
         "strategy_save",
+        "strategy_zone_offset",
         "supply_get",
         "supply_save",
         "system_status_get",

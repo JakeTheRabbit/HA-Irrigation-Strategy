@@ -10,6 +10,7 @@ SERVICES = (
     "strategy_preview",
     "strategy_activate",
     "strategy_disarm",
+    "strategy_zone_offset",
 )
 # These only read. Every other strategy service changes the room's plan, and is refused to a
 # signed-in user who is not an administrator.
@@ -53,6 +54,13 @@ async def async_setup_strategy_services(hass):
                 )
             if call.service == "strategy_disarm":
                 return await manager.disarm(who=attribution(hass, call))
+            if call.service == "strategy_zone_offset":
+                return await manager.set_zone_offset(
+                    call.data["zone_id"],
+                    call.data["offset"],
+                    call.data["reason"],
+                    who=attribution(hass, call),
+                )
             result = manager.response()
             if call.service == "strategy_preview":
                 result["preview"] = manager.preview(
@@ -71,6 +79,10 @@ async def async_setup_strategy_services(hass):
         elif service == "strategy_preview":
             schema[vol.Optional("plan")] = dict
             schema[vol.Optional("date")] = str
+        elif service == "strategy_zone_offset":
+            schema[vol.Required("zone_id")] = vol.All(int, vol.Range(min=1, max=64))
+            schema[vol.Required("offset")] = vol.Coerce(float)
+            schema[vol.Required("reason")] = vol.All(str, vol.Length(min=1, max=500))
         hass.services.async_register(
             DOMAIN,
             service,

@@ -19,6 +19,7 @@ PLAN_KINDS = (
     "plan.activated",
     "plan.disarmed",
     "plan.expired",
+    "plan.zone_offset",
 )
 CALIBRATION_KINDS = ("calibration.committed", "calibration.reverted", "pump.calibrated")
 # The journal kinds a fold reads (journal_query `kinds`).
@@ -176,6 +177,9 @@ def _row(event, outcomes, limits, superseded) -> dict:
         if data.get("store") in SITE:
             scope = "site"
         old, new = data.get("old"), data.get("new")
+    elif kind == "plan.zone_offset":
+        section, key = "plan", f"zone_{data.get('zone_id')}_vwc_offset"
+        old, new, reason = data.get("previous"), data.get("offset"), data.get("reason")
     elif kind in PLAN_KINDS:
         section, new = "plan", data.get("status")
         reason = data.get("reason") or kind.split(".", 1)[1]

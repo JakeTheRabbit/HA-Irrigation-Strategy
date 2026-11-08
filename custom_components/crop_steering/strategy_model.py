@@ -313,6 +313,54 @@ def normalize_plan(plan, zone_ids, catalog):
     return out
 
 
+# The four moisture levels a zone's VWC offset moves (strategy_zone_offset), and how far it may move them.
+OFFSET_KEYS = (
+    "field_capacity",
+    "p1_target_vwc",
+    "p2_vwc_threshold",
+    "p3_emergency_vwc_threshold",
+)
+OFFSET_MAX = 20.0
+
+
+def check_offset(value):
+    """PURE. A zone's VWC offset in percentage points, or ValueError."""
+    offset = finite(value, "offset")
+    if not -OFFSET_MAX <= offset <= OFFSET_MAX:
+        raise ValueError(
+            f"Offset must be between -{OFFSET_MAX:g} and {OFFSET_MAX:g} points"
+        )
+    return offset
+
+
+def apply_offset(parameters, offset, catalog=None):
+    """PURE. `parameters` with `offset` points added to each of OFFSET_KEYS it has, each clamped to its
+    catalog min and max (else the engine's bounds) and aligned to its step. ValueError when the result
+    leaves the moisture levels out of order (validate_relationships). An offset of 0 changes nothing.
+    """
+    if not offset:
+        return dict(parameters)
+    out = dict(parameters)
+    for key in OFFSET_KEYS:
+        if key not in out:
+            continue
+        bounds = (catalog or {}).get(key) or {}
+        low = bounds.get("min", ENGINE_BOUNDS[key][0])
+        high = bounds.get("max", ENGINE_BOUNDS[key][1])
+        value = out[key] + offset
+        step = bounds.get("step", 0)
+        if step > 0:
+            value = low + math.floor((value - low) / step + 0.5) * step
+        out[key] = math.floor(min(high, max(low, value)) * 1_000_000 + 0.5) / 1_000_000
+    try:
+        validate_relationships(out)
+    except ValueError as error:
+        raise ValueError(
+            f"An offset of {offset:g} points leaves the moisture levels out of order: {error}"
+        ) from None
+    return out
+
+
 def preview_zone(plan, zone_id, grow_day, catalog=None):
     assignment = next(
         (item for item in plan["zones"] if item["zone_id"] == zone_id), None

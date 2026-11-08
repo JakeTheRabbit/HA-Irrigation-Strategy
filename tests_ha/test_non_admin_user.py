@@ -29,6 +29,7 @@ CHANGES = {
     "strategy_save": {"room_id": ROOM, "expected_revision": 0, "plan": {}},
     "strategy_activate": {"room_id": ROOM, "expected_revision": 0},
     "strategy_disarm": {"room_id": ROOM},
+    "strategy_zone_offset": {"room_id": ROOM, "zone_id": 1, "offset": -2, "reason": "x"},
     "runs_save": {"room_id": ROOM, "expected_revision": 0, "record": {}},
     "runs_archive": {"room_id": ROOM, "expected_revision": 0, "id": "r", "archived": True},
     "runs_import": {"room_id": ROOM, "expected_revision": 0, "runs": []},
