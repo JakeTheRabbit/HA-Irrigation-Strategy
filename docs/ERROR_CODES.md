@@ -1854,7 +1854,7 @@ controller still reports a setup change (CS-201) and a hardware hold (CS-301, CS
 
 *Information · Notification*
 
-**What it means.** The peaks of a zone did not agree with its grow plan on 3 clean grow-days in a row. The P1 target was more than 4 points over every peak, or every peak was more than 3 points over field capacity. The controller changed the VWC offset of the zone in the plan. The offset moves field capacity, the P1 target, the P2 threshold and the P3 emergency floor together, at most 3 points a grow-day. The card gives the old and the new offset and the peaks.
+**What it means.** The peaks of a zone did not agree with its grow plan. The P1 target was more than 4 points over the peak, or the peak was more than 3 points over field capacity. This was so on 3 clean grow-days in a row, or on 1 clean grow-day when the zone was more than 8 points off. The controller changed the VWC offset of the zone in the plan, the whole way in one step, so that field capacity is 1 point over the median peak. The offset moves field capacity, the P1 target, the P2 threshold and the P3 emergency floor together. The card gives the old and the new offset, the move, the peaks and why.
 
 **Effect on water.** The zone gets water on the moved targets at once. The plan itself, its revision and its other zones do not change.
 

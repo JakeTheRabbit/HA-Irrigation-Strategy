@@ -3,7 +3,8 @@
 F1, 9 Nov 2026: a reseated probe read about 15 points lower (peaks 76 -> about 53). The armed plan kept a P1
 target of 61 and a P2 threshold of 54 the zone could never reach, and it was overwatered for 10 days. Now, once a
 grow-day after the ramp, a zone whose peaks have not agreed with its plan for 3 clean grow-days gets a VWC offset on
-the plan (crop_steering.strategy_zone_offset), at most 3 points a grow-day, read back and told (CS-714).
+the plan (crop_steering.strategy_zone_offset), the whole way in one write, read back and told (CS-714). A zone more
+than 8 points off is moved after one clean grow-day.
 """
 from datetime import datetime
 
@@ -24,32 +25,39 @@ def _days(*peaks):
 
 
 # ------------------------------------------------------------------ the rule (pure)
-def test_an_unreachable_p1_target_moves_the_offset_down_by_at_most_three_points():
+def test_an_unreachable_p1_target_moves_the_offset_the_whole_way_in_one_write():
     got = F.decide(_days(53, 52.5, 53.4), p1=61, fc=64, base_fc=64, offset=0)
-    assert got == {"offset": -3.0, "why": "unreachable", "median": 53, "goal": -10.0, "peaks": [53, 52.5, 53.4]}
-    # the next grow-day, judged on the plan as it is then, moves on towards the goal
-    assert F.decide(_days(53, 52.5, 53.4), p1=58, fc=61, base_fc=64, offset=-3)["offset"] == -6.0
-    # within reach (55 - 53.4 is under 4): left alone
-    assert F.decide(_days(53, 52.5, 53.4), p1=55, fc=58, base_fc=64, offset=-6) is None
+    assert got == {"offset": -10.0, "why": "unreachable", "median": 53, "goal": -10.0, "peaks": [53, 52.5, 53.4],
+                   "gap": 8.0}
+    # the next grow-day, on the moved plan (P1 51, FC 54), nothing more to do
+    assert F.decide(_days(53, 52.5, 53.4), p1=51, fc=54, base_fc=64, offset=-10) is None
 
 
 def test_peaks_over_field_capacity_move_the_offset_up():
     got = F.decide(_days(70, 71, 69.5), p1=61, fc=64, base_fc=64, offset=0)
-    assert (got["why"], got["offset"], got["goal"]) == ("overshoot", 3.0, 7.0)
-    # a small goal is reached in one step
+    assert (got["why"], got["offset"], got["goal"]) == ("overshoot", 7.0, 7.0)
     assert F.decide(_days(68, 68, 68), p1=61, fc=64, base_fc=64, offset=3)["offset"] == 5.0
 
 
-def test_three_days_must_all_agree():
-    assert F.decide(_days(53, 53), p1=61, fc=64, base_fc=64, offset=0) is None
+def test_three_days_must_all_agree_for_a_small_gap():
+    assert F.decide(_days(53, 53), p1=61, fc=64, base_fc=64, offset=0) is None  # 8 points off: not over 8
     assert F.decide(_days(53, 58, 53), p1=61, fc=64, base_fc=64, offset=0) is None  # one day within 4 points
     assert F.decide(_days(70, 66, 70), p1=61, fc=64, base_fc=64, offset=0) is None  # one day within 3 over FC
 
 
-def test_the_offset_never_leaves_twenty_points():
-    got = F.decide(_days(30, 30, 30), p1=61, fc=64, base_fc=64, offset=-19)
-    assert got["offset"] == -20.0
-    assert F.decide(_days(30, 30, 30), p1=44, fc=47, base_fc=64, offset=-20) is None
+def test_a_zone_way_off_is_moved_after_one_clean_grow_day():
+    """The F1 incident: P1 61, the reseated probe peaking at 46 the first clean day after it."""
+    got = F.decide(_days(46), p1=61, fc=64, base_fc=64, offset=0)
+    assert (got["offset"], got["why"], got["peaks"], got["gap"]) == (-17.0, "unreachable", [46], 15.0)
+    # the one day judged is the last: an older far-off day does not count once a closer one follows
+    assert F.decide(_days(46, 55), p1=61, fc=64, base_fc=64, offset=0) is None
+    got = F.decide(_days(75), p1=61, fc=64, base_fc=64, offset=0)
+    assert (got["offset"], got["why"]) == (12.0, "overshoot")
+
+
+def test_there_is_no_bound_on_the_offset_but_the_settings_own():
+    got = F.decide(_days(30), p1=61, fc=64, base_fc=64, offset=-19)
+    assert got["offset"] == -33.0  # the integration clamps each setting and keeps their order
 
 
 def test_a_step_change_or_a_day_without_a_peak_starts_the_count_again():
@@ -137,15 +145,36 @@ def _cards(fake):
 def test_the_controller_moves_the_offset_reads_it_back_and_says_so():
     c, fake, room, st = _rig()
     assert c._plan_follow(room, 1, st, NOW) is True
-    assert _offset_calls(fake) == [{"room_id": "room:", "zone_id": 1, "offset": -3.0,
-                                    "reason": "P1 target out of reach: peaks 53, 52.5, 53.4% on the last 3 grow-days"}]
+    assert _offset_calls(fake) == [{
+        "room_id": "room:", "zone_id": 1, "offset": -10.0,
+        "reason": "P1 target out of reach: peaks 53, 52.5, 53.4% on the last 3 clean grow-days"}]
     card = _cards(fake)[-1]
     assert "(CS-714)" in card["title"]
-    assert "from +0 to -3 points" in card["message"] and "53, 52.5, 53.4%" in card["message"]
-    assert "The P1 target is now 58%." in card["message"]
+    assert "from +0 to -10 points, a move of -10 points in one step" in card["message"]
+    assert "53, 52.5, 53.4% (median 53%)" in card["message"] and "all 3 days agreed" in card["message"]
+    assert "its P1 target was 8 points over that" in card["message"]
+    assert "The P1 target is now 51%." in card["message"]
     # once a grow-day
     assert c._plan_follow(room, 1, st, NOW.replace(hour=18)) is False
     assert len(_offset_calls(fake)) == 1
+
+
+def test_a_zone_way_off_is_moved_the_whole_way_after_one_clean_grow_day():
+    c, fake, room, st = _rig(days=(46,))  # the F1 probe: 15 points under its P1 target the first clean day
+    assert c._plan_follow(room, 1, st, NOW) is True
+    (call,) = _offset_calls(fake)
+    assert call["offset"] == -17.0
+    assert call["reason"] == "P1 target out of reach: peak 46% on the last clean grow-day"
+    card = _cards(fake)[-1]["message"]
+    assert "from +0 to -17 points, a move of -17 points in one step" in card
+    assert "one clean grow-day is enough when a zone is more than 8 points off" in card
+
+
+def test_a_moved_offset_moves_again_from_where_it_is():
+    c, fake, room, st = _rig(offset=-4.0, days=(46,))  # P1 57 in force, base FC 64
+    assert c._plan_follow(room, 1, st, NOW) is True
+    assert _offset_calls(fake)[0]["offset"] == -17.0
+    assert "from -4 to -17 points, a move of -13 points" in _cards(fake)[-1]["message"]
 
 
 def test_an_offset_that_did_not_land_raises_no_card():
@@ -174,7 +203,7 @@ def test_pause_ai_changes_stops_it():
     {"held": "Zone 1 VWC is unavailable or stale"},  # the probe is stale: the plan holds the zone
     {"status": "armed"},  # not running yet
     {"phase": "P1"},  # the ramp has not ended
-    {"days": (53, 52.5)},  # only two clean grow-days
+    {"days": (55, 55)},  # only two clean grow-days, 6 points off (not over 8)
     {"days": (53, 59, 53)},  # one day within reach
 ])
 def test_it_waits(kwargs):

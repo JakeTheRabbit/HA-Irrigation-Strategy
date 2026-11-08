@@ -53,8 +53,8 @@ async def test_the_offset_service_moves_a_running_zone_at_once(hass, controller_
 async def test_the_service_refuses_a_bad_offset_and_a_plan_that_is_not_running(hass, controller_for, monkeypatch):
     at = _start()
     _entry, manager, _c, _fake = await _tent(hass, controller_for, monkeypatch, at)
-    with pytest.raises(Exception):  # the schema's or the integration's refusal, never a stored change
-        await _offset(hass, -40)
+    with pytest.raises(HomeAssistantError, match="no room"):  # the minimums leave no order that fits
+        await _offset(hass, -100)
     with pytest.raises(HomeAssistantError, match="not in this room"):
         await _offset(hass, -2, zone=5)
     assert manager.offset(1) == 0
@@ -74,13 +74,18 @@ async def test_the_real_controller_sets_the_offset_and_reads_it_back(hass, contr
     room = room_of(c, TENT)
     row = room._strategy_raw[1]["zones"][0]
     p1 = row["parameters"]["p1_target_vwc"]
+    base_fc = row["vwc_base"].get("field_capacity", p1)
     st = room.state[1]
     # the pass itself looked once (no peaks kept yet: nothing to do) and will not look again today
     assert st["phase"] in ("P2", "P3")
     assert st["plan_follow"]["checked"] == c._grow_day_start(room, at).isoformat()
     assert manager.offset(1) == 0
-    st["plan_follow"]["checked"] = None  # three clean grow-days of peaks, 8 points under its P1 target
-    st["plan_follow"]["days"] = [{"day": f"d{i}", "peak": round(p1 - 8, 1)} for i in range(3)]
+    # the F1 shape: one clean grow-day since the probe settled, its peak 15 points under the P1 target (over 8:
+    # one day is enough), and the offset set the whole way in one write
+    st["plan_follow"]["checked"] = None
+    peak = round(p1 - 15, 1)
+    st["plan_follow"]["days"] = [{"day": "d0", "peak": peak}]
+    want = round(peak + 1 - base_fc, 1)
     loop = asyncio.get_running_loop()
 
     def answer(domain, service, data, timeout=12):
@@ -94,13 +99,18 @@ async def test_the_real_controller_sets_the_offset_and_reads_it_back(hass, contr
 
     monkeypatch.setattr(controller, "ha_service_response", answer)
     assert await hass.async_add_executor_job(c._plan_follow, room, 1, st, at) is True
-    assert manager.offset(1) == -3
+    assert want < -14 and manager.offset(1) == want
     landed = hass.states.get(PLAN).attributes["zones"][0]
-    assert landed["vwc_offset"] == -3
-    assert landed["parameters"]["p1_target_vwc"] == pytest.approx(p1 - 3)
+    assert landed["vwc_offset"] == want
+    levels = [landed["parameters"].get("field_capacity", p1), landed["parameters"]["p1_target_vwc"],
+              landed["parameters"]["p2_vwc_threshold"], landed["parameters"]["p3_emergency_vwc_threshold"]]
+    assert levels[1] == pytest.approx(p1 + want)  # P1 lands under the peak the zone reaches
+    assert levels[0] >= levels[1] > levels[2] >= levels[3] + 3  # in order, as the controller reads it
     cards = [d for dom, svc, d in fake.calls if (dom, svc) == ("persistent_notification", "create")
              and "CS-714" in d.get("title", "")]
-    assert len(cards) == 1 and "from +0 to -3 points" in cards[0]["message"]
+    assert len(cards) == 1
+    assert f"from +0 to {want:+g} points, a move of {want:+g} points in one step" in cards[0]["message"]
+    assert "one clean grow-day is enough when a zone is more than 8 points off" in cards[0]["message"]
     # once a grow-day: a second look the same day changes nothing
     assert await hass.async_add_executor_job(c._plan_follow, room, 1, st, at + timedelta(hours=1)) is False
-    assert manager.offset(1) == -3
+    assert manager.offset(1) == want

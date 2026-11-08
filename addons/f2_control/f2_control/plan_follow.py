@@ -8,19 +8,21 @@ alone, so nothing caught it.
 The peaks are the follower's (controller._count_peak, _keep_day_peak): the highest trusted reading of each grow-day,
 kept at lights-on. Here the last DAYS of them are kept as well, and a grow-day with a step change in the probe's
 reading (a 0.0, or a jump of more than JUMP_PTS in about a minute or across a blind gap) starts the count again, so
-the offset is only ever moved on clean days after the probe settled.
+the offset is only ever moved on clean days after the probe settled. A zone far off (over BIG_GAP_PTS) is moved after
+one clean grow-day; a smaller gap needs DAYS of them. The offset moves the whole way in one write (owner's rule,
+9 Nov 2026: "let the controller move it however many points it wants, especially if it's way off"); the only limits
+are each setting's own and the order of the levels, which the integration keeps (strategy_model.apply_offset).
 
 `rec` is a plain JSON-safe dict, kept in the controller's state file.
 """
 import math
 import statistics
 
-DAYS = 3  # clean grow-days of peaks the rule needs, all of them saying the same
+DAYS = 3  # clean grow-days of peaks the rule needs, all of them saying the same...
+BIG_GAP_PTS = 8.0  # ...or one, when the last one is this far off
 UNREACHABLE_PTS = 4.0  # the plan's P1 target this far over every peak: the zone cannot reach it
 OVERSHOOT_PTS = 3.0  # every peak this far over the plan's field capacity: the plan is set under the zone
 HEADROOM_PTS = 1.0  # field capacity is put this far over the median peak
-STEP_MAX_PTS = 3.0  # the offset moves at most this far a grow-day
-OFFSET_MAX = 20.0  # the integration's bound (strategy_model.OFFSET_MAX)
 JUMP_PTS = 10.0  # a reading this far from the one before...
 JUMP_S = 120.0  # ...this soon after it, or after a blind gap, is a step change
 
@@ -80,16 +82,22 @@ def close_day(rec, day, peak):
 
 
 def decide(days, p1, fc, base_fc, offset):
-    """-> {"offset", "why", "median", "goal", "peaks"} for the offset to set, or None to leave it.
+    """-> {"offset", "why", "median", "goal", "peaks", "gap"} for the offset to set, or None to leave it.
 
     `p1`, `fc`: the plan's P1 target and field capacity in force (the offset included); `base_fc`: its field capacity
-    before the offset; `offset`: the zone's offset now. The plan is out of step with the probe when, on every one of
-    the last DAYS clean grow-days, the P1 target sat more than UNREACHABLE_PTS over the peak ("unreachable"), or the
-    peak more than OVERSHOOT_PTS over field capacity ("overshoot"). The offset then moves towards the one that puts
-    field capacity HEADROOM_PTS over the median peak, at most STEP_MAX_PTS a grow-day."""
-    if len(days) < DAYS:
+    before the offset; `offset`: the zone's offset now. The plan is out of step with the probe when the P1 target sat
+    more than UNREACHABLE_PTS over the peak ("unreachable"), or the peak more than OVERSHOOT_PTS over field capacity
+    ("overshoot"): on the last clean grow-day when it is more than BIG_GAP_PTS off, else on every one of the last DAYS.
+    The offset is then set, in one write, to the one that puts field capacity HEADROOM_PTS over the median peak."""
+    if not days:
         return None
-    peaks = [d["peak"] for d in days[-DAYS:]]
+    last = days[-1]["peak"]
+    if p1 - last > BIG_GAP_PTS or last - fc > BIG_GAP_PTS:
+        peaks = [last]
+    elif len(days) >= DAYS:
+        peaks = [d["peak"] for d in days[-DAYS:]]
+    else:
+        return None
     if all(p1 - x > UNREACHABLE_PTS for x in peaks):
         why = "unreachable"
     elif all(x - fc > OVERSHOOT_PTS for x in peaks):
@@ -98,8 +106,7 @@ def decide(days, p1, fc, base_fc, offset):
         return None
     median = statistics.median(peaks)
     goal = round(median + HEADROOM_PTS - base_fc, 1)
-    move = max(-STEP_MAX_PTS, min(STEP_MAX_PTS, goal - offset))
-    new = round(max(-OFFSET_MAX, min(OFFSET_MAX, offset + move)), 1)
-    if abs(new - offset) < 0.05:
+    if abs(goal - offset) < 0.05:
         return None
-    return {"offset": new, "why": why, "median": round(median, 2), "goal": goal, "peaks": peaks}
+    gap = round(max(p1 - median, median - fc), 1)
+    return {"offset": goal, "why": why, "median": round(median, 2), "goal": goal, "peaks": peaks, "gap": gap}

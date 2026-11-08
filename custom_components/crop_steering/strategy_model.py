@@ -313,45 +313,68 @@ def normalize_plan(plan, zone_ids, catalog):
     return out
 
 
-# The four moisture levels a zone's VWC offset moves (strategy_zone_offset), and how far it may move them.
+# The four moisture levels a zone's VWC offset moves (strategy_zone_offset), top rung first. A rung is kept
+# under the one above it by this many points: P1 <= FC, P2 under P1 by at least a step, P3 3 under P2.
 OFFSET_KEYS = (
     "field_capacity",
     "p1_target_vwc",
     "p2_vwc_threshold",
     "p3_emergency_vwc_threshold",
 )
-OFFSET_MAX = 20.0
+_UNDER = {
+    "p1_target_vwc": 0.0,
+    "p2_vwc_threshold": None,
+    "p3_emergency_vwc_threshold": 3.0,
+}
 
 
 def check_offset(value):
-    """PURE. A zone's VWC offset in percentage points, or ValueError."""
-    offset = finite(value, "offset")
-    if not -OFFSET_MAX <= offset <= OFFSET_MAX:
-        raise ValueError(
-            f"Offset must be between -{OFFSET_MAX:g} and {OFFSET_MAX:g} points"
-        )
-    return offset
+    """PURE. A zone's VWC offset in percentage points, or ValueError. Its only limits are the settings'
+    own (apply_offset)."""
+    return finite(value, "offset")
+
+
+def _round6(value):
+    return math.floor(value * 1_000_000 + 0.5) / 1_000_000
 
 
 def apply_offset(parameters, offset, catalog=None):
     """PURE. `parameters` with `offset` points added to each of OFFSET_KEYS it has, each clamped to its
-    catalog min and max (else the engine's bounds) and aligned to its step. ValueError when the result
-    leaves the moisture levels out of order (validate_relationships). An offset of 0 changes nothing.
+    catalog min and max (else the engine's bounds) and aligned to its step. Where a clamp would leave
+    the levels out of order (P3 + 3 <= P2 < P1 <= FC), the lower rungs are pushed down under the one
+    above. ValueError only when a rung's minimum leaves it no room. An offset of 0 changes nothing.
     """
     if not offset:
         return dict(parameters)
     out = dict(parameters)
+    above = None
     for key in OFFSET_KEYS:
         if key not in out:
             continue
         bounds = (catalog or {}).get(key) or {}
         low = bounds.get("min", ENGINE_BOUNDS[key][0])
         high = bounds.get("max", ENGINE_BOUNDS[key][1])
+        step = bounds.get("step", 0) or 0
         value = out[key] + offset
-        step = bounds.get("step", 0)
         if step > 0:
             value = low + math.floor((value - low) / step + 0.5) * step
-        out[key] = math.floor(min(high, max(low, value)) * 1_000_000 + 0.5) / 1_000_000
+        value = min(high, max(low, value))
+        if above is not None and key in _UNDER:
+            gap = _UNDER[key] if _UNDER[key] is not None else (step or 0.1)
+            cap = above - gap
+            if value > cap:
+                value = (
+                    low + math.floor((cap - low) / step + 1e-9) * step
+                    if step > 0
+                    else cap
+                )
+        if value < low - 1e-9:
+            raise ValueError(
+                f"An offset of {offset:g} points leaves no room for {key} over its minimum of "
+                f"{low:g}"
+            )
+        out[key] = _round6(value)
+        above = out[key]
     try:
         validate_relationships(out)
     except ValueError as error:

@@ -53,19 +53,47 @@ def test_each_level_is_clamped_to_its_setting_and_step():
     assert out["p1_target_vwc"] == 57.5
 
 
-def test_an_offset_that_breaks_the_order_is_refused():
-    # P1 clamps at 80 while P2 moves on to 74: 3 points under the rescue floor's ladder is still fine,
-    # but a P2 max of 75 under a P1 max of 72 inverts them.
+def test_a_clamp_that_would_break_the_order_pushes_the_lower_rungs_down():
+    # P1 stops at its max of 72 while P2 would go on to 73: P2 is put a step under P1, P3 stays 3 under P2
     tight = {**BOUNDS, "p1_target_vwc": {"min": 30, "max": 72, "step": 0.1}}
-    with pytest.raises(ValueError, match="out of order"):
-        apply_offset(LADDER, 19, tight)
+    out = apply_offset(LADDER, 19, tight)
+    assert (
+        out["field_capacity"],
+        out["p1_target_vwc"],
+        out["p2_vwc_threshold"],
+        out["p3_emergency_vwc_threshold"],
+    ) == (80, 72, 71.9, 50)
+    # FC stops at its max of 66 under a P1 that would be 70: P1 is put at FC
+    out = apply_offset(
+        LADDER, 9, {**BOUNDS, "field_capacity": {"min": 40, "max": 66, "step": 0.1}}
+    )
+    assert (out["field_capacity"], out["p1_target_vwc"], out["p2_vwc_threshold"]) == (
+        66,
+        66,
+        63,
+    )
 
 
-def test_the_offset_is_bounded_to_twenty_points():
-    assert check_offset(-20) == -20
-    for bad in (20.5, -21, float("nan"), True, "3"):
+def test_only_a_minimum_that_leaves_no_room_refuses():
+    # P2 cannot go under its minimum of 70, and P1 sits at 62: no order fits
+    tight = {**BOUNDS, "p2_vwc_threshold": {"min": 70, "max": 75, "step": 0.1}}
+    with pytest.raises(ValueError, match="no room for p2_vwc_threshold"):
+        apply_offset(LADDER, 1, tight)
+
+
+def test_the_offset_has_no_bound_of_its_own():
+    assert check_offset(-35) == -35 and check_offset(42.5) == 42.5
+    for bad in (float("nan"), float("inf"), True, "3"):
         with pytest.raises(ValueError):
             check_offset(bad)
+    out = apply_offset(
+        LADDER, -35, BOUNDS
+    )  # each setting stops at its own minimum, in order
+    assert (
+        out["p1_target_vwc"],
+        out["p2_vwc_threshold"],
+        out["p3_emergency_vwc_threshold"],
+    ) == (30, 20, 10)
 
 
 def _active(monkeypatch):
@@ -132,22 +160,31 @@ def test_an_offset_needs_an_armed_or_active_plan_and_a_zone_in_it(monkeypatch):
     manager, _states, now = _active(monkeypatch)
     with pytest.raises(ValueError, match="not in this room"):
         asyncio.run(manager.set_zone_offset(2, -2, "x", now=now))
-    with pytest.raises(ValueError):
-        asyncio.run(manager.set_zone_offset(1, -25, "x", now=now))
-    # 62.5 + 20 would cross nothing here, but P3 30 - 20 = 10 and P2 50 - 20 = 30 keep their order
-    asyncio.run(manager.set_zone_offset(1, -20, "x", now=now))
-    assert manager.offset(1) == -20
+    # past 20 points is fine: P1 62.5 - 25 = 37.5, P2 25, P3 5
+    asyncio.run(manager.set_zone_offset(1, -25, "x", now=now))
+    assert manager.offset(1) == -25
+
+
+def test_a_clamped_level_pushes_the_ones_under_it_down(monkeypatch):
+    manager, states, now = _active(monkeypatch)
+    for eid, state in states.items():
+        if eid.endswith("zone_1_p1_target_vwc"):
+            state.attributes = {**state.attributes, "max": 66}
+    asyncio.run(manager.set_zone_offset(1, 18, "x", now=now))
+    params = states[manager.entity_id].attributes["zones"][0]["parameters"]
+    assert (
+        params["p1_target_vwc"],
+        params["p2_vwc_threshold"],
+        params["p3_emergency_vwc_threshold"],
+    ) == (66, 65.9, 48)
 
 
 def test_a_refused_offset_changes_nothing(monkeypatch):
     manager, states, now = _active(monkeypatch)
-    # the catalog puts P2 and P1 at most 100: +20 would leave P1 at 82.5, fine; tighten P1's max so it inverts
-    for eid, state in states.items():
-        if eid.endswith("zone_1_p1_target_vwc"):
-            state.attributes = {**state.attributes, "max": 66}
     before = states[manager.entity_id].attributes["zones"][0]["parameters"]
-    with pytest.raises(ValueError, match="out of order"):
-        asyncio.run(manager.set_zone_offset(1, 18, "x", now=now))
+    # P1 2.5, and P2 and P3 at their minimum of 0: P3 cannot sit 3 under P2
+    with pytest.raises(ValueError, match="no room"):
+        asyncio.run(manager.set_zone_offset(1, -60, "x", now=now))
     assert manager.offset(1) == 0
     assert states[manager.entity_id].attributes["zones"][0]["parameters"] == before
 

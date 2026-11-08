@@ -3713,8 +3713,10 @@ class Controller:
             self._save_state()
             return False
         peaks = ", ".join(f"{x:g}" for x in got["peaks"])
+        n = len(got["peaks"])
+        days = "the last clean grow-day" if n == 1 else f"the last {n} clean grow-days"
         reason = (("P1 target out of reach" if got["why"] == "unreachable" else "peaks over field capacity")
-                  + f": peaks {peaks}% on the last {plan_follow.DAYS} grow-days")
+                  + f": {'peak' if n == 1 else 'peaks'} {peaks}% on {days}")
         status, _answer = ha_service_response("crop_steering", "strategy_zone_offset", {
             "room_id": f"room:{room.prefix}", "zone_id": zone, "offset": got["offset"], "reason": reason})
         self._save_state()
@@ -3731,17 +3733,22 @@ class Controller:
             return False
         log(f"[{room.slug}] Z{zone} plan offset {offset:g} -> {got['offset']:g}: {reason}")
         new_p1 = (landed.get("parameters") or {}).get("p1_target_vwc")
-        words = (f"its P1 target was more than {plan_follow.UNREACHABLE_PTS:g} points over every peak"
-                 if got["why"] == "unreachable" else
-                 f"every peak was more than {plan_follow.OVERSHOOT_PTS:g} points over its field capacity")
+        if got["why"] == "unreachable":
+            words = (f"its P1 target was {got['gap']:g} points over that, more than the "
+                     f"{plan_follow.UNREACHABLE_PTS:g} points the zone is allowed to miss it by")
+        else:
+            words = (f"that was {got['gap']:g} points over its field capacity, more than the "
+                     f"{plan_follow.OVERSHOOT_PTS:g} points it is allowed to go over")
+        why_days = (f"one clean grow-day is enough when a zone is more than {plan_follow.BIG_GAP_PTS:g} points off"
+                    if n == 1 else f"all {n} days agreed")
         self._alert(
             f"plan_follow_{room.slug}_z{zone}", "CS-714", "plan moved to follow the probe",
-            f"The grow plan's VWC offset for this zone changed from {offset:+g} to {got['offset']:+g} points. "
-            f"On the last {plan_follow.DAYS} clean grow-days the zone peaked at {peaks}% (median {got['median']:g}%), "
-            f"and {words}. The offset moves field capacity, the P1 target, the P2 threshold and the P3 emergency "
-            f"floor together. It moves at most {plan_follow.STEP_MAX_PTS:g} points a grow-day, towards "
-            f"{got['goal']:+g} points, which puts field capacity {plan_follow.HEADROOM_PTS:g} point over the median "
-            "peak." + (f" The P1 target is now {new_p1:g}%." if isinstance(new_p1, (int, float)) else "")
+            f"The grow plan's VWC offset for this zone changed from {offset:+g} to {got['offset']:+g} points, a move "
+            f"of {got['offset'] - offset:+g} points in one step. On {days} the zone peaked at {peaks}% (median "
+            f"{got['median']:g}%), and {words} ({why_days}). The new offset puts field capacity "
+            f"{plan_follow.HEADROOM_PTS:g} point over the median peak. It moves field capacity, the P1 target, the P2 "
+            "threshold and the P3 emergency floor together, each inside its own limits and in order."
+            + (f" The P1 target is now {new_p1:g}%." if isinstance(new_p1, (int, float)) else "")
             + "\n\nThe plan itself does not change. If the probe was moved, check that it sits well in the "
             "substrate. To undo the change, set the offset to 0 with crop_steering.strategy_zone_offset.",
             room=room, zone=zone, quiet=False)
