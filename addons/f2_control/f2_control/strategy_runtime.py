@@ -95,6 +95,14 @@ def parse_snapshot(state, attributes, prefix, now, was_required=False):
         if state == "draft" and attrs.get("release_legacy") is True:
             result["required"] = False
             return result
+        # A plan that does not run holds nothing: a saved draft, or a plan armed and waiting for its first
+        # lights-on, published with enabled False and no zones. The room runs on its own settings, as before
+        # arming. release_legacy alone is not enough: saving and arming clear it, so a controller that missed
+        # the minute it was set stayed held (F1, 9 Nov 2026: the old plan released at the 10:10 lights-on,
+        # the new one was saved and armed that minute, and every zone held until it was disarmed).
+        if state in ("draft", "armed") and attrs.get("enabled") is False and not attrs.get("zones"):
+            result["required"] = False
+            return result
         if state not in ("active", "disarming") or attrs.get("enabled") is not True:
             raise ValueError(
                 attrs.get("error") or "Strategy is held; no current active snapshot"
