@@ -79,6 +79,32 @@ Nothing is checked in a room that is off, in the first 10 minutes after a start,
 six hours. A plan with the same lights-on and lights-off hour has no lights-on edge, so the checks that wait for one
 are skipped.
 
+## The plan follows the probe
+
+A plan sets each zone's moisture levels from fixed numbers. A probe that is moved or reseated can read higher or
+lower than before. Then the zone can never reach its P1 target, sits under its P2 threshold all day, and gets too
+much water. While a plan runs, Auto setpoints and the AI assistant leave its targets alone, so the plan must move.
+
+Each zone of an armed or running plan has a **VWC offset**, in points, 0 by default. The offset moves the zone's field
+capacity, P1 target, P2 threshold and P3 emergency floor together. It is in force at once, not at the next lights-on.
+It does not change the plan, its revision or the draft. Each level stays inside the limits of its setting, and an
+offset that puts the levels out of order is refused. Saving or arming a plan sets every offset back to 0. The plan
+sensor and `strategy_get` show the offset of each zone. Set it by hand with `crop_steering.strategy_zone_offset`.
+
+The controller sets it too. Once a grow-day, after the zone's ramp, it looks at the zone's peaks on the last 3 clean
+grow-days:
+
+- the P1 target more than 4 points over every peak: the zone cannot reach it;
+- every peak more than 3 points over field capacity: the plan is set under the zone.
+
+Then it moves the offset towards the one that puts field capacity 1 point over the median peak, at most 3 points a
+grow-day. It reads the plan back, and a **CS-714** card names the zone, the old and new offset and the peaks.
+
+It does this only when the room's Auto setpoints switch or the AI assistant's `set_targets_from_achievable` power is
+on, and never while Pause AI changes runs. It skips a zone the plan holds on an earlier day because its probe is
+stale, and a zone with no trusted reading. A day with a step change in the reading (a 0.0, or a jump of more than
+10 points in about a minute or after a gap) starts the count again: the controller waits for 3 clean days after it.
+
 ## Read the combined graph
 
 - **VWC axis:** percent substrate water content. P1 target, P2 trigger and the P3 emergency floor come from the selected interpolated profile.

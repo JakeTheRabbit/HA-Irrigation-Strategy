@@ -9,6 +9,37 @@ notes**, the entity- and code-level detail for developers and AI agents working 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### 🌱 In plain English
+
+- **The grow plan follows the probe.** When a probe is moved and reads higher or lower than before, a running plan
+  could keep targets that the zone never reaches, and water it all day. Now each zone of a running plan can have an
+  offset that moves its four moisture levels together, at once, without a new plan. The controller sets it when the
+  zone's peaks have disagreed with the plan for 3 clean days, at most 3 points a day, and tells you on a card.
+- **You stay in charge of it.** It works only with Auto setpoints or the AI assistant's targets power on, waits while
+  AI changes are paused, and you can set any zone's offset back to 0.
+
+### 🔧 Technical notes
+
+- Integration: new `crop_steering.strategy_zone_offset(room_id, zone_id, offset, reason)` (admin rule as the other
+  `strategy_*` services; automations bypass it). The offset (±20 points) is stored in the plan state document
+  (`offsets`), not in the plan, so the revision and draft are untouched; it is reset by `strategy_save` and
+  `strategy_activate`. When the stored plan resolves a day (`_advance`, `_release_held`, `strategy_preview` without a
+  `plan`), `strategy_model.apply_offset` adds it to `field_capacity`, `p1_target_vwc`, `p2_vwc_threshold` and
+  `p3_emergency_vwc_threshold`, clamps each to its catalog min/max and step, and refuses an order break
+  (`validate_relationships`). The active row is resolved again at once. Rows carry `vwc_offset` and `vwc_base`
+  (strategy plan sensor `zones`, `strategy_get`, `strategy_preview`); `strategy_get` adds `offsets`. Journal kind
+  `plan.zone_offset`, folded into History › Changes. A document stored before `offsets` loads with none.
+- Controller: new pure `plan_follow.py`. The follower's counted peak of each grow-day (`fc_follow.peak`, kept at
+  lights-on) is also kept for the last 3 grow-days in zone state `plan_follow`; a 0.0 reading or a jump of more than 10
+  points within 2 min or across a blind gap starts the count again. Once a grow-day in P2/P3, an active plan's zone
+  whose P1 target is more than 4 points over every peak, or every peak more than 3 points over field capacity, gets
+  its offset moved towards (median peak + 1 − field capacity before the offset), at most 3 points, read back from
+  the plan sensor. Gates: `switch.crop_steering_<prefix>auto_setpoints` or
+  `ai_power_set_targets_from_achievable` on, `ai_no_touch` not pausing, zone not held. New info code **CS-714**.
+  An old `/data/state.json` without `plan_follow` loads a fresh record.
+
 ## [3.18.1] - 2026-10-28
 
 3.18.1 — simpler README and first-run guide, one docs index, internal notes archived, bug report form; dashboard: readable Today strip on phones (#236), decluttered daily plan card (#239).
