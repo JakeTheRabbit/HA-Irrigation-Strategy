@@ -485,6 +485,63 @@ strategy_disarm:
       selector:
         text:
 
+strategy_zone_offset:
+  name: Set zone VWC offset
+  description: >-
+    Moves the moisture levels of one zone of the armed or active plan by the same number of points:
+    field capacity, P1 target, P2 threshold and P3 emergency floor. Use it when the probe of a zone
+    reads higher or lower than the plan expects, for example after a probe is moved. The change has
+    effect at once, not at the next lights-on. It does not change the plan, its revision or the draft.
+    Each level stays inside the limits of its setting. When a level stops at its limit, the levels under
+    it move down to stay in order. The integration refuses an offset only when the limits leave no room
+    for that order. A new saved or armed plan sets every offset back to 0. When a signed-in
+    user calls it, that user must be a Home Assistant administrator. An automation can call it
+    without this check. Read the offset of each zone with `strategy_get`.
+    CAUTION: An offset changes when each zone gets water. Examine the zone in the preview after the
+    change.
+  fields:
+    room_id:
+      name: Room ID
+      description: >-
+        The canonical ID of the room: `room:` for the default room, or `room:` and the room prefix for a
+        named room. A different ID changes a different room. The integration refuses an unknown ID.
+        Example: `room:f1_` for a named room, or `room:` for the default room.
+      required: true
+      selector:
+        text:
+    zone_id:
+      name: Zone
+      description: >-
+        The number of the zone in the plan. The integration refuses a zone that is not in the plan.
+        Example: 2.
+      required: true
+      selector:
+        number:
+          min: 1
+          max: 64
+          mode: box
+    offset:
+      name: Offset
+      description: >-
+        The points to add to the four moisture levels of the zone. A negative value lowers them. 0 removes
+        the offset. The limits of each setting apply. Example: -6.
+      required: true
+      selector:
+        number:
+          min: -100
+          max: 100
+          step: 0.1
+          unit_of_measurement: "%"
+          mode: box
+    reason:
+      name: Reason
+      description: >-
+        Why the offset changes, in a few words. The history of changes shows it. Example: probe moved,
+        peaks now 15 points lower.
+      required: true
+      selector:
+        text:
+
 runs_get:
   name: Read run records
   description: >-

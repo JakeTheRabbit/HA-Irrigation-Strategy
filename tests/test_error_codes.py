@@ -88,6 +88,10 @@ RESERVED = {
         "feat/brain-plan-adherence",
         "the room not running its grow plan as written",
     ),
+    "CS-714": (
+        "feat/plan-follows-probe",
+        "the grow plan moved to follow a zone's probe",
+    ),
     "CS-808": ("feat/mix-check", "a batch's mix off its EC or pH band"),
     "CS-211": ("feat/p6-dosing-ph-autocorrect", "a zone's shots held for too long"),
     "CS-212": (

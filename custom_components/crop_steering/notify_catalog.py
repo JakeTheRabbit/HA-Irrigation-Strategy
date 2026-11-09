@@ -120,7 +120,8 @@ KINDS = (
         "the removed first AI route. Also its feed proposals, and the grow plan "
         "state of the room.",
         "codes": _codes(
-            "CS-404 CS-501 CS-702 CS-705 CS-706 CS-707 CS-708 CS-709 CS-711 CS-712 CS-713"
+            "CS-404 CS-501 CS-702 CS-705 CS-706 CS-707 CS-708 CS-709 CS-711 CS-712 CS-713 "
+            "CS-714"
         ),
         "events": ("jev_setpoint",),
     },
@@ -134,7 +135,7 @@ KINDS = (
         "push with no code or an unknown code that is not critical also comes here.",
         "codes": _codes(
             "CS-201 CS-401 CS-402 CS-403 CS-405 CS-601 CS-605 CS-606 CS-607 CS-610 CS-611 "
-            "CS-613 CS-614 CS-616 CS-713"
+            "CS-613 CS-614 CS-616 CS-713 CS-714"
         ),
         "events": (),
     },
@@ -143,7 +144,7 @@ KIND_IDS = tuple(kind["id"] for kind in KINDS)
 EVENTS = {event: kind["id"] for kind in KINDS for event in kind["events"]}
 EMERGENCY = KINDS[0]["codes"]
 # Every code whose severity is info in docs/error-codes.json: a digest lists them apart from the warnings.
-INFO = _codes("CS-205 CS-305 CS-403 CS-501 CS-702 CS-705 CS-711 CS-712 CS-906")
+INFO = _codes("CS-205 CS-305 CS-403 CS-501 CS-702 CS-705 CS-711 CS-712 CS-714 CS-906")
 
 # The integration's own Repairs cards (health.py, stock_api.py, bounds.py, deprecation.py, migration.py) by translation key, with the code each one
 # carries in its title (strings.json). tests/test_notify_catalog.py keeps the two in step.

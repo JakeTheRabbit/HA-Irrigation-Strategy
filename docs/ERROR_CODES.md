@@ -111,6 +111,7 @@ controller still reports a setup change (CS-201) and a hardware hold (CS-301, CS
 | [CS-711](#cs-711) | AI feed change proposal | Information | Notification |
 | [CS-712](#cs-712) | First AI route removed | Information | Notification |
 | [CS-713](#cs-713) | Room differs from grow plan | Warning | Notification |
+| [CS-714](#cs-714) | Plan moved to follow the probe | Information | Notification |
 | [CS-801](#cs-801) | Dosing pump overrun | Critical | Notification |
 | [CS-802](#cs-802) | Dose not confirmed | Warning | Notification |
 | [CS-803](#cs-803) | Dose interrupted by restart | Warning | Notification |
@@ -1846,6 +1847,28 @@ controller still reports a setup change (CS-201) and a hardware hold (CS-301, CS
 - Set the steering select to agree with the plan.
 - Check the lights hours.
 - If a phase did not change, send the controller log.
+
+<a id="cs-714"></a>
+
+### CS-714: Plan moved to follow the probe
+
+*Information · Notification*
+
+**What it means.** The peaks of a zone did not agree with its grow plan. The P1 target was more than 4 points over the peak, or the peak was more than 3 points over field capacity. This was so on 3 clean grow-days in a row, or on 1 clean grow-day when the zone was more than 8 points off. The controller changed the VWC offset of the zone in the plan, the whole way in one step, so that field capacity is 1 point over the median peak. The offset moves field capacity, the P1 target, the P2 threshold and the P3 emergency floor together. The card gives the old and the new offset, the move, the peaks and why.
+
+**Effect on water.** The zone gets water on the moved targets at once. The plan itself, its revision and its other zones do not change.
+
+**Probable causes**
+
+- A person moved or reseated the probe, and it reads higher or lower than before.
+- The plan targets do not agree with this substrate or this probe.
+
+**What to do**
+
+- Check that the probe sits well in the substrate.
+- If the move is wrong, set the offset to 0 with the strategy_zone_offset action.
+- To stop these changes, set the Auto setpoints switch and the set_targets_from_achievable power to off.
+- To pause them for a time, use the Pause AI changes select.
 
 ## Dosing (CS-8xx)
 

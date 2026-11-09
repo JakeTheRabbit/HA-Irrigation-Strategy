@@ -64,6 +64,12 @@ CHANGES = {
     "strategy_save": {"room_id": ROOM, "expected_revision": 0, "plan": {}},
     "strategy_activate": {"room_id": ROOM, "expected_revision": 0},
     "strategy_disarm": {"room_id": ROOM},
+    "strategy_zone_offset": {
+        "room_id": ROOM,
+        "zone_id": 1,
+        "offset": -2,
+        "reason": "x",
+    },
     "runs_save": {"room_id": ROOM, "expected_revision": 0, "record": {}},
     "runs_archive": {
         "room_id": ROOM,
@@ -156,6 +162,7 @@ def rig(monkeypatch):
         save=AsyncMock(return_value={}),
         activate=AsyncMock(return_value={}),
         disarm=AsyncMock(return_value={}),
+        set_zone_offset=AsyncMock(return_value={}),
         response=MagicMock(return_value={"status": "draft"}),
         preview=MagicMock(return_value={}),
     )
@@ -266,6 +273,7 @@ def rig(monkeypatch):
             strategy.save,
             strategy.activate,
             strategy.disarm,
+            strategy.set_zone_offset,
             runs.mutate,
             tanks.mutate,
             tanks.draw,
