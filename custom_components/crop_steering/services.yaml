@@ -457,6 +457,13 @@ strategy_activate:
         number:
           min: 0
           mode: box
+    start_now:
+      name: Start now
+      description: >-
+        On starts the plan within a minute, with today's settings, instead of at the next local
+        lights-on. Off waits for the next lights-on. Default: off.
+      selector:
+        boolean:
 
 strategy_disarm:
   name: Disarm grow plan

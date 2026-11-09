@@ -507,3 +507,32 @@ def test_api_v2_types_a_stale_probe_as_a_guard_and_lost_storage_as_unavailable(
             await manager._persist()
 
     asyncio.run(scenario())
+
+
+def test_start_now_applies_today_on_the_next_tick(monkeypatch):
+    manager, _, now = manager_fixture(monkeypatch)
+
+    async def scenario():
+        await manager.async_init()
+        await manager.save(plan(), 0)
+        armed = await manager.activate(1, now, start_now=True)
+        today = manager._boundary(now)
+        assert armed["armed_after"] == today.isoformat()
+        await manager.tick(now + timedelta(seconds=60))
+        assert manager.document["status"] == "active"
+        assert manager.document["active"]["grow_day"] == today.date().isoformat()
+
+    asyncio.run(scenario())
+
+
+def test_without_start_now_the_plan_waits_for_the_next_lights_on(monkeypatch):
+    manager, _, now = manager_fixture(monkeypatch)
+
+    async def scenario():
+        await manager.async_init()
+        await manager.save(plan(), 0)
+        await manager.activate(1, now)
+        await manager.tick(now + timedelta(seconds=60))
+        assert manager.document["status"] == "armed"
+
+    asyncio.run(scenario())

@@ -13,6 +13,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### 🌱 In plain English
 
+- **Arming a plan no longer stops the watering.** A room whose old plan had run could stop watering when a new
+  plan was armed, until the new plan started or was disarmed. Only the safety shots got through. Now an armed plan
+  leaves the room on its own settings until its first lights-on, as the guide says.
+- **A plan can start now.** `strategy_activate` has a new **Start now** option. With it on, the plan starts within
+  a minute with today's settings, instead of waiting for the next lights-on.
 - **The grow plan follows the probe.** When a probe is moved and reads higher or lower than before, a running plan
   could keep targets that the zone never reaches, and water it all day. Now each zone of a running plan can have an
   offset that moves its four moisture levels together, at once, without a new plan. The controller sets it when the
@@ -23,6 +28,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### 🔧 Technical notes
 
+- Controller: `strategy_runtime.parse_snapshot` released the room to its own settings only for a `draft` with
+  `release_legacy: true`. `strategy_save` and `strategy_activate` clear that flag, so a controller latched by an
+  earlier plan (`strategy_required`) that missed the minute it was set held every zone with "Strategy hold:
+  Strategy is held; no current active snapshot" while the new plan was armed (F1, 2026-11-09: released at the 10:10
+  lights-on, rev 4 saved and armed in the same minute). A fresh, valid snapshot in `draft` or `armed` with
+  `enabled: false` and no zones now releases the room too. `error`, `active` and `disarming` still hold, as do a
+  missing, stale or foreign snapshot. No change to the integration, entities, options or `/data/state.json`.
 - Integration: new `crop_steering.strategy_zone_offset(room_id, zone_id, offset, reason)` (admin rule as the other
   `strategy_*` services; automations bypass it). The offset (no bound of its own) is stored in the plan state document
   (`offsets`), not in the plan, so the revision and draft are untouched; it is reset by `strategy_save` and

@@ -50,7 +50,9 @@ async def async_setup_strategy_services(hass):
                 )
             if call.service == "strategy_activate":
                 return await manager.activate(
-                    call.data["expected_revision"], who=attribution(hass, call)
+                    call.data["expected_revision"],
+                    who=attribution(hass, call),
+                    start_now=call.data.get("start_now", False),
                 )
             if call.service == "strategy_disarm":
                 return await manager.disarm(who=attribution(hass, call))
@@ -74,6 +76,8 @@ async def async_setup_strategy_services(hass):
         schema = {vol.Required("room_id"): str}
         if service in ("strategy_save", "strategy_activate"):
             schema[vol.Required("expected_revision")] = vol.All(int, vol.Range(min=0))
+        if service == "strategy_activate":
+            schema[vol.Optional("start_now")] = bool
         if service == "strategy_save":
             schema[vol.Required("plan")] = dict
         elif service == "strategy_preview":

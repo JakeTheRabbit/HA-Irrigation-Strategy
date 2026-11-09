@@ -73,6 +73,54 @@ def test_old_install_has_no_strategy_influence_and_activated_missing_data_holds(
     assert "Strategy hold" in strategy_block(active, 1)
 
 
+def _not_running(now, state):
+    """The plan sensor as the integration publishes a plan that does not run: a saved draft, or one armed and
+    waiting for its first lights-on (StrategyManager._publish)."""
+    attrs = {**snapshot(now), "enabled": False, "zones": [], "release_legacy": False, "status": state,
+             "armed_after": (now + timedelta(hours=23)).isoformat() if state == "armed" else None}
+    return attrs
+
+
+@pytest.mark.parametrize("state", ["armed", "draft"])
+def test_a_plan_that_does_not_run_yet_holds_nothing_even_after_one_ran(state):
+    """F1, 9 Nov 2026: the old plan released at lights-on and the new one was saved and armed the same minute,
+    which clears release_legacy, so the controller (still latched from the old plan) held every zone until
+    the plan was disarmed. Until its first lights-on an armed plan leaves the room on its own settings."""
+    now = datetime.now(timezone.utc)
+    parsed = parse_snapshot(state, _not_running(now, state), "", now.timestamp(), was_required=True)
+    assert parsed["required"] is False and parsed["error"] is None
+    assert strategy_block(parsed, 1) is None
+    assert parameter_override(parsed, 1, "p1_target_vwc") is None  # the zone's own setting is read
+
+
+def test_a_plan_that_runs_or_is_broken_still_holds():
+    now = datetime.now(timezone.utc)
+    # armed, but the integration says it runs (enabled with zones): no active snapshot, so it holds
+    running = {**snapshot(now), "status": "armed"}
+    assert "Strategy hold" in strategy_block(parse_snapshot("armed", running, "", now.timestamp(), True), 1)
+    for state, extra in (("error", {"enabled": True, "zones": [], "error": "zones do not match"}),
+                         ("active", {"zones": []}),
+                         ("disarming", {"zones": [{"zone_id": 1, "status": "active", "parameters": {}}]})):
+        attrs = {**snapshot(now), **extra}
+        assert "Strategy hold" in strategy_block(parse_snapshot(state, attrs, "", now.timestamp(), True), 1), state
+    # an armed plan that does not run still has to be a fresh snapshot for this room
+    stale = {**_not_running(now, "armed"), "updated_at": (now - timedelta(minutes=10)).isoformat()}
+    assert "stale" in strategy_block(parse_snapshot("armed", stale, "", now.timestamp(), True), 1)
+    other = _not_running(now, "armed")
+    assert "another room" in strategy_block(parse_snapshot("armed", other, "f2_", now.timestamp(), True), 1)
+
+
+def test_the_controller_runs_the_room_on_its_own_settings_while_a_plan_waits(monkeypatch, tmp_path):
+    c, room = rig(monkeypatch, tmp_path)
+    now = datetime.now(timezone.utc)
+    room.strategy_required = True  # a plan ran here before
+    attrs = _not_running(now, "armed")
+    monkeypatch.setattr(controller, "ha_get", lambda entity, **kw: ("armed", attrs, None))
+    c._load_strategy_snapshot(room, now)
+    assert room.strategy_required is False
+    assert strategy_block(room.strategy_snapshot, 1) is None
+
+
 def test_fresh_default_uses_real_switch_without_changing_existing_legacy_helper(
     monkeypatch, tmp_path
 ):
