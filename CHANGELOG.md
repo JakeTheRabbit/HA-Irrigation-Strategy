@@ -16,6 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Arming a plan no longer stops the watering.** A room whose old plan had run could stop watering when a new
   plan was armed, until the new plan started or was disarmed. Only the safety shots got through. Now an armed plan
   leaves the room on its own settings until its first lights-on, as the guide says.
+- **A plan can start now.** `strategy_activate` has a new **Start now** option. With it on, the plan starts within
+  a minute with today's settings, instead of waiting for the next lights-on.
 
 ### 🔧 Technical notes
 

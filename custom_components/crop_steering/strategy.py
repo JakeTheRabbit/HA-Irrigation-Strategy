@@ -496,7 +496,10 @@ class StrategyManager:
                 stale[zone] = f"Zone {zone} VWC is unavailable or stale"
         return stale
 
-    async def activate(self, expected_revision, now=None, who=None):
+    async def activate(self, expected_revision, now=None, who=None, start_now=False):
+        """Arm the draft for the next lights-on, or with `start_now` for today's: the next tick
+        (within a minute) applies today's grow-day instead of the room waiting until tomorrow.
+        """
         now = now or _now()
         async with self._lock:
             if expected_revision != self.document["revision"]:
@@ -515,13 +518,15 @@ class StrategyManager:
                     "Resolve hydraulic configuration errors before activation"
                 )
             # An unreadable lights_on_hour refuses to arm.
-            first = self._next_boundary(now)
+            first = self._boundary(now) if start_now else self._next_boundary(now)
+            # Today's lights-on is due for a request made just before it.
+            asked = first - timedelta(seconds=1) if start_now else now
             prior = copy.deepcopy(self.document)
             self.document.update(
                 status="armed",
                 error=None,
                 release_legacy=False,
-                armed_at=now.isoformat(),
+                armed_at=asked.isoformat(),
                 armed_after=first.isoformat(),  # what a version before armed_at reads
             )
             try:
