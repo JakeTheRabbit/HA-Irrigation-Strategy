@@ -11,6 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.19.0] - 2026-11-10
+
+3.19.0 — the grow plan follows the probe (per-zone offset, CS-714), arming a plan no longer stops watering, a plan can start now; planner grid cells show stage, dryback, re-water and EC; certifi security bump.
+
+Pair: **controller 3.19.0**. **C3: controller and integration behaviour.** New service `strategy_zone_offset`, new `start_now` field on `strategy_activate`, new zone state `plan_follow` in `/data/state.json` (an old file loads a fresh record; the previous controller ignores the unknown key). No entity id or add-on option changes. **Approved rehearsal, no staging soak:** the owner approved releasing and promoting everything on `testing` on 2026-11-10 (docs/RELEASING.md step 5, `approved-rehearsal`). This candidate carries more than one C3 change and no staging photoperiod, fault drill or catch test is claimed.
+
 ### 🌱 In plain English
 
 - **Arming a plan no longer stops the watering.** A room whose old plan had run could stop watering when a new
@@ -25,6 +31,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   moves the whole way in one step, and tells you on a card.
 - **You stay in charge of it.** It works only with Auto setpoints or the AI assistant's targets power on, waits while
   AI changes are paused, and you can set any zone's offset back to 0.
+- **The grow planner grid says more.** Each cell shows the stage name, dryback, re-water level and EC, in full text colour.
+- **Security update.** The controller's certificate bundle (certifi) is updated.
 
 ### 🔧 Technical notes
 
@@ -53,6 +61,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   field capacity before the offset), read back from the plan sensor. Gates: `switch.crop_steering_<prefix>auto_setpoints` or
   `ai_power_set_targets_from_achievable` on, `ai_no_touch` not pausing, zone not held. New info code **CS-714**.
   An old `/data/state.json` without `plan_follow` loads a fresh record.
+- #249 `fix(planner)`: grid cells show stage name, dryback, re-water and EC in full text colour (`frontend/src/pages/grow-planner.tsx`, `frontend/src/workspace.css`); the committed `dashboard.html` bundles are rebuilt from `package-lock.json` versions.
+- #250 `fix(f2_control)`: certifi 2026.7.22 → 2026.10.23 (GHSA-6q48), `addons/f2_control/requirements.txt`.
+- Docs and CI (#246, #247, #248): install catch-test label, first screen and first-run guide, GitHub Actions bumped.
 
 ## [3.18.1] - 2026-10-28
 
