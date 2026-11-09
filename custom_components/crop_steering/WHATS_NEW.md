@@ -19,6 +19,14 @@ for the people who build the system:
 `tests/test_whats_new.py` checks the shape and the plain words, and that the newest section is the
 version being released.
 
+## 3.19.0 - 2026-11-10
+
+- A running grow plan now follows the probe, and moves a zone's moisture levels to match what it reads.
+- Arming a new plan no longer stops the watering before the plan starts.
+- You can start a plan now, instead of waiting for the next lights-on.
+- The grow planner shows each day's stage, dryback, re-water level and EC in its grid.
+- Bug fixes and improvements.
+
 ## 3.18.1 - 2026-10-28
 
 - On a phone, the Today strip shows each watering as a thin tick, so they no longer pile up.

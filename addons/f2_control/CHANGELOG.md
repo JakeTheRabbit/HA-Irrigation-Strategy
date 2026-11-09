@@ -1,3 +1,7 @@
+# 3.19.0
+
+Pair with integration 3.19.0. **C3.** The grow plan follows the probe: a new pure `plan_follow.py` keeps the last 3 grow-days' peaks per zone (zone state `plan_follow`, an old `state.json` loads a fresh record) and sets the zone's plan offset through `strategy_zone_offset` when the peaks disagree with the plan (CS-714). An armed plan that has not started no longer holds the room (`strategy_runtime.parse_snapshot`). certifi 2026.10.23 (GHSA-6q48). Physical safeguards unchanged.
+
 # 3.18.1
 
 Pair with integration 3.18.1. **C1.** Documentation, plus two dashboard display fixes in the bundled dashboard (a readable Today strip on phones and a decluttered daily plan card). Controller code, engine, state, options and physical safeguards are unchanged; only path comments in `guards.py` and `zone_history.py` moved with the docs.
