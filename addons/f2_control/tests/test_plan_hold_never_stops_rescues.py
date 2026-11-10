@@ -227,3 +227,35 @@ def test_a_copy_of_routine_steering_is_held_like_the_steering(rig):
     c._load_strategy_snapshot(room, now)
     assert "Strategy hold" in c._blocked(room, 2, pub[2]["reason"])
     assert c._blocked(room, 2, Reason("COPY Z1 (VWC probe dead)", "blind_copy_rescue")) is None
+
+
+def floors(fake, ml):
+    for zone in (1, 2):
+        fake.set_state(f"input_number.crop_steering_zone_{zone}_min_daily_ml_per_plant", str(ml))
+
+
+def test_a_blind_zone_that_has_its_floor_does_not_copy_a_siblings_floor_shot(rig):
+    """10 Nov 2026: zone 2 caught up on its floor and the copying zones got every shot too, so the gap stayed."""
+    c, fake, room = rig
+    now = Clock.now()
+    floors(fake, 500)  # 21 L a zone
+    probe(fake, 1, 50)  # zone 2 is blind and copies zone 1, which is behind on its floor
+    for zone in (1, 2):
+        room.state[zone].update(phase="P2", last_shot=now - timedelta(minutes=30))
+    room.state[2]["daily_vol"] = 20.0  # zone 2 already has all its floor due by now
+    pub = c._loop_room(room, now)
+    assert pub[1]["fire"] and pub[1]["reason"].kind == "min_daily"
+    assert not pub[2]["fire"] and "skips its floor shot" in pub[2]["reason"]
+    assert "switch.v1" in opened(fake) and "switch.v2" not in opened(fake)
+
+
+def test_a_blind_zone_behind_its_floor_still_copies_a_siblings_floor_shot(rig):
+    c, fake, room = rig
+    now = Clock.now()
+    floors(fake, 500)
+    probe(fake, 1, 50)
+    for zone in (1, 2):
+        room.state[zone].update(phase="P2", last_shot=now - timedelta(minutes=30))
+    pub = c._loop_room(room, now)
+    assert pub[2]["fire"] and pub[2]["reason"].kind == "blind_copy_rescue"
+    assert {"switch.v1", "switch.v2"} <= set(opened(fake))

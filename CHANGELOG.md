@@ -11,6 +11,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 🌱 In plain English
+- A zone whose probe is set aside copies a sibling's shots. It no longer copies the sibling's daily-minimum
+  catch-up shots once it already has its own daily minimum due by then, so a dry sibling can catch up and
+  the zones even out.
+
+### 🔧 Technical notes
+- `controller.py` blind-zone loop: a sibling's `min_daily` decision is not copied when the blind zone's
+  `daily_vol >= floor_due` (its own paced floor) and its floor is set; the reason reads "COPY Zn skips its
+  floor shot". Tests in `test_plan_hold_never_stops_rescues.py`.
+
 ## [3.19.0] - 2026-11-10
 
 3.19.0 — the grow plan follows the probe (per-zone offset, CS-714), arming a plan no longer stops watering, a plan can start now; planner grid cells show stage, dryback, re-water and EC; certifi security bump.
