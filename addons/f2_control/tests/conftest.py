@@ -26,6 +26,8 @@ def _hermetic_state_file(tmp_path, monkeypatch):
     test. Redirect the path up front, per test.
     """
     monkeypatch.setenv("F2_STATE_PATH", str(tmp_path / "constructor-state.json"))
+    # ...nor write the health check's alive file into the machine's temporary folder (alive.path).
+    monkeypatch.setenv("F2_ALIVE_PATH", str(tmp_path / "alive"))
 
 
 @pytest.fixture(autouse=True)
