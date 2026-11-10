@@ -121,13 +121,14 @@ def test_a_hold_nothing_answered_for_is_asked_again_not_called_missing(monkeypat
 
 
 def test_no_hold_set_up_asks_nothing(monkeypatch):
-    """An old install without the option: no read, no card, no dismiss, at start or after."""
+    """An old install without the option: no read of a hold, no card, no dismiss, at start or after. (The one
+    status read a start does make is of the room's shot-in-flight state: test_shot_in_flight.py.)"""
     c, fake = _build_with([], present=())
     asked = []
     monkeypatch.setattr(controller, "ha_get_status", lambda entity, timeout=8: asked.append(entity))
     fake.calls.clear()
     _start(c, fake, monkeypatch, passes=3)
-    assert asked == [] and fake.calls == []
+    assert asked == ["sensor.crop_steering_shot_in_flight"] and fake.calls == []
 
 
 def test_the_start_check_needs_nothing_new_in_the_options():

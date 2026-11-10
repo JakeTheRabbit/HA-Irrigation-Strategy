@@ -88,9 +88,11 @@ class FakeHA:
         return (200, self.ha_get(entity)) if entity in self.states else (404, _Read((None, {}, None)))
 
     def ha_set(self, entity, state, attributes=None, timeout=None):
-        """A state written lands in `states` too, stamped now, as Home Assistant's own does."""
+        """A state written lands in `states` too, stamped now, as Home Assistant's own does. -> 200, the
+        status Home Assistant answers a state it already has with (201 for a new one)."""
         self.sets[entity] = (state, attributes or {})
         self.set_state(entity, state, attributes)
+        return 200
 
 
 def status_from_get(controller):
