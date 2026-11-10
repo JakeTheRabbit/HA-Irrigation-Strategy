@@ -85,6 +85,33 @@ def test_the_compose_file_pulls_the_image_this_workflow_publishes():
     assert "build-push-action" not in stable and "imagetools create" in stable
 
 
+def test_the_compose_file_has_the_health_check_the_image_carries():
+    """`docker ps` shows the container healthy or unhealthy from the controller's own alive file (healthcheck.py,
+    copied to /app with the rest of f2_control). The check passes on an image from before it, which has no such
+    file, and tests/container runs this same command in the real image."""
+    compose = yaml.safe_load((ROOT / "docker-compose.yml").read_text(encoding="utf-8"))
+    check = compose["services"]["crop-steering-controller"]["healthcheck"]
+    assert check["test"] == [
+        "CMD-SHELL",
+        "[ ! -f /app/healthcheck.py ] || python3 /app/healthcheck.py",
+    ]
+    assert (ROOT / "addons/f2_control/f2_control/healthcheck.py").is_file()
+    dockerfile = (ROOT / "addons/f2_control/Dockerfile").read_text(encoding="utf-8")
+    assert (
+        "COPY f2_control /app" in dockerfile and "HEALTHCHECK" not in dockerfile
+    )  # the app is the Supervisor's
+    container_tests = (ROOT / "tests/container/test_container.py").read_text(
+        encoding="utf-8"
+    )
+    assert f'HEALTH_TEST = "{check["test"][1]}"' in container_tests
+    # a failed check is seen within three minutes, and a start is given time for its first pass
+    assert (check["interval"], check["retries"], check["start_period"]) == (
+        "60s",
+        2,
+        "180s",
+    )
+
+
 def test_a_version_already_published_with_other_bytes_is_refused():
     workflow = (ROOT / ".github/workflows/container.yml").read_text(encoding="utf-8")
     publish = workflow.split("\n  publish:")[1].split("\n  promote:")[0]

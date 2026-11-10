@@ -48,6 +48,7 @@ import phase_options
 import plan_adherence
 import plan_follow
 import runoff_balance
+import alive
 import runtime_env
 import safety_ops
 import sensing
@@ -3988,6 +3989,7 @@ class Controller:
         fit in the time the shot has left with a second to spare. requests applies a timeout to the
         connect and to the read separately, so each write gets half its share; as with the shot's
         reads, a slow network can still overshoot."""
+        self._alive()  # a shot is running: the loop is not stopped, it is watering
         timeout = min(0.5, (remaining - 1) / (2 * self.KEEP_ALIVE_WRITES))
         if timeout < 0.25:
             return
@@ -4010,6 +4012,25 @@ class Controller:
                 self._heartbeat(room, datetime.now(), *room._beat, timeout=timeout)
             else:
                 self._publish_zone_status(room, zone, *room._statuses[zone], timeout=timeout)
+
+    ALIVE_EVERY_S = 10.0  # the alive file is written at most this often
+
+    def _alive(self):
+        """Say that the loop is running, for the container's health check (alive.py, healthcheck.py): after each
+        completed pass, and through a shot. It stays true for three passes and two minutes, so one slow pass
+        is not a stopped controller. Never a reason to fail: a file that cannot be written is said once and
+        left."""
+        try:
+            now = time.monotonic()
+            if 0 <= now - self.__dict__.get("_alive_at", -1e9) < self.ALIVE_EVERY_S:
+                return
+            self._alive_at = now
+            if not alive.mark(os.environ, 3 * float(self.loop_seconds) + 120.0) and not self.__dict__.get("_alive_said"):
+                self._alive_said = True
+                log(f"health check: {alive.path(os.environ)} cannot be written, so a container's health check "
+                    "shows unhealthy; the controller itself runs as usual")
+        except Exception as e:
+            log("health check: alive file error", e)
 
     def _report_before_acting(self, room, decisions, snaps, now):
         """What _keep_alive repeats is a room's last report, and a room has none that holds when
@@ -9534,6 +9555,7 @@ class Controller:
                 if self.hold_entities and self._holds_card is not False:
                     self._check_holds()
                 self.loop_once(datetime.now())
+                self._alive()  # a pass completed: the container's health check reads this (healthcheck.py)
             except Exception as e:
                 log("loop error", e)
             if _GATE.state is None:
@@ -9607,5 +9629,6 @@ def close_only_start():
 
 
 if __name__ == "__main__":
+    alive.clear(os.environ)  # what the last run of this container left says nothing about this one
     runtime_env.preflight(close_only_start, version=CONTROLLER_VERSION)
     Controller().run()

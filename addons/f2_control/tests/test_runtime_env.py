@@ -217,10 +217,14 @@ def test_importing_it_reads_nothing_and_never_raises(monkeypatch):
 
 
 def test_the_controller_checks_before_it_builds_anything():
-    """__main__: preflight (with the close-only start for a non-administrator's token), then Controller()."""
+    """__main__: preflight (with the close-only start for a non-administrator's token), then Controller().
+    Before preflight, which can wait for ever on a refused token, only the last run's alive file is removed
+    (alive.clear: one local file, nothing asked of Home Assistant), so the container's health check never
+    shows a waiting controller as healthy."""
     tree = ast.parse((PKG / "controller.py").read_text(encoding="utf-8"))
     main = next(n for n in tree.body if isinstance(n, ast.If) and "__main__" in ast.unparse(n.test))
     assert [ast.unparse(s) for s in main.body] == [
+        "alive.clear(os.environ)",
         "runtime_env.preflight(close_only_start, version=CONTROLLER_VERSION)",
         "Controller().run()",
     ]
