@@ -2,7 +2,7 @@
 
 docs/error-codes.json is the list. The controller app puts a code in every notification, the
 integration puts one on every Repairs card, docs/ERROR_CODES.md is written from the list, and the
-dashboard's Help & tools page imports it. A code shown to an operator that the list does not
+dashboard's Settings > Help page imports it. A code shown to an operator that the list does not
 explain, or a list entry nothing can raise, fails here.
 
 A code is defined once: once in the list, on at most one Repairs card in each language file, and
@@ -306,3 +306,57 @@ def test_the_guard_catches_a_second_definition_and_an_unreserved_code():
         "CS-105",
         "CS-320",
     }
+
+
+# ------------------------------------------------------------------ where the alert sends the operator
+WHERE = "Crop Steering → Settings → Help → Alert codes"
+
+
+def test_the_alerts_point_at_a_page_the_dashboard_has():
+    """Every alert and every Repairs card ends by saying where its code is explained. It said
+    "Help & tools → Error codes": the dashboard has no "Help & tools" (the page is Help, under
+    Settings) and no "Error codes" (the list's heading is "Alert codes"). The names are read from
+    the dashboard's source, so a renamed menu or heading fails here until the texts follow.
+    """
+    nav = (ROOT / "frontend" / "src" / "lib" / "nav-tree.ts").read_text(
+        encoding="utf-8"
+    )
+    settings = nav[nav.index('label: "Settings"') :]
+    assert '{ page: "help", label: "Help" }' in settings[: settings.index("]")]
+    page = (ROOT / "frontend" / "src" / "pages" / "help.tsx").read_text(
+        encoding="utf-8"
+    )
+    assert '<h2 id="error-codes-title">Alert codes</h2>' in page
+
+    def one_line(path):
+        # as a reader sees it: JSON escapes decoded, a wrapped Python string joined
+        text = path.read_text(encoding="utf-8").replace("\\u2192", "→")
+        return re.sub(r'"\s*\n\s*f?"', "", text)
+
+    strings = one_line(INTEGRATION / "strings.json")
+    footers = re.findall(
+        r"Code CS-\d{3}\. What it means and what to do: ([^.\\]+)\.", strings
+    )
+    assert len(footers) >= 16 and set(footers) == {WHERE}
+    assert (INTEGRATION / "translations" / "en.json").read_text(encoding="utf-8") == (
+        INTEGRATION / "strings.json"
+    ).read_text(encoding="utf-8")
+    for source in (CONTROLLER, INTEGRATION / "notify_api.py"):
+        assert f"What it means and what to do: {WHERE}." in one_line(
+            source
+        ), source.name
+    assert "**Settings → Help → Alert codes**" in "\n".join(
+        render_error_codes.render(CATALOG).splitlines()[:12]
+    )
+    shipped = [
+        CONTROLLER,
+        ROOT / "docs" / "ERROR_CODES.md",
+        *INTEGRATION.glob("*.py"),
+        *INTEGRATION.glob("*.json"),
+        *(INTEGRATION / "translations").glob("*.json"),
+    ]
+    for path in shipped:
+        text = path.read_text(encoding="utf-8")
+        assert (
+            "Help & tools →" not in text and r"Help & tools \u2192" not in text
+        ), path.name
