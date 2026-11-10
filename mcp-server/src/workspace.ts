@@ -1005,10 +1005,14 @@ export class Workspace {
         throw new SafeError(
           "HA reports setup blockers. Turn affected engines and plumbing off through normal controls, then preview again.",
         );
+      // Attributed to MCP and carrying its proposal token, as every other reviewed write is
+      // (write()): without them the room's history shows the save as the token's user's own.
       await this.ha.service("setup_save", {
         entry_id: proposal.entryId!,
         expected_revision: proposal.revision,
         ...proposal.payload,
+        client: "mcp",
+        proposal_token: token,
       });
       const after = await this.selected(id);
       if (
@@ -1040,11 +1044,30 @@ export class Workspace {
       throw new SafeError(
         "Plan or parameter bounds changed after preview. Refresh and review again.",
       );
-    await this.ha.service("strategy_save", {
+    const draft = {
       room_id: id,
       expected_revision: proposal.revision,
       plan: proposal.payload,
-    });
+    };
+    try {
+      await this.ha.service("strategy_save", {
+        ...draft,
+        client: "mcp",
+        proposal_token: token,
+      });
+    } catch (error) {
+      // An integration before 3.18.0 checks this service against a strict schema and refuses the
+      // two fields before its handler runs, so nothing was saved. Sent once more without them:
+      // that integration records the save as the token user's own, as it always did.
+      if (
+        !(error instanceof SafeError) ||
+        !/extra keys not allowed @ data\['(client|proposal_token)'\]/.test(
+          error.message,
+        )
+      )
+        throw error;
+      await this.ha.service("strategy_save", draft);
+    }
     const after = planResponse(
       await this.ha.service("strategy_get", { room_id: id }),
       id,

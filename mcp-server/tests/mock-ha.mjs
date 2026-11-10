@@ -598,6 +598,13 @@ export async function mockHa(t) {
             };
           }
         } else if (action === "strategy_save") {
+          // An integration before 3.18.0: a strict schema, checked before the handler runs.
+          const extra = ["client", "proposal_token"].find((key) => key in body);
+          if (state.strictPlanSave && extra)
+            return json(
+              { message: `extra keys not allowed @ data['${extra}']` },
+              400,
+            );
           const p = plans[body.room_id];
           if (p.revision !== body.expected_revision || p.status !== "draft")
             return json({ message: "Strategy changed" }, 400);
