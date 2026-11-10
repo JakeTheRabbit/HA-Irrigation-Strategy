@@ -31,7 +31,7 @@
             "Room: one room, chosen with its room chip."
           ],
           "caption": "Fictional learning example. Practise software actions only in the isolated demo.",
-          "asset": "assets/screens/demo-overview-r3.png",
+          "asset": "assets/screens/demo-overview-r4.png",
           "alt": "Actual isolated demo screen. Read the displayed room and current sample values; separate paper examples use fictional values."
         },
         "id": "D1-s1",
@@ -109,7 +109,7 @@
             "Why / next action: the reason now and what it waits for."
           ],
           "caption": "Fictional learning example. Practise software actions only in the isolated demo.",
-          "asset": "assets/screens/demo-selected-room-r3.png",
+          "asset": "assets/screens/demo-selected-room-r4.png",
           "alt": "Actual isolated demo screen. Read the displayed room and current sample values; separate paper examples use fictional values."
         },
         "id": "D1-s3",
@@ -238,7 +238,7 @@
             "Settings › Settings › Display › Default view."
           ],
           "caption": "Fictional learning example. Practise software actions only in the isolated demo.",
-          "asset": "assets/screens/demo-settings-defaultview-r3.png",
+          "asset": "assets/screens/demo-settings-defaultview-r4.png",
           "alt": "Actual isolated demo screen. Read the displayed room and current sample values; separate paper examples use fictional values."
         },
         "id": "D1-s6",
@@ -459,7 +459,7 @@
             "Armed schedule: a grow plan owns targets; edit in Calendar."
           ],
           "caption": "Fictional learning example. Practise software actions only in the isolated demo.",
-          "asset": "assets/screens/demo-currentday-r3.png",
+          "asset": "assets/screens/demo-currentday-r4.png",
           "alt": "Actual isolated demo screen. Read the displayed room and current sample values; separate paper examples use fictional values."
         },
         "id": "D2-s1",
@@ -501,7 +501,7 @@
             "Solid dark lines: what the probes recorded."
           ],
           "caption": "Fictional learning example. Practise software actions only in the isolated demo.",
-          "asset": "assets/screens/demo-currentday-graph-r3.png",
+          "asset": "assets/screens/demo-currentday-graph-r4.png",
           "alt": "Actual isolated demo screen. Read the displayed room and current sample values; separate paper examples use fictional values."
         },
         "id": "D2-s2",
@@ -892,7 +892,7 @@
             "Edit only while the plan status is draft."
           ],
           "caption": "Fictional learning example. Practise software actions only in the isolated demo.",
-          "asset": "assets/screens/demo-calendar-r3.png",
+          "asset": "assets/screens/demo-calendar-r4.png",
           "alt": "Actual isolated demo screen. Read the displayed room and current sample values; separate paper examples use fictional values."
         },
         "id": "D3-s1",
@@ -932,7 +932,7 @@
             "Shared profile: duplicate it before changing one zone."
           ],
           "caption": "Fictional learning example. Practise software actions only in the isolated demo.",
-          "asset": "assets/screens/demo-endpoint-profiles-r3.png",
+          "asset": "assets/screens/demo-endpoint-profiles-r4.png",
           "alt": "Actual isolated demo screen. Read the displayed room and current sample values; separate paper examples use fictional values."
         },
         "id": "D3-s2",
@@ -1024,7 +1024,7 @@
             "Arming never turns Watering on or starts a pump."
           ],
           "caption": "Fictional learning example. Practise software actions only in the isolated demo.",
-          "asset": "assets/screens/demo-calendar-profile-grid-r3.png",
+          "asset": "assets/screens/demo-calendar-profile-grid-r4.png",
           "alt": "Actual isolated demo screen. Read the displayed room and current sample values; separate paper examples use fictional values."
         },
         "id": "D3-s4",
@@ -1350,7 +1350,7 @@
             "Grows: run records with names and dates."
           ],
           "caption": "Fictional learning example. Practise software actions only in the isolated demo.",
-          "asset": "assets/screens/demo-history-compare-r3.png",
+          "asset": "assets/screens/demo-history-compare-r4.png",
           "alt": "Actual isolated demo screen. Read the displayed room and current sample values; separate paper examples use fictional values."
         },
         "id": "D4-s1",
@@ -1908,7 +1908,7 @@
             "Commissioned: a supervised water test proves outlets run and stop."
           ],
           "caption": "Fictional learning example. Practise software actions only in the isolated demo.",
-          "asset": "assets/screens/demo-equipment-setup-r3.png",
+          "asset": "assets/screens/demo-equipment-setup-r4.png",
           "alt": "Actual isolated demo screen. Read the displayed room and current sample values; separate paper examples use fictional values."
         },
         "id": "D5-s4",
@@ -2374,7 +2374,7 @@
             "Keep passwords and tokens out of prompts and screenshots."
           ],
           "caption": "Fictional learning example. Practise software actions only in the isolated demo.",
-          "asset": "assets/screens/demo-ai-assistant-r3.png",
+          "asset": "assets/screens/demo-ai-assistant-r4.png",
           "alt": "Actual isolated demo screen. Read the displayed room and current sample values; separate paper examples use fictional values."
         },
         "id": "D6-s5",
