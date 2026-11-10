@@ -1349,6 +1349,7 @@ class Controller:
             self.dosing = None
         self._busy = False
         self._shot_room = None  # the room whose shot is in flight (see _execute_shot / _safe_off)
+        self._shot_pending = None  # that shot's switch sent ON and not yet read back ON (_safe_off_room)
         _GATE.own = self._switched_on  # what a refused token still closes (_AuthGate)
         self._alerted = {}
         self._alert_codes = {}  # key -> the code last raised under it (see _alert_due)
@@ -6259,7 +6260,7 @@ class Controller:
             inside the lead time, so a switch that reports promptly costs a normal shot nothing; one that
             reports late stretches the pump's prime or the main line's lead by the difference. A read-back
             cut short by `until` (the monotonic clock) may have been on: nothing proved it off in time."""
-            pending[0] = ent  # sent ON, not yet read back ON (_close_cut_short)
+            pending[0] = self._shot_pending = ent  # sent ON, not yet read back ON (_close_cut_short, _safe_off_room)
             journaled["sent"].append(ent)
             if not hw_call(ent, True):
                 journaled["refused"] = True
@@ -6287,7 +6288,7 @@ class Controller:
                 journaled["off"] = not maybe_on  # read back a definite OFF (the journal's readback "off")
                 return (f"Home Assistant took the command to {what}, but it did not read on within "
                         f"{waited:.0f} s."), maybe_on, tally
-            pending[0] = None
+            pending[0] = self._shot_pending = None
             journaled["on"].append(ent)
             while (left := lead_s - (time.monotonic() - acked)) > 0:
                 by = stop(acked + lead_s)
@@ -6553,7 +6554,8 @@ class Controller:
                 errored = True  # its water is still counted, after the cleanup below (count_water_so_far)
         except SystemExit:
             # SIGTERM/SIGINT mid-shot (the app stopped or updated): _safe_exit has already closed what this
-            # shot has open, by the reconciler's rules, so the cleanup below must not switch the rest off.
+            # shot has open, by the reconciler's rules, and the switch it was opening (_safe_off_room), so
+            # the cleanup below must not switch the rest off.
             # Count the water this shot delivered before the process goes, or the next start would water
             # the zone as if it had had none.
             stopping = True
@@ -6609,6 +6611,7 @@ class Controller:
             finally:
                 self._busy = False
                 self._shot_room = None
+                self._shot_pending = None
                 if commanded:  # this shot's water is no leak (_watch_meters)
                     self._meters_rebase(room, journaled.get("meter_moved"))
                     self._meters_fresh_after(room, journaled.get("meters_after"))
@@ -6904,7 +6907,11 @@ class Controller:
         heat it and zones are hand-watered with the valves and main line open, and stopping the app must
         end neither. The shot running NOW is closed whatever its kill switch reads (it is this process's
         own); an older interrupted shot is left to the operator while its kill switch is not ON, as in the
-        loop. Anything that cannot be closed and read back OFF stays recorded for the next start.
+        loop. Anything that cannot be closed and read back OFF stays recorded for the next start. One
+        thing goes past the reconciler's rules: a switch the shot running now has sent ON, and that does
+        not read ON yet (it reads OFF, or cannot be read), is switched off all the same, and the shot stays
+        recorded. Never one that reads ON, and never a pump while a hold is on or cannot be read
+        (_safe_off_room).
 
         With a `deadline` (the monotonic clock) every room with a shot recorded gets an equal share of the
         time left, the room whose shot is running now first, so a slow room never takes the next one's
@@ -6925,7 +6932,14 @@ class Controller:
         order = [e for e in (rec.get("valve"), rec.get("mainline"), rec.get("pump")) if e]
         # Each read keeps time for its own switch's off and those of the switches read before it.
         reads = {e: _read(e, stop and stop.keeping(i)) for i, e in enumerate(order, 1)}
-        if all(read[0] == "off" for read in reads.values()):
+        # The shot running now may have sent a switch ON that does not read ON yet (a plug can report seconds
+        # late). What it reads is then only its old state, the ON still to land, so it is switched off whatever
+        # it reads, as a shot cut short while it opens is (_close_cut_short): otherwise it would go ON after
+        # this process has gone, with no record left to close it at the next start. One that reads ON has no ON
+        # still to land: whose it is is told as for any other switch (_inflight_plan).
+        pending = getattr(self, "_shot_pending", None) if running else None
+        blind = pending in order and reads[pending][0] != "on"
+        if not blind and all(read[0] == "off" for read in reads.values()):
             room.shot_inflight = None
             return
         if not running and _read(room_gate(room), stop and stop.keeping(1))[0] != "on":
@@ -6935,6 +6949,16 @@ class Controller:
             # The valve of the shot running now is this process's own: when whose it is could not be told
             # (no time left, or no read), it is switched off all the same. What is upstream stays recorded.
             close, unsure = unsure[:1], unsure[1:]
+        if blind and pending not in close:
+            # Never a pump a hold owns now (dosing, a fill, a flush, circulation), as in _close_cut_short; and
+            # when the hold could not be read in time, whose pump it is cannot be told: it is left recorded.
+            hold = self._hold_on(stop and stop.keeping(len(close) + 1)) if pending == rec.get("pump") else False
+            if hold is False:
+                close = [e for e in order if e in close or e == pending]  # the valve first, then up the line
+                left = [e for e in left if e != pending]
+            elif hold:
+                left = [e for e in order if e in left or e == pending]
+                why = why or "a hold (dosing / fill / flush / circulation) is on"
         if close and not self._switch_off_confirmed(close, stop):
             log(f"[{room.slug}] stopping: {', '.join(close)} not confirmed OFF - left recorded for the next start")
             return
@@ -6942,7 +6966,11 @@ class Controller:
             log(f"[{room.slug}] stopping: switched off {', '.join(close)} (the shot in flight)")
         if left:
             log(f"[{room.slug}] stopping: left {', '.join(left)} alone ({why})")
-        if not unsure:
+        if blind:
+            # Its OFF read back OFF, but so did the switch before the OFF was sent: that proves nothing while
+            # its ON may still land. The record stays, and the next start closes it if it did.
+            log(f"[{room.slug}] stopping: {pending} was still opening - left recorded for the next start")
+        elif not unsure:
             room.shot_inflight = None
 
     def _safe_exit(self, *_):

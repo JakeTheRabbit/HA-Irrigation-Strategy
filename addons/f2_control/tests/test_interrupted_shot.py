@@ -486,6 +486,260 @@ def test_stopping_the_app_mid_shot_closes_that_shot_and_counts_the_water_already
     assert counted_for_30_s(on_disk["1"]["daily_vol"]) and "_shot_inflight" not in on_disk
 
 
+def late_on_plug(monkeypatch, c, fake, clock, entity, lag_s=1.5, stop_after_s=0.5, off_wins=True):
+    """A plug that takes its turn_on at once and shows ON `lag_s` later, as a Zigbee plug does, and the app
+    stopped (SIGTERM) `stop_after_s` after that turn_on, while the plug still reads its old OFF.
+    `off_wins`: the plug does what it was last told, so the OFF the stop sends leaves it off. Not `off_wins`:
+    the ON was still on its way when the OFF arrived (or the OFF was lost) and lands after it.
+    -> settle(), which lets the late report land after the process has gone and says what the plug then reads."""
+    plug = {"told": "off", "shown_at": None, "settled": False}
+    real_call, real_get = controller.ha_call, controller.ha_get
+
+    def show():
+        if plug["shown_at"] is not None and clock.seconds >= plug["shown_at"]:
+            fake.set_state(entity, plug["told"])
+
+    def call(domain, service, **data):
+        if plug["settled"] or data.get("entity_id") != entity or service not in ("turn_on", "turn_off"):
+            return real_call(domain, service, **data)
+        fake.calls.append((domain, service, data))
+        if service == "turn_on" or off_wins:
+            plug["told"] = "on" if service == "turn_on" else "off"
+            plug["shown_at"] = clock.seconds + lag_s
+        if service == "turn_on":
+            clock.sleep(stop_after_s)
+            c._safe_exit()  # ends in SystemExit, inside the shot's switch-on
+        return True
+
+    def get(eid, timeout=8):
+        if eid == entity and not plug["settled"]:
+            show()
+        return real_get(eid, timeout=timeout)
+
+    def settle():
+        clock.sleep(lag_s + 5)
+        show()
+        plug["settled"] = True  # from here an ordinary switch again: it does what it is told, at once
+        return fake.states[entity][0]
+
+    monkeypatch.setattr(controller, "ha_call", call)
+    monkeypatch.setattr(controller, "ha_get", get)
+    return settle
+
+
+def next_start(c, fake):
+    """The app starts again: it reads the state file back and settles what was recorded."""
+    fake.calls.clear()
+    c._load_state()
+    c._reconcile_inflight()
+    return c.rooms[0]
+
+
+OPENED_BEFORE = {"switch.p": [], "switch.m": ["switch.p"], "switch.v1": ["switch.m", "switch.p"]}
+
+
+@pytest.mark.parametrize("opening", ["switch.p", "switch.m", "switch.v1"])
+def test_stopping_the_app_while_a_switch_opens_sends_it_off_though_it_still_reads_off(rig, monkeypatch, opening):
+    """The app is stopped (an update, a restart) 0.5 s after the shot sent a switch ON, before Home Assistant
+    shows it ON. Before: the stop read OFF, sent nothing, dropped the record and left; the plug then went ON with
+    no controller running and nothing recorded to close it at the next start. Now the stop switches off the
+    switch the shot was opening whatever it reads, with what the shot had already opened, and keeps the record:
+    an OFF that reads back OFF proves nothing about a switch that read OFF before it was sent."""
+    c, fake, clock = rig
+    settle = late_on_plug(monkeypatch, c, fake, clock, opening)
+    with pytest.raises(SystemExit):
+        c._execute_shot(c.rooms[0], 1, 120, 5, flow_lps=0.05)
+    assert offs(fake) == [opening] + OPENED_BEFORE[opening]  # the one that was opening first, then up the line
+    assert c.rooms[0].hardware_fault is None
+    assert saved(c)["default"]["_shot_inflight"]["valve"] == "switch.v1"  # still recorded
+    assert settle() == "off"  # the late report lands after the process has gone: the plug is off
+    assert {e: fake.states[e][0] for e in ("switch.v1", "switch.m", "switch.p")} == dict.fromkeys(
+        ("switch.v1", "switch.m", "switch.p"), "off")
+    room = next_start(c, fake)  # everything reads OFF: the record is simply closed, nothing is sent
+    assert offs(fake) == [] and room.shot_inflight is None and "_shot_inflight" not in saved(c)["default"]
+
+
+@pytest.mark.parametrize("opening", ["switch.p", "switch.m", "switch.v1"])
+def test_an_on_that_lands_after_the_stops_off_is_closed_at_the_next_start(rig, monkeypatch, opening):
+    """The ON was still on its way when the stop's OFF arrived, or the OFF was lost: the plug ends ON after the
+    process has gone. The shot is still recorded, so the next start closes it."""
+    c, fake, clock = rig
+    settle = late_on_plug(monkeypatch, c, fake, clock, opening, off_wins=False)
+    with pytest.raises(SystemExit):
+        c._execute_shot(c.rooms[0], 1, 120, 5, flow_lps=0.05)
+    assert opening in offs(fake)
+    assert settle() == "on"
+    room = next_start(c, fake)
+    assert offs(fake) == [opening] + [e for e in OPENED_BEFORE[opening] if fake.states[e][0] != "off"]
+    assert fake.states[opening][0] == "off" and room.shot_inflight is None and room.hardware_fault is None
+
+
+def test_stopping_a_one_switch_room_while_its_valve_opens_sends_it_off(rig, monkeypatch):
+    c, fake, clock = rig
+    room = c.rooms[0]
+    room.hw = {"pump": None, "mainline": None, "valves": {1: "switch.v1"}}
+    settle = late_on_plug(monkeypatch, c, fake, clock, "switch.v1")
+    with pytest.raises(SystemExit):
+        c._execute_shot(room, 1, 120, 5, flow_lps=0.05)
+    assert offs(fake) == ["switch.v1"]
+    assert settle() == "off" and room.shot_inflight["valve"] == "switch.v1"
+
+
+def hold_from_the_pumps_turn_on(monkeypatch, fake, state):
+    """The hold reads `state` from the moment the pump is told ON (None: it cannot be read)."""
+    real_call, real_get = controller.ha_call, controller.ha_get
+    seen = {"on": False}
+
+    def call(domain, service, **data):
+        if (service, data.get("entity_id")) == ("turn_on", "switch.p"):
+            seen["on"] = True
+            if state is not None:
+                fake.set_state("input_boolean.dosing", state)
+        return real_call(domain, service, **data)
+
+    def get(eid, timeout=8):
+        if eid == "input_boolean.dosing" and seen["on"] and state is None:
+            return controller.HAState()
+        return real_get(eid, timeout=timeout)
+
+    fake.set_state("input_boolean.dosing", "off")
+    monkeypatch.setattr(controller, "ha_call", call)
+    monkeypatch.setattr(controller, "ha_get", get)
+
+
+@pytest.mark.parametrize("hold", ["on", None])
+def test_stopping_while_the_pump_opens_never_switches_off_a_pump_a_hold_may_own(rig, monkeypatch, hold):
+    """As everywhere else: a pump is never switched off while a hold (dosing, a fill, a flush, circulation) is
+    on, nor when the hold cannot be read. The shot stays recorded either way."""
+    c, fake, clock = rig
+    c.hold_entities = ["input_boolean.dosing"]
+    settle = late_on_plug(monkeypatch, c, fake, clock, "switch.p")
+    hold_from_the_pumps_turn_on(monkeypatch, fake, hold)
+    with pytest.raises(SystemExit):
+        c._execute_shot(c.rooms[0], 1, 120, 5, flow_lps=0.05)
+    assert offs(fake) == []
+    assert settle() == "on"
+    assert saved(c)["default"]["_shot_inflight"]["pump"] == "switch.p"
+
+
+def unreadable_from_its_turn_on(monkeypatch, fake, entity):
+    """`entity` reads unavailable from the moment it is told ON (its device dropped off as it switched)."""
+    real_call, real_get = controller.ha_call, controller.ha_get
+    told = {"on": False}
+
+    def call(domain, service, **data):
+        if (service, data.get("entity_id")) == ("turn_on", entity):
+            told["on"] = True
+        return real_call(domain, service, **data)
+
+    def get(eid, timeout=8):
+        read = real_get(eid, timeout=timeout)
+        if eid == entity and told["on"]:
+            return controller.HAState("unavailable", read[1], read[2])
+        return read
+
+    monkeypatch.setattr(controller, "ha_call", call)
+    monkeypatch.setattr(controller, "ha_get", get)
+
+
+@pytest.mark.parametrize("opening", ["switch.p", "switch.m", "switch.v1"])
+def test_a_switch_that_cannot_be_read_while_it_opens_is_sent_off_and_the_shot_stays_recorded(rig, monkeypatch,
+                                                                                         opening):
+    """Not reading ON is not reading OFF: a switch whose device dropped off as it was told ON may be on. The stop
+    sends it OFF and keeps the record, because nothing confirms it."""
+    c, fake, clock = rig
+    late_on_plug(monkeypatch, c, fake, clock, opening)
+    unreadable_from_its_turn_on(monkeypatch, fake, opening)
+    with pytest.raises(SystemExit):
+        c._execute_shot(c.rooms[0], 1, 120, 5, flow_lps=0.05)
+    assert opening in offs(fake)
+    assert saved(c)["default"]["_shot_inflight"]["valve"] == "switch.v1"
+
+
+@pytest.mark.parametrize("opening", ["switch.m", "switch.v1"])
+def test_a_hold_never_keeps_the_stop_from_closing_a_valve_or_the_main_line(rig, monkeypatch, opening):
+    """A hold owns the pump, never the shot's valve or main line: those are closed whatever a hold reads."""
+    c, fake, clock = rig
+    c.hold_entities = ["input_boolean.dosing"]
+    fake.set_state("input_boolean.dosing", "off")
+    settle = late_on_plug(monkeypatch, c, fake, clock, opening)
+    real = controller.ha_call
+
+    def hold_starts(domain, service, **data):
+        if (service, data.get("entity_id")) == ("turn_on", opening):
+            fake.set_state("input_boolean.dosing", "on")
+        return real(domain, service, **data)
+
+    monkeypatch.setattr(controller, "ha_call", hold_starts)
+    with pytest.raises(SystemExit):
+        c._execute_shot(c.rooms[0], 1, 120, 5, flow_lps=0.05)
+    assert offs(fake)[0] == opening and "switch.p" not in offs(fake)  # the pump is the hold's now
+    assert settle() == "off"
+
+
+def test_a_pump_a_person_had_running_is_left_running_when_the_stop_comes_as_the_shot_opens_it(rig, monkeypatch):
+    """The tank was being circulated by hand, the pump on for half an hour, when a shot began and the app was
+    stopped as it sent the pump its ON. The pump reads ON: no ON is still to land, and it is the person's
+    (it was on before the shot), so nothing is sent, as before."""
+    c, fake, clock = rig
+    fake.set_state("switch.p", "on", last_updated=(datetime.now(timezone.utc) - timedelta(minutes=30)).isoformat())
+    real = controller.ha_call
+
+    def call(domain, service, **data):
+        if (service, data.get("entity_id")) == ("turn_on", "switch.p"):
+            fake.calls.append((domain, service, data))
+            assert c._shot_pending == "switch.p"
+            c._safe_exit()
+        return real(domain, service, **data)
+
+    monkeypatch.setattr(controller, "ha_call", call)
+    with pytest.raises(SystemExit):
+        c._execute_shot(c.rooms[0], 1, 120, 5, flow_lps=0.05)
+    assert offs(fake) == [] and fake.states["switch.p"][0] == "on"
+
+
+def test_the_opening_switch_is_forgotten_once_it_reads_on_and_when_the_shot_ends(rig, monkeypatch):
+    c, fake, _clock = rig
+    during = []
+    monkeypatch.setattr(c, "_wait_shot", lambda room, zone, duration_s, started=None: during.append(c._shot_pending)
+                        or (duration_s, None))
+    c._execute_shot(c.rooms[0], 1, 30, 5, flow_lps=0.05)
+    assert during == [None]  # every switch had read ON by the time the water ran
+    assert c._shot_pending is None
+
+    def refused(domain, service, **data):  # a switch that never reads ON: the shot is cancelled
+        fake.calls.append((domain, service, data))
+        return True
+
+    real = controller.ha_call
+    monkeypatch.setattr(controller, "ha_call", lambda domain, service, **data: refused(domain, service, **data)
+                        if (service, data.get("entity_id")) == ("turn_on", "switch.p") else real(domain, service, **data))
+    c._execute_shot(c.rooms[0], 2, 30, 5, flow_lps=0.05)
+    assert c._shot_pending is None  # not kept past the shot that set it
+
+
+def test_a_stop_with_no_shot_running_ignores_a_switch_name_left_over(rig):
+    """Only the shot running now has a switch that may still be opening. An older interrupted shot is settled by
+    the reconciler's rules alone, and with every switch reading OFF its record is simply closed."""
+    c, fake, _clock = rig
+    room = c.rooms[0]
+    room.shot_inflight = dict(RECORD)
+    c._shot_room, c._shot_pending = None, "switch.v1"  # no shot in flight in this process
+    c._safe_off()
+    assert offs(fake) == [] and room.shot_inflight is None
+
+
+def test_a_stop_between_two_switches_still_closes_a_record_whose_switches_all_read_off(rig):
+    """Unchanged: with no switch waiting to read ON and every switch reading OFF, the record is closed and
+    nothing is sent."""
+    c, fake, _clock = rig
+    room = c.rooms[0]
+    room.shot_inflight = dict(RECORD)
+    c._shot_room, c._shot_pending = room, None
+    c._safe_off()
+    assert offs(fake) == [] and room.shot_inflight is None
+
+
 def counting(c, fake, monkeypatch):
     """What the valve read each time a shot was counted."""
     seen = []
