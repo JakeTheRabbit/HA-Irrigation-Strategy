@@ -6,6 +6,7 @@ passed, and never before it. It switches nothing on, and it leaves what a person
 """
 
 import asyncio
+import math
 import time
 from datetime import timedelta
 from types import SimpleNamespace
@@ -44,12 +45,24 @@ def _wait_of(hass, sensor=SENSOR):
     return hass.states.get(sensor).attributes["max_s"] + shot_backstop.GRACE_S
 
 
+def _later(start, seconds):
+    """The first reading of the guard's clock at which `seconds` have passed since `start`.
+    `start + seconds` is not always it: the sum is rounded to a float, and the guard's subtraction
+    can then read a hair short (260.99999999999997 of 261). That happens where the sum crosses a
+    power of two, which a clock that counts from the machine's start does often in its first
+    20 minutes, as on a CI runner."""
+    at = start + seconds
+    while at - start < seconds:
+        at = math.nextafter(at, math.inf)
+    return at
+
+
 async def _overdue(hass, guard, sensor=SENSOR, extra=0.0):
     """The guard sees the shot, and then its wait is over: counted on the guard's own monotonic
     clock from when it first saw the shot."""
     await guard.tick()
     seen = guard.memory["seen"]
-    guard.clock = lambda: seen + _wait_of(hass, sensor) + extra
+    guard.clock = lambda: _later(seen, _wait_of(hass, sensor)) + extra
     await guard.tick()
     await hass.async_block_till_done()
 
@@ -131,7 +144,7 @@ async def test_a_shot_the_controller_left_open_is_closed_after_its_deadline_and_
     assert hass.states.get(VALVE).state == "on" and hass.states.get(PUMP).state == "on"
     assert sent == [] and _card(hass) is None
 
-    guard.clock = lambda: seen + wait
+    guard.clock = lambda: _later(seen, wait)
     await guard.tick()
     await hass.async_block_till_done()
     assert sent == [("turn_off", VALVE), ("turn_off", PUMP)]  # valve first, and nothing switched on
@@ -168,7 +181,7 @@ async def test_no_clock_that_can_be_set_ends_or_lengthens_the_wait(hass, control
     await guard.tick(dt_util.utcnow() + timedelta(days=1))  # the time the timer passes is not used
     await hass.async_block_till_done()
     assert hass.states.get(VALVE).state == "on" and _card(hass) is None
-    guard.clock = lambda: seen + attrs["max_s"] + shot_backstop.GRACE_S
+    guard.clock = lambda: _later(seen, attrs["max_s"] + shot_backstop.GRACE_S)
     await guard.tick(dt_util.utcnow() - timedelta(days=1))  # nor a clock that was set back
     await hass.async_block_till_done()
     assert hass.states.get(VALVE).state == "off" and _card(hass) is not None
@@ -383,14 +396,14 @@ async def test_a_reload_of_the_room_does_not_start_the_wait_again_or_send_more_o
     again = _guard(hass, entry)
     assert again is not guard and again.memory["seen"] == seen
     sent = _switched(hass)
-    again.clock = lambda: seen + _wait_of(hass)
+    again.clock = lambda: _later(seen, _wait_of(hass))
     await again.tick()
     await hass.async_block_till_done()
     assert sent == [("turn_off", ghost)]
     assert await hass.config_entries.async_reload(entry.entry_id)
     await hass.async_block_till_done()
     third = _guard(hass, entry)
-    third.clock = lambda: seen + _wait_of(hass)
+    third.clock = lambda: _later(seen, _wait_of(hass))
     for _ in range(5):
         await third.tick()
         await hass.async_block_till_done()
@@ -427,7 +440,7 @@ async def test_a_new_shot_left_open_starts_its_own_wait_and_raises_a_new_card(ha
     await hass.async_block_till_done()
     assert sent == [] and guard.memory["tries"] == 0 and guard.memory["said"] is False
     seen = guard.memory["seen"]
-    guard.clock = lambda: seen + _wait_of(hass)
+    guard.clock = lambda: _later(seen, _wait_of(hass))
     await guard.tick()
     await hass.async_block_till_done()
     assert sent == [("turn_off", ghost)]
@@ -448,7 +461,7 @@ async def _overdue_with_a_fresh_heartbeat(hass, guard, state="healthy"):
     """The shot's wait is over, and the controller wrote its heartbeat a moment ago."""
     await guard.tick()
     seen = guard.memory["seen"]
-    guard.clock = lambda: seen + _wait_of(hass)
+    guard.clock = lambda: _later(seen, _wait_of(hass))
     _reports(hass, guard, state)
     await guard.tick()
     await hass.async_block_till_done()
@@ -470,7 +483,7 @@ async def test_a_controller_that_reports_is_not_accused_while_its_pass_goes_on(h
     guard.clock = lambda: seen + shot_backstop.SILENT_S - 1
     await guard.tick()
     assert _card(hass) is None
-    guard.clock = lambda: seen + shot_backstop.SILENT_S
+    guard.clock = lambda: _later(seen, shot_backstop.SILENT_S)
     await guard.tick()
     await hass.async_block_till_done()
     assert _card(hass).translation_placeholders["left"] == f" It left the rest on: {VALVE} cannot be read."
@@ -525,7 +538,8 @@ async def test_a_heartbeat_that_is_written_again_is_a_controller_that_reports(ha
     assert guard.silent() is False and guard.beat["at"] == start + shot_backstop.SILENT_S - 1
     guard.clock = lambda: start + 2 * shot_backstop.SILENT_S - 2
     assert guard.silent() is False
-    guard.clock = lambda: start + 2 * shot_backstop.SILENT_S - 1
+    again = guard.beat["at"]
+    guard.clock = lambda: _later(again, shot_backstop.SILENT_S)
     assert guard.silent() is True
     hass.states.async_set(HEARTBEAT, "stopped", {})
     guard.clock = lambda: start + 2 * shot_backstop.SILENT_S
