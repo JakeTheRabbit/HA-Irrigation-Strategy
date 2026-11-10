@@ -4432,7 +4432,7 @@ class Controller:
 
     def _alert(self, key, code, title, message, room=None, zone=None, quiet=True, entity_id=None):
         """Raise notification `f2_{key}` with its error code (docs/error-codes.json; the dashboard's
-        Help & tools lists the same catalog). The key, and so the notification id, never changes
+        Settings > Help page lists the same catalog). The key, and so the notification id, never changes
         with the wording: an update replaces an old notification instead of adding a second one.
         True once Home Assistant has it; False while it is inside its quiet period (`quiet`: for a
         condition re-checked every loop) or could not be created. The first raise of an episode Home Assistant
@@ -4449,7 +4449,7 @@ class Controller:
         log("ALERT", title, "-", " ".join(message.split()))
         message = (
             f"{message}\n\nCode {code}. What it means and what to do: "
-            "Crop Steering → Help & tools → Error codes."
+            "Crop Steering → Settings → Help → Alert codes."
         )
         # The 30-minute quiet period starts only once Home Assistant HAS the notification: an alert
         # raised while it is unreachable (the moment a close fails, typically) is raised again on the
