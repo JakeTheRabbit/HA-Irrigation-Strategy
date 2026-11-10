@@ -5784,7 +5784,10 @@ class Controller:
         """A saved write-ahead shot record (see _execute_shot), or None when absent or unusable."""
         if not isinstance(saved, dict):
             return None
-        entities = {key: saved.get(key) for key in ("valve", "mainline", "pump")}
+        # A main line or pump of "" is none: the setup wizard writes "" for a room without one, and a record
+        # that a version before this line saved with it must still be usable. A shot always has a valve.
+        entities = {key: None if key != "valve" and saved.get(key) == "" else saved.get(key)
+                    for key in ("valve", "mainline", "pump")}
         if (
             type(saved.get("zone")) is not int
             or not isinstance(saved.get("started"), str)
@@ -5998,7 +6001,7 @@ class Controller:
         """Another valve fed by this shot's main line or pump is open: someone is watering through it.
         Inside the stop's `deadline` (a _Stop), None when one was not read in time or not answered and
         none read is open: it may be."""
-        line = {rec.get("mainline"), rec.get("pump")} - {None}
+        line = {rec.get("mainline"), rec.get("pump")} - {None, ""}  # no main line is not a line that is shared
         unread = False
         for other in self.rooms:
             if other is not room and not line & {other.hw.get("mainline"), other.hw.get("pump")}:
@@ -6406,7 +6409,7 @@ class Controller:
             # controller dies, is killed or loses Home Assistant mid-shot, the next loop closes exactly what
             # this shot opened, from this record, and nothing else (see _reconcile_room_inflight).
             room.shot_inflight = {
-                "zone": zone, "valve": valve, "mainline": mainline, "pump": pump,
+                "zone": zone, "valve": valve, "mainline": mainline or None, "pump": pump or None,
                 "started": datetime.now(timezone.utc).isoformat(),
             }
             saved = self._save_state()
