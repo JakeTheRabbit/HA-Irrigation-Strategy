@@ -85,7 +85,7 @@ Solid lines carry readings and commands. The dotted line is advice: the optional
 
 - **The AI cannot run a pump or a valve.** Neither the AI judges inside the controller nor an AI assistant connected through MCP has any way to start a shot, switch hardware or stop a safety action.
 - **The integration never switches hardware on.** Only the controller does, and only after the safety checks pass. The integration can switch the pump and the valves of a room off. This is the **Stop all** button, and the second guard for each shot (below). The two operate when the controller is stopped.
-- **An unreadable kill switch counts as off.** So does an unreadable room switch. When something cannot be read, Crop Steering assumes the safe answer.
+- **Before a shot, an unreadable kill switch counts as off.** So does an unreadable zone switch: the controller holds the shot. An unreadable switch does not end a shot that already runs. That shot ends at its set length. It ends earlier when the kill switch, the room switch or the zone switch reads a definite off, or when a manual override or a hold reads on. The "Room in use" switch is different. When the controller cannot read it, the controller keeps the last value that it read. Thus a restart of Home Assistant does not start a room that is off. A switch that the controller has never read counts as on.
 
 ## A second guard for each shot
 
@@ -109,7 +109,7 @@ Limits:
 | --- | --- |
 | 1. Sense | Devices update Home Assistant. The integration combines each zone's probes into one moisture and one EC reading, leaving out probes that are silent or out of range. |
 | 2. Decide | The engine finds the zone's phase and decides whether to water and how much. A zone on a timer follows its program. |
-| 3. Check | A fixed list of checks runs in order. The first one that fails holds the shot and records why, with an alert code. |
+| 3. Check | A fixed list of checks runs in order. The first one that fails holds the shot and records why. Some checks also raise an alert with a code. |
 | 4. Act | Pump on, then main line, then the zone valve. During the shot the controller keeps checking the kill switch and holds. |
 | 5. Prove | Each switch is read back on and then off. With a flow meter, the water counted is compared with the meter. A later check looks at whether the moisture rose. |
 | 6. Record | The shot, any hold, and every setting change go into one journal. The dashboard, History and alerts read from it. |
