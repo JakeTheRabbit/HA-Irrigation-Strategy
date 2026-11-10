@@ -1,0 +1,307 @@
+{
+  "schema": 1,
+  "captured_at": "2026-11-10T21:57:03.543Z",
+  "origin": "http://127.0.0.1:<loopback port>/dashboard.html?demo=1 (frontend/scripts/capture-academy.mjs)",
+  "source_revision": "45ccf079dfb4cd84c3cc57de89247df866e2d9f2",
+  "frontend_source_sha256": "606ed28ea8dd687360888c32c6739da9ce2a64335135f3f2bcfd816e71fb319d",
+  "frontend_source": "www/dashboard.html",
+  "fixed_local_time": "2026-10-18T15:50:00",
+  "supersedes": "demo-capture-manifest-r3.json for lesson stills; the r3 files remain the lesson-video scene sources",
+  "rule": "Genuine unmodified isolated demo UI. Actual Room A/Room B data. Fictional Training East lesson cases are separate. Only navigation, scrolling and tab/disclosure opening; no data edits or service calls.",
+  "captures": [
+    {
+      "file": "assets/screens/demo-overview-r4.png",
+      "route": "dashboard.html?demo=1#/all-zones",
+      "visible_headings": [
+        "All rooms",
+        "Room A",
+        "Zone 1",
+        "Zone 2",
+        "Zone 3"
+      ],
+      "width": 1280,
+      "height": 720,
+      "sha256": "3da8c3f27062c47a8f553db9a5dbd11d207ce0fa199234ace97c8031c73c1f1e",
+      "selectedRoom": "Room A",
+      "demo_label_visible": true,
+      "capture_kind": "full viewport",
+      "description": "Status › All rooms. Actual Room A/Room B grouped zone cards (r3 name: Overview, All zones).",
+      "review": "Visually reviewed: genuine demo UI, visible labels legible at source resolution; no reconstructed controls or values.",
+      "review_status": "reviewed"
+    },
+    {
+      "file": "assets/screens/demo-selected-room-r4.png",
+      "route": "dashboard.html?demo=1#/today",
+      "visible_headings": [
+        "Room A",
+        "Today",
+        "Zone 1Gelato 41",
+        "Sensors"
+      ],
+      "width": 1280,
+      "height": 720,
+      "sha256": "bdf9387541b084388d0c42e591f7f8de6195d00f0f66789f2ae6e22e445817f7",
+      "selectedRoom": "Room A",
+      "demo_label_visible": true,
+      "capture_kind": "full viewport",
+      "description": "Status › Room for actual Room A: zone cards, sensors and AI assistant summary.",
+      "review": "Visually reviewed: genuine demo UI, visible labels legible at source resolution; no reconstructed controls or values.",
+      "review_status": "reviewed"
+    },
+    {
+      "file": "assets/screens/demo-zone-detail-r4.png",
+      "route": "dashboard.html?demo=1#/zone/2",
+      "visible_headings": [
+        "Zone 2",
+        "Today · VWC",
+        "Today · Pore EC"
+      ],
+      "width": 1280,
+      "height": 720,
+      "sha256": "8313eb5facce53005c9e5ebf2383bad63a3534fae89c48d7f7e994735e5f5c95",
+      "selectedRoom": "Room A",
+      "demo_label_visible": true,
+      "capture_kind": "full viewport",
+      "description": "Actual Room A Zone 2 page, including phase, observations and decision context.",
+      "review": "Visually reviewed: genuine demo UI, visible labels legible at source resolution; no reconstructed controls or values.",
+      "review_status": "reviewed"
+    },
+    {
+      "file": "assets/screens/demo-currentday-r4.png",
+      "route": "dashboard.html?demo=1#/plan/targets",
+      "visible_headings": [
+        "Irrigation",
+        "Daily VWC and EC plan",
+        "Zone 1"
+      ],
+      "width": 1280,
+      "height": 720,
+      "sha256": "8fd45e951ef4abcd637a15c662d97f2483481aa1685a4d410c00f039b064db65",
+      "selectedRoom": "Room A",
+      "demo_label_visible": true,
+      "capture_kind": "full viewport",
+      "description": "Irrigation › Current day for actual Room A Zone 1: target source, plan graph and setpoints; unchanged demo values.",
+      "review": "Navigation, target-source and draft/review context. Plot continues below viewport; the graph crop shows it whole.",
+      "review_status": "reviewed"
+    },
+    {
+      "file": "assets/screens/demo-currentday-graph-r4.png",
+      "route": "dashboard.html?demo=1#/plan/targets",
+      "visible_headings": [],
+      "width": 522,
+      "height": 281,
+      "clip": {
+        "x": 264,
+        "y": 90,
+        "width": 522,
+        "height": 281
+      },
+      "sha256": "b619c3f2e4325061b7b5eacb9868d5b1af27273642c6e000d7cdcb7583e4045c",
+      "selectedRoom": "Room A",
+      "demo_label_visible": false,
+      "capture_kind": "actual plot and complete native legend crop",
+      "description": "Unmodified Current day plot with its native legend and both axes. Tight crop from the legend to the bottom of the plot; no inputs or CSS changed.",
+      "review": "Visually reviewed native legend and complete axes; crop taken by the browser, no image editing.",
+      "review_status": "reviewed"
+    },
+    {
+      "file": "assets/screens/demo-calendar-r4.png",
+      "route": "dashboard.html?demo=1#/plan/schedule",
+      "visible_headings": [
+        "Irrigation",
+        "Daily VWC and EC plan"
+      ],
+      "width": 1280,
+      "height": 720,
+      "sha256": "ddc04ea5fa50cf8f88626799feb653173f448f243cd818e3fdeaf14c2cb7f4b0",
+      "selectedRoom": "Room A",
+      "demo_label_visible": true,
+      "capture_kind": "full viewport",
+      "description": "Irrigation › Grow plan & presets (r3 name: Calendar) for actual Room A Zone 1: stored demo schedule reference and plan graph.",
+      "review": "Visually reviewed: genuine demo UI, visible labels legible at source resolution; no reconstructed controls or values.",
+      "review_status": "reviewed"
+    },
+    {
+      "file": "assets/screens/demo-calendar-profile-grid-r4.png",
+      "route": "dashboard.html?demo=1#/plan/schedule",
+      "visible_headings": [
+        "Grow overview"
+      ],
+      "width": 564,
+      "height": 500,
+      "clip": {
+        "x": 264,
+        "y": 72,
+        "width": 564,
+        "height": 500
+      },
+      "sha256": "a61be44332898669ac288d95767e8d531e3bc36172cea204bac18244ac6ed211",
+      "selectedRoom": "Room A",
+      "demo_label_visible": false,
+      "capture_kind": "actual DOM region",
+      "description": "Actual Grow overview balance grid and selected week from the native Grow plan & presets DOM.",
+      "review": "Actual native crop; later weeks continue in horizontal overflow and below, outside this capture.",
+      "review_status": "reviewed"
+    },
+    {
+      "file": "assets/screens/demo-endpoint-profiles-r4.png",
+      "route": "dashboard.html?demo=1#/plan/schedule",
+      "visible_headings": [
+        "Vegetative and generative endpoints"
+      ],
+      "width": 564,
+      "height": 500,
+      "clip": {
+        "x": 264,
+        "y": 72,
+        "width": 564,
+        "height": 500
+      },
+      "sha256": "7aaf5226dbe6582ec3bb4aeb1248d3b8279f4a6a54cae268d0dd8808535ea7ad",
+      "selectedRoom": "Room A",
+      "demo_label_visible": false,
+      "capture_kind": "actual DOM region",
+      "description": "Grow plan & presets › Endpoint profiles tab: actual operator-defined endpoint profile fields; tab opened, no values changed.",
+      "review": "Actual native endpoint editor crop starting at the tab strip; no values changed.",
+      "review_status": "reviewed"
+    },
+    {
+      "file": "assets/screens/demo-history-compare-r4.png",
+      "route": "dashboard.html?demo=1#/history/compare",
+      "visible_headings": [
+        "Compare runs",
+        "VWC, daily mean",
+        "Overnight dryback",
+        "Pore EC, daily mean",
+        "Water per plant"
+      ],
+      "width": 1280,
+      "height": 720,
+      "sha256": "b1aadead757fc01c78739e6087143dcbfebc8bbec62fe983c8a13caba3d22d5e",
+      "selectedRoom": "Room A",
+      "demo_label_visible": true,
+      "capture_kind": "full viewport",
+      "description": "History › Compare runs. Actual available demo comparison; coverage and present reference remain as displayed.",
+      "review": "Visually reviewed: genuine demo UI, visible labels legible at source resolution; no reconstructed controls or values.",
+      "review_status": "reviewed"
+    },
+    {
+      "file": "assets/screens/demo-probes-r4.png",
+      "route": "dashboard.html?demo=1#/equipment/probes",
+      "visible_headings": [
+        "Probes & offsets",
+        "Substrate curve · Room A",
+        "Where to put a probe"
+      ],
+      "width": 1280,
+      "height": 720,
+      "sha256": "be991d54d3dd6b3ad9d79c6274938e3e199912a9e1fd12383be944861d20ced8",
+      "selectedRoom": "Room A",
+      "demo_label_visible": true,
+      "capture_kind": "full viewport",
+      "description": "Equipment › Probes & offsets (r3 name: Probes). Actual probe view with its real demo readings and health.",
+      "review": "Visually reviewed: genuine demo UI, visible labels legible at source resolution; no reconstructed controls or values.",
+      "review_status": "reviewed"
+    },
+    {
+      "file": "assets/screens/demo-equipment-setup-r4.png",
+      "route": "dashboard.html?demo=1#/equipment/setup",
+      "visible_headings": [
+        "Room name and status",
+        "Shared room hardware"
+      ],
+      "width": 1280,
+      "height": 720,
+      "sha256": "b07890d4cfad5e571a6bcbad3b70fa34875be7ae7c9dcef4e4fa8ce682c09458",
+      "selectedRoom": "Room A",
+      "demo_label_visible": false,
+      "capture_kind": "full viewport",
+      "description": "Equipment › Setup: pumps & valves, Rooms & mappings tab, scrolled to the tab: stored revision and acknowledgement state. Tab opened; no configuration edits.",
+      "review": "Visually reviewed: genuine demo UI, visible labels legible at source resolution; no reconstructed controls or values.",
+      "review_status": "reviewed"
+    },
+    {
+      "file": "assets/screens/demo-probe-mapping-r4.png",
+      "route": "dashboard.html?demo=1#/equipment/setup",
+      "visible_headings": [
+        "Zones and probe mapping"
+      ],
+      "width": 984,
+      "height": 500,
+      "clip": {
+        "x": 264,
+        "y": 72,
+        "width": 984,
+        "height": 500
+      },
+      "sha256": "30fec2823d795456d26e79f710e18bd994d5f40f83b717f2dec6dc6e520e86f0",
+      "selectedRoom": "Room A",
+      "demo_label_visible": false,
+      "capture_kind": "actual DOM region",
+      "description": "Rooms & mappings › Zones and probe mapping: actual Zone 1 valve/probe mapping and delivery sizing; no edits.",
+      "review": "Actual native crop of the top of the mapping card; later zones continue below, outside this capture.",
+      "review_status": "reviewed"
+    },
+    {
+      "file": "assets/screens/demo-tank-and-feed-r4.png",
+      "route": "dashboard.html?demo=1#/equipment/dosing",
+      "visible_headings": [
+        "Fill valve",
+        "Tank and pump",
+        "Mix check failed 13:55",
+        "Feed recipes",
+        "Next batch"
+      ],
+      "width": 1280,
+      "height": 720,
+      "sha256": "1b1c5aa7e7173f18a5c0547dedf84dd3b4d4e611f948cb5e32c012f7d9d4c1f0",
+      "selectedRoom": "Room A",
+      "demo_label_visible": false,
+      "capture_kind": "full viewport",
+      "description": "Equipment › Feed & dosing (r3 name: Tank and feed), scrolled to Tank and pump for actual Room A. Values are demo observations, not the lesson tank-conflict scenario.",
+      "review": "Visually reviewed: genuine demo UI, visible labels legible at source resolution; no reconstructed controls or values.",
+      "review_status": "reviewed"
+    },
+    {
+      "file": "assets/screens/demo-settings-defaultview-r4.png",
+      "route": "dashboard.html?demo=1#/settings",
+      "visible_headings": [
+        "Where the app opens"
+      ],
+      "width": 292,
+      "height": 224,
+      "clip": {
+        "x": 956,
+        "y": 147,
+        "width": 292,
+        "height": 224
+      },
+      "sha256": "6d31c9a97eded846845b6e5d1aa687f86ead94204fec4ef150d6fe69c30032ac",
+      "selectedRoom": "Room A",
+      "demo_label_visible": false,
+      "capture_kind": "actual DOM region",
+      "description": "Settings › Dashboards & display › Where the app opens (r3 name: Settings › Display › Default view): actual landing-page preference; not changed.",
+      "review": "Visually reviewed: genuine demo UI, visible labels legible at source resolution; no reconstructed controls or values.",
+      "review_status": "reviewed"
+    },
+    {
+      "file": "assets/screens/demo-ai-assistant-r4.png",
+      "route": "dashboard.html?demo=1#/today/ai",
+      "visible_headings": [
+        "AI assistant",
+        "Status",
+        "AI budget",
+        "Last decision"
+      ],
+      "width": 1280,
+      "height": 720,
+      "sha256": "12d945d4b00c5c2a36651d9fb7b6e4699a99c838871c7492eae7ce8e93d3cd56",
+      "selectedRoom": "Room A",
+      "demo_label_visible": true,
+      "capture_kind": "full viewport",
+      "description": "Actual visible AI assistant state and explanation panels for Room A. No prompt submitted.",
+      "review": "Actual AI status and budget view. Details continue below viewport; this image does not establish advice accuracy.",
+      "review_status": "reviewed"
+    }
+  ]
+}

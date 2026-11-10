@@ -1161,7 +1161,7 @@
             "Matching entity ID",
             "Equipment → Setup"
           ],
-          "asset": "assets/screens/demo-equipment-setup-r3.png",
+          "asset": "assets/screens/demo-equipment-setup-r4.png",
           "alt": "Actual isolated demo screen. Read the displayed room and current sample values; separate paper examples use fictional values."
         },
         "check": {
@@ -1201,7 +1201,7 @@
             "One valve per zone",
             "Units + last update"
           ],
-          "asset": "assets/screens/demo-probes-r3.png",
+          "asset": "assets/screens/demo-probes-r4.png",
           "alt": "Actual isolated demo screen. Read the displayed room and current sample values; separate paper examples use fictional values."
         },
         "check": {
@@ -1364,7 +1364,7 @@
             "Live values match record",
             "Physical checks next"
           ],
-          "asset": "assets/screens/demo-probe-mapping-r3.png",
+          "asset": "assets/screens/demo-probe-mapping-r4.png",
           "alt": "Actual isolated demo screen. Read the displayed room and current sample values; separate paper examples use fictional values."
         },
         "check": {
@@ -1625,7 +1625,7 @@
             "Real location and age",
             "Identified EC method"
           ],
-          "asset": "assets/screens/demo-probes-r3.png",
+          "asset": "assets/screens/demo-probes-r4.png",
           "alt": "Actual isolated demo screen. Read the displayed room and current sample values; separate paper examples use fictional values."
         },
         "workedExample": {
