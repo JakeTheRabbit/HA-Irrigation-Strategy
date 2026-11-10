@@ -5540,6 +5540,10 @@ class Controller:
         st["last_shot"] = now
         st["last_shot_is_anchor"] = False  # water was delivered: this one is an irrigation
         st["daily_vol"] += delivered_l
+        try:  # the plan follows the probe only on a grow-day whose water raised the reading (plan_follow.watered)
+            plan_follow.watered(st.setdefault("plan_follow", plan_follow.fresh()), (st.get("fc_follow") or {}).get("peak"))
+        except Exception as e:  # a record is never worth a delivered shot the counters miss
+            log("plan follow record error", room.slug, zone, e)
         if room.tank.get("distance"):  # what the tank gave, for the level's drawdown check
             tank_level.drawn(room.tank_drawdown, delivered_l)
         elif not room.tank:  # no level mapped: the estimate counts it (only once a fill has been seen)
@@ -8746,7 +8750,7 @@ class Controller:
             if stall is not None and st["phase"] in ("P2", "P3") and stall["rewater"] < p.p2_threshold:
                 p = params[zone] = dataclasses.replace(p, p2_threshold=stall["rewater"])
             self._count_peak(st, snap)
-            plan_follow.reading(st.setdefault("plan_follow", plan_follow.fresh()), snap.vwc, now.timestamp())
+            plan_follow.reading(st.setdefault("plan_follow", plan_follow.fresh()), snap.vwc, now.timestamp(), st["phase"])
             try:  # the plan follows the probe: once a grow-day after the ramp, never a reason to water or not
                 self._plan_follow(room, zone, st, now)
             except Exception as e:

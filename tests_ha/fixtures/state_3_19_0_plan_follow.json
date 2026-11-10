@@ -1,0 +1,177 @@
+{
+ "_about": "What controller 3.19.0 saved in /data/state.json for the one-zone tent (the room test_plan_adherence.py installs, its plan running) at lights-on on 10 Nov 2026, after a grow-day on which no water reached zone 1 (no shot counted, the reading falling from 51.0 all day). 3.19.0's own lights-on (_change_phase into P0) closed that day and kept its peak, 51.0, 14 points under the plan's P1 target of 65, as a clean day: it never asked whether water raised the reading, so the record has no \"rose\", \"watered\", \"before\" or \"ramped\". Recorded by running that release's controller on this tier: the night's state was set by hand (P3, the follower's counted peak, 3.19.0's plan_follow.reading for the day), then its _change_phase and _save_state wrote the file. A test that loads it moves grow_day and day_before to today and yesterday.",
+ "grow_day": "2026-11-10",
+ "day_before": "2026-11-09",
+ "p1": 65.0,
+ "peak": 51.0,
+ "state": {
+  "default": {
+   "_room_active": true,
+   "_journal_backfill": 1
+  },
+  "tent": {
+   "1": {
+    "phase": "P0",
+    "peak": 0.0,
+    "peak_prev": 51.0,
+    "fc_follow": {
+     "peak": 0.0,
+     "day": null,
+     "used": {}
+    },
+    "plan_follow": {
+     "days": [
+      {
+       "day": "2026-11-09",
+       "peak": 51.0
+      }
+     ],
+     "step": false,
+     "last": [
+      45.0,
+      1794297540.0
+     ],
+     "gap": false,
+     "checked": null
+    },
+    "p1_reached": false,
+    "p1_peak_before": null,
+    "p1_extra": 0,
+    "capped_in_a_row": 0,
+    "max_run_latch": null,
+    "p1_settled_before": null,
+    "p1_expected_rise": null,
+    "p1_flat": 0,
+    "p1_stall": null,
+    "ec_flushing": false,
+    "shots": 0,
+    "daily_vol": 0.0,
+    "water_history": [
+     {
+      "grow_day": "2026-11-10",
+      "litres": 0.0,
+      "complete": false
+     }
+    ],
+    "water_history_legacy_excluded_l": 0.0,
+    "learn": {
+     "peak_adj": 0.0,
+     "jev": {
+      "day": null,
+      "nudged": [],
+      "asked": null,
+      "last": null,
+      "changed": null
+     },
+     "peak": null,
+     "gain": null,
+     "day_rate": null,
+     "night_rate": null,
+     "day_n": 0,
+     "night_n": 0,
+     "day_acc": [
+      0.0,
+      0
+     ],
+     "night_acc": [
+      0.0,
+      0
+     ],
+     "hold_days": 0,
+     "day": "2026-11-10",
+     "ramp_start": 41.0,
+     "ramp": [],
+     "pending": null,
+     "outcome": "pending",
+     "stalled_at": null,
+     "last_change": "",
+     "prev_peak": null,
+     "prev_hold": 0,
+     "veto": null
+    },
+    "ec_smooth": 3.1,
+    "ec_settled": 3.1,
+    "ec_settled_at": "2026-11-10T09:59:00",
+    "ec_offset": 0.0,
+    "last_shot": null,
+    "last_shot_is_anchor": false,
+    "last_phase_change": "2026-11-10T08:00:00",
+    "last_ec_steer": null,
+    "last_daily_reset": "2026-11-10",
+    "plateau_hist": [],
+    "night_hist": [],
+    "night": null,
+    "vmax_wetup": [],
+    "rescue_misses": 0,
+    "rescue_check": null,
+    "on_failures": null,
+    "water_vpd": null,
+    "day_hist": [],
+    "day_acc": null,
+    "day_out": []
+   },
+   "_setup": {
+    "revision": 1,
+    "fingerprint": "{\"active\": true, \"enable_flag\": \"switch.crop_steering_tent_engine_enabled\", \"feed_ec_sensor\": \"\", \"feed_ph_sensor\": \"\", \"mainline\": \"\", \"plumbing\": \"valves_only\", \"pump\": \"\", \"valves\": {\"1\": \"switch.gt1_irrigation_switch\"}, \"zones\": [1]}",
+    "entry_id": "01M72ECTWCY8Q7FWARYX2YGQWP"
+   },
+   "_lights": [
+    8.0,
+    0.0
+   ],
+   "_strategy_required": true,
+   "_room_active": true,
+   "_irrigation_mode": {
+    "1": "steering"
+   },
+   "_adherence": {
+    "v": 1,
+    "draft_seen": null,
+    "baseline": {
+     "revision": 1,
+     "status": "active",
+     "values": {
+      "number.crop_steering_tent_zone_1_vegetative_dryback_target": 35.0,
+      "number.crop_steering_tent_zone_1_generative_dryback_target": 45.0,
+      "number.crop_steering_tent_zone_1_ec_target_veg_p0": 3.0,
+      "number.crop_steering_tent_zone_1_ec_target_gen_p0": 4.0,
+      "number.crop_steering_tent_zone_1_ec_target_veg_p1": 3.0,
+      "number.crop_steering_tent_zone_1_ec_target_gen_p1": 5.0,
+      "number.crop_steering_tent_zone_1_ec_target_veg_p2": 3.2,
+      "number.crop_steering_tent_zone_1_ec_target_gen_p2": 6.0,
+      "number.crop_steering_tent_zone_1_p1_target_vwc": 65.0,
+      "number.crop_steering_tent_zone_1_p2_vwc_threshold": 60.0,
+      "number.crop_steering_tent_zone_1_p2_shot_size": 5.0,
+      "number.crop_steering_tent_zone_1_p1_initial_shot_size": 2.0,
+      "number.crop_steering_tent_zone_1_p3_emergency_vwc_threshold": 40.0,
+      "number.crop_steering_tent_zone_1_p3_emergency_shot_size": 2.0,
+      "number.crop_steering_tent_zone_1_p1_shot_size_increment": 0.5,
+      "number.crop_steering_tent_zone_1_p1_maximum_shots": 6.0,
+      "number.crop_steering_tent_zone_1_p1_time_between_shots": 15.0,
+      "number.crop_steering_tent_zone_1_p0_maximum_wait_time": 120.0,
+      "number.crop_steering_tent_zone_1_max_daily_volume": 20.0,
+      "number.crop_steering_tent_zone_1_field_capacity": 70.0,
+      "number.crop_steering_tent_zone_1_maximum_ec": 9.0,
+      "number.crop_steering_tent_zone_1_watchdog_hours": 3.0
+     }
+    },
+    "alerted": {},
+    "phase_log": {
+     "1": [
+      {
+       "at": "2026-11-10T09:59",
+       "from": null,
+       "to": "P2",
+       "how": "first seen"
+      }
+     ]
+    },
+    "bridge": null,
+    "bridge_day": null,
+    "cooldown_until": null,
+    "bridge_outcome": null
+   },
+   "_journal_backfill": 1
+  }
+ }
+}
