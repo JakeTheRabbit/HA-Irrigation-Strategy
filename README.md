@@ -59,7 +59,7 @@ It is not a fit if:
 
 - Do not use the software as an emergency stop. Use the physical shutdown procedure of your installation. The "Watering" switch does not isolate the electrical power.
 - Install valves that close when the power is lost, and a float switch or a timer that can stop a pump without the software.
-- Start on one zone with the "Watering" switch off, and do a catch test before the first watering ([First-run setup](docs/FIRST_RUN.md#before-the-first-watering)). More: [Safety](https://cropsteering.growlabs.nz/safety).
+- Set up each room with the "Watering" switch off. Do a test shot and a catch test before the first automatic watering ([First-run setup](docs/FIRST_RUN.md#before-the-first-watering)). More: [Safety](https://cropsteering.growlabs.nz/safety).
 
 ## Install
 
