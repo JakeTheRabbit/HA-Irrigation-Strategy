@@ -1,3 +1,7 @@
+# 3.20.0
+
+Pair with integration 3.20.0. **C3.** A stop sends OFF to the switch the running shot was still opening and keeps the shot record (#259). An interrupted shot's switches are closed whatever the Watering switch reads (#261), and a shot record from a room with no main line or no pump is no longer dropped as unreadable (#264). A grow-day without water no longer moves a plan to follow the probe (#262). A copying zone skips a sibling's daily-minimum shot once its own floor is met (#254). The controller reports each open shot to the integration for the CS-617 backstop (#266). New `healthcheck.py` for the standalone container (#260). Alerts name Settings → Help → Alert codes (#270). Physical safeguards unchanged.
+
 # 3.19.0
 
 Pair with integration 3.19.0. **C3.** The grow plan follows the probe: a new pure `plan_follow.py` keeps the last 3 grow-days' peaks per zone (zone state `plan_follow`, an old `state.json` loads a fresh record) and sets the zone's plan offset through `strategy_zone_offset` when the peaks disagree with the plan (CS-714). An armed plan that has not started no longer holds the room (`strategy_runtime.parse_snapshot`). certifi 2026.10.23 (GHSA-6q48). Physical safeguards unchanged.

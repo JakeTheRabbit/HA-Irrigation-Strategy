@@ -11,15 +11,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.20.0] - 2026-11-11
+
+3.20.0 — a second guard closes a shot the controller left open (CS-617); an interrupted shot is closed with Watering off, in rooms with no main line or pump, and on a stop mid-open; a grow-day without water no longer moves a plan; a new zone's daily limit starts at its size; Docker healthcheck; alerts name the real help page.
+
+Pair: **controller 3.20.0**. **C3: controller and integration behaviour.** New integration module `shot_backstop.py` and Repairs alert CS-617; new controller `healthcheck.py` and a `healthcheck` in `docker-compose.yml`; a new zone's `max_daily_volume` start comes from its substrate volume. Existing zones, entity ids and add-on options do not change. **Approved rehearsal, no staging soak:** the owner asked on 2026-11-11 to merge every open pull request and release (docs/RELEASING.md step 5, `approved-rehearsal`). This candidate carries more than one C3 change and no staging photoperiod, fault drill or catch test is claimed.
+
 ### 🌱 In plain English
-- A zone whose probe is set aside copies a sibling's shots. It no longer copies the sibling's daily-minimum
-  catch-up shots once it already has its own daily minimum due by then, so a dry sibling can catch up and
-  the zones even out.
+
+- **A second guard for each shot.** If the controller stops, hangs or loses Home Assistant in the middle of a shot,
+  the integration now switches off what that shot opened (valve first, then main line, then pump) one minute after
+  the shot should have ended, and raises a Repairs card (CS-617) that stays until a person confirms it.
+- **An interrupted shot is always closed.** The controller closes what an interrupted shot opened whatever the
+  Watering switch reads. A stop during the seconds a switch is still opening now sends it OFF too. Rooms with no main
+  line or no pump no longer lose the record of an interrupted shot after a restart.
+- **A day without water no longer moves a plan.** The plan follows the probe only on grow-days the zone was
+  actually watered, so a dry day (Watering off, a hold, an empty tank) cannot lower a zone's rescue level.
+- **A copying zone stops copying catch-up shots it does not need.** A zone whose probe is set aside no longer copies a
+  sibling's daily-minimum shots once its own daily minimum is met.
+- **A new zone's daily water limit fits the zone.** It starts at half the zone's substrate volume (20 L at least), so a
+  large zone no longer hits the limit on day one. Zones you have now do not change.
+- **Docker shows the controller's health.** `docker ps` shows healthy or unhealthy for the standalone container.
+- **Clearer help text.** Alerts point to Settings → Help → Alert codes; probe tooltips say median; the README, system
+  map, install guide, entity reference and first-run catch test match the product.
 
 ### 🔧 Technical notes
-- `controller.py` blind-zone loop: a sibling's `min_daily` decision is not copied when the blind zone's
-  `daily_vol >= floor_due` (its own paced floor) and its floor is set; the reason reads "COPY Zn skips its
-  floor shot". Tests in `test_plan_hold_never_stops_rescues.py`.
+
+- #266 `feat`: integration `shot_backstop.py` (30 s poll) closes devices of a shot whose controller-reported deadline
+  plus 1 min has passed; CS-617 in `notify_catalog.py`, `repairs.py`, `docs/ERROR_CODES.md`; the controller publishes
+  the shot's devices and budget once the valve is open. Tests in `tests_ha/test_shot_backstop.py`.
+- #259 `fix(controller)`: on stop, OFF is sent to the switch the running shot was opening and the in-flight record is
+  kept for the next start (`tests_ha/test_stop_budget.py`).
+- #261 `fix`: interrupted-shot close no longer depends on the kill switch (`guard_chain_golden.json` updated).
+- #264 `fix(controller)`: an interrupted-shot record with an empty main-line or pump entity is valid
+  (`tests_ha/test_interrupted_shot_no_main_line.py`).
+- #262 `fix`: `plan_follow.py` keeps a grow-day's peak only when that day was watered; seeded fixture
+  `tests_ha/fixtures/state_3_19_0_plan_follow.json` proves a 3.19.0 state file still loads.
+- #254 `fix`: controller blind-zone loop skips a sibling's `min_daily` copy when `daily_vol >= floor_due`.
+- #271 `feat`: new zones' `max_daily_volume` starts at max(20 L, half of plants × litres per plant) (`bounds.starting_daily_volume`) via the engine defaults, the
+  generated copy, `config_flow.py`, `setup_api.py` and `number.py`; dashboard bundles rebuilt.
+- #260 `feat(container)`: `alive.py` + `healthcheck.py`; unhealthy after three missed passes and 2 min.
+- #270, #267 strings; #268, #269 MCP server; #255, #256, #257 docs; #258, #265, #272 tests.
 
 ## [3.19.0] - 2026-11-10
 
