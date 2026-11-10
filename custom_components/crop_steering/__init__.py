@@ -321,6 +321,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     except Exception as err:  # pragma: no cover - never block setup on the status
         _LOGGER.warning("System status unavailable: %s", err)
 
+    # The second guard of a shot: OFF only, and only past the controller's own deadline.
+    try:
+        from .shot_backstop import async_setup_backstop
+
+        async_setup_backstop(hass, entry)
+    except Exception as err:  # pragma: no cover - never block setup on the guard
+        _LOGGER.warning("Shot guard unavailable: %s", err)
+
     # Setup health checks -> Home Assistant Repairs (read-only diagnostics)
     from datetime import timedelta
 

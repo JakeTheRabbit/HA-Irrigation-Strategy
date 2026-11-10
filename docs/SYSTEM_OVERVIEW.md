@@ -1,6 +1,6 @@
 # System overview
 
-The integration owns rooms, zone metadata, mappings, number/select entities, the native sidebar and persistent grow plans. The controller app owns the decision loop and actuator calls. The pure crop-steering-engine package provides testable phase decisions.
+The integration owns rooms, zone metadata, mappings, number/select entities, the native sidebar and persistent grow plans. The controller app owns the decision loop and actuator calls. The integration sends OFF calls only: Stop all, and the close of a shot that the controller left open (CS-617). The pure crop-steering-engine package provides testable phase decisions.
 
 The frontend reads HA state and Recorder history. Its setup and strategy actions use response-bearing services with explicit room IDs and revision checks. A saved draft does not change active irrigation. At a local lights-on boundary, an armed plan supplies one versioned, expiring snapshot of effective per-zone parameters. The controller validates that snapshot and retains a durable required-plan latch once a plan takes control.
 

@@ -694,6 +694,16 @@ NO_TOUCH_HOURS = {"1 h": 1.0, "24 h": 24.0, "Until lights-on": None}
 # a person since, unless its recorded history shows only Home Assistant losing it and finding it
 # again (_on_since_shot).
 INFLIGHT_OPEN_WINDOW_S = (-5.0, 60.0)
+# The shot that is open, told to Home Assistant (Controller._say_inflight) so that the integration can close it
+# if the controller goes silent (shot_backstop.py there). All times are lengths in seconds, never clock times:
+# the integration counts them itself from when it first sees the state, so a controller on another machine
+# with another clock cannot make it close a shot early.
+# After the shot's own time: the close with its retries and read-backs.
+INFLIGHT_CLOSE_S = 150.0
+INFLIGHT_SAY_TRIES = 3  # rounds of a shot's wait that try the "open" write; then that shot has no second guard
+# At a start, an "open" this long past its own max_s is written over whatever its devices read: the
+# integration has had its time with it.
+INFLIGHT_STALE_S = 600.0
 
 
 def _on_since_shot(history, started):
@@ -804,8 +814,8 @@ _HELD_NUMBERS = re.compile(r"\d{1,2}:\d{2}|[-+]?\d+(?:\.\d+)?")  # a hold's time
 # The codes whose severity is critical in docs/error-codes.json (tests/test_error_codes.py keeps the two equal):
 # their push is urgent, a high-priority one on a phone whose row asks for that.
 CRITICAL_CODES = frozenset({"CS-201", "CS-202", "CS-203", "CS-204", "CS-207", "CS-211", "CS-212", "CS-301",
-                            "CS-308", "CS-310", "CS-311", "CS-315", "CS-402", "CS-601", "CS-606", "CS-801",
-                            "CS-809", "CS-811", "CS-901", "CS-902"})
+                            "CS-308", "CS-310", "CS-311", "CS-315", "CS-402", "CS-601", "CS-606", "CS-617",
+                            "CS-801", "CS-809", "CS-811", "CS-901", "CS-902"})
 # How often a standing alert pushes again, by its severity in docs/error-codes.json (tests/test_error_codes.py
 # keeps INFO_CODES equal to the info codes): a critical code, or a warning that means a zone is not being watered,
 # every 30 minutes for as long as it lasts; any other warning after 15 minutes, then 1, 2 and 4 hours, then every
@@ -1130,6 +1140,10 @@ class Room:
         # what the room last reported, repeated while a shot holds the loop (Controller._keep_alive)
         self._beat = None  # (hardware_fault, room_active, loop_error) of its last heartbeat
         self._beat_at = None  # and when, by time.monotonic()
+        # What Home Assistant has of the shot in flight: None at a start (not known), "open", "idle", or "owed"
+        # after a write that failed.
+        self._inflight_said = None
+        self._inflight_due = None  # the "open" a running shot has still to write (_say_open)
         self._statuses = {}  # z -> (label, reason) of its zones' last status
         self._safety_shown = {}  # z -> (label, since) of its zones' safety status (the hysteresis)
         self._status_at = {}  # z -> when, by time.monotonic()
@@ -6015,6 +6029,114 @@ class Controller:
                 unread = unread or (deadline is not None and v is None)
         return None if unread else False
 
+    def _say_open(self, room, remaining):
+        """In a round of a shot's wait, with `remaining` s of the shot left: tell Home Assistant the shot is
+        open, once. The write is optional, as a keep-alive's is (_keep_alive): it is kept short, fits in the
+        time the shot has left with a second to spare, and after INFLIGHT_SAY_TRIES rounds that failed it is
+        given up. `opened_s`: how long ago the shot began to open, by this controller's monotonic clock, so
+        every switch of the shot went on within that time before the write. `max_s`: what is left of the
+        shot and INFLIGHT_CLOSE_S, by when a controller that still runs has closed it. ("idle" can come
+        later: it is written when the whole pass is over.)"""
+        due = getattr(room, "_inflight_due", None)
+        timeout = min(0.5, (remaining - 1) / 2)
+        if due is None or timeout < 0.25:
+            return
+        if getattr(room, "_inflight_said", None) is None:
+            # Since the start it is not known what Home Assistant has: an "open" of a shot this controller
+            # has no record of may stand there, and it is all the integration has to close that shot.
+            return
+        due["tries"] += 1
+        self._say_inflight(room, {"opened_s": round(time.monotonic() - due["at"], 1),
+                                  "max_s": round(remaining + INFLIGHT_CLOSE_S, 1)}, timeout=timeout)
+        if room._inflight_said == "open" or due["tries"] >= INFLIGHT_SAY_TRIES:
+            room._inflight_due = None
+
+    def _say_inflight(self, room, shot=None, timeout=3):
+        """Tell Home Assistant which shot is open, as sensor.crop_steering_<prefix>shot_in_flight.
+
+        `shot` ({opened_s, max_s}, from _say_open, in a shot's wait): state "open" with what the shot opened
+        (its record), the holds, the other valves on its line and the two lengths. Without `shot`: state
+        "idle" when no record is left and this controller has not written "idle" since its last "open" or
+        its start. That is asked once a pass, after the pass's last pump closed (loop_once), and at a stop
+        (_say_stopped): never before or between shots (R5). While a record stays (its close is not
+        confirmed) nothing is written: the "open" stands. No record left does not mean every device is off:
+        the controller leaves a pump under a hold, and a device a person switched, on purpose.
+
+        At a start the controller does not know what Home Assistant has. An "open" can be there with no
+        record here: the state file was lost, or its record could not be used. So the first "idle" is
+        written only after that "open" was read and every device it names reads off (_inflight_settled);
+        until then it stands, for the integration to act on, and no later shot writes over it (_say_open).
+
+        The integration reads the state. When `max_s` and a margin have passed and it is still "open", it
+        switches off what the shot opened and is still on, by the rules of _inflight_plan. Best effort: a
+        write that fails never stops a shot, and that shot then has no second guard, as before this existed.
+        A shot that dies while it opens, before its "open" is written, has none either."""
+        try:
+            rec = getattr(room, "shot_inflight", None)
+            said = getattr(room, "_inflight_said", None)
+            if shot is None:
+                if rec or said == "idle" or (said is None and not self._inflight_settled(room)):
+                    return
+                state, attrs = "idle", {}
+            else:
+                line = {rec.get("mainline"), rec.get("pump")} - {None, ""}
+                others = [valve for other in self.rooms
+                          if other is room or line & {other.hw.get("mainline"), other.hw.get("pump")}
+                          for valve in other.hw.get("valves", {}).values() if valve and valve != rec.get("valve")]
+                state, attrs = "open", {
+                    **rec, **shot, "holds": list(self.hold_entities), "line_valves": sorted(set(others)),
+                    "controller_instance": self.instance_id}
+            room._inflight_said = "owed"  # not known until Home Assistant answers: an "idle" is owed
+            status = ha_set(f"sensor.crop_steering_{room.prefix}shot_in_flight", state,
+                            {**attrs, "engine": PRODUCT, "friendly_name": "Shot in flight (controller)"},
+                            timeout=timeout)
+            if status is not None and status < 300:
+                room._inflight_said = state
+        except Exception as e:  # never in the way of a shot or of the loop
+            log("shot-in-flight state not written", room.slug, e)
+
+    def _inflight_settled(self, room):
+        """At a start, with no record here: whether "idle" may be written over what Home Assistant has. Yes
+        when it has no such state or not an "open", when the "open" is not one a controller wrote (a device
+        that is not a name), when every device that "open" names reads off or is one Home Assistant no
+        longer has, or when the "open" is INFLIGHT_STALE_S past its own time, by Home Assistant's stamps
+        (the integration has had its time with it). No when a device does not read off or cannot be read,
+        or when Home Assistant did not answer: asked again after the next pass, and said once in the log,
+        because until then no shot of the room is written (_say_open)."""
+        status, read = ha_get_status(f"sensor.crop_steering_{room.prefix}shot_in_flight", timeout=2)
+        if status == 404:
+            return True
+        if status != 200:
+            return False
+        state, attrs = read[0], read[1] or {}
+        if state != "open":
+            return True
+        devices = [attrs.get(key) for key in ("valve", "mainline", "pump") if attrs.get(key)]
+        if not all(isinstance(entity, str) for entity in devices):
+            return True  # not a state this controller wrote
+        waits = None
+        for entity in devices:
+            answered, device = ha_get_status(entity, timeout=2)
+            if answered == 404:
+                continue  # Home Assistant no longer has it: nothing of it is on
+            if answered != 200 or hw_state(entity, device[0]) != "off":
+                waits = entity
+                break
+        if waits is None:
+            return True
+        written, now = _aware(read[2]), read.served_at or datetime.now(timezone.utc)
+        long = attrs.get("max_s")
+        if (written is not None and isinstance(long, (int, float)) and not isinstance(long, bool)
+                and (now - written).total_seconds() >= long + INFLIGHT_STALE_S):
+            log(f"[{room.slug}] the shot-in-flight state of an earlier run is long past its time ({waits} "
+                "does not read off): written over")
+            return True
+        if not getattr(room, "_inflight_waits_said", False):
+            room._inflight_waits_said = True
+            log(f"[{room.slug}] Home Assistant has a shot of an earlier run as open and {waits} does not read "
+                "off: left for the integration to close; this room's shots are not written until it is settled")
+        return False
+
     def _clear_inflight(self, room, message):
         room.shot_inflight = None
         self._save_state()
@@ -6103,6 +6225,7 @@ class Controller:
                     valve_seen_on = valve_seen_on or state == "on"
                 if ended:
                     return time.monotonic() - started, ("external", entity)
+            self._say_open(room, deadline - time.monotonic())  # after the round's reads: they are never later for it
             self._keep_alive(deadline - time.monotonic())
             remaining = deadline - time.monotonic()
             if remaining > 0:
@@ -6417,6 +6540,8 @@ class Controller:
             if not saved or unsaved:  # no record on disk, nothing opens (raised below: CS-212)
                 raise RuntimeError(f"Z{zone} shot refused, its in-flight record was not saved: "
                                    f"{unsaved or 'the state file could not be written'}")
+            # Said to Home Assistant once the valve is open (_wait_shot): nothing new waits on it before that (R5).
+            room._inflight_due = {"at": time.monotonic(), "tries": 0}
             self._journal_shot_started(room, zone, journaled, intent, duration_s, size_pct, nominal_l,
                                        actor, program_id, reason_text, requested_at)
             commanded = True
@@ -6645,6 +6770,7 @@ class Controller:
                     self._meters_fresh_after(room, journaled.get("meters_after"))
                 if journaled["intent_id"] is not None:  # its end, after its water is counted (#197)
                     self._journal_shot_end(room, zone, journaled, valve_started)
+                room._inflight_due = None  # "idle" is said once the pass is over (loop_once), not between shots
 
     def _journal_shot_started(self, room, zone, journaled, intent, duration_s, size_pct, nominal_l, actor,
                               program_id, reason_text, requested_at):
@@ -7061,6 +7187,11 @@ class Controller:
                     },
                     timeout=timeout,
                 )
+                # The shot this run closed is closed: said now, or its "open" would stand until the next
+                # start and a device somebody switches in between would look like that shot's.
+                timeout = min(1.0, (deadline - time.monotonic()) / (2 * (len(self.rooms) - i)))
+                if timeout >= 0.25 and getattr(room, "_inflight_said", None) in ("open", "owed"):
+                    self._say_inflight(room, timeout=timeout)
         except Exception as e:
             log("could not say stopped on the heartbeat:", e)
 
@@ -7642,6 +7773,8 @@ class Controller:
                 self._room_error(room, now, e)
                 self._clear_queue(room)
         self._calibrating_pass = None
+        for room in self.rooms:  # after the pass's last pump closed (R5): "idle" where one is owed
+            self._say_inflight(room)
         self._check_defaulted_setpoints()
         self._maybe_notify(all_pub, now)
         self._send_events()
@@ -9578,6 +9711,8 @@ class Controller:
         if self.hold_entities:
             self._check_holds()
         self._start_dosing()
+        for room in self.rooms:  # what Home Assistant has of a shot in flight, read before the first pass, so
+            self._say_inflight(room)  # that its shots are written too (_say_open)
         while True:
             if _GATE.state is not None:
                 self._park_refused()

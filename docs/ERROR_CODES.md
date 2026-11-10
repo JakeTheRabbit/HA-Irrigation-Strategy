@@ -98,6 +98,7 @@ controller still reports a setup change (CS-201) and a hardware hold (CS-301, CS
 | [CS-614](#cs-614) | Retired entities in use | Warning | Repairs card |
 | [CS-615](#cs-615) | Probe offsets unreadable | Warning | Repairs card |
 | [CS-616](#cs-616) | Upgrade report | Warning | Repairs card |
+| [CS-617](#cs-617) | Controller did not close a shot | Critical | Repairs card |
 | [CS-701](#cs-701) | No water at the zone | Warning | Notification |
 | [CS-702](#cs-702) | Unusual water for each plant | Information | Notification |
 | [CS-703](#cs-703) | Overnight probe fault suspected | Warning | Notification |
@@ -1554,6 +1555,30 @@ controller still reports a setup change (CS-201) and a hardware hold (CS-301, CS
 
 - Open Crop Steering → Settings → System status → Upgrade report. Each line under Needs you links to the page to open and to the section of the upgrade guide to read.
 - Mark the card as read to close it. The report stays in Settings.
+
+<a id="cs-617"></a>
+
+### CS-617: Controller did not close a shot
+
+*Critical · Repairs card*
+
+**What it means.** The controller opened a shot and did not report its end in time. It stopped, hung or lost Home Assistant in the middle of the shot, or a device did not read off after the shot. The integration then sent OFF to what the shot had opened and was still on: the zone valve, the main line and the pump. If its rules told it to leave the valve on, it sent nothing. The card says what it sent, what still reads on, and what it left on and why. The integration never switches anything on.
+
+**Effect on water.** The shot can have run longer than its length, by the time that the integration waits: the time that the controller can need to close a shot, and 1 min more (3.5 to 4.5 min). If the controller stopped, the zones get no shots until it runs again.
+
+**Probable causes**
+
+- The Crop Steering Controller app stopped or was stopped in the middle of a shot.
+- The controller hung, or its machine lost power or its network.
+- A pump or a valve did not read off after the shot. The controller then holds the hardware (CS-301), and the integration sends OFF again.
+
+**What to do**
+
+- CAUTION: If the card says that a device still reads on, water can still flow. Go to the room now and stop it by hand.
+- Examine the room: the substrate of the zone, the runoff and the floor.
+- Read the log of the Crop Steering Controller app and find why it stopped. Start the app again.
+- The integration leaves a switch on if it did not go on while the shot opened (a person switched it, or it lost its connection and came back), if it cannot be read, if another valve on the same line is open, or if a hold is on. The card names what it left.
+- Open the card in Settings → Repairs and confirm it. The card stays until a person confirms it.
 
 ## AI assistant (CS-7xx)
 

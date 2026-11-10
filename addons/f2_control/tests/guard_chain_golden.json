@@ -92,8 +92,8 @@
    }
   },
   "writes": {
-   "n": 59,
-   "sha256": "68b671f9b17783ce0429348dc1e4083228d15a1dfd082dbf155387c804cddc8c"
+   "n": 60,
+   "sha256": "5c7f07c73a830bf1d2cafc4ee9c0e8e96a05498e77b6a399c695b72909cd4802"
   }
  },
  "loop/feed_ec_drifts": {
@@ -180,8 +180,8 @@
    }
   },
   "writes": {
-   "n": 116,
-   "sha256": "b7eb64fc5fa0fa1c9919c0fc240aa1c2a578e6ed5c46e7fe16d9353e729df9de"
+   "n": 117,
+   "sha256": "aa648f39c3ce0107b275f0da5d0b84cae106b3b16cfef10978caf358547a5e17"
   }
  },
  "loop/fires": {
@@ -272,8 +272,8 @@
    }
   },
   "writes": {
-   "n": 22,
-   "sha256": "c0bf5ea6923caa76605aabf5cd0c88c4609091fd3db14a1c7c10347bf5d9e39b"
+   "n": 23,
+   "sha256": "a79b901a56e61b441aea61e6ef6c42607c1ba39ecbe5d7a4853d78ad1d753e37"
   }
  },
  "loop/inflight": {
@@ -532,8 +532,8 @@
    }
   },
   "writes": {
-   "n": 744,
-   "sha256": "ffea64e1221e957e4d2a770bc2d581a64fae826372886ae4cde91efd4deb2912"
+   "n": 745,
+   "sha256": "31801410a1b0a370c177f1533c070291c02f490f1ca3a2830b1cad122139dd8d"
   }
  },
  "loop/tank_min_then_refilled": {
@@ -725,8 +725,8 @@
    }
   },
   "writes": {
-   "n": 104,
-   "sha256": "abfee8802c705629f74420eda17a785388bd373db0c56535789b26a762f0c102"
+   "n": 109,
+   "sha256": "4c352e81a4a3972d576b931ad11bcfd8c3b6217dd6e73150e3c863d4650a7572"
   }
  },
  "loop/waste_open": {
@@ -834,8 +834,8 @@
    }
   },
   "writes": {
-   "n": 59,
-   "sha256": "6aa71d1383844475ecc3d695fa84cbc820af213fc9d12dbdd2917b7d84ccca44"
+   "n": 60,
+   "sha256": "2a5c3e8d343b41157804e2c0b784cd67cf0af2bb59639eec3b2dede1ce531c75"
   }
  },
  "loop/zone_off_then_unreadable_then_kill": {
@@ -978,8 +978,8 @@
    }
   },
   "writes": {
-   "n": 102,
-   "sha256": "ea3c1baf357f749cc6c83ddc4cd41f4bf0345545ec1f9fcbe3fdb6c772079179"
+   "n": 103,
+   "sha256": "1f614cfd83b018cb74688de0387e6d4ef050a25da7ded68f549139cfb09c947b"
   }
  },
  "pass/archived": {

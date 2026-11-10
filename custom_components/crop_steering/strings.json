@@ -828,6 +828,17 @@
       "title": "Crop Steering: {count} setting(s) not found (CS-605)",
       "description": "The controller finds each setting by its exact entity ID. The settings below have a different entity ID. The controller uses its built-in defaults for them.\n\n{entities}\n\nThe built-in defaults apply, also for the daily water cap and the plant count. The shots can be wrong for the zones.\n\nKeep the kill switch off until you correct the entity IDs. If you changed an entity ID, change it back. Go to Settings → Devices & services → Entities. Select the entity. Select the cog. Enter the old ID in Entity ID. If almost every entity is in the list, delete the Crop Steering entry. Restart Home Assistant. Add Crop Steering again. The integration does not rename an entity for you.\n\nCAUTION: Keep the kill switch off until the card clears. The defaults can give too much or too little water to the zones.\n\nCode CS-605. What it means and what to do: Crop Steering → Help & tools → Error codes."
     },
+    "shot_left_open": {
+      "title": "Crop Steering: Controller did not close a shot (CS-617)",
+      "fix_flow": {
+        "step": {
+          "confirm": {
+            "title": "A shot was not closed in time",
+            "description": "The controller opened a shot in zone {zone} and did not report its end in time. The controller stopped, hung or lost Home Assistant in the middle of the shot, or a device did not read off after the shot.\n\n{at}: {action}{caution}{left}\n\nExamine the room: the substrate, the runoff and the floor. The shot can have run longer than its length. Then read the log of the Crop Steering Controller app. If the controller does not run, start it. The zones get shots when the controller runs and its checks pass.\n\nCode CS-617. What it means and what to do: Crop Steering \u2192 Settings \u2192 Help \u2192 Alert codes.\n\nConfirm to remove this card. Do this only after you examine the room."
+          }
+        }
+      }
+    },
     "max_run_latch": {
       "title": "Crop Steering: Shots at maximum length (CS-312)",
       "fix_flow": {
