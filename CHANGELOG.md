@@ -11,6 +11,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.20.1] - 2026-11-11
+
+3.20.1 — every screenshot, and the Academy's lesson pictures, show the 3.20.0 dashboard.
+
+Pair: **controller 3.20.1**. **C0: documentation only.** No code, entity, option or state-file change; the controller and integration code are those of 3.20.0. Released so the GitHub Pages demo and the Academy publish the new pictures (Pages deploys from `main`, which moves only by promotion).
+
+### 🌱 In plain English
+
+- **Pictures match the app.** The README, the screenshot gallery, the feature pages and the pictures the website uses
+  were taken again from the 3.20.0 dashboard.
+- **The Academy shows today's dashboard.** Its 15 lesson pictures were taken again. The lesson videos still show the
+  October screens until they are rendered again.
+
+### 🔧 Technical notes
+
+- #274: `frontend/scripts/capture-readme.mjs` (27 images in `img/` + `img/screenshots.json`) and
+  `frontend/scripts/capture-screens.mjs` + `scripts/optimise_screens.py` (42 images in `docs/screens/`).
+- #275: new `frontend/scripts/capture-academy.mjs`; 15 `www/learn/assets/screens/demo-*-r4.png` with
+  `demo-capture-manifest-r4.json`; lesson `visual.asset` paths moved from r3 to r4 in `modules/operations.json` and
+  `modules/setup.json`, `course.json` rebuilt. The r3 files stay: the published lesson videos are bound to them
+  (`build_course_videos.py`), and `--verify-media` checks narration and video only.
+
 ## [3.20.0] - 2026-11-11
 
 3.20.0 — a second guard closes a shot the controller left open (CS-617); an interrupted shot is closed with Watering off, in rooms with no main line or pump, and on a stop mid-open; a grow-day without water no longer moves a plan; a new zone's daily limit starts at its size; Docker healthcheck; alerts name the real help page.

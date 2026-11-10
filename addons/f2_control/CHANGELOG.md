@@ -1,3 +1,7 @@
+# 3.20.1
+
+Pair with integration 3.20.1. **C0.** Screenshots and Academy stills only; the controller code is unchanged from 3.20.0.
+
 # 3.20.0
 
 Pair with integration 3.20.0. **C3.** A stop sends OFF to the switch the running shot was still opening and keeps the shot record (#259). An interrupted shot's switches are closed whatever the Watering switch reads (#261), and a shot record from a room with no main line or no pump is no longer dropped as unreadable (#264). A grow-day without water no longer moves a plan to follow the probe (#262). A copying zone skips a sibling's daily-minimum shot once its own floor is met (#254). The controller reports each open shot to the integration for the CS-617 backstop (#266). New `healthcheck.py` for the standalone container (#260). Alerts name Settings → Help → Alert codes (#270). Physical safeguards unchanged.
