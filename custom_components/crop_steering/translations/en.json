@@ -834,7 +834,7 @@
         "step": {
           "confirm": {
             "title": "A shot was not closed in time",
-            "description": "The controller opened a shot in zone {zone} and did not report its end in time. The controller stopped, hung or lost Home Assistant in the middle of the shot, or a device did not read off after the shot.\n\n{at}: {action}{caution}{left}\n\nExamine the room: the substrate, the runoff and the floor. The shot can have run longer than its length. Then read the log of the Crop Steering Controller app. If the controller does not run, start it. The zones get shots when the controller runs and its checks pass.\n\nCode CS-617. What it means and what to do: Crop Steering \u2192 Help & tools \u2192 Error codes.\n\nConfirm to remove this card. Do this only after you examine the room."
+            "description": "The controller opened a shot in zone {zone} and did not report its end in time. The controller stopped, hung or lost Home Assistant in the middle of the shot, or a device did not read off after the shot.\n\n{at}: {action}{caution}{left}\n\nExamine the room: the substrate, the runoff and the floor. The shot can have run longer than its length. Then read the log of the Crop Steering Controller app. If the controller does not run, start it. The zones get shots when the controller runs and its checks pass.\n\nCode CS-617. What it means and what to do: Crop Steering \u2192 Settings \u2192 Help \u2192 Alert codes.\n\nConfirm to remove this card. Do this only after you examine the room."
           }
         }
       }
