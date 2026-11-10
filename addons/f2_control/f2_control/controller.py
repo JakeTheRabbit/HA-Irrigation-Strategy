@@ -8837,13 +8837,24 @@ class Controller:
                     f"probe unreadable {out_min:.0f} min: waiting {BLIND_GRACE_MIN} min before watering "
                     "without it", "blind_wait"))
                 continue
+            # The minimum daily water due by now (decide()'s floor, paced by floor_share): no probe needed.
+            floor_due = p.min_daily_volume * floor_share(SimpleNamespace(
+                hours_since_lights_on=(24.0 - self._hours_to(now, room.lights_on_hour)) % 24.0,
+                hours_to_lights_off=self._hours_to(now, room.lights_off_hour)), p)
             if healthy:
                 sib = pick_sibling(p.p1_target, healthy)
                 s_fire, s_size, s_reason = decisions[sib]
                 rescue = getattr(s_reason, "kind", None) in PLAN_HOLD_EXEMPT
                 mss = self._minutes_since_shot(st, now)
                 floor_last = room.__dict__.get("_last_shot_kind", {}).get(zone) == "min_daily"
-                if s_fire and not rescue and floor_last and mss < p.p2_min_interval_min:
+                if (s_fire and getattr(s_reason, "kind", None) == "min_daily" and p.min_daily_volume > 0
+                        and st["daily_vol"] >= floor_due):
+                    # 10 Nov 2026: a dry sibling catching up on its floor gave each copying zone the same water,
+                    # so the zones never evened out. The sibling's floor shot is its own; this zone has its share.
+                    decisions[zone] = (False, 0.0, Reason(
+                        f"COPY Z{sib} skips its floor shot: this zone has {st['daily_vol']:.1f} of the "
+                        f"{floor_due:.1f}L due", "blind_copy"))
+                elif s_fire and not rescue and floor_last and mss < p.p2_min_interval_min:
                     # only after this zone's own floor shot (below): no routine copy lands minutes after it.
                     # Every other copy follows the sibling exactly, its ramp and EC shots included.
                     decisions[zone] = (False, 0.0, Reason(
@@ -8873,9 +8884,6 @@ class Controller:
             # gets it too, with the lights on and past P0, when no other shot fires. Every shot counts toward it.
             # Never into a table that is not draining (CS-310), the zone's or, in copy mode, its sibling's.
             backed_up = getattr(room, "_backed_up", None) or {}
-            floor_due = p.min_daily_volume * floor_share(SimpleNamespace(
-                hours_since_lights_on=(24.0 - self._hours_to(now, room.lights_on_hour)) % 24.0,
-                hours_to_lights_off=self._hours_to(now, room.lights_off_hour)), p)
             if (not decisions[zone][0] and p.min_daily_volume > 0 and lights_on and st["phase"] != "P0"
                     and zone not in backed_up and sib not in backed_up
                     and st["daily_vol"] < floor_due and mss >= p.p2_min_interval_min):
