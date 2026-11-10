@@ -1,0 +1,898 @@
+{
+ "version": "1.0.0",
+ "title": "Grow facility licence intake",
+ "notes": [
+  "One question asks for one fact. Do not combine facts in one answer.",
+  "Speak the answer in full sentences. Say names, numbers and units clearly.",
+  "If the answer is not known, say 'not known' and say who knows it.",
+  "Take a photo of each document or item that the question names."
+ ],
+ "routes": {
+  "new": "New licence (no current licence)",
+  "amend": "Add or change a location on a current licence",
+  "renew": "Renew a current licence",
+  "other": "Other change (responsible person, activity, security)"
+ },
+ "sections": [
+  {
+   "id": "S00",
+   "title": "Interview",
+   "questions": [
+    {
+     "id": "Q000",
+     "q": "Who does this interview?",
+     "type": "text",
+     "map": "meta.interviewer",
+     "required": true
+    },
+    {
+     "id": "Q001",
+     "q": "Who gives the answers? Give the full name and the role.",
+     "type": "text",
+     "map": "meta.respondent",
+     "required": true
+    },
+    {
+     "id": "Q002",
+     "q": "Which type of application do you need?",
+     "type": "choice",
+     "options": [
+      "new",
+      "amend",
+      "renew",
+      "other"
+     ],
+     "map": "meta.route",
+     "required": true,
+     "help": "new = no licence now. amend = add or change a location. renew = the licence expires soon. other = change of responsible person, activity or security."
+    },
+    {
+     "id": "Q003",
+     "q": "Does the customer agree that we keep these answers and use them to prepare the application?",
+     "type": "yesno",
+     "map": "meta.consent",
+     "required": true
+    },
+    {
+     "id": "Q004",
+     "q": "By which date must the application go to the Agency? Say why that date.",
+     "type": "text",
+     "map": "timeline.target_lodgement"
+    }
+   ]
+  },
+  {
+   "id": "S01",
+   "title": "Company",
+   "questions": [
+    {
+     "id": "Q010",
+     "q": "What is the full legal name of the company, as on the Companies Office register?",
+     "type": "text",
+     "map": "applicant.legal_name",
+     "required": true,
+     "legal_entity": true
+    },
+    {
+     "id": "Q011",
+     "q": "What is the company number?",
+     "type": "text",
+     "map": "applicant.company_number",
+     "required": true
+    },
+    {
+     "id": "Q012",
+     "q": "What is the NZBN?",
+     "type": "text",
+     "map": "applicant.nzbn"
+    },
+    {
+     "id": "Q013",
+     "q": "What is the registered office address?",
+     "type": "text",
+     "map": "applicant.registered_office_line",
+     "required": true
+    },
+    {
+     "id": "Q014",
+     "q": "Who holds the shares? Give each name and the number of shares.",
+     "type": "text",
+     "map": "applicant.shareholding",
+     "required": true,
+     "help": "The Agency checks every person with significant influence. A trust or a parent company needs the names behind it."
+    },
+    {
+     "id": "Q015",
+     "q": "Who are the directors? Give each full name.",
+     "type": "text",
+     "map": "applicant.directors",
+     "required": true
+    },
+    {
+     "id": "Q016",
+     "q": "Does the industry code on the Companies Office register match medicinal cannabis cultivation?",
+     "type": "yesno",
+     "map": "applicant.industry_code_ok",
+     "help": "A wrong code is a small fix. Do it before you lodge."
+    },
+    {
+     "id": "Q017",
+     "q": "What is the company website and social media? Does any page sell or advertise seeds, clones or flower?",
+     "type": "text",
+     "map": "applicant.public_footprint",
+     "help": "The Agency looks at public pages. Claims about past illegal growing, seed sales or 'signed offtake' cause questions."
+    }
+   ]
+  },
+  {
+   "id": "S02",
+   "title": "Responsible person",
+   "questions": [
+    {
+     "id": "Q020",
+     "q": "What is the full legal name of the responsible person, exactly as on the driver licence or passport?",
+     "type": "text",
+     "map": "applicant.director.full_name",
+     "required": true,
+     "help": "The Ministry of Justice check fails if the name does not match the ID. Include all middle names.",
+     "photo": "Front of the driver licence or passport"
+    },
+    {
+     "id": "Q021",
+     "q": "What name does this person use every day?",
+     "type": "text",
+     "map": "applicant.director.known_as"
+    },
+    {
+     "id": "Q022",
+     "q": "What is the position of this person in the company?",
+     "type": "text",
+     "map": "applicant.director.position",
+     "required": true
+    },
+    {
+     "id": "Q023",
+     "q": "What is the mobile phone number of this person?",
+     "type": "text",
+     "map": "applicant.director.phone",
+     "required": true
+    },
+    {
+     "id": "Q024",
+     "q": "What is the email address of this person? Is it a Google account?",
+     "type": "text",
+     "map": "applicant.director.email",
+     "required": true,
+     "help": "Shared Drive folders need a Google account. Record a second address if the main address is not a Google account."
+    },
+    {
+     "id": "Q025",
+     "q": "In which town or suburb does this person live?",
+     "type": "text",
+     "map": "applicant.director.place"
+    },
+    {
+     "id": "Q026",
+     "q": "How many minutes does this person need to drive from home to the site?",
+     "type": "number",
+     "unit": "min",
+     "map": "security.response_minutes",
+     "required": true,
+     "help": "The security plan must give a real alarm response time."
+    },
+    {
+     "id": "Q027",
+     "q": "Does this person have a criminal conviction or a pending charge, in New Zealand or in another country?",
+     "type": "text",
+     "map": "applicant.director.convictions",
+     "help": "Say 'none' if none. Do not guess. The Agency gets the record from the Ministry of Justice."
+    },
+    {
+     "id": "Q028",
+     "q": "Is there a second key-holder who lives near the site? Give the name, phone and drive time.",
+     "type": "text",
+     "map": "security.second_keyholder"
+    }
+   ]
+  },
+  {
+   "id": "S03",
+   "title": "Current licence",
+   "show_if": {
+    "Q002": [
+     "amend",
+     "renew",
+     "other"
+    ]
+   },
+   "questions": [
+    {
+     "id": "Q030",
+     "q": "What is the licence number?",
+     "type": "text",
+     "map": "licence.number",
+     "required": true,
+     "photo": "Every page of the current licence"
+    },
+    {
+     "id": "Q031",
+     "q": "What is the expiry date on the licence?",
+     "type": "date",
+     "map": "timeline.licence_expiry",
+     "required": true,
+     "help": "One licence has one expiry. A location added later expires on the same date."
+    },
+    {
+     "id": "Q032",
+     "q": "Which activities does the licence permit? For example cultivation, possession for manufacture, research.",
+     "type": "text",
+     "map": "licence.activities",
+     "required": true
+    },
+    {
+     "id": "Q033",
+     "q": "Does the licence have conditions? Read each condition.",
+     "type": "text",
+     "map": "licence.conditions"
+    },
+    {
+     "id": "Q034",
+     "q": "What are the addresses of all locations on the licence now?",
+     "type": "text",
+     "map": "licence.existing_location",
+     "required": true
+    },
+    {
+     "id": "Q035",
+     "q": "Does each current location stay on the licence?",
+     "type": "yesno",
+     "map": "licence.keep_existing_locations",
+     "required": true,
+     "help": "You cannot move a location. You add the new location, then remove the old location."
+    },
+    {
+     "id": "Q036",
+     "q": "At each current location, which SOP version, register and electronic record system do you use today?",
+     "type": "text",
+     "map": "licence.current_practice",
+     "required": true,
+     "help": "If something changed at a current location without approval, stop and get advice before you lodge."
+    },
+    {
+     "id": "Q037",
+     "q": "Did you send every monthly supply return and the last 31 December stocktake? Give the date of the last one.",
+     "type": "text",
+     "map": "records.returns_status",
+     "required": true
+    },
+    {
+     "id": "Q038",
+     "q": "Is any record, manifest or register entry wrong or incomplete? Describe it.",
+     "type": "text",
+     "map": "records.known_issues",
+     "help": "Never change a used record. We write a signed and dated correction note."
+    }
+   ]
+  },
+  {
+   "id": "S04",
+   "title": "Site and land",
+   "questions": [
+    {
+     "id": "Q040",
+     "q": "What is the street address of the site?",
+     "type": "text",
+     "map": "site.one_line",
+     "required": true
+    },
+    {
+     "id": "Q041",
+     "q": "What is the legal description? For example Lot 1 DP 123456.",
+     "type": "text",
+     "map": "site.legal_description",
+     "required": true,
+     "help": "It is on the record of title or the council rates notice."
+    },
+    {
+     "id": "Q042",
+     "q": "What is the GPS position of the centre of the grow buildings?",
+     "type": "gps",
+     "map": "site.gps",
+     "required": true,
+     "help": "Use the GPS button while you stand at the buildings."
+    },
+    {
+     "id": "Q043",
+     "q": "What is the land area of the lot in square metres?",
+     "type": "number",
+     "unit": "m2",
+     "map": "site.land_area_m2"
+    },
+    {
+     "id": "Q044",
+     "q": "Who is the registered owner on the record of title?",
+     "type": "text",
+     "map": "site.owner",
+     "required": true,
+     "help": "The owner must give written consent. We buy the title from LINZ to check the name.",
+     "photo": "Record of title, if available",
+     "legal_entity": true
+    },
+    {
+     "id": "Q045",
+     "q": "Does the company own the land, or does it lease the land?",
+     "type": "choice",
+     "options": [
+      "own",
+      "lease",
+      "other"
+     ],
+     "map": "site.tenure",
+     "required": true
+    },
+    {
+     "id": "Q046",
+     "q": "Who is the landlord? Give the legal name, the person who can sign for the landlord, the phone and the email.",
+     "type": "text",
+     "map": "site.landlord_line",
+     "show_if": {
+      "Q045": [
+       "lease",
+       "other"
+      ]
+     },
+     "photo": "Lease, first page and signature page"
+    },
+    {
+     "id": "Q047",
+     "q": "Does the lease cover the whole lot, or only part of the lot? Describe the leased part.",
+     "type": "text",
+     "map": "site.licensed_area",
+     "required": true,
+     "help": "Recommended: make the licensed area only the fenced grow compound. A small fenced area is easier to secure and to show on the plan."
+    },
+    {
+     "id": "Q048",
+     "q": "Who else uses the property? Is there a house on the lot? How do those people get in?",
+     "type": "text",
+     "map": "planning.other_users",
+     "required": true
+    },
+    {
+     "id": "Q049",
+     "q": "Do members of the public visit any part of the property?",
+     "type": "yesno",
+     "map": "planning.public_access",
+     "required": true
+    },
+    {
+     "id": "Q04A",
+     "q": "What was the property used for before?",
+     "type": "text",
+     "map": "site.former_use"
+    },
+    {
+     "id": "Q04B",
+     "q": "How far is the nearest house from the grow buildings, in metres?",
+     "type": "number",
+     "unit": "m",
+     "map": "planning.nearest_dwelling_m",
+     "required": true,
+     "help": "Some SOPs ask for 120 m. Closer houses need a strong odour and visibility plan."
+    },
+    {
+     "id": "Q04C",
+     "q": "Are there easements, pipelines, power lines or drains on the lot? Where?",
+     "type": "text",
+     "map": "planning.easements",
+     "help": "Do a beforeUdig request before any post hole."
+    },
+    {
+     "id": "Q04D",
+     "q": "Did the council say whether the buildings or containers need a building consent or a resource consent? Do you have it in writing?",
+     "type": "text",
+     "map": "planning.council",
+     "required": true
+    },
+    {
+     "id": "Q04E",
+     "q": "How many vehicle entrances does the property have? Where is each one?",
+     "type": "text",
+     "map": "site.entrances",
+     "required": true,
+     "help": "Every entrance needs a locked gate. Only one entrance stays in use."
+    }
+   ]
+  },
+  {
+   "id": "S05",
+   "title": "Buildings and layout",
+   "questions": [
+    {
+     "id": "Q050",
+     "q": "List every building, room or container on the site. For each one, give a short name, for example C1 or Room 1.",
+     "type": "text",
+     "map": "layout.structures_list",
+     "required": true,
+     "help": "Use the site layout tool to draw each one to size. Include sheds and containers that hold no cannabis."
+    },
+    {
+     "id": "Q051",
+     "q": "For each one, give the internal length and the internal width in metres.",
+     "type": "text",
+     "map": "layout.dimensions",
+     "required": true
+    },
+    {
+     "id": "Q052",
+     "q": "For each one, say what it is used for: flowering, vegetative, mothers, propagation, drying, storage, office or other.",
+     "type": "text",
+     "map": "layout.uses",
+     "required": true
+    },
+    {
+     "id": "Q053",
+     "q": "Which building is the secure store for dried cannabis, seed and the register?",
+     "type": "text",
+     "map": "cultivation.drying_and_storage",
+     "required": true
+    },
+    {
+     "id": "Q054",
+     "q": "Is there a safe? Give the make, the model, the size and how it is fixed to the floor.",
+     "type": "text",
+     "map": "security.safe"
+    },
+    {
+     "id": "Q055",
+     "q": "For each building, how do you go in? List each door in order, for example outer door, vestibule, inner door.",
+     "type": "text",
+     "map": "layout.entry_sequence",
+     "required": true
+    },
+    {
+     "id": "Q056",
+     "q": "Does any door, window or vent have glass, or a weak panel?",
+     "type": "text",
+     "map": "layout.weak_points"
+    },
+    {
+     "id": "Q057",
+     "q": "How many rack tiers does each grow room have? What is the total bench area?",
+     "type": "text",
+     "map": "cultivation.racking"
+    },
+    {
+     "id": "Q058",
+     "q": "Where do you keep cannabis waste, and how do you destroy it?",
+     "type": "text",
+     "map": "layout.waste",
+     "required": true
+    },
+    {
+     "id": "Q059",
+     "q": "Where is the quarantine area for new plants? Where is the breeding area, if any?",
+     "type": "text",
+     "map": "research.locations"
+    },
+    {
+     "id": "Q05A",
+     "q": "Are there more buildings or a greenhouse planned for later? Where, and what size?",
+     "type": "text",
+     "map": "cultivation.future_stages",
+     "help": "Leave future stages out of this application. Add them later with a separate amendment."
+    },
+    {
+     "id": "Q05B",
+     "q": "Take photos of each building from outside, each door and each room inside. Say what each photo shows.",
+     "type": "photos",
+     "map": "layout.photos",
+     "required": true
+    }
+   ]
+  },
+  {
+   "id": "S06",
+   "title": "Cultivation",
+   "questions": [
+    {
+     "id": "Q060",
+     "q": "Is all cultivation indoors? If not, give the outdoor area in square metres.",
+     "type": "text",
+     "map": "cultivation.outdoor",
+     "required": true
+    },
+    {
+     "id": "Q061",
+     "q": "What is the total indoor cultivation area in square metres? Do not include drying or storage rooms.",
+     "type": "number",
+     "unit": "m2",
+     "map": "cultivation.indoor_m2",
+     "required": true
+    },
+    {
+     "id": "Q062",
+     "q": "How do you control the climate? Name the air conditioning, the dehumidifiers and the controller.",
+     "type": "text",
+     "map": "cultivation.automation",
+     "required": true
+    },
+    {
+     "id": "Q063",
+     "q": "Do you inject CO2? If yes, where are the bottles and is there a CO2 alarm?",
+     "type": "text",
+     "map": "cultivation.co2",
+     "required": true
+    },
+    {
+     "id": "Q064",
+     "q": "What is the most plants you will have at one time, in each stage?",
+     "type": "text",
+     "map": "cultivation.plant_numbers",
+     "required": true
+    },
+    {
+     "id": "Q065",
+     "q": "List every cultivar you hold now. For each one, say where it came from.",
+     "type": "text",
+     "map": "genetics.held",
+     "required": true,
+     "help": "Each name must be in the register and the last stocktake. Keep one provenance sheet for each cultivar."
+    },
+    {
+     "id": "Q066",
+     "q": "Do you want to declare a new New Zealand variety? Give its name.",
+     "type": "text",
+     "map": "genetics.new_declarations",
+     "help": "Each variety needs its own Form D and fee."
+    },
+    {
+     "id": "Q067",
+     "q": "Which pesticides or fertilisers do you use? Do you keep a spray log?",
+     "type": "text",
+     "map": "cultivation.inputs"
+    },
+    {
+     "id": "Q068",
+     "q": "What is the largest quantity of dried cannabis you will hold on site at one time, in kilograms? How soon do you send it after cure?",
+     "type": "text",
+     "map": "cultivation.max_dried_kg",
+     "required": true
+    }
+   ]
+  },
+  {
+   "id": "S07",
+   "title": "Security",
+   "questions": [
+    {
+     "id": "Q070",
+     "q": "Describe the fence around the licensed area: type, height, and any gaps.",
+     "type": "text",
+     "map": "security.perimeter",
+     "required": true,
+     "help": "Recommended: a continuous, climb-resistant fence at least 1.8 m high, with a ground gap of no more than 120 mm. Plain chain-link usually fails.",
+     "photo": "Each run of fence and each gate"
+    },
+    {
+     "id": "Q071",
+     "q": "Is there an electric fence? Who installed it, is it live, and is there a certificate to AS/NZS 3016?",
+     "type": "text",
+     "map": "security.electric_fence"
+    },
+    {
+     "id": "Q072",
+     "q": "How does the entrance gate lock? Is there a keypad or a fob?",
+     "type": "text",
+     "map": "security.gate",
+     "required": true
+    },
+    {
+     "id": "Q073",
+     "q": "Which door locks are on each building? Give the make and model if known. Do they need two factors, for example PIN and fob?",
+     "type": "text",
+     "map": "security.locks",
+     "required": true
+    },
+    {
+     "id": "Q074",
+     "q": "Is there an intruder alarm? Who installed it, and what is the installer's security technician licence number?",
+     "type": "text",
+     "map": "security.alarm_installer",
+     "required": true,
+     "help": "The installer must hold a licence under the Private Security Personnel and Private Investigators Act 2010."
+    },
+    {
+     "id": "Q075",
+     "q": "What is the exact legal name of the alarm monitoring company? Is the contract signed? Is there patrol response?",
+     "type": "text",
+     "map": "security.alarm_monitoring_company",
+     "required": true,
+     "help": "Check the name on the contract. A name we cannot find causes an information request.",
+     "legal_entity": true
+    },
+    {
+     "id": "Q076",
+     "q": "How many cameras are there now? Are they wired or battery? Where does each one point?",
+     "type": "text",
+     "map": "security.cctv_existing",
+     "required": true,
+     "help": "Use wired cameras only. Put a camera inside each room and at each point of entry."
+    },
+    {
+     "id": "Q077",
+     "q": "Where is the camera recorder? How many days does it keep the video? Is it on a UPS?",
+     "type": "text",
+     "map": "security.cctv",
+     "required": true,
+     "help": "Recommended: at least 30 days of storage and at least 60 minutes of UPS."
+    },
+    {
+     "id": "Q078",
+     "q": "Are there duress buttons? Where?",
+     "type": "text",
+     "map": "security.duress"
+    },
+    {
+     "id": "Q079",
+     "q": "Is there outside security lighting? Where?",
+     "type": "text",
+     "map": "security.lighting"
+    },
+    {
+     "id": "Q07A",
+     "q": "Which security items are not installed yet? For each item, give the supplier and the date it will be done.",
+     "type": "text",
+     "map": "security.to_install",
+     "required": true,
+     "help": "The Agency inspects only a finished site. Get written quotes."
+    },
+    {
+     "id": "Q07B",
+     "q": "Did you tell the local police about the site? Give the reference number.",
+     "type": "text",
+     "map": "security.police_ref"
+    }
+   ]
+  },
+  {
+   "id": "S08",
+   "title": "Odour",
+   "questions": [
+    {
+     "id": "Q080",
+     "q": "Is a carbon filter fitted on every exhaust now? If not, when?",
+     "type": "text",
+     "map": "odour.filters_installed",
+     "required": true
+    },
+    {
+     "id": "Q081",
+     "q": "Do the rooms run under negative pressure?",
+     "type": "yesno",
+     "map": "odour.negative_pressure"
+    },
+    {
+     "id": "Q082",
+     "q": "How often do you change the carbon filters?",
+     "type": "text",
+     "map": "odour.filter_change"
+    },
+    {
+     "id": "Q083",
+     "q": "Did any neighbour complain about odour, noise or light? What did you do?",
+     "type": "text",
+     "map": "odour.complaints"
+    }
+   ]
+  },
+  {
+   "id": "S09",
+   "title": "Staff and records",
+   "questions": [
+    {
+     "id": "Q090",
+     "q": "How many staff work on site? Give the name and role of each person who can witness a receipt or a destruction.",
+     "type": "text",
+     "map": "staff.list",
+     "required": true
+    },
+    {
+     "id": "Q091",
+     "q": "Who does a person working alone call to check in?",
+     "type": "text",
+     "map": "staff.lone_worker"
+    },
+    {
+     "id": "Q092",
+     "q": "Do you keep a bound paper register? Where is it kept?",
+     "type": "text",
+     "map": "records.register",
+     "required": true
+    },
+    {
+     "id": "Q093",
+     "q": "Which electronic record system do you use? Give the product, the version, where the data is hosted and who owns the account.",
+     "type": "text",
+     "map": "records.electronic_system",
+     "required": true,
+     "help": "Take a screenshot of the batch screen and the audit log.",
+     "photo": "Screenshot of the batch screen and audit log"
+    },
+    {
+     "id": "Q094",
+     "q": "How do you transport cannabis? Who drives, and is there a manifest and an escort?",
+     "type": "text",
+     "map": "records.transport"
+    }
+   ]
+  },
+  {
+   "id": "S10",
+   "title": "Supply and purpose",
+   "questions": [
+    {
+     "id": "Q100",
+     "q": "To whom will you supply the crop? Give the company name.",
+     "type": "text",
+     "map": "supply.buyer_name",
+     "required": true,
+     "help": "The Agency returns an application that does not show where the crop goes.",
+     "legal_entity": true
+    },
+    {
+     "id": "Q101",
+     "q": "What is the buyer's licence number? Does the buyer's licence include possession for manufacture?",
+     "type": "text",
+     "map": "supply.buyer_licence",
+     "required": true,
+     "help": "Get a copy of the buyer's licence."
+    },
+    {
+     "id": "Q102",
+     "q": "Is a supply agreement signed? If not, is a letter of intent signed? Give the date.",
+     "type": "choice",
+     "options": [
+      "signed agreement",
+      "signed letter of intent",
+      "not yet"
+     ],
+     "map": "supply.agreement_kind",
+     "required": true,
+     "photo": "Signed agreement, every page"
+    },
+    {
+     "id": "Q103",
+     "q": "Who at the buyer signs the agreement? Give the name, phone and email.",
+     "type": "text",
+     "map": "supply.buyer_contact"
+    },
+    {
+     "id": "Q104",
+     "q": "Do you have other supply agreements, current or old? Do they continue?",
+     "type": "text",
+     "map": "supply.other_agreements",
+     "help": "An old agreement continues until you end it by notice."
+    },
+    {
+     "id": "Q105",
+     "q": "Will you supply plants or seed to other licence holders?",
+     "type": "yesno",
+     "map": "supply.genetics_to_growers"
+    },
+    {
+     "id": "Q106",
+     "q": "Will you export, or send samples to a lab overseas?",
+     "type": "text",
+     "map": "supply.export"
+    },
+    {
+     "id": "Q107",
+     "q": "Will you do breeding or research? Give the maximum seedlings, breeding plants and mother plants each year.",
+     "type": "text",
+     "map": "research.quantities",
+     "help": "Give upper limits you will stay under."
+    }
+   ]
+  },
+  {
+   "id": "S11",
+   "title": "Renewal",
+   "show_if": {
+    "Q002": [
+     "renew",
+     "amend"
+    ]
+   },
+   "questions": [
+    {
+     "id": "Q110",
+     "q": "For each location, does the owner's written permission cover the renewed licence period? Give the date of the last letter.",
+     "type": "text",
+     "map": "renewal.owner_letters",
+     "required": true
+    },
+    {
+     "id": "Q111",
+     "q": "Did the security, SOPs or records change at any location since the last approval?",
+     "type": "text",
+     "map": "renewal.changes",
+     "required": true
+    },
+    {
+     "id": "Q112",
+     "q": "Did the supply purposes change since the last approval?",
+     "type": "text",
+     "map": "renewal.purposes_changed"
+    }
+   ]
+  },
+  {
+   "id": "S12",
+   "title": "Money and dates",
+   "questions": [
+    {
+     "id": "Q120",
+     "q": "Does the customer know the Agency fees and agree to pay each invoice on the day it arrives?",
+     "type": "yesno",
+     "map": "timeline.fees_ok",
+     "required": true,
+     "help": "The assessment starts only after payment."
+    },
+    {
+     "id": "Q121",
+     "q": "When will the build be finished and tested? Is that date realistic?",
+     "type": "date",
+     "map": "timeline.build_complete",
+     "required": true
+    },
+    {
+     "id": "Q122",
+     "q": "Is any cannabis at the new site now, or was it ever there?",
+     "type": "yesno",
+     "map": "records.cannabis_at_new_site",
+     "required": true,
+     "help": "If yes, stop. Get legal advice before you lodge."
+    },
+    {
+     "id": "Q123",
+     "q": "Who is a JP near the customer, and when can the customer see the JP?",
+     "type": "text",
+     "map": "timeline.jp"
+    },
+    {
+     "id": "Q124",
+     "q": "Is there anything else we must know?",
+     "type": "text",
+     "map": "meta.other_notes"
+    }
+   ]
+  },
+  {
+   "id": "S13",
+   "title": "Documents and drawing",
+   "questions": [
+    {
+     "id": "Q130",
+     "q": "Take a photo of each document you have: licence, ID, title, lease, landlord letter, supply agreement, quotes, certificates.",
+     "type": "photos",
+     "map": "documents.photos"
+    },
+    {
+     "id": "Q131",
+     "q": "Draw the site layout. Put each building, the fence, the gates and north.",
+     "type": "layout",
+     "map": "layout.plan",
+     "required": true,
+     "help": "Draw each building to size. Drag to move. Tap 'Turn' to turn it 90 degrees."
+    },
+    {
+     "id": "Q132",
+     "q": "Make a quick sketch of anything the layout tool cannot show.",
+     "type": "sketch",
+     "map": "layout.sketch"
+    }
+   ]
+  }
+ ]
+}

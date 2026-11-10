@@ -1,0 +1,175 @@
+# MCA application data - single source of truth for one case.
+# Edit values here, then rebuild every document, plan and email from this file.
+# Empty string = not known yet. Each `confirm:` list holds assumptions the customer must check before signing.
+# Never commit a filled copy of this file to a public repository.
+
+meta:
+  interviewer: ""
+  respondent: ""
+  route: ""                    # new | amend | renew | other
+  consent: ""
+  prepared_by: ""
+  prepared_date: ""
+  package_version: "v1.0"
+  mca_email: "medicinalcannabis@health.govt.nz"
+  other_notes: ""
+  intake_id: ""
+
+applicant:
+  legal_name: ""
+  company_number: ""
+  nzbn: ""
+  registered_office_line: ""
+  shareholding: ""
+  directors: ""
+  industry_code_ok: ""
+  public_footprint: ""
+  director:                    # the responsible person
+    full_name: ""              # exactly as on the ID (MoJ name-match rule)
+    known_as: ""
+    position: ""
+    phone: ""
+    email: ""
+    place: ""
+    convictions: ""
+  confirm: []
+
+licence:
+  number: ""
+  activities: ""
+  conditions: ""
+  existing_location: ""
+  keep_existing_locations: ""
+  current_practice: ""         # SOP version, register and e-system at each current location
+  confirm: []
+
+consultant:
+  name: ""
+  email: ""
+  phone: ""
+  role: "Regulatory and technical adviser (cc on correspondence)"
+  links_to_other_licence_holders: ""
+
+site:
+  one_line: ""
+  legal_description: ""
+  gps: ""
+  land_area_m2: ""
+  owner: ""                    # registered owner on the record of title
+  tenure: ""                   # own | lease | other
+  landlord_line: ""
+  licensed_area: ""            # recommended: the fenced grow compound only
+  former_use: ""
+  entrances: ""
+  confirm: []
+
+planning:
+  other_users: ""
+  public_access: ""
+  nearest_dwelling_m: ""
+  easements: ""
+  council: ""
+
+layout:
+  structures_list: ""
+  dimensions: ""
+  uses: ""
+  entry_sequence: ""
+  weak_points: ""
+  waste: ""
+  photos: ""
+  sketch: ""
+  north_deg: 0
+  site: {w: 40, d: 30}
+  boundary: []
+  excluded: []
+  items: []
+  fence: {height_m: 1.8, type: "climb-resistant"}
+
+cultivation:
+  outdoor: ""
+  indoor_m2: ""
+  automation: ""
+  co2: ""
+  plant_numbers: ""
+  racking: ""
+  drying_and_storage: ""
+  future_stages: ""
+  inputs: ""
+  max_dried_kg: ""
+  confirm: []
+
+genetics:
+  held: ""
+  new_declarations: ""
+
+supply:
+  buyer_name: ""
+  buyer_licence: ""            # must include the activity the forms claim (e.g. possession for manufacture)
+  buyer_contact: ""
+  agreement_kind: ""           # signed agreement | signed letter of intent | not yet
+  agreement_pdf: ""            # path to the signed PDF; empty = blocker
+  other_agreements: ""
+  genetics_to_growers: ""
+  export: ""
+  confirm: []
+
+research:
+  quantities: ""               # upper limits a year
+  locations: ""                # breeding and quarantine areas, shown on the plans
+  confirm: []
+
+security:
+  response_minutes: ""
+  second_keyholder: ""
+  safe: ""
+  perimeter: ""
+  electric_fence: ""
+  gate: ""
+  locks: ""
+  alarm_installer: ""          # with security technician licence number
+  alarm_monitoring_company: "" # exact legal name from the signed contract
+  cctv_existing: ""
+  cctv: ""
+  duress: ""
+  lighting: ""
+  to_install: ""
+  police_ref: ""
+  confirm: []
+
+equipment: []                  # {item, where, status: existing|upgrade|to_install, supplier, due}
+
+odour:
+  filters_installed: ""
+  negative_pressure: ""
+  filter_change: ""
+  complaints: ""
+
+staff:
+  list: ""
+  lone_worker: ""
+
+records:
+  register: ""
+  electronic_system: ""
+  transport: ""
+  returns_status: ""
+  known_issues: ""
+  cannabis_at_new_site: ""     # "yes" = stop and get legal advice
+  confirm: []
+
+renewal:
+  owner_letters: ""
+  changes: ""
+  purposes_changed: ""
+  confirm: []
+
+timeline:
+  target_lodgement: ""
+  licence_expiry: ""
+  build_complete: ""
+  fees_ok: ""
+  jp: ""
+
+documents:
+  photos: ""

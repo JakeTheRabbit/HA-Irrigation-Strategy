@@ -1,0 +1,485 @@
+<!doctype html>
+<html lang="en-NZ">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Grow Licence Intake</title>
+<style>
+:root{
+  --bg:#f6f7f4; --card:#ffffff; --ink:#1d241f; --muted:#5d6a61; --line:#d9dfd8;
+  --accent:#2f6b3f; --accent-ink:#ffffff; --warn:#a4501a; --warn-bg:#fbeee3; --ok:#2f6b3f; --chip:#eef2ec;
+  --focus:#7fb08b;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#121614; --card:#1b201d; --ink:#e7ece8; --muted:#9aa79f; --line:#2e3631;
+    --accent:#6fbf83; --accent-ink:#0d1a11; --warn:#f0a36b; --warn-bg:#33231a; --chip:#232a26; --focus:#4f8f60;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#121614; --card:#1b201d; --ink:#e7ece8; --muted:#9aa79f; --line:#2e3631;
+  --accent:#6fbf83; --accent-ink:#0d1a11; --warn:#f0a36b; --warn-bg:#33231a; --chip:#232a26; --focus:#4f8f60;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{position:sticky;top:0;z-index:5;background:var(--card);border-bottom:1px solid var(--line);padding:10px 16px;display:flex;gap:10px;align-items:center}
+header h1{font-size:17px;margin:0;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+main{max-width:760px;margin:0 auto;padding:12px 16px 120px}
+button{font:inherit;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink);padding:10px 14px;min-height:44px;cursor:pointer}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
+button.small{min-height:36px;padding:6px 10px;font-size:14px}
+button:focus-visible,textarea:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid var(--focus);outline-offset:1px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin:10px 0}
+.muted{color:var(--muted)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.grow{flex:1}
+textarea,input,select{width:100%;font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px}
+textarea{min-height:84px;resize:vertical}
+.q{font-weight:600;margin:0 0 6px}
+.qid{font:12px ui-monospace,monospace;color:var(--muted);margin-right:6px}
+.req{color:var(--warn);font-size:13px;margin-left:4px}
+.help{font-size:14px;color:var(--muted);margin:6px 0 8px}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+.chip{background:var(--chip);border:1px solid var(--line);border-radius:999px;padding:8px 14px;min-height:40px}
+.chip.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.tabs{display:flex;gap:6px;overflow-x:auto;padding:6px 0 10px;scrollbar-width:none}
+.tab{white-space:nowrap;font-size:14px;padding:6px 12px;min-height:36px;border-radius:999px}
+.tab.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.tab .n{opacity:.8;font-size:12px;margin-left:4px}
+.bar{height:6px;background:var(--line);border-radius:6px;overflow:hidden}
+.bar>i{display:block;height:100%;background:var(--accent)}
+.foot{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);padding:10px 16px calc(10px + env(safe-area-inset-bottom));display:flex;gap:8px;justify-content:space-between;z-index:5}
+.files{font-size:13px;color:var(--muted);margin-top:6px;word-break:break-all}
+.files span{display:inline-block;background:var(--chip);border-radius:8px;padding:2px 8px;margin:2px}
+.warnbox{background:var(--warn-bg);color:var(--warn);border-radius:10px;padding:10px 12px;font-size:14px}
+canvas{touch-action:none;display:block;width:100%;background:var(--bg);border:1px solid var(--line);border-radius:10px}
+.list-item{display:flex;align-items:center;gap:10px}
+.list-item .grow{min-width:0}
+.list-item b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hidden{display:none!important}
+.toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;font-size:14px;z-index:9;max-width:90vw}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+label.f{font-size:13px;color:var(--muted);display:block}
+</style>
+</head>
+<body>
+<header>
+  <button id="backBtn" class="small hidden" aria-label="Back">‹ Back</button>
+  <h1 id="title">Grow Licence Intake</h1>
+  <button id="menuBtn" class="small hidden">Review</button>
+</header>
+<main id="app"></main>
+<div id="foot" class="foot hidden">
+  <button id="prevBtn">‹ Previous</button>
+  <button id="nextBtn" class="primary">Next ›</button>
+</div>
+
+<script src="config.js"></script>
+<script src="questions.js"></script>
+<script>
+"use strict";
+/* ---------- platform bridge ---------- */
+const NATIVE = typeof window.Android !== "undefined";
+const CFG = window.INTAKE_CONFIG || {recipient:"", app_version:"dev"};
+const Q = window.QUESTIONNAIRE;
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+function toast(msg){const t=document.createElement("div");t.className="toast";t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),2600);}
+function store(){try{return window.localStorage}catch(e){return null}}
+const mem = {};
+function sget(k){const s=store();try{return s?s.getItem(k):mem[k]}catch(e){return mem[k]}}
+function sset(k,v){const s=store();try{s?s.setItem(k,v):mem[k]=v}catch(e){mem[k]=v}}
+function sdel(k){const s=store();try{s?s.removeItem(k):delete mem[k]}catch(e){delete mem[k]}}
+
+/* ---------- interview state ---------- */
+let cur = null;      // current interview object
+let secIdx = 0;
+function newId(){return "INT-" + new Date().toISOString().replace(/[-:T]/g,"").slice(0,14) + "-" + Math.random().toString(36).slice(2,6);}
+function listIds(){try{return JSON.parse(sget("intake.index")||"[]")}catch(e){return []}}
+function saveIndex(ids){sset("intake.index", JSON.stringify(ids));}
+function load(id){try{return JSON.parse(sget("intake."+id))}catch(e){return null}}
+function save(){if(!cur)return;cur.updated=new Date().toISOString();sset("intake."+cur.id, JSON.stringify(cur));
+  const ids=listIds(); if(!ids.includes(cur.id)){ids.unshift(cur.id);saveIndex(ids);} }
+function blankInterview(){return {schema:"mca-intake/1",questionnaire_version:Q.version,app_version:CFG.app_version,id:newId(),
+  created:new Date().toISOString(),updated:null,answers:{},photos:{},
+  layout:{site:{w:40,d:30},north:0,items:[]},sketch:null,sent:[]};}
+
+/* ---------- visibility rules ---------- */
+function visible(rule){
+  if(!rule) return true;
+  return Object.entries(rule).every(([qid,vals]) => vals.includes((cur.answers[qid]||"").trim()));
+}
+function sections(){return Q.sections.filter(s=>visible(s.show_if));}
+function questionsOf(s){return s.questions.filter(q=>visible(q.show_if));}
+function answered(q){
+  if(q.type==="photos") return (cur.photos[q.id]||[]).length>0 || !!(cur.answers[q.id]||"").trim();
+  if(q.type==="layout") return cur.layout.items.length>0;
+  if(q.type==="sketch") return !!cur.sketch;
+  return !!(cur.answers[q.id]||"").trim();
+}
+function missing(){const out=[];sections().forEach(s=>questionsOf(s).forEach(q=>{if(q.required&&!answered(q))out.push({s,q});}));return out;}
+function progress(){let n=0,d=0;sections().forEach(s=>questionsOf(s).forEach(q=>{n++;if(answered(q))d++;}));return {n,d};}
+
+/* ---------- screens ---------- */
+function setHeader(title, back, review){
+  $("#title").textContent=title;
+  $("#backBtn").classList.toggle("hidden",!back);
+  $("#menuBtn").classList.toggle("hidden",!review);
+}
+function showFoot(on){$("#foot").classList.toggle("hidden",!on);}
+
+function homeScreen(){
+  cur=null; setHeader("Grow Licence Intake",false,false); showFoot(false);
+  const ids=listIds();
+  let h=`<div class="card"><p class="q">Start a new interview</p>
+    <p class="muted">Ask each question. Tap <b>Speak</b> and say the answer. Take photos of documents and site items. When you finish, tap <b>Send</b>. The answers go by email${CFG.recipient?` to <b>${esc(CFG.recipient)}</b>`:""}.</p>
+    <button class="primary" id="newBtn">New interview</button></div>`;
+  if(ids.length){
+    h+=`<h2 style="font-size:15px;margin:18px 4px 4px" class="muted">Saved interviews</h2>`;
+    ids.forEach(id=>{const it=load(id); if(!it) return;
+      const name=it.answers.Q010||it.answers.Q040||"(no company name yet)";
+      const sent=it.sent&&it.sent.length?` · sent ${it.sent.length}×`:"";
+      h+=`<div class="card list-item"><div class="grow"><b>${esc(name)}</b>
+        <span class="muted" style="font-size:13px">${esc((it.updated||it.created).slice(0,16).replace("T"," "))}${sent}</span></div>
+        <button class="small" data-open="${esc(id)}">Open</button>
+        <button class="small" data-del="${esc(id)}" aria-label="Delete">✕</button></div>`;});
+  }
+  h+=`<p class="muted" style="font-size:12px;text-align:center;margin-top:24px">Questionnaire v${esc(Q.version)} · app ${esc(CFG.app_version)}</p>`;
+  $("#app").innerHTML=h;
+  $("#newBtn").onclick=()=>{cur=blankInterview();save();secIdx=0;sectionScreen();};
+  document.querySelectorAll("[data-open]").forEach(b=>b.onclick=()=>{cur=load(b.dataset.open);secIdx=0;sectionScreen();});
+  document.querySelectorAll("[data-del]").forEach(b=>b.onclick=()=>{
+    if(!confirm("Delete this interview from this phone? Sent emails are not changed."))return;
+    sdel("intake."+b.dataset.del); saveIndex(listIds().filter(x=>x!==b.dataset.del));
+    if(NATIVE&&Android.deleteInterview) Android.deleteInterview(b.dataset.del);
+    homeScreen();});
+}
+
+function tabsHtml(){
+  return `<div class="tabs" role="tablist">`+sections().map((s,i)=>{
+    const qs=questionsOf(s), d=qs.filter(answered).length;
+    return `<button class="tab ${i===secIdx?"on":""}" data-tab="${i}">${esc(s.title)}<span class="n">${d}/${qs.length}</span></button>`;}).join("")+`</div>`;
+}
+
+function sectionScreen(){
+  const secs=sections(); if(secIdx>=secs.length) secIdx=secs.length-1;
+  const s=secs[secIdx], p=progress();
+  setHeader(cur.answers.Q010||"New interview",true,true); showFoot(true);
+  let h=tabsHtml()+`<div class="bar" aria-label="Progress"><i style="width:${Math.round(100*p.d/p.n)}%"></i></div>`;
+  h+=`<h2 style="margin:14px 2px 2px;font-size:20px">${esc(s.title)}</h2>`;
+  questionsOf(s).forEach(q=>{h+=questionCard(q);});
+  $("#app").innerHTML=h;
+  bindSection(s);
+  $("#prevBtn").disabled=secIdx===0;
+  $("#nextBtn").textContent= secIdx===secs.length-1 ? "Review ›" : "Next ›";
+  document.querySelector(".tab.on")?.scrollIntoView({inline:"center",block:"nearest"});
+  window.scrollTo(0,0);
+}
+
+function questionCard(q){
+  const a=cur.answers[q.id]||"";
+  let h=`<div class="card" id="card-${q.id}"><p class="q"><span class="qid">${q.id}</span>${esc(q.q)}${q.required?'<span class="req">required</span>':""}</p>`;
+  if(q.help) h+=`<p class="help">${esc(q.help)}</p>`;
+  if(q.type==="choice"||q.type==="yesno"){
+    const opts=q.type==="yesno"?["yes","no","not known"]:q.options.concat(["not known"]);
+    h+=`<div class="chips">`+opts.map(o=>`<button class="chip ${a.split("\n")[0].trim()===o?"on":""}" data-chip="${q.id}" data-v="${esc(o)}">${esc(o)}</button>`).join("")+`</div>`;
+    h+=`<textarea data-ans="${q.id}" placeholder="Add detail (optional)" style="min-height:56px">${esc(a.split("\n").slice(1).join("\n"))}</textarea>`;
+    h+=micRow(q,true);
+  } else if(q.type==="layout"){
+    h+=`<div id="layoutHost"></div>`;
+  } else if(q.type==="sketch"){
+    h+=`<div id="sketchHost"></div>`;
+  } else {
+    const ph = q.type==="number"?`Number${q.unit?" in "+q.unit:""}, then any detail`: q.type==="date"?"Date, for example 30 March 2027":q.type==="gps"?"Tap GPS, or say the position":"Type or tap Speak";
+    h+=`<textarea data-ans="${q.id}" placeholder="${esc(ph)}">${esc(a)}</textarea>`;
+    h+=micRow(q,false);
+  }
+  if(q.photo||q.type==="photos"){
+    const files=cur.photos[q.id]||[];
+    h+=`<div class="row" style="margin-top:8px">
+      <button class="small" data-cam="${q.id}">📷 Take photo</button>
+      <button class="small" data-pick="${q.id}">🖼 Add from phone</button></div>`;
+    if(q.photo) h+=`<div class="help" style="margin:4px 0 0">Photo: ${esc(q.photo)}</div>`;
+    h+=`<div class="files" id="files-${q.id}">${filesHtml(q.id)}</div>`;
+  }
+  return h+`</div>`;
+}
+function filesHtml(qid){return (cur.photos[qid]||[]).map(f=>`<span>${esc(f)} <a href="#" data-rm="${qid}" data-f="${esc(f)}" aria-label="Remove">✕</a></span>`).join("");}
+function micRow(q,detail){
+  return `<div class="row" style="margin-top:8px">
+    <button class="small primary" data-mic="${q.id}">🎤 Speak</button>
+    ${q.type==="gps"?`<button class="small" data-gps="${q.id}">📍 GPS</button>`:""}
+    <button class="small" data-nk="${q.id}">Not known</button>
+    <span class="muted grow" style="font-size:13px;text-align:right" id="st-${q.id}"></span></div>`;
+}
+
+function bindSection(s){
+  document.querySelectorAll("[data-tab]").forEach(b=>b.onclick=()=>{secIdx=+b.dataset.tab;sectionScreen();});
+  document.querySelectorAll("textarea[data-ans]").forEach(t=>{
+    t.oninput=()=>{const q=findQ(t.dataset.ans);
+      if(q.type==="choice"||q.type==="yesno"){const first=(cur.answers[q.id]||"").split("\n")[0];cur.answers[q.id]=first+(t.value?"\n"+t.value:"");}
+      else cur.answers[q.id]=t.value;
+      save();};
+  });
+  document.querySelectorAll("[data-chip]").forEach(b=>b.onclick=()=>{
+    const id=b.dataset.chip, rest=(cur.answers[id]||"").split("\n").slice(1).join("\n");
+    cur.answers[id]=b.dataset.v+(rest?"\n"+rest:""); save();
+    if(id==="Q002"||id==="Q045"){sectionScreen();return;}
+    document.querySelectorAll(`[data-chip="${id}"]`).forEach(x=>x.classList.toggle("on",x===b));});
+  document.querySelectorAll("[data-mic]").forEach(b=>b.onclick=()=>speak(b.dataset.mic));
+  document.querySelectorAll("[data-nk]").forEach(b=>b.onclick=()=>appendAnswer(b.dataset.nk,"Not known. Ask: "));
+  document.querySelectorAll("[data-gps]").forEach(b=>b.onclick=()=>gps(b.dataset.gps));
+  document.querySelectorAll("[data-cam]").forEach(b=>b.onclick=()=>photo(b.dataset.cam,true));
+  document.querySelectorAll("[data-pick]").forEach(b=>b.onclick=()=>photo(b.dataset.pick,false));
+  bindRemove();
+  if($("#layoutHost")) Layout.mount($("#layoutHost"));
+  if($("#sketchHost")) Sketch.mount($("#sketchHost"));
+}
+function bindRemove(){
+  document.querySelectorAll("[data-rm]").forEach(a=>a.onclick=e=>{e.preventDefault();
+    const qid=a.dataset.rm,f=a.dataset.f; cur.photos[qid]=(cur.photos[qid]||[]).filter(x=>x!==f); save();
+    if(NATIVE&&Android.removeFile) Android.removeFile(cur.id,f);
+    $("#files-"+qid).innerHTML=filesHtml(qid); bindRemove();});
+}
+function findQ(id){for(const s of Q.sections)for(const q of s.questions)if(q.id===id)return q;return null;}
+function appendAnswer(qid,text){
+  const q=findQ(qid);
+  if(q.type==="choice"||q.type==="yesno"){
+    const parts=(cur.answers[qid]||"").split("\n"); const first=parts[0]||""; let rest=parts.slice(1).join("\n");
+    rest=(rest?rest.trim()+" ":"")+text; cur.answers[qid]=first+"\n"+rest;
+    const t=document.querySelector(`textarea[data-ans="${qid}"]`); if(t) t.value=rest;
+  } else {
+    const prev=(cur.answers[qid]||"").trim(); cur.answers[qid]=(prev?prev+" ":"")+text;
+    const t=document.querySelector(`textarea[data-ans="${qid}"]`); if(t){t.value=cur.answers[qid];t.focus();}
+  }
+  save();
+}
+function status(qid,msg){const el=$("#st-"+qid); if(el) el.textContent=msg;}
+
+/* ---------- voice ---------- */
+function speak(qid){
+  if(NATIVE){status(qid,"Listening…");Android.speak(qid, findQ(qid).q);return;}
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){toast("Voice input is not available here. Use the keyboard microphone.");return;}
+  const r=new SR(); r.lang="en-NZ"; r.interimResults=false; status(qid,"Listening…");
+  r.onresult=e=>{appendAnswer(qid,e.results[0][0].transcript.trim());status(qid,"");};
+  r.onerror=e=>status(qid,"Voice error: "+e.error); r.onend=()=>{}; r.start();
+}
+window.onSpeech=function(qid,text,err){
+  if(err){status(qid,err);return;}
+  const t=String(text||"").trim(); if(!t){status(qid,"Nothing heard");return;}
+  appendAnswer(qid, t.charAt(0).toUpperCase()+t.slice(1));
+  status(qid,"");
+};
+/* ---------- gps ---------- */
+function gps(qid){
+  status(qid,"Finding position…");
+  if(NATIVE){Android.gps(qid);return;}
+  if(!navigator.geolocation){status(qid,"No GPS");return;}
+  navigator.geolocation.getCurrentPosition(p=>window.onGps(qid,p.coords.latitude,p.coords.longitude,p.coords.accuracy),
+    e=>window.onGps(qid,0,0,0,e.message),{enableHighAccuracy:true,timeout:20000});
+}
+window.onGps=function(qid,lat,lon,acc,err){
+  if(err){status(qid,err);return;}
+  appendAnswer(qid,`GPS ${(+lat).toFixed(6)}, ${(+lon).toFixed(6)} (WGS84, about ±${Math.round(acc)} m).`);status(qid,"");
+};
+/* ---------- photos ---------- */
+function photo(qid,camera){
+  if(!NATIVE){toast("Photos work in the Android app.");return;}
+  camera?Android.takePhoto(cur.id,qid):Android.pickPhotos(cur.id,qid);
+}
+window.onPhotos=function(qid,namesJson,err){
+  if(err){toast(err);return;}
+  const names=JSON.parse(namesJson||"[]"); if(!names.length) return;
+  cur.photos[qid]=(cur.photos[qid]||[]).concat(names); save();
+  const el=$("#files-"+qid); if(el){el.innerHTML=filesHtml(qid);bindRemove();}
+  toast(names.length+" photo"+(names.length>1?"s":"")+" added");
+};
+
+/* ---------- layout editor ---------- */
+const USES=["Flowering","Vegetative","Mothers / propagation","Drying / curing","Secure store (vault)","Shed (no cannabis)","Office","Waste","Other"];
+const USE_COLOURS={"Flowering":"#4f8a5b","Vegetative":"#7fb069","Mothers / propagation":"#a3c26b","Drying / curing":"#b88a3d","Secure store (vault)":"#8a4f4f","Shed (no cannabis)":"#8c8c8c","Office":"#5a7fa8","Waste":"#6e6e4f","Other":"#7a6aa8"};
+const Layout={
+  sel:-1, cv:null, scale:1, ox:0, oy:0, drag:null,
+  mount(host){
+    const L=cur.layout;
+    host.innerHTML=`
+      <div class="grid2">
+        <div><label class="f">Licensed area width (m, west–east)</label><input type="number" inputmode="decimal" id="lw" value="${L.site.w}"></div>
+        <div><label class="f">Licensed area depth (m, north–south)</label><input type="number" inputmode="decimal" id="ld" value="${L.site.d}"></div>
+      </div>
+      <div class="row" style="margin:8px 0">
+        <button class="small primary" id="addB">+ Building</button>
+        <button class="small" id="addG">+ Gate</button>
+        <button class="small" id="addC">+ Camera</button>
+        <label class="f" style="margin-left:auto">North ↑ is the top of the screen</label>
+      </div>
+      <canvas id="lc" height="420"></canvas>
+      <div id="lsel" class="card hidden" style="margin-top:8px"></div>
+      <p class="help">Drag an item to move it. Tap an item to edit it. Sizes are in metres. Grid lines are 5 m apart.</p>`;
+    this.cv=$("#lc"); this.sel=-1;
+    $("#lw").onchange=e=>{L.site.w=Math.max(5,+e.target.value||40);save();this.draw();};
+    $("#ld").onchange=e=>{L.site.d=Math.max(5,+e.target.value||30);save();this.draw();};
+    const n=k=>L.items.filter(i=>i.kind===k).length+1;
+    $("#addB").onclick=()=>{ // place each new building below the last one so none hide each other
+      const bs=L.items.filter(i=>i.kind==="building"); let y=2;
+      bs.forEach(b=>{const d=this.dims(b); y=Math.max(y,b.y+d.b+1);}); if(y+2.44>L.site.d) y=2;
+      L.items.push({kind:"building",label:"C"+n("building"),use:"Flowering",x:2,y:y,l:12.19,w:2.44,rot:0,doors:"west end"});this.sel=L.items.length-1;save();this.draw();this.panel();};
+    $("#addG").onclick=()=>{L.items.push({kind:"gate",label:"G"+n("gate"),x:L.site.w/2,y:0,l:4,w:0.4,rot:0});this.sel=L.items.length-1;save();this.draw();this.panel();};
+    $("#addC").onclick=()=>{L.items.push({kind:"camera",label:"CAM"+n("camera"),x:L.site.w/2,y:L.site.d/2,l:1,w:1,rot:0,dir:0});this.sel=L.items.length-1;save();this.draw();this.panel();};
+    const cv=this.cv;
+    const pt=e=>{const r=cv.getBoundingClientRect();return {x:(e.clientX-r.left)*(cv.width/r.width),y:(e.clientY-r.top)*(cv.height/r.height)};};
+    cv.onpointerdown=e=>{const p=pt(e);const i=this.hit(p);this.sel=i;
+      if(i>=0){const it=L.items[i];this.drag={i,dx:p.x-(this.ox+it.x*this.scale),dy:p.y-(this.oy+it.y*this.scale)};cv.setPointerCapture(e.pointerId);}
+      this.draw();this.panel();};
+    cv.onpointermove=e=>{if(!this.drag)return;const p=pt(e);const it=L.items[this.drag.i];
+      const snap=v=>Math.round(v*2)/2;
+      it.x=snap((p.x-this.drag.dx-this.ox)/this.scale); it.y=snap((p.y-this.drag.dy-this.oy)/this.scale); this.draw();};
+    cv.onpointerup=()=>{if(this.drag){this.drag=null;save();this.panel();}};
+    window.addEventListener("resize",()=>this.cv&&document.body.contains(this.cv)&&this.draw());
+    this.draw();
+  },
+  dims(it){return it.rot===90?{a:it.w,b:it.l}:{a:it.l,b:it.w};},
+  hit(p){const L=cur.layout;for(let i=L.items.length-1;i>=0;i--){const it=L.items[i],d=this.dims(it);
+      const x=this.ox+it.x*this.scale,y=this.oy+it.y*this.scale,pad=it.kind==="building"?0:14;
+      if(p.x>=x-pad&&p.x<=x+d.a*this.scale+pad&&p.y>=y-pad&&p.y<=y+d.b*this.scale+pad)return i;}return -1;},
+  draw(){
+    const cv=this.cv,L=cur.layout; const css=getComputedStyle(document.documentElement);
+    const ink=css.getPropertyValue("--ink").trim(),line=css.getPropertyValue("--line").trim(),acc=css.getPropertyValue("--accent").trim();
+    const W=Math.max(320,cv.clientWidth)*2, H=Math.round(W*0.72); cv.width=W; cv.height=H;
+    const c=cv.getContext("2d"); c.clearRect(0,0,W,H);
+    const m=60; this.scale=Math.min((W-2*m)/L.site.w,(H-2*m)/L.site.d); this.ox=(W-L.site.w*this.scale)/2; this.oy=(H-L.site.d*this.scale)/2;
+    c.strokeStyle=line;c.lineWidth=1;
+    for(let x=0;x<=L.site.w;x+=5){c.beginPath();c.moveTo(this.ox+x*this.scale,this.oy);c.lineTo(this.ox+x*this.scale,this.oy+L.site.d*this.scale);c.stroke();}
+    for(let y=0;y<=L.site.d;y+=5){c.beginPath();c.moveTo(this.ox,this.oy+y*this.scale);c.lineTo(this.ox+L.site.w*this.scale,this.oy+y*this.scale);c.stroke();}
+    c.strokeStyle="#c0392b";c.lineWidth=5;c.setLineDash([18,10]);c.strokeRect(this.ox,this.oy,L.site.w*this.scale,L.site.d*this.scale);c.setLineDash([]);
+    L.items.forEach((it,i)=>{const d=this.dims(it),x=this.ox+it.x*this.scale,y=this.oy+it.y*this.scale;
+      if(it.kind==="building"){c.fillStyle=USE_COLOURS[it.use]||"#777";c.globalAlpha=.85;c.fillRect(x,y,d.a*this.scale,d.b*this.scale);c.globalAlpha=1;
+        c.strokeStyle=i===this.sel?acc:ink;c.lineWidth=i===this.sel?6:2;c.strokeRect(x,y,d.a*this.scale,d.b*this.scale);
+        c.fillStyle="#fff";c.font="bold 26px system-ui";c.textAlign="center";c.textBaseline="middle";
+        c.fillText(it.label,x+d.a*this.scale/2,y+d.b*this.scale/2-(d.b*this.scale>60?12:0));
+        if(d.b*this.scale>60){c.font="20px system-ui";c.fillText(`${it.l}×${it.w} m`,x+d.a*this.scale/2,y+d.b*this.scale/2+16);}
+      } else if(it.kind==="gate"){c.strokeStyle=i===this.sel?acc:"#e67e22";c.lineWidth=12;c.beginPath();c.moveTo(x,y);
+        if(it.rot===90)c.lineTo(x,y+it.l*this.scale);else c.lineTo(x+it.l*this.scale,y);c.stroke();
+        c.fillStyle=ink;c.font="bold 22px system-ui";c.textAlign="left";c.fillText(it.label,x+6,y-14);
+      } else {c.save();c.translate(x,y);c.rotate((it.dir||0)*Math.PI/180);c.fillStyle=i===this.sel?acc:"#2c3e50";
+        c.beginPath();c.moveTo(-12,-10);c.lineTo(14,0);c.lineTo(-12,10);c.closePath();c.fill();
+        c.globalAlpha=.15;c.beginPath();c.moveTo(0,0);c.arc(0,0,120,-0.5,0.5);c.closePath();c.fill();c.restore();
+        c.fillStyle=ink;c.font="18px system-ui";c.textAlign="left";c.fillText(it.label,x+14,y-12);}
+    });
+    // north arrow + scale bar
+    c.fillStyle=ink;c.strokeStyle=ink;c.lineWidth=3;const nx=W-40,ny=46;c.beginPath();c.moveTo(nx,ny-30);c.lineTo(nx-12,ny+6);c.lineTo(nx+12,ny+6);c.closePath();c.fill();
+    c.font="bold 22px system-ui";c.textAlign="center";c.fillText("N",nx,ny+28);
+    const sb=10*this.scale;c.beginPath();c.moveTo(20,H-24);c.lineTo(20+sb,H-24);c.stroke();c.font="18px system-ui";c.textAlign="left";c.fillText("10 m",24+sb,H-24);
+  },
+  panel(){
+    const el=$("#lsel"),L=cur.layout; if(this.sel<0){el.classList.add("hidden");return;}
+    const it=L.items[this.sel]; el.classList.remove("hidden");
+    let h=`<div class="grid2"><div><label class="f">Name</label><input id="iLabel" value="${esc(it.label)}"></div>`;
+    if(it.kind==="building"){
+      h+=`<div><label class="f">Use</label><select id="iUse">${USES.map(u=>`<option ${u===it.use?"selected":""}>${u}</option>`).join("")}</select></div>
+        <div><label class="f">Length (m)</label><input id="iL" type="number" inputmode="decimal" value="${it.l}"></div>
+        <div><label class="f">Width (m)</label><input id="iW" type="number" inputmode="decimal" value="${it.w}"></div>
+        <div style="grid-column:1/-1"><label class="f">Doors (where and what type)</label><input id="iDoors" value="${esc(it.doors||"")}"></div></div>`;
+    } else if(it.kind==="gate"){h+=`<div><label class="f">Width (m)</label><input id="iL" type="number" value="${it.l}"></div></div>`;}
+    else {h+=`<div><label class="f">Points (degrees, 0 = east, 90 = south)</label><input id="iDir" type="number" value="${it.dir||0}"></div></div>`;}
+    h+=`<div class="row" style="margin-top:8px"><span class="muted">x ${it.x} m, y ${it.y} m</span><span class="grow"></span>
+      ${it.kind!=="camera"?'<button class="small" id="iTurn">Turn 90°</button>':""}<button class="small" id="iDel">Delete</button></div>`;
+    el.innerHTML=h;
+    const upd=()=>{it.label=$("#iLabel").value; if($("#iUse"))it.use=$("#iUse").value; if($("#iL"))it.l=+$("#iL").value||it.l;
+      if($("#iW"))it.w=+$("#iW").value||it.w; if($("#iDoors"))it.doors=$("#iDoors").value; if($("#iDir"))it.dir=+$("#iDir").value||0; save(); this.draw();};
+    el.querySelectorAll("input,select").forEach(x=>x.onchange=upd);
+    if($("#iTurn")) $("#iTurn").onclick=()=>{it.rot=it.rot===90?0:90;save();this.draw();this.panel();};
+    $("#iDel").onclick=()=>{L.items.splice(this.sel,1);this.sel=-1;save();this.draw();this.panel();};
+  },
+  png(){ // render to an off-screen canvas for the email attachment
+    if(!cur.layout.items.length) return null;
+    const keep=this.cv,tmp=document.createElement("canvas");tmp.style.width="1200px";document.body.appendChild(tmp);
+    this.cv=tmp;const s=this.sel;this.sel=-1;this.draw();const url=tmp.toDataURL("image/png");tmp.remove();this.cv=keep;this.sel=s;return url;}
+};
+
+/* ---------- sketch ---------- */
+const Sketch={
+  mount(host){
+    host.innerHTML=`<canvas id="sk" height="420" style="background:#fff"></canvas>
+      <div class="row" style="margin-top:8px"><button class="small" id="skClear">Clear</button><span class="muted" style="font-size:13px">Draw with one finger.</span></div>`;
+    const cv=$("#sk"); const W=Math.max(320,cv.clientWidth)*2; cv.width=W; cv.height=Math.round(W*0.72);
+    const c=cv.getContext("2d"); c.lineWidth=5;c.lineCap="round";c.strokeStyle="#111";
+    c.fillStyle="#fff";c.fillRect(0,0,cv.width,cv.height);
+    if(cur.sketch){const img=new Image();img.onload=()=>c.drawImage(img,0,0,cv.width,cv.height);img.src=cur.sketch;}
+    let down=false;const pt=e=>{const r=cv.getBoundingClientRect();return [(e.clientX-r.left)*(cv.width/r.width),(e.clientY-r.top)*(cv.height/r.height)];};
+    cv.onpointerdown=e=>{down=true;cv.setPointerCapture(e.pointerId);const [x,y]=pt(e);c.beginPath();c.moveTo(x,y);};
+    cv.onpointermove=e=>{if(!down)return;const [x,y]=pt(e);c.lineTo(x,y);c.stroke();};
+    cv.onpointerup=()=>{if(!down)return;down=false;cur.sketch=cv.toDataURL("image/png");save();};
+    $("#skClear").onclick=()=>{c.fillStyle="#fff";c.fillRect(0,0,cv.width,cv.height);cur.sketch=null;save();};
+  }
+};
+
+/* ---------- review & send ---------- */
+function summaryText(){
+  const p=progress(); const lines=[];
+  lines.push(`GROW LICENCE INTAKE - ${cur.answers.Q010||"(company not given)"}`);
+  lines.push(`Route: ${(cur.answers.Q002||"?").split("\n")[0]} | Interviewer: ${cur.answers.Q000||"?"} | Respondent: ${cur.answers.Q001||"?"}`);
+  lines.push(`Interview ${cur.id} | updated ${cur.updated} | ${p.d}/${p.n} answered | questionnaire v${Q.version}`);
+  const miss=missing(); if(miss.length) lines.push(`Required but not answered: ${miss.map(m=>m.q.id).join(", ")}`);
+  sections().forEach(s=>{lines.push("");lines.push("== "+s.title.toUpperCase()+" ==");
+    questionsOf(s).forEach(q=>{
+      let a=(cur.answers[q.id]||"").trim().replace(/\n/g," | ");
+      if(q.type==="layout") a=cur.layout.items.length?`${cur.layout.items.length} items on a ${cur.layout.site.w} x ${cur.layout.site.d} m licensed area (see layout.png and intake.json)`:"";
+      if(q.type==="sketch") a=cur.sketch?"see sketch.png":"";
+      const ph=(cur.photos[q.id]||[]).length; if(ph) a+=(a?" ":"")+`[${ph} photo${ph>1?"s":""}]`;
+      lines.push(`${q.id} ${q.q}\n   -> ${a||"(no answer)"}`);});});
+  lines.push("");lines.push("The attached intake.json is the full record. Load it with the mca-licence-builder skill.");
+  return lines.join("\n");
+}
+function exportJson(){
+  const out=JSON.parse(JSON.stringify(cur)); out.sketch=cur.sketch?"sketch.png":null;
+  out.exported=new Date().toISOString(); out.route=(cur.answers.Q002||"").split("\n")[0];
+  out.answers_mapped={}; Q.sections.forEach(s=>s.questions.forEach(q=>{ if(cur.answers[q.id]) out.answers_mapped[q.id]={map:q.map,q:q.q,a:cur.answers[q.id]};}));
+  return JSON.stringify(out,null,2);
+}
+function reviewScreen(){
+  setHeader("Review and send",true,false); showFoot(false);
+  const miss=missing(), p=progress();
+  let h=`<div class="card"><p class="q">${p.d} of ${p.n} questions answered</p><div class="bar"><i style="width:${Math.round(100*p.d/p.n)}%"></i></div></div>`;
+  if(miss.length){
+    h+=`<div class="card"><div class="warnbox">${miss.length} required question${miss.length>1?"s are":" is"} not answered. You can send now and finish later. The missing items go in the email.</div>`;
+    h+=miss.map(m=>`<div class="list-item" style="margin-top:8px"><div class="grow"><span class="qid">${m.q.id}</span>${esc(m.q.q)}</div>
+      <button class="small" data-go="${m.q.id}">Go</button></div>`).join("")+`</div>`;
+  }
+  h+=`<div class="card"><p class="q">Send by email</p>
+    <p class="muted">The email has the answers as text, the file intake.json, the layout drawing, the sketch and all photos. Your email app opens. Check the email, then tap send.</p>
+    <label class="f">To</label><input id="to" value="${esc(cur.sendTo||CFG.recipient)}" inputmode="email">
+    <div class="row" style="margin-top:10px"><button class="primary grow" id="sendBtn">Send</button>
+    ${NATIVE?"":'<button id="dlBtn">Download file</button>'}</div></div>`;
+  if(cur.sent&&cur.sent.length) h+=`<p class="muted" style="font-size:13px">Sent before: ${cur.sent.map(x=>esc(x.slice(0,16).replace("T"," "))).join(", ")}</p>`;
+  $("#app").innerHTML=h;
+  document.querySelectorAll("[data-go]").forEach(b=>b.onclick=()=>{
+    const id=b.dataset.go; const i=sections().findIndex(s=>questionsOf(s).some(q=>q.id===id)); secIdx=Math.max(0,i); sectionScreen();
+    setTimeout(()=>document.getElementById("card-"+id)?.scrollIntoView({block:"center"}),50);});
+  $("#sendBtn").onclick=send;
+  if($("#dlBtn")) $("#dlBtn").onclick=()=>{const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([exportJson()],{type:"application/json"}));a.download=`intake-${cur.id}.json`;a.click();};
+}
+function send(){
+  const to=$("#to").value.trim(); cur.sendTo=to; save();
+  const name=(cur.answers.Q010||cur.answers.Q040||"unnamed facility").split("\n")[0].slice(0,60);
+  const subject=`Grow licence intake - ${name} - ${(cur.answers.Q002||"?").split("\n")[0]}`;
+  const body=summaryText(), json=exportJson();
+  const images={}; const lp=Layout.png(); if(lp) images["layout.png"]=lp; if(cur.sketch) images["sketch.png"]=cur.sketch;
+  const photos=[].concat(...Object.values(cur.photos));
+  if(NATIVE){Android.send(to,subject,body,json,JSON.stringify(images),JSON.stringify(photos),cur.id);}
+  else{location.href=`mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body.slice(0,1800)+"\n\n(Attach the downloaded intake.json.)")}`;}
+  cur.sent=(cur.sent||[]).concat([new Date().toISOString()]); save();
+}
+window.onSendError=function(msg){toast(msg);};
+
+/* ---------- navigation ---------- */
+$("#prevBtn").onclick=()=>{if(secIdx>0){secIdx--;sectionScreen();}};
+$("#nextBtn").onclick=()=>{if(secIdx<sections().length-1){secIdx++;sectionScreen();}else reviewScreen();};
+$("#menuBtn").onclick=reviewScreen;
+$("#backBtn").onclick=()=>{ if($("#title").textContent==="Review and send") sectionScreen(); else homeScreen(); };
+window.onBack=function(){ if(!cur) return false; $("#backBtn").click(); return true; };
+homeScreen();
+</script>
+</body>
+</html>
