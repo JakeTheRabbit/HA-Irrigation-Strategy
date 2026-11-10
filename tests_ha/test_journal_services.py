@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, MagicMock
 import aiohttp.connector
 import pytest
 from aiohttp.resolver import ThreadedResolver
-from homeassistant.core import Context, SupportsResponse
+from homeassistant.core import Context, SupportsResponse, callback
 from homeassistant.exceptions import HomeAssistantError
 from test_setup_entry import _install
 
@@ -81,7 +81,9 @@ async def test_query_round_trips_what_append_stored(
         is SupportsResponse.OPTIONAL
     )
     fired = []
-    hass.bus.async_listen("crop_steering_event", lambda e: fired.append(e.data))
+    # In the event loop, so in the order the events were fired: Home Assistant runs a plain function
+    # in a worker thread, and two threads can finish in either order.
+    hass.bus.async_listen("crop_steering_event", callback(lambda e: fired.append(e.data)))
     first = _event()
     out = await _call(
         hass,
