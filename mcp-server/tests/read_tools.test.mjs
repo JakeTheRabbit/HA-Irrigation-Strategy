@@ -47,6 +47,24 @@ test("get_timeline calls timeline_get with api 2 and returns its data", async (t
   assert.equal(out.rooms[0].added_later, true);
 });
 
+test("get_timeline's description names the zone filter by the name its strict schema takes", async (t) => {
+  // The description said "optional zone_ids". The parameter is `zones`, and the schema is strict:
+  // an assistant that followed the description had its call refused.
+  const ha = await mockHa(t),
+    { client } = await stdio(t, ha);
+  const tool = (await client.listTools()).tools.find(
+    (row) => row.name === "get_timeline",
+  );
+  assert.ok("zones" in tool.inputSchema.properties);
+  assert.ok(!("zone_ids" in tool.inputSchema.properties));
+  assert.match(tool.description, /optional zones\b/);
+  assert.doesNotMatch(tool.description, /zone_ids/);
+  const span = { room_id: ROOM, start: "2026-10-22T00:00:00", end: "2026-10-23T00:00:00" };
+  const before = ha.calls.length;
+  error(await call(client, "get_timeline", { ...span, zone_ids: [1] }), /zone_ids/);
+  assert.equal(ha.calls.length, before); // refused before Home Assistant is asked anything
+});
+
 test("get_timeline with days reads timeline_summary; a span and days together are refused", async (t) => {
   const ha = await mockHa(t),
     { client } = await stdio(t, ha);
