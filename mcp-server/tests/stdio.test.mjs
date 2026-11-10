@@ -111,10 +111,15 @@ test("reviewed setup saves exact server payload and reads back, preserving other
   const submitted = ha.calls.find((row) =>
     row.path.includes("/setup_save?"),
   ).body;
+  // The save says who it is from and which reviewed proposal it carries, so the room's history
+  // shows it as the assistant's and not as the token's user's own change.
+  assert.match(p.proposal_token, /^[a-f0-9]{64}$/);
   assert.deepEqual(submitted, {
     entry_id: "entry-room_b_",
     expected_revision: 4,
     ...p.proposed_configuration,
+    client: "mcp",
+    proposal_token: p.proposal_token,
   });
   error(await apply(client, p), /already used/);
   assert.equal(ha.saveCount, 1);
@@ -231,6 +236,16 @@ test("HA validates plan preview, then only draft saved with exact readback; no a
   assert.equal(result.revision, 8);
   assert.deepEqual(ha.plans["room:room_b_"].plan, plan);
   assert.equal(ha.plans["room:"].revision, 7);
+  assert.deepEqual(
+    ha.calls.find((row) => row.path.includes("/strategy_save?")).body,
+    {
+      room_id: "room:room_b_",
+      expected_revision: 7,
+      plan,
+      client: "mcp",
+      proposal_token: p.proposal_token,
+    },
+  );
   assert.ok(ha.calls.some((row) => row.path.includes("/strategy_preview?")));
   assert.ok(
     !ha.calls.some((row) =>
@@ -248,6 +263,50 @@ test("HA validates plan preview, then only draft saved with exact readback; no a
     await call(client, "preview_plan", { room_id: "room:room_b_", plan }),
     /not draft/,
   );
+});
+
+test("an integration before 3.18.0 refuses the two fields on a plan save, and the draft is still saved", async (t) => {
+  const ha = await mockHa(t),
+    { client } = await stdio(t, ha, { CROP_STEERING_ALLOW_WRITES: "true" });
+  ha.strictPlanSave = true;
+  const plan = planFixture();
+  plan.profiles[0].vegetative.p1_target_vwc = 65;
+  const p = data(
+    await call(client, "preview_plan", { room_id: "room:room_b_", plan }),
+  );
+  const result = data(await apply(client, p));
+  assert.equal(result.status, "draft");
+  assert.equal(result.revision, 8);
+  assert.deepEqual(ha.plans["room:room_b_"].plan, plan);
+  assert.equal(ha.saveCount, 1);
+  const sent = ha.calls
+    .filter((row) => row.path.includes("/strategy_save?"))
+    .map((row) => Object.keys(row.body).sort());
+  assert.deepEqual(sent, [
+    ["client", "expected_revision", "plan", "proposal_token", "room_id"],
+    ["expected_revision", "plan", "room_id"],
+  ]);
+});
+
+test("a plan save that Home Assistant refuses for another reason is not sent again", async (t) => {
+  const ha = await mockHa(t),
+    { client } = await stdio(t, ha, { CROP_STEERING_ALLOW_WRITES: "true" });
+  const plan = planFixture();
+  plan.profiles[0].vegetative.p1_target_vwc = 65;
+  const p = data(
+    await call(client, "preview_plan", { room_id: "room:room_b_", plan }),
+  );
+  ha.intercept = async (req, res, body, json) => {
+    if (!req.url.includes("/strategy_save?")) return false;
+    json({ message: "extra keys not allowed @ data['plan']['surprise']" }, 400);
+    return true;
+  };
+  error(await apply(client, p), /extra keys not allowed/);
+  assert.equal(
+    ha.calls.filter((row) => row.path.includes("/strategy_save?")).length,
+    1,
+  );
+  assert.equal(ha.saveCount, 0);
 });
 
 test("changed plan bounds or active status after preview block draft save", async (t) => {
