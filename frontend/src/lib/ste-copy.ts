@@ -196,7 +196,7 @@ export const SETTING_COPY: Record<string, SteCopy> = {
   },
   "max_daily_volume": {
     "caution": "CAUTION: Do not set the daily water limit too low. Maintenance shots then stop early, and the plants can dry until the watchdog shot.",
-    "guidance": "The default is 20 L. If the controller cannot read a value, it uses 150 L. The controller uses at least 10 L. The integration refuses a value above 4 times the zone substrate volume, or above 20 L for a small zone. The daily total starts again at lights-on. Examine the daily water of the zone for some grow-days before you decrease it.",
+    "guidance": "A new zone starts at half of its substrate volume (plants x litres for each plant), and at 20 L if that is less. If the controller cannot read a value, it uses 150 L. The controller uses at least 10 L. The integration refuses a value above 4 times the zone substrate volume, or above 20 L for a small zone. The daily total starts again at lights-on. Examine the daily water of the zone for some grow-days before you decrease it.",
     "impact": "Increase: A zone can get more maintenance shots in a grow-day before the shots stop. Decrease: Shots stop sooner, and the controller cuts the last shot to the water that is left.",
     "tooltip": "The most water that a zone gets in one grow-day, in litres. Maintenance shots, extra ramp shots, dilution shots and P0 EC flushes stop at this limit. Ramp shots, rescue shots, watchdog shots and high-EC flushes can go past it."
   },
