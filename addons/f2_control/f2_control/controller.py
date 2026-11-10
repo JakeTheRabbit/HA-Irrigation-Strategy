@@ -4404,9 +4404,10 @@ class Controller:
         """Switch the engine switch off for each RETIRED_SWITCHES entry that reads off, and return
         their names. Only ever OFF: an off one never switches watering back on. A retired switch
         that is on, missing or unreadable changes nothing (the integration will remove them).
-        Not while an interrupted shot is unsettled: _reconcile_room_inflight reads an engine switch
-        that is off as a person taking over, and would leave what the shot opened running. The
-        names still hold the room (_blocked) until the switch goes off after the shot is settled."""
+        Not while an interrupted shot is unsettled: the shot is settled first. (_reconcile_room_inflight
+        once left what the shot opened running while the engine switch was off; it no longer asks that
+        switch, and the order is kept.) The names still hold the room (_blocked) until the switch goes
+        off after the shot is settled."""
         off = []
         for key, name in RETIRED_SWITCHES:
             entity = f"switch.crop_steering_{room.prefix}{key}"
@@ -5742,6 +5743,8 @@ class Controller:
                 f"[{room.slug}] hardware hold (CS-301) cleared: watering is off and every pump and valve "
                 "reads OFF; switch watering back on to resume"
             )
+            if inflight and self._alerted.pop(f"inflight_{room.slug}", None):  # its card too (CS-308, CS-309)
+                ha_call("persistent_notification", "dismiss", notification_id=f"f2_inflight_{room.slug}")
             # The next hold is a new fault: announce it, don't take it for this one still quiet.
             self._alerted.pop(f"hardware_fault_{room.slug}", None)
         for room in self.rooms:
@@ -5781,7 +5784,9 @@ class Controller:
         The record names the valve, main line and pump the shot opened, and when (_execute_shot writes it
         before opening anything). People run this hardware by hand: the tank is circulated for well over
         20 minutes to heat it, and zones are hand-watered with the valves and main line open. So:
-          * nothing is touched while the room's kill switch is not ON: the operator has taken over;
+          * the room's kill switch is not asked: a shot this controller opened is closed whatever the
+            switch reads. "Watering off" means no water, and the alert for a switch that will not close
+            (CS-301) itself says to set it to off. (Before, nothing was touched while it was not ON.)
           * a switch is closed only if it has been ON since this shot opened it (Home Assistant's
             last_changed inside INFLIGHT_OPEN_WINDOW_S of the record's start, or, when a Home Assistant
             restart or the switch reconnecting has moved last_changed, its recorded history ON since
@@ -5800,19 +5805,15 @@ class Controller:
         if all(read[0] == "off" for read in reads.values()):
             self._clear_inflight(room, f"{tag}: its valve/main line/pump read OFF - record closed")
             return
-        flag = ha_get(room_gate(room))[0]
-        if flag is None:
-            return  # Home Assistant unreachable: nothing can be read or closed; try again next loop
-        if flag != "on":
-            if not getattr(room, "_inflight_waiting_logged", False):
-                still_on = ", ".join(e for e in order if reads[e][0] != "off")
-                log(f"{tag}: kill switch {room_gate(room)} is {flag}, so the operator has it - "
-                    f"leaving {still_on} alone")
-                room._inflight_waiting_logged = True
+        if all(read[0] is None for read in reads.values()) and ha_get_status(order[0])[0] != 404:
+            # Home Assistant did not answer: nothing can be read or closed; try again next loop. One that
+            # answers "no such entity" (404) did answer: that is a switch that cannot be read (CS-309, below).
             return
         close, left, unsure, why = self._inflight_plan(room, rec, reads)
         if close:
             failures = self._switch_off_failures(close)
+            if failures and _GATE.state == "all":
+                return  # Home Assistant refuses this controller's token: not a switch that is stuck; next loop
             if failures:
                 if not room.hardware_fault:
                     self._latch_hardware_fault(room, f"zone {zone} interrupted shot", failures)
@@ -5987,7 +5988,6 @@ class Controller:
 
     def _clear_inflight(self, room, message):
         room.shot_inflight = None
-        room._inflight_waiting_logged = False
         self._save_state()
         log(message)
         if self._alerted.pop(f"inflight_{room.slug}", None):

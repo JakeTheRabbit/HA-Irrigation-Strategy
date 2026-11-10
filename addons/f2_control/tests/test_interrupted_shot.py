@@ -220,8 +220,8 @@ def test_after_a_restart_with_no_history_nothing_is_switched_and_it_is_said_so(r
 
 def test_a_retired_switch_that_is_off_never_hands_an_unsettled_shot_to_a_person(rig):
     # While System Enabled or Auto Irrigation Enabled reads off, the controller switches the room's
-    # engine switch off in its place. This check leaves everything alone while that switch is off (a
-    # person has taken over), so a check that had to wait a loop was never finished: the valve ran on.
+    # engine switch off in its place, but only once an interrupted shot is settled: the shot's valve
+    # is closed first.
     c, fake, _ = rig
     crashed(c, fake)
     restarted(fake)
@@ -285,15 +285,155 @@ def test_the_line_is_left_alone_while_another_valve_on_it_is_open(rig):
     assert fake.states["switch.m"][0] == "on" and fake.states["switch.p"][0] == "on"
 
 
-def test_with_the_kill_switch_off_the_operator_has_it_and_nothing_is_touched(rig):
+@pytest.mark.parametrize("kill", ["off", "unavailable", None])
+def test_with_the_kill_switch_off_what_the_shot_opened_is_still_closed(rig, kill):
+    """"Watering off" means no water. Before, an interrupted shot's valve, main line and pump were left ON for as
+    long as the room's kill switch was not ON, with one log line and no alert: the operator who obeyed CS-301
+    ("set the kill switch to off") kept the water running. Now what the shot opened is closed whatever the kill
+    switch reads, or when Home Assistant no longer has it."""
     c, fake, _ = rig
+    crashed(c, fake)
+    if kill is None:
+        del fake.states["input_boolean.kill"]
+    else:
+        fake.set_state("input_boolean.kill", kill)
+    c._reconcile_inflight()
+    assert offs(fake) == ["switch.v1", "switch.m", "switch.p"]  # the valve first, then back up the line
+    assert c.rooms[0].shot_inflight is None and c.rooms[0].hardware_fault is None
+    assert "_shot_inflight" not in saved(c)["default"]
+
+
+def test_with_the_kill_switch_off_a_valve_a_person_has_switched_since_is_still_theirs(rig):
+    """The rule that protects hand watering does not change: only what has been ON since the shot opened it."""
+    c, fake, _ = rig
+    crashed(c, fake, valve=600)  # switched again ten minutes in: somebody is hand-watering this zone
+    fake.set_state("input_boolean.kill", "off")
+    c._reconcile_inflight()
+    assert offs(fake) == [] and c.rooms[0].shot_inflight is None
+
+
+def test_with_the_kill_switch_off_a_pump_a_hold_owns_is_still_left(rig):
+    c, fake, _ = rig
+    c.hold_entities = ["input_boolean.dosing"]
+    fake.set_state("input_boolean.dosing", "on")
     crashed(c, fake)
     fake.set_state("input_boolean.kill", "off")
     c._reconcile_inflight()
-    assert offs(fake) == [] and c.rooms[0].shot_inflight is not None
-    fake.set_state("input_boolean.kill", "on")
+    assert offs(fake) == ["switch.v1", "switch.m"] and fake.states["switch.p"][0] == "on"
+
+
+def test_with_the_kill_switch_off_the_line_is_still_left_while_another_valve_on_it_is_open(rig):
+    c, fake, _ = rig
+    crashed(c, fake)
+    fake.set_state("switch.v2", "on")  # somebody is hand-watering zone 2 on the same line
+    fake.set_state("input_boolean.kill", "off")
     c._reconcile_inflight()
-    assert offs(fake) == ["switch.v1", "switch.m", "switch.p"] and c.rooms[0].shot_inflight is None
+    assert offs(fake) == ["switch.v1"]
+    assert {e: fake.states[e][0] for e in ("switch.m", "switch.p")} == {"switch.m": "on", "switch.p": "on"}
+
+
+def test_with_the_kill_switch_off_a_switch_that_cannot_be_read_is_left_and_said_so(rig):
+    """CS-309 as before: what cannot be read is not touched, whatever the kill switch reads."""
+    c, fake, _ = rig
+    room = crashed(c, fake)
+    fake.set_state("input_boolean.kill", "off")
+    for entity in ("switch.v1", "switch.m", "switch.p"):
+        fake.set_state(entity, "unavailable")
+    c._reconcile_inflight()
+    assert offs(fake) == [] and room.shot_inflight is not None
+    (card,) = notifications(fake)
+    assert "(CS-309)" in card["title"] and "Can't be read: switch.v1, switch.m, switch.p" in card["message"]
+
+
+def test_a_pump_home_assistant_no_longer_has_is_named_and_the_rest_is_closed(rig):
+    c, fake, _ = rig
+    room = crashed(c, fake)
+    del fake.states["switch.p"]
+    c._reconcile_inflight()
+    assert offs(fake) == ["switch.v1", "switch.m"] and room.shot_inflight is not None
+    (card,) = notifications(fake)
+    assert "(CS-309)" in card["title"] and "Can't be read: switch.p" in card["message"]
+
+
+def test_a_record_whose_only_switch_home_assistant_no_longer_has_is_said_not_waited_on_for_ever(rig):
+    """Home Assistant answers, and has none of the recorded switches (a relay board removed or renamed). That is
+    not Home Assistant being away: the record holds every shot of the room, so it has to be said (CS-309)."""
+    c, fake, _ = rig
+    room = c.rooms[0]
+    room.shot_inflight = {"zone": 1, "valve": "switch.gone", "mainline": None, "pump": None,
+                          "started": STARTED.isoformat()}
+    c._reconcile_inflight()
+    assert offs(fake) == [] and room.shot_inflight is not None
+    (card,) = notifications(fake)
+    assert "(CS-309)" in card["title"] and "Can't be read: switch.gone" in card["message"]
+
+
+def test_a_cleared_hold_takes_the_interrupted_shots_card_down_with_it(rig, monkeypatch):
+    """A switch that would not close (CS-301, CS-308), then closed by hand with the kill switch off: the hold
+    clears, the record is settled, and its card goes too."""
+    c, fake, _ = rig
+    room = crashed(c, fake)
+    real = controller.ha_call
+    monkeypatch.setattr(controller, "ha_call", lambda domain, service, **data: True
+                        if (service, data.get("entity_id")) == ("turn_off", "switch.v1")
+                        else real(domain, service, **data))
+    fake.set_state("input_boolean.kill", "off")
+    c._reconcile_inflight()
+    assert room.hardware_fault and "inflight_default" in c._alerted
+    monkeypatch.setattr(controller, "ha_call", real)
+    for entity in ("switch.v1", "switch.m", "switch.p"):
+        fake.set_state(entity, "off")  # the operator closed them
+    fake.calls.clear()
+    c._recover_hardware_faults()
+    assert room.hardware_fault is None and room.shot_inflight is None and "inflight_default" not in c._alerted
+    assert ("persistent_notification", "dismiss", {"notification_id": "f2_inflight_default"}) in fake.calls
+
+
+def test_a_stuck_switch_still_latches_when_only_the_tokens_writes_are_refused(rig, monkeypatch):
+    """A token whose user is no longer an administrator ("writes") still sends its offs: a switch that then stays
+    ON is a stuck switch, and it latches as any other."""
+    c, fake, _ = rig
+    room = crashed(c, fake)
+    real = controller.ha_call
+
+    def stuck(domain, service, **data):
+        if service == "turn_off" and data.get("entity_id") == "switch.v1":
+            fake.calls.append((domain, service, data))
+            return True
+        return real(domain, service, **data)
+
+    monkeypatch.setattr(controller, "ha_call", stuck)
+    monkeypatch.setattr(controller._GATE, "state", "writes")
+    c._reconcile_inflight()
+    assert room.hardware_fault is not None and room.shot_inflight is not None
+    assert any("(CS-308)" in n["title"] for n in notifications(fake))
+
+
+def test_a_close_home_assistant_refuses_for_the_token_latches_nothing(rig, monkeypatch):
+    """A refused token is not a stuck switch (as in the shot's own cleanup): nothing latches, the next loop tries."""
+    c, fake, _ = rig
+    room = crashed(c, fake)
+    monkeypatch.setattr(controller, "ha_call", lambda domain, service, **data: False)
+    monkeypatch.setattr(controller._GATE, "state", "all")
+    c._reconcile_inflight()
+    assert room.hardware_fault is None and room.shot_inflight is not None and notifications(fake) == []
+
+
+@pytest.mark.parametrize("status", [None, 502, 401])
+def test_while_home_assistant_answers_nothing_the_record_waits_and_nothing_is_sent(rig, monkeypatch, status):
+    """Unchanged: with no read at all there is nothing to close and nobody to tell; the next loop tries again.
+    No answer, a 502 from a proxy and a 401 are all "not answering": only a 404 says the entity is gone."""
+    c, fake, _ = rig
+    room = crashed(c, fake)
+    real_get, real_status = controller.ha_get, controller.ha_get_status
+    monkeypatch.setattr(controller, "ha_get", lambda entity, *a, **k: controller.HAState())
+    monkeypatch.setattr(controller, "ha_get_status", lambda entity, *a, **k: (status, controller.HAState()))
+    c._reconcile_inflight()
+    assert offs(fake) == [] and notifications(fake) == [] and room.shot_inflight is not None
+    monkeypatch.setattr(controller, "ha_get", real_get)
+    monkeypatch.setattr(controller, "ha_get_status", real_status)
+    c._reconcile_inflight()
+    assert offs(fake) == ["switch.v1", "switch.m", "switch.p"] and room.shot_inflight is None
 
 
 def test_a_record_whose_switches_all_read_off_is_simply_closed(rig):
