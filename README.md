@@ -17,8 +17,8 @@
 
 - **Why.** A timer waters at fixed times, whatever the plants did overnight. Crop steering lets the substrate dry back by a set amount, then brings it back up, so you choose whether the plants lean vegetative or generative.
 - **It watches.** Moisture (VWC) and pore EC probes in each zone, the feed tank and the lights. Several probes in one zone become one reading, and a probe that goes quiet is left out.
-- **It decides.** Each day runs in [four phases](docs/GROW_PLANS.md#the-words-youll-see): P0 morning dryback, P1 ramp, P2 maintenance and P3 overnight dryback. You set targets per zone, or a plan for the whole grow, and the engine sizes each watering (the dashboard calls it a shot) from how fast that zone is drying.
-- **It stays safe.** A fixed list of checks runs before every watering. Every pump and valve switch is read back, and one that does not answer stops watering and raises an alert. A daily water limit and a maximum shot duration mean a stuck probe cannot keep a valve open all day.
+- **It decides.** Each day runs in [four phases](docs/GROW_PLANS.md#the-words-youll-see): P0 morning dryback, P1 ramp, P2 maintenance and P3 overnight dryback. You set targets per zone, or a plan for the whole grow. The engine waters a zone up to a moisture target, then adds water each time the moisture falls to a set level. It can also water on a timer, flush a high pore EC, and supply a minimum of water each day. It sizes each watering (the dashboard calls it a shot) from your shot settings. It adjusts ramp and top-up shots for the pore EC.
+- **It stays safe.** A fixed list of checks runs before every watering. Every pump and valve switch is read back, and one that does not answer stops watering and raises an alert. No shot runs longer than the maximum shot duration that you set. A daily water limit holds the top-up, timed, timer and test shots of a zone. That limit does not hold the morning ramp shots, the rescue shots, or a flush at the maximum pore EC.
 - **You see it.** All rooms, then a room, then a zone with every watering on its day chart. History compares runs. It works on a phone, and alerts with a code go to the phones you choose.
 - **You change it.** Edits stay a draft until you review and apply them, and each value is read back so you see what the controller now holds.
 
@@ -67,7 +67,7 @@ Crop Steering has two parts. Automatic watering needs both parts. The two parts 
 
 | Part | Install with | What it does |
 | --- | --- | --- |
-| **The integration** | HACS | It keeps your rooms, zones, settings, plans and history. It adds the **Crop Steering** page to the Home Assistant sidebar. It does not operate equipment. |
+| **The integration** | HACS | It keeps your rooms, zones, settings, plans and history. It adds the **Crop Steering** page to the Home Assistant sidebar. It never switches a pump or a valve on. Its **Stop all** button switches them off. |
 | **The controller** | The Home Assistant app store, or Docker | It reads your probes each minute and decides each shot. It operates the pump and the valves with all the safety checks. It asks the AI assistant when that is set. |
 
 [![Open your Home Assistant instance and open this repository in HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=JakeTheRabbit&repository=HA-Irrigation-Strategy&category=integration)
