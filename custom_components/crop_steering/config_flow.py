@@ -17,6 +17,7 @@ from .const import (
     SOFTWARE_VERSION,
     DOMAIN,
     CONF_NUM_ZONES,
+    CONF_DAILY_LIMIT_FROM_SIZE,
     CONF_P0_ADDITIONAL_DRYBACK,
     NEW_ROOM_P0_ADDITIONAL_DRYBACK,
     MIN_ZONES,
@@ -240,8 +241,11 @@ def _hardware_schema(
     return out
 
 
-def _build_zones(num_zones: int, data: dict, existing: dict | None = None) -> dict:
-    """Build the config entry's `zones` dict from submitted form data."""
+def _build_zones(
+    num_zones: int, data: dict, existing: dict | None = None, had: int = 0
+) -> dict:
+    """Build the config entry's `zones` dict from submitted form data. `had`: how many zones the
+    room had before this save (0 for a room that is being made)."""
     zones: dict = {str(k): {**v, "active": False} for k, v in (existing or {}).items()}
     for z in range(1, int(num_zones) + 1):
         vwc = _as_list(data.get(f"zone_{z}_vwc"))
@@ -265,10 +269,13 @@ def _build_zones(num_zones: int, data: dict, existing: dict | None = None) -> di
             "plant_count": int(
                 data.get(f"zone_{z}_plant_count", SIZING_DEFAULTS["plant_count"])
             ),
-            "max_daily_volume": ((existing or {}).get(str(z)) or {}).get(
-                "max_daily_volume", ENTITY_DEFAULTS["max_daily_volume"]
-            ),
         }
+        known = (existing or {}).get(str(z)) or (existing or {}).get(z)
+        if not known and z > had:
+            # A zone made now: its daily water limit starts at the zone's size. A zone that
+            # exists keeps what it has (the spread above): its limit, or no mark. A zone the
+            # room counted before, with nothing stored for it, is not a new zone either.
+            zones[str(z)][CONF_DAILY_LIMIT_FROM_SIZE] = True
     return zones
 
 
@@ -831,7 +838,12 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         new_data = {
             **data,
             "num_zones": max(num, int(data.get("num_zones", 1))),
-            "zones": _build_zones(num, user_input, data.get("zones", {})),
+            "zones": _build_zones(
+                num,
+                user_input,
+                data.get("zones", {}),
+                had=int(data.get("num_zones") or 0),
+            ),
             "hardware": {**data.get("hardware", {}), **_build_hardware(user_input)},
             "parameters": {
                 **data.get("parameters", {}),

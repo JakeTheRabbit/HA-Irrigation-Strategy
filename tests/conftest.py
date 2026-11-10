@@ -57,3 +57,5 @@ def _hermetic_controller_state(tmp_path, monkeypatch):
     real /data/state.json (see addons/f2_control/tests/conftest.py for the full story).
     """
     monkeypatch.setenv("F2_STATE_PATH", str(tmp_path / "constructor-state.json"))
+    # ...nor write the health check's alive file into the machine's temporary folder (alive.path).
+    monkeypatch.setenv("F2_ALIVE_PATH", str(tmp_path / "alive"))

@@ -67,7 +67,7 @@ def test_the_start_names_every_missing_hold_in_one_card_with_the_kill_switch_off
     assert DOSING not in card["message"]
     assert "remove it from the app's hold entities, or create it" in card["message"]
     assert card["message"].endswith("Code CS-210. What it means and what to do: "
-                                    "Crop Steering → Help & tools → Error codes.")
+                                    "Crop Steering → Settings → Help → Alert codes.")
     # raised before the first loop began, while nothing is watered: the kill switch is off
     assert fake.calls.index(("persistent_notification", "create", card)) < seen[0]
     assert fake.states[KILL][0] == "off"
@@ -121,13 +121,14 @@ def test_a_hold_nothing_answered_for_is_asked_again_not_called_missing(monkeypat
 
 
 def test_no_hold_set_up_asks_nothing(monkeypatch):
-    """An old install without the option: no read, no card, no dismiss, at start or after."""
+    """An old install without the option: no read of a hold, no card, no dismiss, at start or after. (The one
+    status read a start does make is of the room's shot-in-flight state: test_shot_in_flight.py.)"""
     c, fake = _build_with([], present=())
     asked = []
     monkeypatch.setattr(controller, "ha_get_status", lambda entity, timeout=8: asked.append(entity))
     fake.calls.clear()
     _start(c, fake, monkeypatch, passes=3)
-    assert asked == [] and fake.calls == []
+    assert asked == ["sensor.crop_steering_shot_in_flight"] and fake.calls == []
 
 
 def test_the_start_check_needs_nothing_new_in_the_options():

@@ -341,9 +341,10 @@ them on.
 
 - **Changes list.** `get_changes` with the room and a `since` time lists who changed what, newest first.
   Your own check is the same list in the dashboard: **History › Changes**. Timer, alert rule, preset,
-  copy, probe offset and supply saves are sent with `client: "mcp"` and recorded with actor `mcp`. Setup
-  and plan saves are not; they show as a manual change by the assistant's Home Assistant user, which is
-  why it should have its own account.
+  copy, probe offset, supply, setup and plan saves are sent with `client: "mcp"` and recorded with actor
+  `mcp`. One exception: an integration before 3.18.0 does not accept that label on a plan save, so the
+  plan is saved without it and shows as a manual change by the assistant's Home Assistant user. This
+  is one reason why the assistant should have its own account.
 - **Journal.** `get_events` with `actor: "mcp"` lists the events the `mcp` saves recorded.
 - **Read it back yourself.** Open the page each change belongs to (**Equipment › Setup: pumps & valves**,
   **Irrigation › Timer programs**, **Settings › Alert rules**) and compare with the diff you approved.

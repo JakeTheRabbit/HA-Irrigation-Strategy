@@ -18,9 +18,9 @@ the archive does not use its entity ID as the measurement.
 
 The explorer's recorded-history loader uses the selected source. Errors and
 empty responses fall back to Recorder with a visible warning. Queries return
-mean/min/max at no more than 1000 points per sensor and 4 mapped room sensors
-per request, over at most 366 days. A request has an eight-second total deadline,
-two-megabyte response limit per sensor and one concurrent request per room.
+mean/min/max at no more than 1000 points per sensor and 16 mapped room sensors
+per request, over at most 366 days. Each sensor of a request has an eight-second
+deadline and a two-megabyte response limit. One request runs at a time per room.
 There is no arbitrary query field, write endpoint or browser connection to
 InfluxDB. The integration generates all query text and validates room membership
 on the server. Attribute-rich daily event timelines still use Recorder.

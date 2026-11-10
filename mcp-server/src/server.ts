@@ -171,7 +171,7 @@ export function createServer(ha: HaClient) {
     "get_timeline",
     {
       description:
-        "Read one room's timeline from the journal. Give start and end (ISO times, at most 48 h apart; optional zone_ids) for its shot, held, queued, alert and planned blocks per zone, pump load and error markers; or give days (YYYY-MM-DD, at most 14) for per-day shot, failed, warning, held and queued counts.",
+        "Read one room's timeline from the journal. Give start and end (ISO times, at most 48 h apart; optional zones, a list of zone numbers) for its shot, held, queued, alert and planned blocks per zone, pump load and error markers; or give days (YYYY-MM-DD, at most 14) for per-day shot, failed, warning, held and queued counts.",
       inputSchema: z.strictObject({
         room_id: roomId,
         start: time.optional(),

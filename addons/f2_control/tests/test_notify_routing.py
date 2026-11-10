@@ -23,7 +23,7 @@ pytestmark = pytest.mark.usefixtures("settings_built_in")
 
 CONFIG = "sensor.crop_steering_notify_config"
 OPTION = "notify/mobile_app_old_phone"  # the notify_service option, as an install before this has it
-FOOTER = "\n\nCode {}. What it means and what to do: Crop Steering → Help & tools → Error codes."
+FOOTER = "\n\nCode {}. What it means and what to do: Crop Steering → Settings → Help → Alert codes."
 TOOK = {"sent_to": ["notify.mobile_app_a"], "error": None}
 
 

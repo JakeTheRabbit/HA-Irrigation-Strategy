@@ -68,6 +68,20 @@ services:
     # ports:
     #   - "127.0.0.1:8420:8420"
 
+    # `docker ps` shows this container as healthy while the controller completes its passes, and as
+    # unhealthy when it has completed none for three passes and two minutes: it hangs, it waits
+    # because Home Assistant refuses its token, or Home Assistant does not answer (see `docker logs`).
+    # The check reads a file inside the container; it asks Home Assistant nothing and switches
+    # nothing. Docker does not restart an unhealthy container by itself, and do NOT add something
+    # that does: a restart on a refused token sends that token again, and Home Assistant may then
+    # ban this machine. An older image has no healthcheck.py and always shows healthy.
+    healthcheck:
+      test: ["CMD-SHELL", "[ ! -f /app/healthcheck.py ] || python3 /app/healthcheck.py"]
+      interval: 60s
+      timeout: 10s
+      retries: 2
+      start_period: 180s
+
     logging:
       driver: json-file
       options:

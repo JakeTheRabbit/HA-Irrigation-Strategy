@@ -135,6 +135,9 @@ muted room. The `options_<version>_*.json` files with a `data` folder
 `data_3_11_1_usage/`) are apps from 2.25.1 and the first AI route's line as each left `/data/options.json` and
 `/data`, recorded by running that version's own controller: they prove each still loads after the route's
 removal, moves to Claude only where a brain file shows that route ran and a key is set, and otherwise runs the rules.
+`state_3_19_0_plan_follow.json` is the `/data/state.json` controller 3.19.0 wrote for the one-zone tent at lights-on
+after a grow-day with no water, its own lights-on code closing that day (the night's state was set by hand): it
+proves the kept peak of that day is dropped at load and moves no plan (`test_plan_follows_probe.py`).
 `entities_moved_2_25_1.json` (F-605) is that 2.25.1 room with a few setting ids moved, as CS-605 describes:
 it names the snapshot it starts from and the ids it moves, and proves a controller-only update keeps the
 room watering and holds only the zone whose water-sizing setting it cannot read (`test_settings_wait.py`).

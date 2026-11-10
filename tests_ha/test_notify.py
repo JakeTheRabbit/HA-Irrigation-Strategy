@@ -349,7 +349,7 @@ async def test_the_low_stock_card_reaches_the_phone_that_ticks_stock_once(
     assert push["title"] == "Tent: 1 stock tank(s) low (CS-608)"
     assert "- Bloom: 1 L of 10 L" in push["message"]
     assert push["message"].endswith(
-        "Code CS-608. What it means and what to do: Crop Steering → Help & tools → Error codes."
+        "Code CS-608. What it means and what to do: Crop Steering → Settings → Help → Alert codes."
     )
     assert push["data"] == {"tag": "stock_low_tent", **LINK}  # the card of the room that has the slug
     assert received[TABLET] == []  # not an emergency

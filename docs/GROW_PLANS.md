@@ -108,6 +108,26 @@ on, and never while Pause AI changes runs. It skips a zone the plan holds on an 
 stale, and a zone with no trusted reading. A day with a step change in the reading (a 0.0, or a jump of more than
 10 points in about a minute or after a gap) starts the count again: the controller waits for 3 clean days after it.
 
+A grow-day is clean only when it also passes these checks:
+
+- the zone was in P2 that day, so its ramp ended;
+- the controller gave the zone water that day;
+- the peak ended 3 points or more over what the zone read before its first shot of the day.
+
+A day with the Watering switch off, or with a hold all day, fails a check. A day when the shots were counted but
+no water came (a blocked line, an empty tank, a pump that does not run) fails the third check: the reading rises a
+point or two as the lights warm the substrate, and a ramp that waters the zone usually raises it 5 points or more.
+A day that fails a check starts the count again and does not move the plan.
+
+The rule has two limits.
+
+- The controller sees one probe, and it cannot tell a probe that reads lower from water that stopped after the
+  ramp raised the reading 3 points. That day counts, and it can move the plan down. Look at the CS-714 card after
+  a day with a supply problem. If the move is wrong, set the offset to 0.
+- A zone that swings less than 3 points a day never passes the third check (clones, early veg, a zone that gets a
+  late top-up and dries back little at night). The plan does not follow the probe of such a zone. Set its offset
+  by hand.
+
 ## Read the combined graph
 
 - **VWC axis:** percent substrate water content. P1 target, P2 trigger and the P3 emergency floor come from the selected interpolated profile.

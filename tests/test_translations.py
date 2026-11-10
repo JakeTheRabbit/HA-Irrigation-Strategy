@@ -227,3 +227,31 @@ def test_every_plumbing_layout_has_a_plain_english_choice_and_nothing_else_does(
     options = _strings()["selector"]["plumbing"]["options"]
     assert set(options) == set(PLUMBING_LAYOUTS) == set(LABELS)
     assert list(options) == list(PLUMBING_LAYOUTS)  # offered simplest first
+
+
+def test_the_probe_tooltips_name_the_method_a_zone_starts_with():
+    """A zone's probes become one reading by the zone's "from probes" setting, whose first option
+    is the default (const.PROBE_METHODS, select.py). The tooltips said "the average ... does not
+    reject an outlier" while every zone starts on the median, and with three or more readings one
+    that is far from the others is left out, for moisture and for EC (calculations.fuse_probes,
+    const.PROBE_FAR)."""
+    const = (INTEGRATION / "const.py").read_text(encoding="utf-8")
+    first = re.search(r'^PROBE_METHODS = \["(\w+)"', const, re.M).group(1)
+    select = (INTEGRATION / "select.py").read_text(encoding="utf-8")
+    assert 'name=f"Zone {zone_num} {label} from probes"' in select
+    labels = dict(re.findall(r'\("(vwc|ec)", "(\w+)", "mdi:', select))
+    assert set(labels) == {"vwc", "ec"}
+    seen = 0
+    for half in (_strings()["config"], _strings()["options"]):
+        for step in half["step"].values():
+            for field, tooltip in (step.get("data_description") or {}).items():
+                kind = re.fullmatch(r"zone_\d+_(vwc|ec)", field)
+                if not kind:
+                    continue
+                seen += 1
+                assert f"is the {first.lower()} " in tooltip, field
+                assert "is the average" not in tooltip, field
+                assert "does not reject an outlier" not in tooltip, field
+                assert "far from the others is not used" in tooltip, field
+                assert f'"{labels[kind[1]]} from probes"' in tooltip, field
+    assert seen == 96  # 24 zones, moisture and EC, in the wizard and in Configure

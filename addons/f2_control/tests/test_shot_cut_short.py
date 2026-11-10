@@ -208,7 +208,11 @@ def test_one_alert_per_zone_per_half_hour_however_often_it_happens(rig, monkeypa
     c._execute_shot(c.rooms[0], 1, 60, 5, flow_lps=FLOW)
     c._execute_shot(c.rooms[0], 1, 60, 5, flow_lps=FLOW)
     assert [n["title"] for n in notifications(fake)] == [CUT]  # the usual 30-minute quiet period
-    assert c.rooms[0].state[1]["daily_vol"] == pytest.approx(FLOW * 16)  # and both counted as delivered
+    # and both counted as delivered. To 0.1%, as the two earlier tests in this file that count to a close stamp
+    # (the counts of 4.187 s and of `counted`): the count runs from the controller's own stamp, taken just
+    # before it sends ON, to Home Assistant's stamp of the close, so it holds the time that the call took
+    # (microseconds here; more on a busy machine).
+    assert c.rooms[0].state[1]["daily_vol"] == pytest.approx(FLOW * 16, rel=1e-3)
 
 
 # ---------------------------------------------------------------------------

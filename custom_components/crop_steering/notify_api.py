@@ -895,12 +895,17 @@ class Notifier:
                 self.hass, language, "issues", [DOMAIN]
             )
             head = f"component.{DOMAIN}.issues.{base}."
-            title, message = strings[head + "title"], strings[head + "description"]
+            # a card with a Fix button has its words on the confirm step
+            title, message = (
+                strings[head + "title"],
+                strings.get(head + "description")
+                or strings[head + "fix_flow.step.confirm.description"],
+            )
         except Exception:
             title = f"a card in Settings → Repairs ({code})"
             message = (
-                f"Code {code}. What it means and what to do: Crop Steering → Help & tools → "
-                "Error codes."
+                f"Code {code}. What it means and what to do: Crop Steering → Settings → Help → "
+                "Alert codes."
             )
         for key, value in placeholders.items():
             title = title.replace("{" + key + "}", str(value))

@@ -110,7 +110,7 @@
     "persistent_notification",
     "create",
     {
-     "message": "The batch stopped in its dose step: Balance: refused: Balance already reads dosing. The controller set the power of each dosing pump, the fill valve, the mix pump and the mix valves to off and released the hold. The rooms that it held get water again. Dosed before the stop: nothing. Check the tank before the next batch.\n\nCode CS-806. What it means and what to do: Crop Steering \u2192 Help & tools \u2192 Error codes.",
+     "message": "The batch stopped in its dose step: Balance: refused: Balance already reads dosing. The controller set the power of each dosing pump, the fill valve, the mix pump and the mix valves to off and released the hold. The rooms that it held get water again. Dosed before the stop: nothing. Check the tank before the next batch.\n\nCode CS-806. What it means and what to do: Crop Steering \u2192 Settings \u2192 Help \u2192 Alert codes.",
      "notification_id": "f2_dosing_default_806_2026_09_28t01_00_00_00_00",
      "title": "A batch stopped (CS-806)"
     }
@@ -1296,7 +1296,7 @@
     "persistent_notification",
     "create",
     {
-     "message": "The batch tank reads pH 5.6, outside the feed pH band of the room (5.8 to 6.5). pH auto-correct is on, but it did not dose: the 3 doses a day it may give are used. While the feed pH is outside its band, the source-water gate holds the shots of the room. Correct the tank by hand, or fix the reason. This alert comes again tomorrow while it lasts.\n\nCode CS-809. What it means and what to do: Crop Steering \u2192 Help & tools \u2192 Error codes.",
+     "message": "The batch tank reads pH 5.6, outside the feed pH band of the room (5.8 to 6.5). pH auto-correct is on, but it did not dose: the 3 doses a day it may give are used. While the feed pH is outside its band, the source-water gate holds the shots of the room. Correct the tank by hand, or fix the reason. This alert comes again tomorrow while it lasts.\n\nCode CS-809. What it means and what to do: Crop Steering \u2192 Settings \u2192 Help \u2192 Alert codes.",
      "notification_id": "f2_dosing_default_809_ph_refused_2026_09_28",
      "title": "PH auto-correct can't correct the batch tank (CS-809)"
     }
@@ -1339,7 +1339,7 @@
     "persistent_notification",
     "create",
     {
-     "message": "The batch tank reads pH 5.6, outside the feed pH band of the room (5.8 to 6.5). pH auto-correct is on, but it did not dose: a 5 s dose of Balance is less than 1 mL. While the feed pH is outside its band, the source-water gate holds the shots of the room. Correct the tank by hand, or fix the reason. This alert comes again tomorrow while it lasts.\n\nCode CS-809. What it means and what to do: Crop Steering \u2192 Help & tools \u2192 Error codes.",
+     "message": "The batch tank reads pH 5.6, outside the feed pH band of the room (5.8 to 6.5). pH auto-correct is on, but it did not dose: a 5 s dose of Balance is less than 1 mL. While the feed pH is outside its band, the source-water gate holds the shots of the room. Correct the tank by hand, or fix the reason. This alert comes again tomorrow while it lasts.\n\nCode CS-809. What it means and what to do: Crop Steering \u2192 Settings \u2192 Help \u2192 Alert codes.",
      "notification_id": "f2_dosing_default_809_ph_refused_2026_09_28",
      "title": "PH auto-correct can't correct the batch tank (CS-809)"
     }
@@ -1976,7 +1976,7 @@
     "persistent_notification",
     "create",
     {
-     "message": "The batch tank reads pH 5.6, outside the feed pH band of the room (5.8 to 6.5). pH auto-correct is on, but it did not dose: the mixing pump has a minimum power but no power sensor to read it. While the feed pH is outside its band, the source-water gate holds the shots of the room. Correct the tank by hand, or fix the reason. This alert comes again tomorrow while it lasts.\n\nCode CS-809. What it means and what to do: Crop Steering \u2192 Help & tools \u2192 Error codes.",
+     "message": "The batch tank reads pH 5.6, outside the feed pH band of the room (5.8 to 6.5). pH auto-correct is on, but it did not dose: the mixing pump has a minimum power but no power sensor to read it. While the feed pH is outside its band, the source-water gate holds the shots of the room. Correct the tank by hand, or fix the reason. This alert comes again tomorrow while it lasts.\n\nCode CS-809. What it means and what to do: Crop Steering \u2192 Settings \u2192 Help \u2192 Alert codes.",
      "notification_id": "f2_dosing_default_809_ph_refused_2026_09_28",
      "title": "PH auto-correct can't correct the batch tank (CS-809)"
     }
@@ -2035,7 +2035,7 @@
     "persistent_notification",
     "create",
     {
-     "message": "The batch tank reads pH 5.6, outside the feed pH band of the room (5.8 to 6.5). pH auto-correct is on, but it did not dose: the batch tank has no mixing pump set up, and a dose is never made into a tank that is not mixed. While the feed pH is outside its band, the source-water gate holds the shots of the room. Correct the tank by hand, or fix the reason. This alert comes again tomorrow while it lasts.\n\nCode CS-809. What it means and what to do: Crop Steering \u2192 Help & tools \u2192 Error codes.",
+     "message": "The batch tank reads pH 5.6, outside the feed pH band of the room (5.8 to 6.5). pH auto-correct is on, but it did not dose: the batch tank has no mixing pump set up, and a dose is never made into a tank that is not mixed. While the feed pH is outside its band, the source-water gate holds the shots of the room. Correct the tank by hand, or fix the reason. This alert comes again tomorrow while it lasts.\n\nCode CS-809. What it means and what to do: Crop Steering \u2192 Settings \u2192 Help \u2192 Alert codes.",
      "notification_id": "f2_dosing_default_809_ph_refused_2026_09_28",
      "title": "PH auto-correct can't correct the batch tank (CS-809)"
     }
@@ -2078,7 +2078,7 @@
     "persistent_notification",
     "create",
     {
-     "message": "The batch tank reads pH 5.6, outside the feed pH band of the room (5.8 to 6.5). pH auto-correct is on, but it did not dose: no dosing pump has the pH up role (Equipment > Dosing, Dosing setup). While the feed pH is outside its band, the source-water gate holds the shots of the room. Correct the tank by hand, or fix the reason. This alert comes again tomorrow while it lasts.\n\nCode CS-809. What it means and what to do: Crop Steering \u2192 Help & tools \u2192 Error codes.",
+     "message": "The batch tank reads pH 5.6, outside the feed pH band of the room (5.8 to 6.5). pH auto-correct is on, but it did not dose: no dosing pump has the pH up role (Equipment > Dosing, Dosing setup). While the feed pH is outside its band, the source-water gate holds the shots of the room. Correct the tank by hand, or fix the reason. This alert comes again tomorrow while it lasts.\n\nCode CS-809. What it means and what to do: Crop Steering \u2192 Settings \u2192 Help \u2192 Alert codes.",
      "notification_id": "f2_dosing_default_809_ph_refused_2026_09_28",
      "title": "PH auto-correct can't correct the batch tank (CS-809)"
     }
@@ -2370,7 +2370,7 @@
     "persistent_notification",
     "create",
     {
-     "message": "The batch tank reads pH 5.6, outside the feed pH band of the room (5.8 to 6.5). pH auto-correct is on, but it did not dose: Balance is not calibrated (flow 0). While the feed pH is outside its band, the source-water gate holds the shots of the room. Correct the tank by hand, or fix the reason. This alert comes again tomorrow while it lasts.\n\nCode CS-809. What it means and what to do: Crop Steering \u2192 Help & tools \u2192 Error codes.",
+     "message": "The batch tank reads pH 5.6, outside the feed pH band of the room (5.8 to 6.5). pH auto-correct is on, but it did not dose: Balance is not calibrated (flow 0). While the feed pH is outside its band, the source-water gate holds the shots of the room. Correct the tank by hand, or fix the reason. This alert comes again tomorrow while it lasts.\n\nCode CS-809. What it means and what to do: Crop Steering \u2192 Settings \u2192 Help \u2192 Alert codes.",
      "notification_id": "f2_dosing_default_809_ph_refused_2026_09_28",
      "title": "PH auto-correct can't correct the batch tank (CS-809)"
     }

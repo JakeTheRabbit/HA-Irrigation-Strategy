@@ -100,3 +100,49 @@ async def test_strategy_activate_emits_plan_armed(hass, hass_admin_user, room):
     assert events[1]["source"]["actor"] == "manual"
     assert events[1]["data"]["revision"] == saved["revision"]
     assert events[1]["data"]["status"] == "armed"
+
+
+async def test_a_save_that_says_it_is_from_the_mcp_server_is_recorded_as_the_assistants(
+    hass, hass_admin_user, room
+):
+    """The MCP server's setup and plan saves carry `client: "mcp"` and the reviewed proposal's token
+    (mcp-server/src/workspace.ts). With them the room's history names the assistant; without them
+    a save reads as the signed-in person's own (the setup save above)."""
+    token = "ab" * 32
+    first = room["rooms"][0]
+    await _call(
+        hass,
+        hass_admin_user,
+        "setup_save",
+        {
+            "entry_id": first["entry_id"],
+            "expected_revision": first["revision"],
+            "room_name": "Back room",
+            "active": first["active"],
+            "zones": first["zones"],
+            "hardware": first["hardware"],
+            "client": "mcp",
+            "proposal_token": token,
+        },
+    )
+    (changed,) = await _journal(hass, hass_admin_user, "config.changed")
+    assert changed["source"]["actor"] == "mcp" and changed["source"]["client"] == "mcp"
+    assert changed["source"]["user_id"] == hass_admin_user.id  # and whose token it used
+    assert [d["path"] for d in changed["data"]["diff"]] == ["room_name"]  # the two fields are no setting
+
+    manager = hass.data[DOMAIN]["_strategy"][first["entry_id"]]
+    await _call(
+        hass,
+        hass_admin_user,
+        "strategy_save",
+        {
+            "room_id": ROOM,
+            "plan": manager.document["plan"],
+            "expected_revision": manager.document["revision"],
+            "client": "mcp",
+            "proposal_token": token,
+        },
+    )
+    (saved,) = await _journal(hass, hass_admin_user, "plan.saved")
+    assert saved["source"]["actor"] == "mcp" and saved["source"]["client"] == "mcp"
+    assert saved["correlation"]["proposal_token"] == token

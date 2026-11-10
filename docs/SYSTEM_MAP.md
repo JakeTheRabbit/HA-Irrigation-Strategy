@@ -8,7 +8,7 @@ Crop Steering does not talk to devices. It talks to Home Assistant.
 
 1. **Your devices** (probes, valves, pumps, meters, tanks, lights) connect to Home Assistant the way they always have.
 2. **Home Assistant** turns every device into an entity: a sensor, a switch, a valve, a number, a button.
-3. **Crop Steering** reads those entities, decides when each zone drinks, and runs the pump and valves with safety checks. It has two parts: the **integration**, which lives inside Home Assistant and keeps your setup, and the **controller**, which is the only part that switches hardware.
+3. **Crop Steering** reads those entities, decides when each zone drinks, and runs the pump and valves with safety checks. It has two parts: the **integration**, which lives inside Home Assistant and keeps your setup, and the **controller**, which is the only part that switches hardware on.
 4. **You** watch it on the dashboard in the Home Assistant sidebar, get alerts on the phones you choose, and can let an AI assistant prepare changes for you to approve.
 
 If Home Assistant shows a device as the right kind of entity, with a unit Crop Steering understands, Crop Steering can use it. How the device got into Home Assistant does not matter.
@@ -47,7 +47,7 @@ flowchart LR
       services["Services and settings"]
       journal["Event journal"]
     end
-    subgraph CTL["Controller (the only part that switches hardware)"]
+    subgraph CTL["Controller (the only part that switches hardware on)"]
       engine["Steering engine<br/>P0 to P3"]
       guards["Safety checks<br/>before every shot"]
       shot["Shot: pump, main line, valve"]
@@ -84,8 +84,24 @@ Solid lines carry readings and commands. The dotted line is advice: the optional
 ## Three lines that are never crossed
 
 - **The AI cannot run a pump or a valve.** Neither the AI judges inside the controller nor an AI assistant connected through MCP has any way to start a shot, switch hardware or stop a safety action.
-- **The integration never switches hardware on.** Only the controller does, and only after the safety checks pass. The integration can switch the pump and the valves of a room off. This is the **Stop all** button. It also operates when the controller is stopped.
+- **The integration never switches hardware on.** Only the controller does, and only after the safety checks pass. The integration can switch the pump and the valves of a room off. This is the **Stop all** button, and the second guard for each shot (below). The two operate when the controller is stopped.
 - **Before a shot, an unreadable kill switch counts as off.** So does an unreadable zone switch: the controller holds the shot. An unreadable switch does not end a shot that already runs. That shot ends at its set length. It ends earlier when the kill switch, the room switch or the zone switch reads a definite off, or when a manual override or a hold reads on. The "Room in use" switch is different. When the controller cannot read it, the controller keeps the last value that it read. Thus a restart of Home Assistant does not start a room that is off. A switch that the controller has never read counts as on.
+
+## A second guard for each shot
+
+In a shot, when its valve is open, the controller tells Home Assistant which devices the shot opened and how much time the shot and its close can need. If the controller stops, hangs or loses Home Assistant in the middle of the shot, the integration waits for that time and 1 minute more. Then the integration switches off the devices that the shot opened and that are still on: the zone valve first, then the main line and the pump. It raises the alert CS-617, which stays until a person confirms it.
+
+The integration switches off only a device that went on while the shot opened. It leaves a device that a person switched. It leaves the pump on while a hold is on. It leaves the main line and the pump on while a different valve on the same line is open. It never switches a device on, and it does nothing before the controller's own time is over. It acts whether the Watering switch of the room is on or off.
+
+The valve of the shot is closed in each case. For a pump or a main line behind a closed valve, and for a valve that it must leave on, the integration also looks at the heartbeat of the controller: while the controller reports, the integration leaves them and raises no alert, because the controller is at work on other zones.
+
+Limits:
+
+- Home Assistant does not keep this information through its own restart. After a restart of Home Assistant in the middle of a shot, this guard does not know the shot.
+- The controller writes the information after the valve is open, so that nothing new delays a shot. If the controller stops in the seconds while the pump primes and the valve opens, this guard does not know the shot. A shot of less than about 3 seconds has no time for the write.
+- After a start, if Home Assistant still shows a shot of an earlier run as open and one of its devices does not read off, the controller writes no new shot of that room until that is settled (10 minutes at most after the time of that shot).
+- In those cases, the controller closes the shot when it runs again, if its own record of the shot is there.
+- If the write fails, that shot has no second guard.
 
 ## One shot, from reading to record
 

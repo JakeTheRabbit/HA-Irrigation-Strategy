@@ -247,11 +247,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Set up platforms
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     _link_zone_devices(hass, entry)
-    # Every number has restored its value by now: name each one held above its zone's limit.
-    from .bounds import check_held_values
+    # Every number has restored its value by now: give a new zone's daily water limit its start,
+    # then name each number held above its zone's limit.
+    from .bounds import check_held_values, start_new_daily_limits
 
     # A number platform that failed to set up leaves nothing to check, never a failed room.
     numbers = hass.data[DOMAIN].get("_numbers", {}).get(entry.entry_id, {})
+    start_new_daily_limits(numbers.values())
     check_held_values(hass, entry, numbers.values())
     # Once Home Assistant has started: name each deprecated entity an automation or script uses.
     from .deprecation import async_setup_deprecation
@@ -320,6 +322,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         async_setup_system_status(hass, entry)
     except Exception as err:  # pragma: no cover - never block setup on the status
         _LOGGER.warning("System status unavailable: %s", err)
+
+    # The second guard of a shot: OFF only, and only past the controller's own deadline.
+    try:
+        from .shot_backstop import async_setup_backstop
+
+        async_setup_backstop(hass, entry)
+    except Exception as err:  # pragma: no cover - never block setup on the guard
+        _LOGGER.warning("Shot guard unavailable: %s", err)
 
     # Setup health checks -> Home Assistant Repairs (read-only diagnostics)
     from datetime import timedelta

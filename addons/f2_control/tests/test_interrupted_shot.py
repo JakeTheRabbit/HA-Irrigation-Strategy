@@ -137,6 +137,87 @@ def test_an_old_state_file_loads_and_a_damaged_record_is_ignored(rig):
         assert c.rooms[0].shot_inflight is None and c.rooms[0].state[1]["daily_vol"] == 4
 
 
+@pytest.mark.parametrize("none", ["", None])
+@pytest.mark.parametrize("without", [("mainline",), ("pump",), ("mainline", "pump")],
+                         ids=["no main line", "no pump", "a valve only"])
+def test_a_room_without_a_main_line_or_a_pump_keeps_a_record_the_next_start_can_use(rig, monkeypatch, without, none):
+    """The setup wizard writes "" for a room with no main line, and for one with no pump. The record was saved
+    with that "", and the next start took it for damaged and ignored it: a shot that a crash, a kill -9 or a
+    power cut interrupted in such a room was not closed by the controller at its next start."""
+    c, fake, _ = rig
+    room = c.rooms[0]
+    for key in without:
+        room.hw[key] = none
+    on_disk = []
+    real = controller.ha_call
+
+    def call(domain, service, **data):
+        if domain == "switch" and service == "turn_on" and not on_disk:
+            on_disk.append(saved(c)["default"].get("_shot_inflight"))
+        return real(domain, service, **data)
+
+    def killed(*_a, **_k):
+        raise SystemExit(137)  # no cleanup runs: the stop's own cleanup is a signal handler, not called here
+
+    monkeypatch.setattr(controller, "ha_call", call)
+    monkeypatch.setattr(c, "_wait_shot", killed)
+    with pytest.raises(SystemExit):
+        c._execute_shot(room, 1, 60, 5)
+    kept = {"mainline": "switch.m", "pump": "switch.p"}
+    assert {key: on_disk[0][key] for key in kept} == {key: None if key in without else kept[key] for key in kept}
+    opened = ["switch.v1", *(kept[key] for key in kept if key not in without)]
+    assert all(fake.states[entity][0] == "on" for entity in opened)
+    c._busy = False
+    c._load_state()  # the next start
+    assert room.shot_inflight == on_disk[0]
+    fake.calls.clear()
+    c._reconcile_inflight()
+    assert offs(fake) == opened and room.shot_inflight is None
+
+
+@pytest.mark.parametrize("key", ["mainline", "pump"])
+def test_a_record_saved_with_an_empty_main_line_or_pump_is_usable(rig, key):
+    """A controller is updated after a crash in a room without that device: the state file still holds the
+    record with the "" that the version before wrote."""
+    c, fake, _ = rig
+    c.rooms[0].hw[key] = ""
+    record = {**RECORD, key: ""}
+    assert controller.Controller._inflight_record(record) == {**RECORD, key: None}
+    with open(c._state_path, "w") as fh:
+        json.dump({"default": {"_shot_inflight": record}}, fh)
+    for entity in ("switch.v1", "switch.m", "switch.p"):
+        if entity != RECORD[key]:
+            fake.set_state(entity, "on", last_updated=at(2))
+    c._load_state()
+    fake.calls.clear()
+    c._reconcile_inflight()
+    assert offs(fake) == [e for e in ("switch.v1", "switch.m", "switch.p") if e != RECORD[key]]
+    assert c.rooms[0].shot_inflight is None
+
+
+def test_a_record_that_is_damaged_is_still_ignored():
+    """No entity at all, a valve of "" (a shot always has one), or something that is no name."""
+    for damaged in ({**RECORD, "valve": "", "mainline": "", "pump": ""}, {**RECORD, "valve": ""},
+                    {**RECORD, "mainline": 0}, {**RECORD, "pump": ["switch.p"]}, {**RECORD, "valve": False}):
+        assert controller.Controller._inflight_record(damaged) is None, damaged
+
+
+@pytest.mark.parametrize("none", ["", None])
+def test_two_rooms_with_no_main_line_on_two_pumps_do_not_share_a_line(rig, none):
+    c, fake, _ = rig
+    other = type("Room", (), {})()
+    other.hw = {"pump": "switch.p2", "mainline": none, "valves": {1: "switch.b1"}}
+    fake.set_state("switch.b1", "on")  # the other room waters
+    c.rooms.append(other)
+    try:
+        record = {**RECORD, "mainline": none}
+        assert c._line_in_use(c.rooms[0], record) is False
+        other.hw["pump"] = "switch.p"  # the same pump: now it is one line
+        assert c._line_in_use(c.rooms[0], record) is True
+    finally:
+        c.rooms.pop()
+
+
 # ---------------------------------------------------------------------------
 # Closing what the interrupted shot opened, and nothing else
 # ---------------------------------------------------------------------------
@@ -220,8 +301,8 @@ def test_after_a_restart_with_no_history_nothing_is_switched_and_it_is_said_so(r
 
 def test_a_retired_switch_that_is_off_never_hands_an_unsettled_shot_to_a_person(rig):
     # While System Enabled or Auto Irrigation Enabled reads off, the controller switches the room's
-    # engine switch off in its place. This check leaves everything alone while that switch is off (a
-    # person has taken over), so a check that had to wait a loop was never finished: the valve ran on.
+    # engine switch off in its place, but only once an interrupted shot is settled: the shot's valve
+    # is closed first.
     c, fake, _ = rig
     crashed(c, fake)
     restarted(fake)
@@ -285,15 +366,155 @@ def test_the_line_is_left_alone_while_another_valve_on_it_is_open(rig):
     assert fake.states["switch.m"][0] == "on" and fake.states["switch.p"][0] == "on"
 
 
-def test_with_the_kill_switch_off_the_operator_has_it_and_nothing_is_touched(rig):
+@pytest.mark.parametrize("kill", ["off", "unavailable", None])
+def test_with_the_kill_switch_off_what_the_shot_opened_is_still_closed(rig, kill):
+    """"Watering off" means no water. Before, an interrupted shot's valve, main line and pump were left ON for as
+    long as the room's kill switch was not ON, with one log line and no alert: the operator who obeyed CS-301
+    ("set the kill switch to off") kept the water running. Now what the shot opened is closed whatever the kill
+    switch reads, or when Home Assistant no longer has it."""
     c, fake, _ = rig
+    crashed(c, fake)
+    if kill is None:
+        del fake.states["input_boolean.kill"]
+    else:
+        fake.set_state("input_boolean.kill", kill)
+    c._reconcile_inflight()
+    assert offs(fake) == ["switch.v1", "switch.m", "switch.p"]  # the valve first, then back up the line
+    assert c.rooms[0].shot_inflight is None and c.rooms[0].hardware_fault is None
+    assert "_shot_inflight" not in saved(c)["default"]
+
+
+def test_with_the_kill_switch_off_a_valve_a_person_has_switched_since_is_still_theirs(rig):
+    """The rule that protects hand watering does not change: only what has been ON since the shot opened it."""
+    c, fake, _ = rig
+    crashed(c, fake, valve=600)  # switched again ten minutes in: somebody is hand-watering this zone
+    fake.set_state("input_boolean.kill", "off")
+    c._reconcile_inflight()
+    assert offs(fake) == [] and c.rooms[0].shot_inflight is None
+
+
+def test_with_the_kill_switch_off_a_pump_a_hold_owns_is_still_left(rig):
+    c, fake, _ = rig
+    c.hold_entities = ["input_boolean.dosing"]
+    fake.set_state("input_boolean.dosing", "on")
     crashed(c, fake)
     fake.set_state("input_boolean.kill", "off")
     c._reconcile_inflight()
-    assert offs(fake) == [] and c.rooms[0].shot_inflight is not None
-    fake.set_state("input_boolean.kill", "on")
+    assert offs(fake) == ["switch.v1", "switch.m"] and fake.states["switch.p"][0] == "on"
+
+
+def test_with_the_kill_switch_off_the_line_is_still_left_while_another_valve_on_it_is_open(rig):
+    c, fake, _ = rig
+    crashed(c, fake)
+    fake.set_state("switch.v2", "on")  # somebody is hand-watering zone 2 on the same line
+    fake.set_state("input_boolean.kill", "off")
     c._reconcile_inflight()
-    assert offs(fake) == ["switch.v1", "switch.m", "switch.p"] and c.rooms[0].shot_inflight is None
+    assert offs(fake) == ["switch.v1"]
+    assert {e: fake.states[e][0] for e in ("switch.m", "switch.p")} == {"switch.m": "on", "switch.p": "on"}
+
+
+def test_with_the_kill_switch_off_a_switch_that_cannot_be_read_is_left_and_said_so(rig):
+    """CS-309 as before: what cannot be read is not touched, whatever the kill switch reads."""
+    c, fake, _ = rig
+    room = crashed(c, fake)
+    fake.set_state("input_boolean.kill", "off")
+    for entity in ("switch.v1", "switch.m", "switch.p"):
+        fake.set_state(entity, "unavailable")
+    c._reconcile_inflight()
+    assert offs(fake) == [] and room.shot_inflight is not None
+    (card,) = notifications(fake)
+    assert "(CS-309)" in card["title"] and "Can't be read: switch.v1, switch.m, switch.p" in card["message"]
+
+
+def test_a_pump_home_assistant_no_longer_has_is_named_and_the_rest_is_closed(rig):
+    c, fake, _ = rig
+    room = crashed(c, fake)
+    del fake.states["switch.p"]
+    c._reconcile_inflight()
+    assert offs(fake) == ["switch.v1", "switch.m"] and room.shot_inflight is not None
+    (card,) = notifications(fake)
+    assert "(CS-309)" in card["title"] and "Can't be read: switch.p" in card["message"]
+
+
+def test_a_record_whose_only_switch_home_assistant_no_longer_has_is_said_not_waited_on_for_ever(rig):
+    """Home Assistant answers, and has none of the recorded switches (a relay board removed or renamed). That is
+    not Home Assistant being away: the record holds every shot of the room, so it has to be said (CS-309)."""
+    c, fake, _ = rig
+    room = c.rooms[0]
+    room.shot_inflight = {"zone": 1, "valve": "switch.gone", "mainline": None, "pump": None,
+                          "started": STARTED.isoformat()}
+    c._reconcile_inflight()
+    assert offs(fake) == [] and room.shot_inflight is not None
+    (card,) = notifications(fake)
+    assert "(CS-309)" in card["title"] and "Can't be read: switch.gone" in card["message"]
+
+
+def test_a_cleared_hold_takes_the_interrupted_shots_card_down_with_it(rig, monkeypatch):
+    """A switch that would not close (CS-301, CS-308), then closed by hand with the kill switch off: the hold
+    clears, the record is settled, and its card goes too."""
+    c, fake, _ = rig
+    room = crashed(c, fake)
+    real = controller.ha_call
+    monkeypatch.setattr(controller, "ha_call", lambda domain, service, **data: True
+                        if (service, data.get("entity_id")) == ("turn_off", "switch.v1")
+                        else real(domain, service, **data))
+    fake.set_state("input_boolean.kill", "off")
+    c._reconcile_inflight()
+    assert room.hardware_fault and "inflight_default" in c._alerted
+    monkeypatch.setattr(controller, "ha_call", real)
+    for entity in ("switch.v1", "switch.m", "switch.p"):
+        fake.set_state(entity, "off")  # the operator closed them
+    fake.calls.clear()
+    c._recover_hardware_faults()
+    assert room.hardware_fault is None and room.shot_inflight is None and "inflight_default" not in c._alerted
+    assert ("persistent_notification", "dismiss", {"notification_id": "f2_inflight_default"}) in fake.calls
+
+
+def test_a_stuck_switch_still_latches_when_only_the_tokens_writes_are_refused(rig, monkeypatch):
+    """A token whose user is no longer an administrator ("writes") still sends its offs: a switch that then stays
+    ON is a stuck switch, and it latches as any other."""
+    c, fake, _ = rig
+    room = crashed(c, fake)
+    real = controller.ha_call
+
+    def stuck(domain, service, **data):
+        if service == "turn_off" and data.get("entity_id") == "switch.v1":
+            fake.calls.append((domain, service, data))
+            return True
+        return real(domain, service, **data)
+
+    monkeypatch.setattr(controller, "ha_call", stuck)
+    monkeypatch.setattr(controller._GATE, "state", "writes")
+    c._reconcile_inflight()
+    assert room.hardware_fault is not None and room.shot_inflight is not None
+    assert any("(CS-308)" in n["title"] for n in notifications(fake))
+
+
+def test_a_close_home_assistant_refuses_for_the_token_latches_nothing(rig, monkeypatch):
+    """A refused token is not a stuck switch (as in the shot's own cleanup): nothing latches, the next loop tries."""
+    c, fake, _ = rig
+    room = crashed(c, fake)
+    monkeypatch.setattr(controller, "ha_call", lambda domain, service, **data: False)
+    monkeypatch.setattr(controller._GATE, "state", "all")
+    c._reconcile_inflight()
+    assert room.hardware_fault is None and room.shot_inflight is not None and notifications(fake) == []
+
+
+@pytest.mark.parametrize("status", [None, 502, 401])
+def test_while_home_assistant_answers_nothing_the_record_waits_and_nothing_is_sent(rig, monkeypatch, status):
+    """Unchanged: with no read at all there is nothing to close and nobody to tell; the next loop tries again.
+    No answer, a 502 from a proxy and a 401 are all "not answering": only a 404 says the entity is gone."""
+    c, fake, _ = rig
+    room = crashed(c, fake)
+    real_get, real_status = controller.ha_get, controller.ha_get_status
+    monkeypatch.setattr(controller, "ha_get", lambda entity, *a, **k: controller.HAState())
+    monkeypatch.setattr(controller, "ha_get_status", lambda entity, *a, **k: (status, controller.HAState()))
+    c._reconcile_inflight()
+    assert offs(fake) == [] and notifications(fake) == [] and room.shot_inflight is not None
+    monkeypatch.setattr(controller, "ha_get", real_get)
+    monkeypatch.setattr(controller, "ha_get_status", real_status)
+    c._reconcile_inflight()
+    assert offs(fake) == ["switch.v1", "switch.m", "switch.p"] and room.shot_inflight is None
 
 
 def test_a_record_whose_switches_all_read_off_is_simply_closed(rig):
@@ -484,6 +705,260 @@ def test_stopping_the_app_mid_shot_closes_that_shot_and_counts_the_water_already
     assert c.rooms[0].hardware_fault is None and c.rooms[0].shot_inflight is None
     on_disk = saved(c)["default"]
     assert counted_for_30_s(on_disk["1"]["daily_vol"]) and "_shot_inflight" not in on_disk
+
+
+def late_on_plug(monkeypatch, c, fake, clock, entity, lag_s=1.5, stop_after_s=0.5, off_wins=True):
+    """A plug that takes its turn_on at once and shows ON `lag_s` later, as a Zigbee plug does, and the app
+    stopped (SIGTERM) `stop_after_s` after that turn_on, while the plug still reads its old OFF.
+    `off_wins`: the plug does what it was last told, so the OFF the stop sends leaves it off. Not `off_wins`:
+    the ON was still on its way when the OFF arrived (or the OFF was lost) and lands after it.
+    -> settle(), which lets the late report land after the process has gone and says what the plug then reads."""
+    plug = {"told": "off", "shown_at": None, "settled": False}
+    real_call, real_get = controller.ha_call, controller.ha_get
+
+    def show():
+        if plug["shown_at"] is not None and clock.seconds >= plug["shown_at"]:
+            fake.set_state(entity, plug["told"])
+
+    def call(domain, service, **data):
+        if plug["settled"] or data.get("entity_id") != entity or service not in ("turn_on", "turn_off"):
+            return real_call(domain, service, **data)
+        fake.calls.append((domain, service, data))
+        if service == "turn_on" or off_wins:
+            plug["told"] = "on" if service == "turn_on" else "off"
+            plug["shown_at"] = clock.seconds + lag_s
+        if service == "turn_on":
+            clock.sleep(stop_after_s)
+            c._safe_exit()  # ends in SystemExit, inside the shot's switch-on
+        return True
+
+    def get(eid, timeout=8):
+        if eid == entity and not plug["settled"]:
+            show()
+        return real_get(eid, timeout=timeout)
+
+    def settle():
+        clock.sleep(lag_s + 5)
+        show()
+        plug["settled"] = True  # from here an ordinary switch again: it does what it is told, at once
+        return fake.states[entity][0]
+
+    monkeypatch.setattr(controller, "ha_call", call)
+    monkeypatch.setattr(controller, "ha_get", get)
+    return settle
+
+
+def next_start(c, fake):
+    """The app starts again: it reads the state file back and settles what was recorded."""
+    fake.calls.clear()
+    c._load_state()
+    c._reconcile_inflight()
+    return c.rooms[0]
+
+
+OPENED_BEFORE = {"switch.p": [], "switch.m": ["switch.p"], "switch.v1": ["switch.m", "switch.p"]}
+
+
+@pytest.mark.parametrize("opening", ["switch.p", "switch.m", "switch.v1"])
+def test_stopping_the_app_while_a_switch_opens_sends_it_off_though_it_still_reads_off(rig, monkeypatch, opening):
+    """The app is stopped (an update, a restart) 0.5 s after the shot sent a switch ON, before Home Assistant
+    shows it ON. Before: the stop read OFF, sent nothing, dropped the record and left; the plug then went ON with
+    no controller running and nothing recorded to close it at the next start. Now the stop switches off the
+    switch the shot was opening whatever it reads, with what the shot had already opened, and keeps the record:
+    an OFF that reads back OFF proves nothing about a switch that read OFF before it was sent."""
+    c, fake, clock = rig
+    settle = late_on_plug(monkeypatch, c, fake, clock, opening)
+    with pytest.raises(SystemExit):
+        c._execute_shot(c.rooms[0], 1, 120, 5, flow_lps=0.05)
+    assert offs(fake) == [opening] + OPENED_BEFORE[opening]  # the one that was opening first, then up the line
+    assert c.rooms[0].hardware_fault is None
+    assert saved(c)["default"]["_shot_inflight"]["valve"] == "switch.v1"  # still recorded
+    assert settle() == "off"  # the late report lands after the process has gone: the plug is off
+    assert {e: fake.states[e][0] for e in ("switch.v1", "switch.m", "switch.p")} == dict.fromkeys(
+        ("switch.v1", "switch.m", "switch.p"), "off")
+    room = next_start(c, fake)  # everything reads OFF: the record is simply closed, nothing is sent
+    assert offs(fake) == [] and room.shot_inflight is None and "_shot_inflight" not in saved(c)["default"]
+
+
+@pytest.mark.parametrize("opening", ["switch.p", "switch.m", "switch.v1"])
+def test_an_on_that_lands_after_the_stops_off_is_closed_at_the_next_start(rig, monkeypatch, opening):
+    """The ON was still on its way when the stop's OFF arrived, or the OFF was lost: the plug ends ON after the
+    process has gone. The shot is still recorded, so the next start closes it."""
+    c, fake, clock = rig
+    settle = late_on_plug(monkeypatch, c, fake, clock, opening, off_wins=False)
+    with pytest.raises(SystemExit):
+        c._execute_shot(c.rooms[0], 1, 120, 5, flow_lps=0.05)
+    assert opening in offs(fake)
+    assert settle() == "on"
+    room = next_start(c, fake)
+    assert offs(fake) == [opening] + [e for e in OPENED_BEFORE[opening] if fake.states[e][0] != "off"]
+    assert fake.states[opening][0] == "off" and room.shot_inflight is None and room.hardware_fault is None
+
+
+def test_stopping_a_one_switch_room_while_its_valve_opens_sends_it_off(rig, monkeypatch):
+    c, fake, clock = rig
+    room = c.rooms[0]
+    room.hw = {"pump": None, "mainline": None, "valves": {1: "switch.v1"}}
+    settle = late_on_plug(monkeypatch, c, fake, clock, "switch.v1")
+    with pytest.raises(SystemExit):
+        c._execute_shot(room, 1, 120, 5, flow_lps=0.05)
+    assert offs(fake) == ["switch.v1"]
+    assert settle() == "off" and room.shot_inflight["valve"] == "switch.v1"
+
+
+def hold_from_the_pumps_turn_on(monkeypatch, fake, state):
+    """The hold reads `state` from the moment the pump is told ON (None: it cannot be read)."""
+    real_call, real_get = controller.ha_call, controller.ha_get
+    seen = {"on": False}
+
+    def call(domain, service, **data):
+        if (service, data.get("entity_id")) == ("turn_on", "switch.p"):
+            seen["on"] = True
+            if state is not None:
+                fake.set_state("input_boolean.dosing", state)
+        return real_call(domain, service, **data)
+
+    def get(eid, timeout=8):
+        if eid == "input_boolean.dosing" and seen["on"] and state is None:
+            return controller.HAState()
+        return real_get(eid, timeout=timeout)
+
+    fake.set_state("input_boolean.dosing", "off")
+    monkeypatch.setattr(controller, "ha_call", call)
+    monkeypatch.setattr(controller, "ha_get", get)
+
+
+@pytest.mark.parametrize("hold", ["on", None])
+def test_stopping_while_the_pump_opens_never_switches_off_a_pump_a_hold_may_own(rig, monkeypatch, hold):
+    """As everywhere else: a pump is never switched off while a hold (dosing, a fill, a flush, circulation) is
+    on, nor when the hold cannot be read. The shot stays recorded either way."""
+    c, fake, clock = rig
+    c.hold_entities = ["input_boolean.dosing"]
+    settle = late_on_plug(monkeypatch, c, fake, clock, "switch.p")
+    hold_from_the_pumps_turn_on(monkeypatch, fake, hold)
+    with pytest.raises(SystemExit):
+        c._execute_shot(c.rooms[0], 1, 120, 5, flow_lps=0.05)
+    assert offs(fake) == []
+    assert settle() == "on"
+    assert saved(c)["default"]["_shot_inflight"]["pump"] == "switch.p"
+
+
+def unreadable_from_its_turn_on(monkeypatch, fake, entity):
+    """`entity` reads unavailable from the moment it is told ON (its device dropped off as it switched)."""
+    real_call, real_get = controller.ha_call, controller.ha_get
+    told = {"on": False}
+
+    def call(domain, service, **data):
+        if (service, data.get("entity_id")) == ("turn_on", entity):
+            told["on"] = True
+        return real_call(domain, service, **data)
+
+    def get(eid, timeout=8):
+        read = real_get(eid, timeout=timeout)
+        if eid == entity and told["on"]:
+            return controller.HAState("unavailable", read[1], read[2])
+        return read
+
+    monkeypatch.setattr(controller, "ha_call", call)
+    monkeypatch.setattr(controller, "ha_get", get)
+
+
+@pytest.mark.parametrize("opening", ["switch.p", "switch.m", "switch.v1"])
+def test_a_switch_that_cannot_be_read_while_it_opens_is_sent_off_and_the_shot_stays_recorded(rig, monkeypatch,
+                                                                                         opening):
+    """Not reading ON is not reading OFF: a switch whose device dropped off as it was told ON may be on. The stop
+    sends it OFF and keeps the record, because nothing confirms it."""
+    c, fake, clock = rig
+    late_on_plug(monkeypatch, c, fake, clock, opening)
+    unreadable_from_its_turn_on(monkeypatch, fake, opening)
+    with pytest.raises(SystemExit):
+        c._execute_shot(c.rooms[0], 1, 120, 5, flow_lps=0.05)
+    assert opening in offs(fake)
+    assert saved(c)["default"]["_shot_inflight"]["valve"] == "switch.v1"
+
+
+@pytest.mark.parametrize("opening", ["switch.m", "switch.v1"])
+def test_a_hold_never_keeps_the_stop_from_closing_a_valve_or_the_main_line(rig, monkeypatch, opening):
+    """A hold owns the pump, never the shot's valve or main line: those are closed whatever a hold reads."""
+    c, fake, clock = rig
+    c.hold_entities = ["input_boolean.dosing"]
+    fake.set_state("input_boolean.dosing", "off")
+    settle = late_on_plug(monkeypatch, c, fake, clock, opening)
+    real = controller.ha_call
+
+    def hold_starts(domain, service, **data):
+        if (service, data.get("entity_id")) == ("turn_on", opening):
+            fake.set_state("input_boolean.dosing", "on")
+        return real(domain, service, **data)
+
+    monkeypatch.setattr(controller, "ha_call", hold_starts)
+    with pytest.raises(SystemExit):
+        c._execute_shot(c.rooms[0], 1, 120, 5, flow_lps=0.05)
+    assert offs(fake)[0] == opening and "switch.p" not in offs(fake)  # the pump is the hold's now
+    assert settle() == "off"
+
+
+def test_a_pump_a_person_had_running_is_left_running_when_the_stop_comes_as_the_shot_opens_it(rig, monkeypatch):
+    """The tank was being circulated by hand, the pump on for half an hour, when a shot began and the app was
+    stopped as it sent the pump its ON. The pump reads ON: no ON is still to land, and it is the person's
+    (it was on before the shot), so nothing is sent, as before."""
+    c, fake, clock = rig
+    fake.set_state("switch.p", "on", last_updated=(datetime.now(timezone.utc) - timedelta(minutes=30)).isoformat())
+    real = controller.ha_call
+
+    def call(domain, service, **data):
+        if (service, data.get("entity_id")) == ("turn_on", "switch.p"):
+            fake.calls.append((domain, service, data))
+            assert c._shot_pending == "switch.p"
+            c._safe_exit()
+        return real(domain, service, **data)
+
+    monkeypatch.setattr(controller, "ha_call", call)
+    with pytest.raises(SystemExit):
+        c._execute_shot(c.rooms[0], 1, 120, 5, flow_lps=0.05)
+    assert offs(fake) == [] and fake.states["switch.p"][0] == "on"
+
+
+def test_the_opening_switch_is_forgotten_once_it_reads_on_and_when_the_shot_ends(rig, monkeypatch):
+    c, fake, _clock = rig
+    during = []
+    monkeypatch.setattr(c, "_wait_shot", lambda room, zone, duration_s, started=None: during.append(c._shot_pending)
+                        or (duration_s, None))
+    c._execute_shot(c.rooms[0], 1, 30, 5, flow_lps=0.05)
+    assert during == [None]  # every switch had read ON by the time the water ran
+    assert c._shot_pending is None
+
+    def refused(domain, service, **data):  # a switch that never reads ON: the shot is cancelled
+        fake.calls.append((domain, service, data))
+        return True
+
+    real = controller.ha_call
+    monkeypatch.setattr(controller, "ha_call", lambda domain, service, **data: refused(domain, service, **data)
+                        if (service, data.get("entity_id")) == ("turn_on", "switch.p") else real(domain, service, **data))
+    c._execute_shot(c.rooms[0], 2, 30, 5, flow_lps=0.05)
+    assert c._shot_pending is None  # not kept past the shot that set it
+
+
+def test_a_stop_with_no_shot_running_ignores_a_switch_name_left_over(rig):
+    """Only the shot running now has a switch that may still be opening. An older interrupted shot is settled by
+    the reconciler's rules alone, and with every switch reading OFF its record is simply closed."""
+    c, fake, _clock = rig
+    room = c.rooms[0]
+    room.shot_inflight = dict(RECORD)
+    c._shot_room, c._shot_pending = None, "switch.v1"  # no shot in flight in this process
+    c._safe_off()
+    assert offs(fake) == [] and room.shot_inflight is None
+
+
+def test_a_stop_between_two_switches_still_closes_a_record_whose_switches_all_read_off(rig):
+    """Unchanged: with no switch waiting to read ON and every switch reading OFF, the record is closed and
+    nothing is sent."""
+    c, fake, _clock = rig
+    room = c.rooms[0]
+    room.shot_inflight = dict(RECORD)
+    c._shot_room, c._shot_pending = room, None
+    c._safe_off()
+    assert offs(fake) == [] and room.shot_inflight is None
 
 
 def counting(c, fake, monkeypatch):

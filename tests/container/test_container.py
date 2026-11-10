@@ -31,6 +31,8 @@ os.environ["MSYS_NO_PATHCONV"] = "1"
 REQ_LINE = re.compile(r"^\[fake-ha [0-9.]+\] REQ (\S+) (\S+) (\d{3})$")
 CALL_LINE = re.compile(r"^\[fake-ha [0-9.]+\] CALL (.+)$")
 
+# The health check as docker-compose.yml runs it (tests/test_container_plan.py keeps the two the same).
+HEALTH_TEST = "[ ! -f /app/healthcheck.py ] || python3 /app/healthcheck.py"
 VALVE = "switch.zone_1_valve"
 OPTIONS = {"num_zones": 1, "lights_on_hour": 0, "lights_off_hour": 24, "enable_flag": "input_boolean.engine",
            "loop_seconds": 5, "hardware": {"pump": "switch.pump", "mainline": "switch.main_line",
@@ -181,6 +183,44 @@ def test_c1_a_bare_address_gets_api_and_the_heartbeat_carries_the_version(rig):
 
 
 # ------------------------------------------------------------------ C2
+# ------------------------------------------------------------------ C9: the health check
+def health(name):
+    """The compose file's health check, run inside the container -> (exit code, what it said)."""
+    result = subprocess.run(["docker", "exec", name, "sh", "-c", HEALTH_TEST], capture_output=True, text=True,
+                            timeout=60)
+    return result.returncode, (result.stdout + result.stderr).strip()
+
+
+def test_c9_the_compose_health_check_says_healthy_while_the_loop_runs_and_unhealthy_when_it_has_stopped(rig):
+    rig.fake()
+    name = rig.controller(**container_env(rig))
+    rig.wait(name, "starting | rooms")
+    end = time.monotonic() + 60
+    while health(name)[0] != 0 and time.monotonic() < end:  # until the first pass has completed
+        time.sleep(1)
+    code, said = health(name)
+    assert code == 0 and "completed a pass" in said, said
+    # The loop stops (the process is frozen, as a hung controller is): three passes of 5 s and two minutes later
+    # the same check says unhealthy. The file's age is moved back in place of the wait.
+    # pkill, not `kill $(pgrep ...)` in a shell: that shell's own command line matches the pattern too
+    docker("exec", name, "pkill", "-STOP", "-f", "python3 controller.py")
+    docker("exec", name, "sh", "-c", "touch -d @$(( $(date +%s) - 136 )) /tmp/crop-steering-alive")
+    code, said = health(name)
+    assert code == 1 and "hung or waits on a refused token" in said, said
+    docker("exec", name, "pkill", "-CONT", "-f", "python3 controller.py")
+
+
+def test_c9_a_parked_controller_goes_unhealthy(rig):
+    """A token Home Assistant refuses: the container stays up and parked, and completes no pass."""
+    rig.fake(REFUSE="401")
+    name = rig.controller(**container_env(rig, HA_TOKEN="bad-token"))
+    rig.wait(name, "HA rejected the token: GET http://fakeha:8123/api/ -> HTTP 401")
+    assert rig.running(name)
+    code, said = health(name)
+    assert code == 1 and "has not completed a pass since it started" in said, said
+
+
+# ------------------------------------------------------------------ C2 (continued)
 def test_c2_a_bad_token_parks_with_one_request_and_a_restart_sends_one_more(rig):
     rig.fake(REFUSE="401")
     ctl = rig.controller(**container_env(rig, HA_TOKEN="bad-token", F2_OPT_CF_API_TOKEN="cf-SENTINEL"))

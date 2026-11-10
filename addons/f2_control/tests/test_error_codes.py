@@ -23,7 +23,7 @@ pytestmark = pytest.mark.usefixtures("no_blind_grace")
 
 NOW = datetime(2026, 9, 21, 14, 0, 0)
 OPTIONS = {"num_zones": 3, "enable_flag": "input_boolean.f2_control_enabled"}
-FOOTER = "Code {}. What it means and what to do: Crop Steering → Help & tools → Error codes."
+FOOTER = "Code {}. What it means and what to do: Crop Steering → Settings → Help → Alert codes."
 
 
 def _alerts(states, options=OPTIONS):
