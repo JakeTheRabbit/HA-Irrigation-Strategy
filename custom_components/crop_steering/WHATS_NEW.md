@@ -19,6 +19,14 @@ for the people who build the system:
 `tests/test_whats_new.py` checks the shape and the plain words, and that the newest section is the
 version being released.
 
+## 3.20.0 - 2026-11-11
+
+- If the controller stops in the middle of a shot, Home Assistant now closes the valve and tells you.
+- A stopped or restarted controller closes a shot it left open, also with Watering off.
+- A new zone's daily water limit starts at the zone's size, not at 20 L for every zone.
+- In Docker, the controller now shows as healthy or unhealthy.
+- Bug fixes and improvements.
+
 ## 3.19.0 - 2026-11-10
 
 - A running grow plan now follows the probe, and moves a zone's moisture levels to match what it reads.
