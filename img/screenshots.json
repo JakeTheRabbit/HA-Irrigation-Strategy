@@ -1,6 +1,6 @@
 {
   "source": "www/dashboard.html?demo=1",
-  "sourceSha256": "3e2469334ce81e94dc06b4b43ad1a4b26f24356d0701d4907975cb2b34808576",
+  "sourceSha256": "606ed28ea8dd687360888c32c6739da9ce2a64335135f3f2bcfd816e71fb319d",
   "fixedLocalTime": "2026-10-18T15:50:00",
   "captures": [
     {
@@ -64,7 +64,7 @@
         "width": 1440,
         "height": 1000
       },
-      "selector": "[data-day-timeline]"
+      "selector": "[data-day-timeline] > :last-child"
     },
     {
       "file": "img/jev-zone-panel.png",
@@ -140,7 +140,7 @@
     },
     {
       "file": "img/sensor-history.png",
-      "route": "#/history/timeline",
+      "route": "#/history/explorer?zone=1",
       "viewport": {
         "width": 1440,
         "height": 1000
@@ -149,21 +149,21 @@
     },
     {
       "file": "img/jev-history.png",
-      "route": "#/history/timeline",
+      "route": "#/history/explorer?zone=1",
       "viewport": {
         "width": 1440,
         "height": 1000
       },
-      "selector": ".timeline-panel"
+      "selector": ".explorer-ai"
     },
     {
       "file": "img/jev-history-setpoints.png",
-      "route": "#/history/timeline",
+      "route": "#/history/changes",
       "viewport": {
         "width": 1440,
         "height": 1000
       },
-      "selector": ".timeline-panel"
+      "selector": "[data-changes-backend]"
     },
     {
       "file": "img/water-use.png",
@@ -212,7 +212,7 @@
     },
     {
       "file": "img/tank-status.png",
-      "route": "#/equipment/feed",
+      "route": "#/equipment/dosing",
       "viewport": {
         "width": 1440,
         "height": 1000
@@ -221,7 +221,7 @@
     },
     {
       "file": "img/tank-level.png",
-      "route": "#/equipment/feed",
+      "route": "#/equipment/dosing",
       "viewport": {
         "width": 1440,
         "height": 1000
@@ -230,7 +230,7 @@
     },
     {
       "file": "img/tank-history.png",
-      "route": "#/equipment/feed",
+      "route": "#/equipment/dosing",
       "viewport": {
         "width": 1440,
         "height": 1000
