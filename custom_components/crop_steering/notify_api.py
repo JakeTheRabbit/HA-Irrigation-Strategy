@@ -904,8 +904,8 @@ class Notifier:
         except Exception:
             title = f"a card in Settings → Repairs ({code})"
             message = (
-                f"Code {code}. What it means and what to do: Crop Steering → Help & tools → "
-                "Error codes."
+                f"Code {code}. What it means and what to do: Crop Steering → Settings → Help → "
+                "Alert codes."
             )
         for key, value in placeholders.items():
             title = title.replace("{" + key + "}", str(value))

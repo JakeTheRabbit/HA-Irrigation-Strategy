@@ -67,7 +67,7 @@ def test_the_start_names_every_missing_hold_in_one_card_with_the_kill_switch_off
     assert DOSING not in card["message"]
     assert "remove it from the app's hold entities, or create it" in card["message"]
     assert card["message"].endswith("Code CS-210. What it means and what to do: "
-                                    "Crop Steering → Help & tools → Error codes.")
+                                    "Crop Steering → Settings → Help → Alert codes.")
     # raised before the first loop began, while nothing is watered: the kill switch is off
     assert fake.calls.index(("persistent_notification", "create", card)) < seen[0]
     assert fake.states[KILL][0] == "off"
