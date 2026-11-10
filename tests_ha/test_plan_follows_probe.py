@@ -11,9 +11,20 @@ import json
 from datetime import timedelta
 
 import pytest
-from conftest import room_of
+from conftest import fixture, room_of
 from homeassistant.exceptions import HomeAssistantError
-from test_plan_adherence import TENT, _pass, _start, _tent
+from test_plan_adherence import (
+    TENT,
+    TENT_ARMED,
+    TENT_KILL,
+    _install,
+    _lights,
+    _pass,
+    _running,
+    _start,
+    _tent,
+    _utc,
+)
 
 DOMAIN = "crop_steering"
 ROOM = "room:tent_"
@@ -84,7 +95,7 @@ async def test_the_real_controller_sets_the_offset_and_reads_it_back(hass, contr
     # one day is enough), and the offset set the whole way in one write
     st["plan_follow"]["checked"] = None
     peak = round(p1 - 15, 1)
-    st["plan_follow"]["days"] = [{"day": "d0", "peak": peak}]
+    st["plan_follow"]["days"] = [{"day": "d0", "peak": peak, "rose": 8.0}]  # a watered day
     want = round(peak + 1 - base_fc, 1)
     loop = asyncio.get_running_loop()
 
@@ -114,3 +125,59 @@ async def test_the_real_controller_sets_the_offset_and_reads_it_back(hass, contr
     # once a grow-day: a second look the same day changes nothing
     assert await hass.async_add_executor_job(c._plan_follow, room, 1, st, at + timedelta(hours=1)) is False
     assert manager.offset(1) == want
+
+
+def _moved_to_today(seed, today):
+    """The fixture's state file with its two dates moved: its grow-day to today, the day before to yesterday."""
+    text = json.dumps(seed["state"])
+    text = text.replace(seed["grow_day"], today.isoformat())
+    text = text.replace(seed["day_before"], (today - timedelta(days=1)).isoformat())
+    return json.loads(text)
+
+
+async def test_a_3_19_0_state_file_keeps_no_day_without_water_and_the_plan_does_not_move(hass, controller_for,
+                                                                                        monkeypatch):
+    """3.19.0 kept a grow-day's peak without asking whether water raised it (fixtures/state_3_19_0_plan_follow.json:
+    the tent at lights-on after a day with no water, its kept peak 14 points under the P1 target). The new
+    controller loads that file with everything else as it was, drops the day it cannot vouch for, and its look
+    after the ramp moves nothing. On 3.19.0 the same file wrote an offset of about -13 points, the rescue floor
+    included."""
+    import controller
+
+    seed = fixture("state_3_19_0_plan_follow.json")
+    at = _start()
+    state = _moved_to_today(seed, at.date())
+    old = state["tent"]["1"]
+    yesterday = (at.date() - timedelta(days=1)).isoformat()
+    assert old["plan_follow"]["days"] == [{"day": yesterday, "peak": seed["peak"]}]
+    old["last_phase_change"] = (at - timedelta(minutes=30)).isoformat()  # lights-on was within the hour
+    await _utc(hass)
+    entry = await _install(hass)
+    await _lights(hass, TENT, (at.hour - 1) % 24, (at.hour + 15) % 24)
+    manager = await _running(hass, entry, TENT, TENT_KILL, at.date() - timedelta(days=16))
+    c, fake, _clock = controller_for({"enable_flag": TENT_KILL}, saved_state=state)
+    c._start = at - timedelta(hours=1)
+    for switch in TENT_ARMED:
+        hass.states.async_set(switch, "off")
+    hass.states.async_set("switch.crop_steering_tent_auto_setpoints", "on")
+    room = room_of(c, TENT)
+    st = room.state[1]
+    # the old file loads: what it held is kept, and only the day nobody judged is gone
+    assert (st["phase"], st["peak_prev"], st["shots"], st["daily_vol"], st["last_daily_reset"]) == (
+        old["phase"], old["peak_prev"], old["shots"], old["daily_vol"], at.date())
+    assert st["plan_follow"]["days"] == []
+    assert (st["plan_follow"]["watered"], st["plan_follow"]["before"], st["plan_follow"]["ramped"]) == (
+        False, None, False)
+    assert st["plan_follow"]["last"] == old["plan_follow"]["last"]
+    await _pass(hass, c, fake, monkeypatch, manager, at)
+    assert seed["p1"] == room._strategy_raw[1]["zones"][0]["parameters"]["p1_target_vwc"]  # the same plan
+    assert seed["p1"] - seed["peak"] > 8  # one such day was enough for 3.19.0
+    calls = []
+    monkeypatch.setattr(controller, "ha_service_response",
+                        lambda domain, service, data, timeout=12: calls.append((domain, service, data)) or (200, {}))
+    st["phase"], st["plan_follow"]["checked"] = "P2", None  # today's ramp has ended: the rule looks
+    assert await hass.async_add_executor_job(c._plan_follow, room, 1, st, at) is False
+    assert calls == [] and manager.offset(1) == 0
+    cards = [d for dom, svc, d in fake.calls if (dom, svc) == ("persistent_notification", "create")
+             and "CS-714" in d.get("title", "")]
+    assert cards == []

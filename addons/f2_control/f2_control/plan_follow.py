@@ -8,8 +8,16 @@ alone, so nothing caught it.
 The peaks are the follower's (controller._count_peak, _keep_day_peak): the highest trusted reading of each grow-day,
 kept at lights-on. Here the last DAYS of them are kept as well, and a grow-day with a step change in the probe's
 reading (a 0.0, or a jump of more than JUMP_PTS in about a minute or across a blind gap) starts the count again, so
-the offset is only ever moved on clean days after the probe settled. A zone far off (over BIG_GAP_PTS) is moved after
-one clean grow-day; a smaller gap needs DAYS of them. The offset moves the whole way in one write (owner's rule,
+the offset is only ever moved on clean days after the probe settled. A grow-day is also not clean when watering did
+not raise the reading: the zone was not in P2 that day (its ramp did not end), it got no water, or its peak ended
+less than RISE_PTS over what it read before the day's first shot. Such a peak can be low because no water came (the
+kill switch off, a hold, an empty tank or a blocked line), not because the probe reads lower. RISE_PTS is over what
+a reading drifts up by itself as the lights warm the substrate (a point or two), and under what a ramp usually
+raises it. The rule has two costs. A supply that fails after the ramp raised the reading by RISE_PTS cannot be told
+from a probe that reads lower: that day counts. And a zone that swings less than RISE_PTS a day (clones, early veg,
+a late top-up and a small night dryback) never has a clean day: the plan does not follow its probe, and the offset
+is set by hand. A zone far off (over BIG_GAP_PTS) is moved after one clean grow-day; a smaller gap needs DAYS of
+them. The offset moves the whole way in one write (owner's rule,
 9 Nov 2026: "let the controller move it however many points it wants, especially if it's way off"); the only limits
 are each setting's own and the order of the levels, which the integration keeps (strategy_model.apply_offset).
 
@@ -25,15 +33,24 @@ OVERSHOOT_PTS = 3.0  # every peak this far over the plan's field capacity: the p
 HEADROOM_PTS = 1.0  # field capacity is put this far over the median peak
 JUMP_PTS = 10.0  # a reading this far from the one before...
 JUMP_S = 120.0  # ...this soon after it, or after a blind gap, is a step change
+# A clean grow-day's peak ends this far, or more, over what the zone read before its first shot. A reading drifts up
+# a point or two with no water as the lights warm the substrate, and two shots into a dry line raise it under 3; a
+# ramp that waters the zone usually raises it 5 or more. A zone that swings less than this a day has no clean day.
+RISE_PTS = 3.0
 
 
 def fresh():
-    return {"days": [], "step": False, "last": None, "gap": False, "checked": None}
+    return {"days": [], "step": False, "last": None, "gap": False, "checked": None,
+            "watered": False, "before": None, "ramped": False}
 
 
 def _pct(v):
     return (float(v) if isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v)
             and 0.0 < v <= 100.0 else None)
+
+
+def _num(v):
+    return isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v)
 
 
 def restore(saved):
@@ -43,8 +60,15 @@ def restore(saved):
         return out
     days = saved.get("days")
     if isinstance(days, list):
-        out["days"] = [{"day": d["day"], "peak": _pct(d.get("peak"))} for d in days
-                       if isinstance(d, dict) and isinstance(d.get("day"), str) and _pct(d.get("peak"))][-DAYS:]
+        # A day kept before the rise was judged has no "rose": it may be a day without water. The days kept are
+        # days in a row, so only the run after the last such day stays.
+        kept = []
+        for d in reversed(days):
+            if not (isinstance(d, dict) and isinstance(d.get("day"), str) and _pct(d.get("peak"))
+                    and _num(d.get("rose")) and d["rose"] >= RISE_PTS):
+                break
+            kept.insert(0, {"day": d["day"], "peak": _pct(d["peak"]), "rose": float(d["rose"])})
+        out["days"] = kept[-DAYS:]
     out["step"] = saved.get("step") is True
     out["gap"] = saved.get("gap") is True
     last = saved.get("last")
@@ -52,11 +76,18 @@ def restore(saved):
                                                           for x in last)):
         out["last"] = [float(last[0]), float(last[1])]
     out["checked"] = saved.get("checked") if isinstance(saved.get("checked"), str) else None
+    # Absent before the rise was judged: the grow-day in progress then counts as not watered, so it is not kept.
+    out["watered"] = saved.get("watered") is True
+    out["before"] = _pct(saved.get("before"))
+    out["ramped"] = saved.get("ramped") is True
     return out
 
 
-def reading(rec, vwc, ts):
-    """A trusted reading at epoch seconds `ts`: marks the grow-day as a step change when it is one."""
+def reading(rec, vwc, ts, phase=None):
+    """A trusted reading at epoch seconds `ts`: marks the grow-day as a step change when it is one. A reading in P2
+    (`phase`) says the zone's ramp ended this grow-day."""
+    if phase == "P2":
+        rec["ramped"] = True
     last = rec["last"]
     if vwc <= 0.0:
         rec["step"] = True
@@ -70,15 +101,30 @@ def blind(rec):
     rec["gap"] = True
 
 
+def watered(rec, peak):
+    """Water was counted for the zone. The first of the grow-day keeps what the zone read before it: `peak`, the
+    follower's counted peak of the grow-day so far (the highest trusted reading since lights-on). With none
+    counted yet (a shot in the very pass that started the grow-day), the reading of this pass; with neither
+    (blind until the shot), nothing, and the day is not kept."""
+    if not rec.get("watered"):
+        before = _pct(peak)
+        if before is None and rec["last"] is not None and not rec["gap"]:
+            before = _pct(rec["last"][0])
+        rec["watered"], rec["before"] = True, before
+
+
 def close_day(rec, day, peak):
-    """Lights-on: the grow-day `day` that ended, with the follower's counted `peak` for it. A step change day, or
-    one without a counted peak (blind all day, a CS-310 day), starts the count again."""
+    """Lights-on: the grow-day `day` that ended, with the follower's counted `peak` for it. A step change day, one
+    without a counted peak (blind all day, a CS-310 day), or one on which watering did not raise the reading (not in
+    P2, no water, or a peak under RISE_PTS over what the zone read before the first shot) starts the count again."""
     peak = _pct(peak)
-    if rec["step"] or peak is None:
+    before = _pct(rec.get("before"))  # no water counted: nothing before it
+    rose = None if peak is None or before is None else round(peak - before, 2)
+    if rec["step"] or peak is None or not rec.get("ramped") or rose is None or rose < RISE_PTS:
         rec["days"] = []
     else:
-        rec["days"] = (rec["days"] + [{"day": day, "peak": round(peak, 2)}])[-DAYS:]
-    rec["step"] = False
+        rec["days"] = (rec["days"] + [{"day": day, "peak": round(peak, 2), "rose": rose}])[-DAYS:]
+    rec["step"], rec["watered"], rec["before"], rec["ramped"] = False, False, None, False
 
 
 def decide(days, p1, fc, base_fc, offset):
