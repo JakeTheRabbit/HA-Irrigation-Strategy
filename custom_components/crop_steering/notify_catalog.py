@@ -22,7 +22,7 @@ KINDS = (
         # Every code whose severity is critical in docs/error-codes.json.
         "codes": _codes(
             "CS-201 CS-202 CS-203 CS-204 CS-207 CS-211 CS-212 CS-301 CS-308 CS-310 CS-311 "
-            "CS-315 CS-402 CS-601 CS-606 CS-801 CS-809 CS-811 CS-901 CS-902"
+            "CS-315 CS-402 CS-601 CS-606 CS-617 CS-801 CS-809 CS-811 CS-901 CS-902"
         ),
         "events": (),
     },
@@ -37,10 +37,11 @@ KINDS = (
         "the moisture, a waste valve that is not closed, and a pump that runs with "
         "every valve shut. Also a sump water balance that does not close. Also a "
         "zone that needs more than its pump. Also a flow meter that saw less water "
-        "than a shot gave, or water with no zone on.",
+        "than a shot gave, or water with no zone on. Also a shot that the "
+        "controller left open and the integration closed.",
         "codes": _codes(
             "CS-214 CS-301 CS-302 CS-303 CS-304 CS-305 CS-306 CS-307 CS-308 CS-309 CS-310 CS-311 "
-            "CS-312 CS-313 CS-314 CS-315 CS-316 CS-317 CS-318 CS-319 CS-701 CS-710"
+            "CS-312 CS-313 CS-314 CS-315 CS-316 CS-317 CS-318 CS-319 CS-617 CS-701 CS-710"
         ),
         "events": (),
     },
@@ -165,6 +166,7 @@ REPAIRS = {
     "deprecated_entities": "CS-614",
     "probe_offsets_unreadable": "CS-615",
     "upgrade_report_3_18": "CS-616",
+    "shot_left_open": "CS-617",
 }
 
 

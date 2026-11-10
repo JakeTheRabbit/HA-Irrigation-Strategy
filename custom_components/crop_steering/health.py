@@ -33,6 +33,9 @@ ISSUE_IDS = (
     # Raised and cleared by stock_api.py, not by the checks here; listed so every card this
     # integration can show is in one place.
     "stock_low",
+    # Raised by shot_backstop.py when it switches off a shot the controller left open. It stays
+    # until a person confirms it: clear_all and a room switched off leave it.
+    "shot_left_open",
     # Raised and cleared by bounds.py, when the room sets up and when a setting changes.
     "outside_zone_bounds",
     # Raised by deprecations.py, once per Home Assistant run, as deprecated_<service or select>.
@@ -61,7 +64,8 @@ def _iid(base: str, slug: str) -> str:
 def clear_all(hass: HomeAssistant, slug: str = "default") -> None:
     """Remove a room's crop-steering Repairs issues (on unload)."""
     for base in ISSUE_IDS:
-        ir.async_delete_issue(hass, DOMAIN, _iid(base, slug))
+        if base != "shot_left_open":
+            ir.async_delete_issue(hass, DOMAIN, _iid(base, slug))
 
 
 def _issue(hass, present, issue_id, severity, placeholders=None, fix=None):
@@ -236,6 +240,7 @@ def run_health_check(hass: HomeAssistant, entry: ConfigEntry) -> None:
                     "calibration_due",
                     "probe_offsets_unreadable",
                     "deprecated_entities",
+                    "shot_left_open",
                 ):
                     _issue(hass, False, _iid(base, slug), ir.IssueSeverity.WARNING)
             return

@@ -1,6 +1,7 @@
 """The Fix buttons: the max-run latch card (CS-312, health.py) releases the room's zones the
-controller stopped, and the Upgrade report card (migration.py) is marked as read. Every other Crop
-Steering card is fixed where its cause is, and has no button."""
+controller stopped, the Upgrade report card (migration.py) is marked as read, and the card of a shot
+the integration closed (CS-617, shot_backstop.py) is confirmed as seen. Every other Crop Steering
+card is fixed where its cause is, and has no button."""
 
 from __future__ import annotations
 
@@ -40,6 +41,20 @@ class UpgradeReportRead(ConfirmRepairFlow):
         return await super().async_step_confirm(user_input)
 
 
+class ShotLeftOpenSeen(ConfirmRepairFlow):
+    """Confirm, and the alert closes in the room's journal too. The card itself goes with the flow."""
+
+    def __init__(self, entry_id) -> None:
+        self._entry_id = entry_id
+
+    async def async_step_confirm(self, user_input=None):
+        if user_input is not None:
+            from .shot_backstop import confirmed
+
+            confirmed(self.hass, self._entry_id)
+        return await super().async_step_confirm(user_input)
+
+
 async def async_create_fix_flow(
     hass: HomeAssistant, issue_id: str, data: dict | None
 ) -> RepairsFlow:
@@ -48,4 +63,6 @@ async def async_create_fix_flow(
     entry_id = (data or {}).get("entry_id")
     if (data or {}).get("kind") == ISSUE:
         return UpgradeReportRead(entry_id)
+    if (data or {}).get("kind") == "shot_left_open":
+        return ShotLeftOpenSeen(entry_id)
     return MaxRunReset(entry_id)
