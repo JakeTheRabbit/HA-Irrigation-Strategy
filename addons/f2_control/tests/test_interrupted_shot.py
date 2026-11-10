@@ -137,6 +137,87 @@ def test_an_old_state_file_loads_and_a_damaged_record_is_ignored(rig):
         assert c.rooms[0].shot_inflight is None and c.rooms[0].state[1]["daily_vol"] == 4
 
 
+@pytest.mark.parametrize("none", ["", None])
+@pytest.mark.parametrize("without", [("mainline",), ("pump",), ("mainline", "pump")],
+                         ids=["no main line", "no pump", "a valve only"])
+def test_a_room_without_a_main_line_or_a_pump_keeps_a_record_the_next_start_can_use(rig, monkeypatch, without, none):
+    """The setup wizard writes "" for a room with no main line, and for one with no pump. The record was saved
+    with that "", and the next start took it for damaged and ignored it: a shot that a crash, a kill -9 or a
+    power cut interrupted in such a room was not closed by the controller at its next start."""
+    c, fake, _ = rig
+    room = c.rooms[0]
+    for key in without:
+        room.hw[key] = none
+    on_disk = []
+    real = controller.ha_call
+
+    def call(domain, service, **data):
+        if domain == "switch" and service == "turn_on" and not on_disk:
+            on_disk.append(saved(c)["default"].get("_shot_inflight"))
+        return real(domain, service, **data)
+
+    def killed(*_a, **_k):
+        raise SystemExit(137)  # no cleanup runs: the stop's own cleanup is a signal handler, not called here
+
+    monkeypatch.setattr(controller, "ha_call", call)
+    monkeypatch.setattr(c, "_wait_shot", killed)
+    with pytest.raises(SystemExit):
+        c._execute_shot(room, 1, 60, 5)
+    kept = {"mainline": "switch.m", "pump": "switch.p"}
+    assert {key: on_disk[0][key] for key in kept} == {key: None if key in without else kept[key] for key in kept}
+    opened = ["switch.v1", *(kept[key] for key in kept if key not in without)]
+    assert all(fake.states[entity][0] == "on" for entity in opened)
+    c._busy = False
+    c._load_state()  # the next start
+    assert room.shot_inflight == on_disk[0]
+    fake.calls.clear()
+    c._reconcile_inflight()
+    assert offs(fake) == opened and room.shot_inflight is None
+
+
+@pytest.mark.parametrize("key", ["mainline", "pump"])
+def test_a_record_saved_with_an_empty_main_line_or_pump_is_usable(rig, key):
+    """A controller is updated after a crash in a room without that device: the state file still holds the
+    record with the "" that the version before wrote."""
+    c, fake, _ = rig
+    c.rooms[0].hw[key] = ""
+    record = {**RECORD, key: ""}
+    assert controller.Controller._inflight_record(record) == {**RECORD, key: None}
+    with open(c._state_path, "w") as fh:
+        json.dump({"default": {"_shot_inflight": record}}, fh)
+    for entity in ("switch.v1", "switch.m", "switch.p"):
+        if entity != RECORD[key]:
+            fake.set_state(entity, "on", last_updated=at(2))
+    c._load_state()
+    fake.calls.clear()
+    c._reconcile_inflight()
+    assert offs(fake) == [e for e in ("switch.v1", "switch.m", "switch.p") if e != RECORD[key]]
+    assert c.rooms[0].shot_inflight is None
+
+
+def test_a_record_that_is_damaged_is_still_ignored():
+    """No entity at all, a valve of "" (a shot always has one), or something that is no name."""
+    for damaged in ({**RECORD, "valve": "", "mainline": "", "pump": ""}, {**RECORD, "valve": ""},
+                    {**RECORD, "mainline": 0}, {**RECORD, "pump": ["switch.p"]}, {**RECORD, "valve": False}):
+        assert controller.Controller._inflight_record(damaged) is None, damaged
+
+
+@pytest.mark.parametrize("none", ["", None])
+def test_two_rooms_with_no_main_line_on_two_pumps_do_not_share_a_line(rig, none):
+    c, fake, _ = rig
+    other = type("Room", (), {})()
+    other.hw = {"pump": "switch.p2", "mainline": none, "valves": {1: "switch.b1"}}
+    fake.set_state("switch.b1", "on")  # the other room waters
+    c.rooms.append(other)
+    try:
+        record = {**RECORD, "mainline": none}
+        assert c._line_in_use(c.rooms[0], record) is False
+        other.hw["pump"] = "switch.p"  # the same pump: now it is one line
+        assert c._line_in_use(c.rooms[0], record) is True
+    finally:
+        c.rooms.pop()
+
+
 # ---------------------------------------------------------------------------
 # Closing what the interrupted shot opened, and nothing else
 # ---------------------------------------------------------------------------
