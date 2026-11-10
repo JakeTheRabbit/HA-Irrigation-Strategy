@@ -112,9 +112,9 @@ names each one that does (CS-614).
 ### Substrate & schedule
 | Entity | Range | Default | Unit | What it does |
 |---|---|---|---|---|
-| `substrate_volume` | 1-200 | 10 | L | The litres of substrate for each plant, for example the volume of one block or pot. All shot sizes are a percentage of this volume. The water of a shot is the shot size, times this volume, times the plant count. |
+| `substrate_volume` | 0.1-200 | 10 | L | The litres of substrate for each plant, for example the volume of one block or pot. All shot sizes are a percentage of this volume. The water of a shot is the shot size, times this volume, times the plant count. |
 | `dripper_flow_rate` | 0.1-50 | 1.2 | L/hr | The litres per hour that one dripper gives. The controller uses it to calculate how long each shot runs. A value of 0, or a value that the controller cannot read, stops the shots of that zone (CS-204). |
-| `drippers_per_plant` | 1-6 | 2 | - | The number of drippers on each plant. With the dripper flow and the plant count, it gives the zone flow. The shot time is the water of the shot divided by the zone flow. |
+| `drippers_per_plant` | 1-20 | 2 | - | The number of drippers on each plant. With the dripper flow and the plant count, it gives the zone flow. The shot time is the water of the shot divided by the zone flow. |
 | `field_capacity` | 40-100 | 70 | % | The VWC at which the substrate is full and drains freely. The ramp stops at this level or at the peak target, whichever is lower. EC flushes that can go past the daily water limit need VWC more than 2 points below it. |
 | `vegetative_dryback_target` | 5-80 | 35 | % | The dryback for a zone in vegetative steering mode, as a percentage of the peak. At a peak of 60% and a target of 10%, the dryback ends at 54% VWC. The controller uses it in P0 when the P0 extra dryback is 0, and to start P3 early. |
 | `generative_dryback_target` | 5-70 | 45 | % | The dryback for a zone in generative steering mode, as a percentage of the peak. At a peak of 60% and a target of 10%, the dryback ends at 54% VWC. The controller uses it in P0 when the P0 extra dryback is 0, and to start P3 early. |
@@ -142,7 +142,7 @@ for that zone. (3 zones × 27 = 81 entities on a 3-zone system.)
 **Per-zone only (no global equivalent):**
 | Entity | Range | Default | Unit | What it does |
 |---|---|---|---|---|
-| `zone_N_plant_count` | 1-50 | 4 | - | The number of plants in this zone. The water of a shot is the shot size, times the substrate for each plant, times this number. |
+| `zone_N_plant_count` | 1-1000 | 4 | - | The number of plants in this zone. The water of a shot is the shot size, times the substrate for each plant, times this number. |
 | `zone_N_p0_additional_dryback` | 0-40 | 3 on a room set up from this release, 0 on a room updated in place | % | P0 extra dryback: the dryback after lights-on before the first shot, as a percentage of the highest VWC since lights-on. At 3% and a highest VWC of 60%, P0 ends at 58.2% VWC. At `0`, P0 uses the dryback target of the steering mode. P0 also ends at the maximum wait time, or when VWC falls to the re-water point. |
 | `zone_N_max_daily_volume` | 0 to the zone's limit | 20 | L | The most water that a zone gets in one grow-day, in litres. Maintenance shots, extra ramp shots, dilution shots and P0 EC flushes stop at this limit, and the last shot gets only what is left. Ramp shots, rescue shots, watchdog shots and high-EC flushes can go past it. The limit of the setting is 4 times the substrate of the zone (plants x litres for each plant), and at least 20 L. A value already above it stays, and Repairs lists it (CS-611). |
 | `zone_N_min_daily_ml_per_plant` | 0-10000 | 0 (off) | mL | The least water that each plant gets in one grow-day, in millilitres. The controller gives it at any probe reading, from lights-on (never in P0), and spreads it so that it is complete 3 h before lights-off. The shots stop when VWC is 5 points above field capacity, and never go past the daily water limit. A new entity takes the value of the old `input_number` helper of the same name. |
