@@ -43,7 +43,9 @@ DEFAULTS = {
     # before a zone's valve. Seconds; the waits were fixed at 2 and 1 before these.
     "pump_prime_time": (2.0, 2.0),
     "main_line_lead_time": (1.0, 1.0),
-    "max_daily_volume": (20.0, 150),  # litres per zone per grow-day
+    # litres per zone per grow-day. A new zone starts at this or at its share of the
+    # zone's substrate (ZONE_STARTS), the greater.
+    "max_daily_volume": (20.0, 150),
     # mL per plant per grow-day, 0 = off. The controller falls back to the old
     # input_number helper of the same name, then to 0.
     "min_daily_ml_per_plant": (0.0, None),
@@ -293,6 +295,19 @@ def to_canonical(quantity, value, unit):
 ZONE_BOUNDS = {
     "max_daily_volume": {"substrate_multiple": 4.0, "floor": 20.0},
     "max_shot_duration": {"substrate_multiple": 1.0, "floor": 900.0},
+}
+
+# What a NEW zone's daily water limit starts at: this share of the zone's substrate
+# (plants x litres per plant), never less than the entity default and never more than
+# the ceiling, which is the most the engine accepts for this setting (core.py
+# _PARAM_BOUNDS). The share is what the entity default is of the default zone (20 L of
+# 4 plants x 10 L), so a default zone starts where it always did and a bigger zone
+# starts in proportion. Before, every new zone started at the entity default: a zone
+# of 40 plants x 10 L reached its limit with its ramp and got no maintenance shot
+# until a person raised it. Only a zone that setup marks as new takes this; every
+# zone made before keeps its limit.
+ZONE_STARTS = {
+    "max_daily_volume": {"substrate_multiple": 0.5, "ceiling": 2000.0},
 }
 
 # Substrate profiles: the numbers that depend on what a room grows in, keyed by the

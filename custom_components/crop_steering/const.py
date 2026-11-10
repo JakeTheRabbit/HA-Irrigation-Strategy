@@ -19,6 +19,10 @@ CONF_NUM_ZONES = "num_zones"
 # stores it; a room set up before has none, so its zones start at 0 (off) and P0 is unchanged.
 CONF_P0_ADDITIONAL_DRYBACK = "p0_additional_dryback"
 NEW_ROOM_P0_ADDITIONAL_DRYBACK = 3.0
+# A zone's own mark, in its setup: its daily water limit starts at the zone's size
+# (bounds.starting_daily_volume). Setup writes it for a zone it makes from this release on. A zone
+# made before has none, so its limit starts at the entity default as it always did.
+CONF_DAILY_LIMIT_FROM_SIZE = "daily_limit_from_size"
 
 # Zone configuration
 MIN_ZONES = 1

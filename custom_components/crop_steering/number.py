@@ -18,6 +18,7 @@ from . import overlays, setpoint_log
 from .const import (
     DOMAIN,
     CONF_NUM_ZONES,
+    CONF_DAILY_LIMIT_FROM_SIZE,
     CONF_P0_ADDITIONAL_DRYBACK,
     MOISTURE_RANGES,
     SOFTWARE_VERSION,
@@ -950,6 +951,12 @@ async def async_setup_entry(
                 ),
             )
         )
+        # A zone that setup marked as new, with no limit of its own in its setup: the limit starts
+        # at the zone's size, once every number of the room holds its value
+        # (bounds.start_new_daily_limits).
+        numbers[-1].start_from_size = bool(
+            zone_cfg.get(CONF_DAILY_LIMIT_FROM_SIZE)
+        ) and (zone_cfg.get("max_daily_volume") is None)
 
         # Minimum daily water: watered whatever the probe reads, so it starts off. It replaces
         # the input_number helper of the same name nothing created; a new entity takes its value.
@@ -1083,6 +1090,12 @@ class CropSteeringNumber(NumberEntity, RestoreEntity):
         self._setup_value = None
         self._setup_revision = 0
         self._room = {}
+        self.start_from_size = (
+            False  # a new zone's daily water limit (bounds.start_new_daily_limits)
+        )
+        self.was_restored = (
+            False  # whether Home Assistant gave this number its own last value
+        )
         if zone_num is not None:
             sizing, revision = configured_sizing(entry, zone_num)
             key = description.key.removeprefix(f"zone_{zone_num}_")
@@ -1139,6 +1152,7 @@ class CropSteeringNumber(NumberEntity, RestoreEntity):
         restored = last_state is not None and restored_state_is_ours(
             self._entry, last_state
         )
+        self.was_restored = restored
         if not restored and self._substrate_key is not None:
             # A setting with no value yet: the room's substrate profile (generic = the table).
             value = substrate_default(self.hass, self._entry, self._substrate_key)

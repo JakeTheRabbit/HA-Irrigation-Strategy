@@ -11,7 +11,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import issue_registry as ir
 
-from .generated.defaults import ZONE_BOUNDS
+from .generated.defaults import ENTITY_DEFAULTS, ZONE_BOUNDS, ZONE_STARTS
 from .health import _iid, _issue
 
 ISSUE = "outside_zone_bounds"
@@ -34,6 +34,39 @@ def daily_volume_bound(plants, litres_per_plant):
     return round(
         max(rule["floor"], numbers[0] * numbers[1] * rule["substrate_multiple"]), 1
     )
+
+
+def starting_daily_volume(plants, litres_per_plant):
+    """What a new zone's daily water limit starts at (L): its share of the zone's substrate, to the
+    nearest litre, never less than the entity default (which is also what a zone of unknown size
+    gets) and never more than the engine accepts. For the same plants and litres it is inside
+    daily_volume_bound."""
+    start = ENTITY_DEFAULTS["max_daily_volume"]
+    numbers = _positive(plants, litres_per_plant)
+    if numbers is None:
+        return start
+    rule = ZONE_STARTS["max_daily_volume"]
+    share = numbers[0] * numbers[1] * rule["substrate_multiple"]
+    return min(rule["ceiling"], max(start, float(math.floor(share + 0.5))))
+
+
+def start_new_daily_limits(numbers) -> None:
+    """Give each NEW zone's daily water limit its start, once every number of the room holds its
+    value (restored, or from setup). The size is read from the same two numbers as the limit of the
+    setting (CropSteeringNumber.zone_bound), so the start is inside that limit. A limit that
+    restored its own value, and a zone that setup did not mark as new, are left as they are.
+    """
+    for number in numbers:
+        zone = getattr(number, "_zone_num", None)
+        if not getattr(number, "start_from_size", False) or number.was_restored:
+            continue
+        if number.hass is None:
+            continue  # a number that a person disabled is not in Home Assistant
+        number._attr_native_value = starting_daily_volume(
+            number._sizing(zone, "plant_count"),
+            number._sizing(zone, "substrate_volume"),
+        )
+        number.async_write_ha_state()
 
 
 def shot_duration_bound(litres_per_plant, drippers_per_plant, dripper_lph):

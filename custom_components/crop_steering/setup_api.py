@@ -11,7 +11,12 @@ import math
 from . import units
 from .admin import async_require_admin
 from .api_v2 import StaleRevision
-from .const import DOMAIN, LEGACY_KILL_SWITCH, MAX_ZONES
+from .const import (
+    CONF_DAILY_LIMIT_FROM_SIZE,
+    DOMAIN,
+    LEGACY_KILL_SWITCH,
+    MAX_ZONES,
+)
 from .generated.defaults import SIZING_DEFAULTS
 from .journal_api import attribution, note
 from .plumbing import (
@@ -415,6 +420,10 @@ def prepare_setup(hass, payload, old=None, entry_id=None):
     for row in rows:
         z = row["id"]
         prior = deepcopy(old_zones.get(z, {}))
+        if z not in old_zones and z > int(old.get("num_zones") or 0):
+            # A zone made now: its daily water limit starts at the zone's size. A zone the room
+            # counted before, with nothing stored for it, is not a new zone.
+            prior[CONF_DAILY_LIMIT_FROM_SIZE] = True
         enabled = row.get("active", True)
         if type(enabled) is not bool:
             raise ValueError("Zone active must be a boolean")
