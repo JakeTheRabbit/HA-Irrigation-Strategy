@@ -1666,6 +1666,9 @@ class Controller:
             "fc_follow": {"peak": 0.0, "day": None, "used": {}},
             # the plan follows the probe (plan_follow): the last clean grow-days' peaks, and this grow-day's check
             "plan_follow": plan_follow.fresh(),
+            # the reading this zone's peak and window were built on is the room's average (_room_average), not its
+            # own probe's: when the room's switch changes, both start again from the new reading (_snapshot)
+            "room_avg": False,
             "p1_reached": False,  # the P1 rule (core.decide): this P1 has read at or over its target
             "p1_peak_before": None,  # ...the zone's peak right before its last P1 shot
             "p1_extra": 0,  # ...and the P1 shots fired since the target was reached
@@ -3193,11 +3196,28 @@ class Controller:
         ec = self._read_sensor(
             self._fused_id(room.prefix, "ec", zone, room.zones[zone].get("ec")), "ec"
         )
+        # the zone's own probe, for what watches the zone itself (a table not draining, the shot table)
+        room.__dict__.setdefault("_own_reading", {})[zone] = (vwc, ec)
+        shared = getattr(room, "_room_reading", None)  # steering on the room average (_room_average)
+        if shared is not None:
+            vwc, ec = shared
         if vwc is None:
             return None, self._params(room, zone)
+        if bool(st.get("room_avg")) != (shared is not None):
+            # The reading the zone is steered on changed source: its peak, its window and the P1 rule's
+            # before-shot readings were another reading's, and start again from this one.
+            st["room_avg"] = shared is not None
+            st["peak"], st["win"] = vwc, []
+            st["p1_peak_before"] = st["p1_settled_before"] = None
         if vwc > st["peak"]:
             st["peak"] = vwc
         st["win"] = (st["win"] + [(now, vwc)])[-30:]
+        # On the room average the zones are one: the gap between shots counts from the room's last shot, so the
+        # zones fall due in the same pass and each shot round is judged on the whole room's rise.
+        last_shot = st["last_shot"]
+        if shared is not None:
+            last_shot = max((z["last_shot"] for z in room.state.values()
+                             if isinstance(z.get("last_shot"), datetime)), default=last_shot)
         rate = 0.0
         if len(st["win"]) >= 3:
             t0, v0 = st["win"][0]
@@ -3237,8 +3257,8 @@ class Controller:
             shot_count=st["shots"],
             phase_minutes=(now - st["last_phase_change"]).total_seconds() / 60.0,
             minutes_since_shot=(
-                (now - st["last_shot"]).total_seconds() / 60.0
-                if st["last_shot"]
+                (now - last_shot).total_seconds() / 60.0
+                if last_shot
                 else 1e9
             ),
             daily_vol=st["daily_vol"],
@@ -3269,6 +3289,35 @@ class Controller:
             steering_held=bool(strategy_block(getattr(room, "strategy_snapshot", None), zone)),
         )
         return snap, self._params(room, zone, ec_known=ec is not None)
+
+    def _room_average(self, room):
+        """The room's one steering reading as (moisture, pore EC), or None with the room's "Steer on room average"
+        switch off or absent (an older integration): every zone then steers on its own probe, as before. Each is
+        the mean over the zones that are switched on and give a reading, None when none does. Every zone of the
+        room then decides on this reading with its own settings, so the zones keep one phase and fall due
+        together, and each still gets its own shot through its own valve, sized and capped as its own."""
+        if not self._on(f"switch.crop_steering_{room.prefix}steer_on_room_average", False):
+            return None
+
+        def mean(metric):
+            got = [v for v in (
+                self._read_sensor(self._fused_id(room.prefix, metric, z, room.zones[z].get(metric)), metric)
+                for z in room.zones
+                if self._on(f"switch.crop_steering_{room.prefix}zone_{z}_enabled", True)
+            ) if v is not None]
+            return sum(got) / len(got) if got else None
+
+        return mean("vwc"), mean("ec")
+
+    @staticmethod
+    def _own_probe(room, zone, snap):
+        """`snap` with the zone's own probe readings, for what watches the zone itself while the room steers on its
+        average. `snap` as it is when the room steers each zone on its own probe; None when the zone's own probe
+        gives no moisture reading."""
+        if getattr(room, "_room_reading", None) is None:
+            return snap
+        vwc, ec = room.__dict__.get("_own_reading", {}).get(zone, (None, None))
+        return None if vwc is None else dataclasses.replace(snap, vwc=vwc, ec=ec)
 
     @staticmethod
     def _settled_vwc(st):
@@ -8877,6 +8926,7 @@ class Controller:
                 log("brain lights-on error", room.slug, e)
         self._watch_feed_known(room)
         snaps, decisions, healthy, blind, params = {}, {}, [], [], {}
+        room._room_reading = self._room_average(room)
         for zone in room.zones:
             st = room.state[zone]
             self._apply_phase_request(room, zone, st, now)
@@ -8920,11 +8970,12 @@ class Controller:
                 continue
             room._blind_since.pop(zone, None)
             snaps[zone] = snap
-            self._sensing_tick(room, zone, snap, lights_on, now)
+            own = self._own_probe(room, zone, snap)  # the zone's own probe; `snap` unless on the room average
+            self._sensing_tick(room, zone, own or snap, lights_on, now)
             if st["phase"] == "P1" and snap.vwc >= min(p.p1_target, p.field_capacity):
                 st["p1_reached"] = True  # the P1 rule (core.decide): the target has been read this P1
             try:  # CS-310: never pour the daily minimum, or an EC flush, into a table that isn't draining
-                if self._watch_backup(room, zone, snap, now):
+                if own is not None and self._watch_backup(room, zone, own, now):
                     p = params[zone] = dataclasses.replace(p, min_daily_volume=0.0)
                     snap = snaps[zone] = dataclasses.replace(snap, backed_up=True)
             except Exception as e:
