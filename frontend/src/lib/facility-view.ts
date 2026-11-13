@@ -160,6 +160,9 @@ export interface FacilityRoom {
   growDay: { day: number; of: number | null; daysLeft: number | null; stage: string } | null;
   /** binary_sensor.crop_steering_<prefix>calibration_due: a feed probe is due. */
   feedCalibrationDue: boolean;
+  /** switch.crop_steering_<prefix>steer_on_room_average is on: every zone steers on the room's mean
+   * moisture, over the zones that are switched on and read (null when none does). Null with it off. */
+  roomAverage: { vwc: number | null } | null;
 }
 
 /** An entity's state, with "unknown" and "unavailable" read as absent. */
@@ -168,6 +171,11 @@ const known = (entity: EntityState | undefined) =>
 const numberOf = (state: string | null) => {
   const value = state === null || state.trim() === "" ? NaN : Number(state);
   return Number.isFinite(value) ? value : null;
+};
+
+const mean = (values: (number | null | undefined)[]) => {
+  const read = values.filter((value): value is number => typeof value === "number" && Number.isFinite(value));
+  return read.length ? read.reduce((sum, value) => sum + value, 0) / read.length : null;
 };
 
 const digitsOf = (value: number) => (String(value).split(".")[1] ?? "").length;
@@ -371,6 +379,10 @@ export function facilityView(
       litresPerPlant: plantCount > 0 ? plantL / plantCount : null,
       growDay,
       feedCalibrationDue: states[`binary_sensor.crop_steering_${prefix}calibration_due`]?.state === "on",
+      roomAverage:
+        states[`switch.crop_steering_${prefix}steer_on_room_average`]?.state === "on"
+          ? { vwc: mean(zones.filter((z) => z.item.mode !== "paused").map((z) => z.item.zone.vwc.value)) }
+          : null,
     };
   });
 }

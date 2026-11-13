@@ -392,6 +392,19 @@
       ]
     },
     {
+      "id": "room_average",
+      "group": "phases",
+      "label": "Steer on room average",
+      "help": "On: every zone follows the room's average moisture and EC, and each still gets its own shot.",
+      "master": {
+        "domain": "switch",
+        "key": "steer_on_room_average",
+        "scope": "room",
+        "default": false
+      },
+      "settings": []
+    },
+    {
       "id": "ec_stacking",
       "group": "feed",
       "label": "EC stacking",

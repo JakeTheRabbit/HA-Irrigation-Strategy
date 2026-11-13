@@ -169,6 +169,14 @@ describe("all rooms: queue, flow, grow day and problems in place", () => {
     });
     expect([a.feedCalibrationDue, b.feedCalibrationDue]).toEqual([true, false]);
   });
+  it("a room steered on its average says so, with the mean of the zones that read", () => {
+    const { a, b } = facility(put("switch.crop_steering_steer_on_room_average", "on"));
+    const read = a.zones.map((z) => z.zone.vwc.value).filter((v): v is number => typeof v === "number");
+    expect(read.length).toBeGreaterThan(1);
+    expect(a.roomAverage?.vwc).toBeCloseTo(read.reduce((sum, v) => sum + v, 0) / read.length, 6);
+    expect(b.roomAverage).toBeNull();
+    expect(facility({}).a.roomAverage).toBeNull();
+  });
   it("drink line uses formatVolume", () => {
     setDisplayUnits({ volume: "L" });
     expect(drinkLine(24.8, 0.21)).toEqual({ perPlant: "0.21 L", room: "24.8 L" });
