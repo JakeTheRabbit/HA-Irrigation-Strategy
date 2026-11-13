@@ -60,6 +60,13 @@ BASE_SWITCH_DESCRIPTIONS = [
         name="Use P2 EC ratios",
         icon="mdi:arrow-up-bold",
     ),
+    # Opt-in, OFF: every zone of the room steers on the room's average moisture and pore EC, and each
+    # still gets its own shot through its own valve. Off: each zone steers on its own probe, as always.
+    SwitchEntityDescription(
+        key="steer_on_room_average",
+        name="Steer on room average",
+        icon="mdi:set-all",
+    ),
     SwitchEntityDescription(
         key="ec_stacking_enabled",
         name="EC stacking",
