@@ -60,9 +60,6 @@ export function Gauge({
   /** Show the key of the marked levels under the bar (else the row shows it). */
   marksKey?: boolean;
 }) {
-  const span = model.max - model.min || 1;
-  const at = (value: number) =>
-    `${Math.min(100, Math.max(0, ((value - model.min) / span) * 100))}%`;
   const unit = (value: number) => `${fix(value, model.digits)}${model.unit}`;
   return (
     <div
@@ -78,40 +75,6 @@ export function Gauge({
           {model.value === null ? "—" : fix(model.value, model.digits)}
           {model.value !== null && model.unit && <span className="unit">{model.unit}</span>}
         </strong>
-      </div>
-      <div className="hmi-gauge-track">
-        {model.band && (
-          <span
-            className="hmi-gauge-band"
-            style={{
-              left: at(model.band[0]),
-              width: `calc(${at(model.band[1])} - ${at(model.band[0])})`,
-            }}
-          />
-        )}
-        {model.value !== null && (
-          <span className="hmi-gauge-fill" style={{ width: at(model.value) }} />
-        )}
-        {model.reference && (
-          <span
-            className="hmi-gauge-reference"
-            style={{
-              left: at(model.reference[0]),
-              width: `calc(${at(model.reference[1])} - ${at(model.reference[0])})`,
-            }}
-          />
-        )}
-        {model.marks.map((mark) => (
-          <span
-            key={mark.key}
-            className="hmi-gauge-mark"
-            data-mark={mark.key}
-            style={{ left: at(mark.value) }}
-          />
-        ))}
-        {model.target !== null && !model.band && (
-          <span className="hmi-gauge-target" style={{ left: at(model.target) }} />
-        )}
       </div>
       <div className="hmi-gauge-foot">
         <span>

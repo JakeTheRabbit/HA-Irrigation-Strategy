@@ -38,17 +38,17 @@
   font-size: var(--text-sm);
 }
 
-/* Mockup 04: the charts, the AI's suggestion under them; beside them today in numbers, why and
- * what comes next, and the shot log. The zone day's own parts sit in this grid. */
+/* The zone's day: charts and shot log on the left; numbers, why and the AI's suggestion beside
+ * them. Overlapping spans keep both columns packed. The zone day's own parts sit in this grid. */
 .zone-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(320px, 400px);
   grid-template-areas:
     "charts numbers"
     "charts why"
-    "suggest shots"
-    ". shots";
-  grid-template-rows: auto auto auto 1fr;
+    "shots why"
+    "shots suggest";
+  grid-template-rows: min-content min-content min-content 1fr;
   align-items: start;
   gap: 16px;
 }

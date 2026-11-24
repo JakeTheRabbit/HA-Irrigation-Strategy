@@ -737,7 +737,9 @@ try {
       await day.locator(".grow-tip").waitFor({ state: "hidden" });
       await readings.selectOption("below");
       // Every entry in the key switches its layer, off the chart and out of the readings.
-      const ecKey = key.getByRole("button", { name: "Pore EC" });
+      // An off layer moves into the closed More layers disclosure. Read its state by the stable
+      // layer identity; role queries intentionally exclude that hidden button.
+      const ecKey = key.locator('[data-layer-toggle="ec"]');
       assert.equal(await ecKey.getAttribute("aria-pressed"), "true");
       await expectVisible(layer("ec"));
       await ecKey.click();
@@ -747,7 +749,8 @@ try {
       await page.mouse.move(plot.x + plot.width / 2, box.y + box.height / 2);
       assert.doesNotMatch(await readout.innerText(), /pore EC/);
       await page.mouse.move(0, 0);
-      assert.equal(await key.getByRole("button").count(), await key.locator("li:not(.grow-legend-more)").count());
+      assert.equal(await key.locator("[data-layer-toggle]").count(), await key.locator("li:not(.grow-legend-more)").count());
+      await expectVisible(key.getByText("More layers (1 off)", { exact: true }));
       // Compare with Off, Yesterday, the last run's day of the same number (mockup 04) or Typical.
       const compare = day.getByRole("group", { name: "Compare with" });
       const choice = (name) => compare.getByRole("button", { name, exact: true });
@@ -768,6 +771,7 @@ try {
       assert.equal(await choice("Off").getAttribute("aria-pressed"), "true");
       assert.equal(await ecKey.getAttribute("aria-pressed"), "false");
       assert.equal(await layer("ec").count(), 0);
+      await key.getByText("More layers (1 off)", { exact: true }).click();
       await ecKey.click();
       await expectVisible(layer("ec"));
       await choice("Yesterday").click();

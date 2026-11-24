@@ -1,0 +1,174 @@
+/* The steering lanes: one clock per room (DayRail), each zone's moisture under it (VwcLane). */
+.day-rail {
+  position: relative;
+  height: 46px;
+}
+.day-rail-track {
+  position: relative;
+  height: 26px;
+}
+.day-rail-lights {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-radius: 4px;
+  background: color-mix(in srgb, #ffb300 12%, transparent);
+}
+.day-rail-phase {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  padding: 4px 8px;
+  border-left: 1px solid var(--border);
+  font-size: var(--text-xs);
+  color: var(--muted-foreground);
+  white-space: nowrap;
+  overflow: hidden;
+}
+.day-rail-phase b {
+  color: var(--foreground);
+  font-weight: 600;
+}
+.day-rail-ticks {
+  position: absolute;
+  top: 29px;
+  left: 0;
+  right: 0;
+  height: 16px;
+  font-size: var(--text-xs);
+  color: var(--muted-foreground);
+  font-variant-numeric: tabular-nums;
+}
+.day-rail-ticks span {
+  position: absolute;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+.day-rail-ticks span[data-edge="start"] {
+  transform: none;
+}
+.day-rail-ticks span[data-edge="end"] {
+  transform: translateX(-100%);
+}
+.day-rail-ticks .day-rail-now-label {
+  color: var(--foreground);
+  font-weight: 600;
+  background: var(--surface);
+  padding: 0 4px;
+}
+.day-rail > .lane-now {
+  bottom: 18px;
+}
+
+.lane-now {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 0;
+  border-left: 1.5px solid var(--foreground);
+  opacity: 0.8;
+  pointer-events: none;
+}
+
+.vwc-lane {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  height: 92px;
+  min-width: 0;
+}
+.vwc-lane-plot {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+.vwc-lane-plot svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.lane-night {
+  fill: color-mix(in srgb, var(--foreground) 6%, transparent);
+}
+.lane-band {
+  fill: color-mix(in srgb, var(--success) 15%, transparent);
+}
+.lane-band-edge {
+  stroke: color-mix(in srgb, var(--success) 55%, transparent);
+  stroke-width: 1;
+}
+.lane-vwc {
+  fill: none;
+  stroke: var(--series-vwc, var(--primary));
+  stroke-width: 2.25;
+  stroke-linejoin: round;
+}
+.lane-band-label {
+  position: absolute;
+  right: 0;
+  transform: translateY(-50%);
+  padding: 0 4px;
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--success);
+  font-size: var(--text-xs);
+  white-space: nowrap;
+}
+.lane-loading {
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+}
+.lane-flag {
+  position: absolute;
+  top: 2px;
+  max-width: 60%;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--warning-mark) 16%, var(--surface));
+  color: var(--foreground);
+  font-size: var(--text-xs);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lane-flag[data-level="critical"] {
+  background: color-mix(in srgb, var(--destructive) 16%, var(--surface));
+}
+.vwc-lane-shots {
+  position: relative;
+  height: 12px;
+  flex: none;
+}
+.lane-shot {
+  position: absolute;
+  top: 0;
+  width: 4px;
+  height: 12px;
+  margin-left: -2px;
+  border-radius: 1px;
+  background: var(--series-vwc, var(--primary));
+}
+.lane-shot[data-open] {
+  background: none;
+  border: 1.5px solid var(--series-vwc, var(--primary));
+}
+
+@media (max-width: 720px) {
+  .day-rail-name {
+    display: none;
+  }
+  .day-rail-phase {
+    padding: 4px 5px;
+  }
+  .lane-flag {
+    left: auto !important;
+    right: 0;
+    max-width: 70%;
+  }
+}
