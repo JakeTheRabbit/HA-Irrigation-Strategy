@@ -1,9 +1,11 @@
 import { CanonicalControls } from "@/components/canonical-controls";
 import { Fragment, useEffect, useRef, useState } from "react";
-import { ArrowRight, Search, TriangleAlert } from "lucide-react";
+import { Activity, ArrowRight, Cpu, Search, Sparkles, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Empty, Heading, Status, time, type Page } from "@/components/dashboard";
+import { AlertCodeText } from "@/components/alert-code-text";
+import { KpiCard, KpiGrid } from "@/components/ha-primitives";
 import { UiTip } from "@/components/info-tip";
 import { JevTrouble, jevUsage } from "@/components/jev-status";
 import { Pill, Sparkline } from "@/components/mini-visuals";
@@ -188,12 +190,20 @@ export function Probes({
         description={`${counts.total} ${counts.total === 1 ? "probe" : "probes"} · ${counts.used} in zone values · raw readings always kept`}
         action={<UiTip copyKey="probes" />}
       />
-      <CanonicalControls controller={controller} owner="probes" onDirtyChange={onDirtyChange} />
-      <section className="panel probes-status" aria-label="Controller and AI assistant">
-        <div>
-          <span className="eyebrow">Controller</span>
-          <strong>
-            {heartbeat.health === "fresh"
+      <KpiGrid className="probes-status" >
+        <KpiCard
+          icon={Cpu}
+          tone={counts.healthy === counts.total ? "success" : "warning"}
+          label="Probe health"
+          value={`${counts.healthy} / ${counts.total}`}
+          detail={`${counts.used} in zone values`}
+        />
+        <KpiCard
+          icon={Activity}
+          tone={heartbeat.health === "fresh" ? "success" : heartbeat.health === "stale" || heartbeat.health === "stopped" ? "error" : "warning"}
+          label="Controller"
+          value={
+            heartbeat.health === "fresh"
               ? "Reporting"
               : heartbeat.health === "stale"
                 ? "Not reporting"
@@ -201,23 +211,24 @@ export function Probes({
                   ? "No heartbeat"
                   : heartbeat.health === "stopped"
                     ? "Stopped"
-                    : "Heartbeat unreadable"}
-          </strong>
-          <span className="muted small">
-            {heartbeat.at === null
-              ? "No time on its last report"
-              : `Last report ${ageText(now - heartbeat.at)} ago`}
-            {status ? ` · ${status.replaceAll("_", " ")}` : ""}
-          </span>
-        </div>
-        <div>
-          <span className="eyebrow">AI assistant</span>
-          <strong>{brainWords(jev).tile}</strong>
-          <span className="muted small">
-            {jev?.on ? jevUsage(jev, true) || "No calls today" : brainWords(jev).detail}
-          </span>
-        </div>
-      </section>
+                    : "Unreadable"
+          }
+          detail={
+            heartbeat.at === null
+              ? "No report time"
+              : `${ageText(now - heartbeat.at)} ago${status ? ` · ${status.replaceAll("_", " ")}` : ""}`
+          }
+        />
+        <KpiCard
+          icon={Sparkles}
+          tone={jev?.on ? "primary" : "neutral"}
+          label="AI assistant"
+          value={brainWords(jev).tile}
+          detail={jev?.on ? jevUsage(jev, true) || "No calls today" : brainWords(jev).detail}
+          onClick={() => navigate("today/ai")}
+        />
+      </KpiGrid>
+      <CanonicalControls controller={controller} owner="probes" onDirtyChange={onDirtyChange} />
       {jev && <JevTrouble jev={jev} />}
       {room.alerts.length > 0 && (
         <div className="attention-list">
@@ -225,7 +236,7 @@ export function Probes({
             <div className={`attention attention-${notice.severity}`} key={notice.id}>
               <div>
                 <strong>{notice.title}</strong>
-                <p>{notice.detail}</p>
+                <p><AlertCodeText text={notice.detail} /></p>
               </div>
             </div>
           ))}

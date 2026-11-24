@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
+import { Droplets, Gauge, Layers, Sprout } from "lucide-react";
 import { Empty, Heading } from "@/components/dashboard";
+import { KpiCard, KpiGrid } from "@/components/ha-primitives";
 import { Pill } from "@/components/mini-visuals";
 import { NeedsIntegration } from "@/components/needs-integration";
 import { ArcGauge } from "@/components/primitives/arc-gauge";
@@ -62,9 +64,43 @@ export function WaterUsePage({ controller }: { controller: Controller }) {
   // Where the controller may journal this meter's CS-319: the first room that reads it.
   const alertRooms = meter ? meterRooms(supply.data, others, meter) : [];
   const oneAtATime = roomPump<{ max_concurrent_zones?: unknown }>(supply.data?.irrigation_pumps, pump)?.max_concurrent_zones === 1;
+  const totalTodayL = zones.reduce((sum, z) => sum + (z.water.value ?? 0), 0);
+  const reportingZones = zones.filter((z) => z.water.value !== null).length;
   return (
     <>
       <Heading title="Water & flow" action={meter ? <MeterLine controller={controller} meter={meter} /> : undefined} />
+      {zones.length > 0 && (
+        <KpiGrid>
+          <KpiCard
+            icon={Droplets}
+            tone="primary"
+            label="Water today"
+            value={reportingZones ? formatVolume(totalTodayL, 1) : "—"}
+            detail={controller.room.room.name}
+          />
+          <KpiCard
+            icon={Layers}
+            tone="neutral"
+            label="Zones reporting"
+            value={`${reportingZones} / ${zones.length}`}
+            detail="Live daily counters"
+          />
+          <KpiCard
+            icon={Gauge}
+            tone={meter ? "success" : "neutral"}
+            label="Flow meter"
+            value={meter ? "Mapped" : "Not mapped"}
+            detail={meter ? (shared ? "Shared main line" : "Dedicated line") : "Optional metered verification"}
+          />
+          <KpiCard
+            icon={Sprout}
+            tone="primary"
+            label="Avg per zone"
+            value={reportingZones ? formatVolume(totalTodayL / reportingZones, 1) : "—"}
+            detail="Across reporting zones"
+          />
+        </KpiGrid>
+      )}
       {supply.state === "missing" ? (
         <>
           <div className="wf-intro">

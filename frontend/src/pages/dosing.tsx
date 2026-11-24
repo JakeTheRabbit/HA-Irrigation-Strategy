@@ -7,8 +7,12 @@ import {
   CircleDashed,
   CircleDot,
   CircleStop,
+  Droplets,
+  FlaskConical,
+  Gauge,
   LoaderCircle,
   Settings2,
+  ShieldCheck,
   SkipForward,
   X,
 } from "lucide-react";
@@ -24,6 +28,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Empty, FaultSummary, Heading, number, type Page } from "@/components/dashboard";
+import { KpiCard, KpiGrid } from "@/components/ha-primitives";
 import { UiTip } from "@/components/info-tip";
 import { Pill } from "@/components/mini-visuals";
 import { PeristalticPump } from "@/components/peristaltic-pump";
@@ -35,6 +40,7 @@ import { TankStatus } from "@/components/tank-status";
 import {
   PUMP_STATES,
   STOCK_STATES,
+  stockState,
   batchLevel,
   batchSteps,
   batchTime,
@@ -1241,15 +1247,12 @@ export function Dosing({
       : null;
   const ec = (value: number) => formatEc(value, 2);
 
+  const lowStockCount = stock ? stock.tanks.filter((t) => stockState(t) !== "ok").length : 0;
+
   return (
     <div className="dosing-page">
       <Heading
         title={`Feed & dosing · ${room.room.name}`}
-        description={
-          config
-            ? `Batch tank, ${views.length} dosing ${views.length === 1 ? "pump" : "pumps"}, ${room.zones.length} ${room.zones.length === 1 ? "zone" : "zones"}${armed.length && !failed ? ` · protections armed ${armedCount} of ${armed.length}` : ""}`
-            : undefined
-        }
         action={
           config && (
             <Button variant="outline" onClick={() => openSetup(false)}>
@@ -1258,6 +1261,39 @@ export function Dosing({
           )
         }
       />
+      {config && (
+        <KpiGrid>
+          <KpiCard
+            icon={Gauge}
+            tone={level.pct !== null && atPct !== null && level.pct <= atPct ? "warning" : "primary"}
+            label="Batch tank"
+            value={level.pct === null ? "—" : `${Math.round(level.pct)}%`}
+            detail={atPct !== null ? `Refill at ${Math.round(atPct)}%` : "Batch reservoir"}
+          />
+          <KpiCard
+            icon={FlaskConical}
+            tone={batchRunning ? "success" : failed ? "error" : "primary"}
+            label="Pumps & batch"
+            value={batchRunning ? "Batch running" : dosingNow ? `${dosingNow.pump.name} dosing` : `${views.length} pumps idle`}
+            detail={inUse.name ? `Recipe: ${inUse.name}` : `${room.zones.length} zones fed`}
+          />
+          <KpiCard
+            icon={ShieldCheck}
+            tone={armed.length && armedCount === armed.length ? "success" : "warning"}
+            label="Protections"
+            value={armed.length ? `${armedCount} / ${armed.length}` : "—"}
+            detail={failed ? "Mix check needs review" : "Interlocks & guards"}
+          />
+          <KpiCard
+            icon={Droplets}
+            tone={lowStockCount > 0 ? "warning" : "success"}
+            label="Stock tanks"
+            value={stock ? (lowStockCount > 0 ? `${lowStockCount} low` : `${stock.tanks.length} OK`) : "—"}
+            detail="Open stock shelf"
+            onClick={() => navigate("equipment/stock")}
+          />
+        </KpiGrid>
+      )}
       {config && failed && mix && (
         <MixFaultSummary
           mix={mix}

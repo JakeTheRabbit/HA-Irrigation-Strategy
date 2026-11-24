@@ -1,24 +1,5 @@
-/* Equipment › Probes: the controller and the AI assistant at a glance, each zone's probes, the room's pump and
+/* Equipment › Probes: KPI summary tiles, each zone's probes, the room's pump and
    feed water; one tap down, the room map and the controller's own sensors. */
-.probes-status {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0;
-  margin-bottom: 16px;
-  padding: 0;
-}
-.probes-status > div {
-  display: grid;
-  gap: 2px;
-  padding: 14px 20px;
-}
-.probes-status > div + div {
-  border-left: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
-}
-.probes-status strong {
-  font-size: 17px;
-  font-weight: 600;
-}
 .probes-status + .jev-trouble {
   margin-bottom: 16px;
 }

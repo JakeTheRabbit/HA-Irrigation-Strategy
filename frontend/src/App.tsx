@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowUpRight, Droplets, House } from "lucide-react";
+import { ArrowUpRight, Droplets, House, Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -37,7 +37,7 @@ import {
   type Route,
 } from "@/lib/routes";
 import { featureLabel, featureTargets, useHashFeature } from "@/lib/feature-focus";
-import { NAV_TREE } from "@/lib/nav-tree";
+import { MOBILE_PRIMARY_SECTIONS, NAV_TREE } from "@/lib/nav-tree";
 import { AppHeader, StaleBanner } from "@/components/app-header";
 import { UiTip } from "@/components/info-tip";
 import { PageTabs, pageLabel } from "@/components/page-tabs";
@@ -645,13 +645,15 @@ export default function App() {
               page={page}
               navigate={(next) => navigate(next)}
               badges={{ "plan/targets": Object.keys(drafts).length }}
+              roomName={controller.room.room.name}
+              zoneName={zoneName}
             />
             {renderPage()}
           </div>
         </main>
       </div>
       <nav className="bottom-nav" aria-label="Sections">
-        {NAV_TREE.map((group) => {
+        {NAV_TREE.filter((group) => MOBILE_PRIMARY_SECTIONS.includes(group.section)).map((group) => {
           const target = SECTION_PAGES[group.section] ?? group.items[0].page;
           return (
             <button
@@ -661,15 +663,25 @@ export default function App() {
               onClick={() => navigate(target)}
             >
               <span className="bottom-nav-icon">
-                <group.icon size={21} aria-hidden="true" />
-                {group.section === "plan" && Object.keys(drafts).length > 0 && (
+                <group.icon size={20} aria-hidden="true" />
+                {group.section === "watering" && Object.keys(drafts).length > 0 && (
                   <i className="nav-draft-count">{Object.keys(drafts).length}</i>
                 )}
               </span>
-              <span>{group.label}</span>
+              <span>{group.shortLabel ?? group.label}</span>
             </button>
           );
         })}
+        <button
+          type="button"
+          aria-current={!MOBILE_PRIMARY_SECTIONS.includes(section) ? "page" : undefined}
+          onClick={() => setMobile(true)}
+        >
+          <span className="bottom-nav-icon">
+            <Menu size={20} aria-hidden="true" />
+          </span>
+          <span>More</span>
+        </button>
       </nav>
       <p id="feature-announce" className="sr-only" role="status">
         {announce}

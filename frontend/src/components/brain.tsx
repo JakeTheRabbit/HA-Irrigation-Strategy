@@ -1,9 +1,10 @@
 import { CanonicalControls } from "@/components/canonical-controls";
 import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Clock, Coins, SlidersHorizontal, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Heading, time as clock, type Page } from "@/components/dashboard";
+import { KpiCard, KpiGrid, type HaTone } from "@/components/ha-primitives";
 import { UiTip } from "@/components/info-tip";
 import { Meter } from "@/components/mini-visuals";
 import {
@@ -235,36 +236,6 @@ function DemoSwitcher({ demo }: { demo: BrainDemoState }) {
 
 /** Shared view switcher unifying Status › AI assistant (#/today/ai) and Settings › AI assistant
  * (#/settings/ai) into one workspace without breaking either route. */
-function AiTabs({
-  active,
-  navigate,
-}: {
-  active: "overview" | "settings";
-  navigate?: Navigate;
-}) {
-  if (!navigate) return null;
-  return (
-    <nav className="history-toggle ai-view-tabs" aria-label="AI assistant views">
-      <button
-        type="button"
-        aria-pressed={active === "overview"}
-        aria-current={active === "overview" ? "page" : undefined}
-        onClick={() => navigate("today/ai")}
-      >
-        Live status &amp; decisions
-      </button>
-      <button
-        type="button"
-        aria-pressed={active === "settings"}
-        aria-current={active === "settings" ? "page" : undefined}
-        onClick={() => navigate("settings/ai")}
-      >
-        Judges, budget &amp; settings
-      </button>
-    </nav>
-  );
-}
-
 /** The AI assistant page: its state, budget, last decision, what it may do and its latest decisions. */
 export function BrainPage({
   controller,
@@ -279,9 +250,48 @@ export function BrainPage({
   const log = readJev(states, room.room.prefix).log;
   const last = panel?.lastDecision ?? null;
   const budget = panel && budgetLine(panel);
+  const stateTone: HaTone =
+    view.tone === "positive"
+      ? "success"
+      : view.tone === "info"
+        ? "primary"
+        : view.tone === "warning"
+          ? "warning"
+          : "neutral";
   return (
     <div className="brain-page" data-brain-page={panel?.state ?? "none"}>
-      <Heading title="AI assistant" action={<AiTabs active="overview" navigate={navigate} />} />
+      <Heading title="AI assistant" />
+      <KpiGrid>
+        <KpiCard
+          icon={Sparkles}
+          tone={stateTone}
+          label="Assistant state"
+          value={view.chip}
+          detail={`${providerWords(panel)}${panel?.model ? ` · ${panel.model}` : ""}`}
+        />
+        <KpiCard
+          icon={SlidersHorizontal}
+          tone="primary"
+          label="Operating mode"
+          value={modeWords(panel)}
+          detail={panel?.mode === "dry_run" ? "Observing only" : "Inside safety bounds"}
+          onClick={() => navigate("settings/ai")}
+        />
+        <KpiCard
+          icon={Coins}
+          tone={panel?.budgetLeftUsd === 0 ? "warning" : "primary"}
+          label="Budget today"
+          value={panel?.budgetUsd != null ? money(panel.spentUsd ?? 0) : "—"}
+          detail={panel?.budgetUsd != null ? `of ${money(panel.budgetUsd)} daily limit` : "No budget reported"}
+        />
+        <KpiCard
+          icon={Clock}
+          tone="neutral"
+          label="Last decision"
+          value={last?.time != null ? clock(last.time) : "None yet"}
+          detail={last ? `${judgeTitle(last.judge)}` : "No recent judge call"}
+        />
+      </KpiGrid>
       {controller.demo && <DemoSwitcher demo={demo} />}
       <section className="panel" aria-labelledby="brain-status-title">
         <div className="panel-heading">
@@ -936,7 +946,7 @@ export function AiSettings({
   );
   return (
     <>
-      <Heading title="AI assistant" action={<AiTabs active="settings" navigate={navigate} />} />
+      <Heading title="AI assistant" />
       <div className="ai-settings" data-ai-settings>
         <div className="ai-grid">
           <JudgesCard controller={controller} />

@@ -1,8 +1,9 @@
-import { ChevronLeft, ChevronRight, X } from "lucide-react";
+import { AlertTriangle, ChevronLeft, ChevronRight, Droplets, Layers, TriangleAlert, X } from "lucide-react";
 import { Popover } from "radix-ui";
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import { toast } from "sonner";
 import { Heading } from "@/components/dashboard";
+import { KpiCard, KpiGrid } from "@/components/ha-primitives";
 import { NeedsIntegration } from "@/components/needs-integration";
 import { ShotTimeline } from "@/components/shot-timeline";
 import { Button } from "@/components/ui/button";
@@ -377,9 +378,43 @@ export function Watering({
       body.current?.querySelector<HTMLButtonElement>(`.st-block[data-id="${CSS.escape(b.id)}"]`)?.focus(),
     );
   };
+  const totalShots = rows.reduce((sum, r) => (r.zone === null ? sum : sum + r.blocks.length), 0);
+  const failedInView = problemBlocks.filter((p) => p.block.glyph === "failed").length;
+  const warnInView = problemBlocks.filter((p) => p.block.glyph === "warning").length;
   return (
     <>
       <Heading title="Timeline" description={phone ? "All rooms · swipe for more" : undefined} action={phone ? spanToggle : undefined} />
+      <KpiGrid>
+        <KpiCard
+          icon={Droplets}
+          tone="primary"
+          label="Shots in window"
+          value={totalShots}
+          detail={`${spanHours} h window · ${dayWords(date)}`}
+        />
+        <KpiCard
+          icon={AlertTriangle}
+          tone={failedInView > 0 ? "error" : "success"}
+          label="Failed shots"
+          value={failedInView}
+          detail={failedInView > 0 ? "Click to focus failed" : "None failed"}
+          onClick={failedInView > 0 ? tapFailed : undefined}
+        />
+        <KpiCard
+          icon={TriangleAlert}
+          tone={warnInView > 0 ? "warning" : "neutral"}
+          label="Warnings"
+          value={warnInView}
+          detail={warnInView > 0 ? "Review highlighted shots" : "No warnings"}
+        />
+        <KpiCard
+          icon={Layers}
+          tone="neutral"
+          label="Rooms shown"
+          value={controller.rooms.length}
+          detail={controller.rooms.map((r) => r.name).join(" · ")}
+        />
+      </KpiGrid>
       <section className="panel watering" aria-label="Watering timeline" data-watering>
         {phone ? (
           <div className="wt-dayline" data-watering-day>

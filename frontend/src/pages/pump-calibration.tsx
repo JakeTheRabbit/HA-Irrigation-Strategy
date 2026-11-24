@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { Check, X } from "lucide-react";
-import { Empty } from "@/components/dashboard";
+import { Empty, Heading } from "@/components/dashboard";
 import { NeedsIntegration } from "@/components/needs-integration";
 import { PeristalticPump } from "@/components/peristaltic-pump";
 import { HoldButton } from "@/components/primitives/hold-button";
@@ -323,17 +323,7 @@ export function PumpCalibration({ controller, navigate, onDirtyChange }: PagePro
   };
 
   const room = controller.room.room.name;
-  const header = (
-    <div className="pump-cal-title">
-      <button type="button" className="pump-cal-crumb" onClick={() => navigate("equipment/dosing")}>
-        Feed &amp; dosing · {room}
-      </button>
-      <span className="pump-cal-sep" aria-hidden="true">
-        ›
-      </span>
-      <h1>Prime &amp; calibrate a pump</h1>
-    </div>
-  );
+  const header = <Heading title={`Pump calibration · ${room}`} />;
   if (load.state === "missing")
     return (
       <div className="pump-cal">

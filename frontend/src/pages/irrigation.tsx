@@ -80,10 +80,7 @@ export function Irrigation({
         : "current room targets · automation state unavailable";
   return (
     <div className="irrigation-workspace" data-view={view}>
-      <Heading
-        title="Irrigation"
-        description="Review current targets and plan future grow days for the same zone."
-      />
+      <Heading title="Irrigation" />
       <div className="irrigation-context">
         <label htmlFor="irrigation-zone">Zone</label>
         <select

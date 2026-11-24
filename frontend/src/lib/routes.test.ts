@@ -94,15 +94,18 @@ describe("the retired single-page dashboards' ?view= links", () => {
 });
 
 describe("the menu", () => {
-  it("files each page under one of five entries", () => {
+  it("files each page under one of eight workspaces", () => {
     expect(new Set(PAGES.map(sectionOf))).toEqual(
-      new Set(["today", "plan", "history", "equipment", "settings"]),
+      new Set(["overview", "watering", "dosing", "hardware", "history", "ai", "alerts", "system"]),
     );
-    expect(sectionOf("zone")).toBe("today");
-    expect(sectionOf("help")).toBe("settings");
-    expect(sectionOf("equipment/pump-calibration")).toBe("equipment");
-    expect(sectionOf("settings/alerts")).toBe("settings");
-    expect(sectionOf("equipment/dosing")).toBe("equipment");
+    expect(sectionOf("zone")).toBe("overview");
+    expect(sectionOf("help")).toBe("system");
+    expect(sectionOf("equipment/pump-calibration")).toBe("dosing");
+    expect(sectionOf("settings/alerts")).toBe("alerts");
+    expect(sectionOf("equipment/dosing")).toBe("dosing");
+    expect(sectionOf("equipment/probes")).toBe("hardware");
+    expect(sectionOf("today/ai")).toBe("ai");
+    expect(sectionOf("settings/ai")).toBe("ai");
   });
   it("old addresses land on their new homes", () => {
     expect(canonicalHash("#/history/timeline?zone=2")).toBe("#/history/explorer?zone=2");
@@ -113,7 +116,7 @@ describe("the menu", () => {
       canonical: false,
     });
   });
-  it("opens each room's batch-tank dosing under Equipment", () => {
+  it("opens each room's batch-tank dosing under Dosing & Tank", () => {
     expect(parseRoute("#/equipment/dosing")).toEqual({
       route: { page: "equipment/dosing" },
       canonical: true,
@@ -121,12 +124,12 @@ describe("the menu", () => {
     expect(routeHash({ page: "equipment/dosing" })).toBe("#/equipment/dosing");
     expect(canonicalHash("#/equipment/dosing")).toBeNull();
   });
-  it("opens the site's notifications under Settings", () => {
+  it("opens the site's notifications under Alerts", () => {
     expect(parseRoute("#/settings/notifications")).toEqual({
       route: { page: "settings/notifications" },
       canonical: true,
     });
-    expect(sectionOf("settings/notifications")).toBe("settings");
+    expect(sectionOf("settings/notifications")).toBe("alerts");
     expect(routeHash({ page: "settings/notifications" })).toBe("#/settings/notifications");
     expect(canonicalHash("#/settings/notifications")).toBeNull();
     // Settings itself stays where it was.

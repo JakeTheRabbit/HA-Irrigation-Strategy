@@ -439,19 +439,6 @@ export function FeedCalibration({ controller, navigate }: PageProps) {
     </div>
   ) : (
     <div className="feed-cal-title">
-      <button
-        type="button"
-        className="feed-cal-crumb"
-        onClick={() => {
-          abandon(session);
-          navigate("equipment/dosing");
-        }}
-      >
-        Feed &amp; dosing · {room}
-      </button>
-      <span className="feed-cal-sep" aria-hidden="true">
-        ›
-      </span>
       <h1>{title}</h1>
     </div>
   );

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Check, TrendingUp } from "lucide-react";
+import { Check, History, Sparkles, TrendingUp, User } from "lucide-react";
 import { Heading } from "@/components/dashboard";
+import { KpiCard, KpiGrid } from "@/components/ha-primitives";
 import { NeedsIntegration } from "@/components/needs-integration";
 import { runApply, type ApplyReceipt, type ApplyState } from "@/components/review-apply";
 import { Button } from "@/components/ui/button";
@@ -204,9 +205,34 @@ export function Changes({ controller }: PageProps) {
       onReload={reload}
     />
   );
+  const aiChanges = entries.filter((e) => e.actor === "ai" || e.actor === "jev" || e.actor === "controller").length;
+  const userChanges = entries.length - aiChanges;
   return (
     <>
       <Heading title="Changes" />
+      <KpiGrid>
+        <KpiCard
+          icon={History}
+          tone="primary"
+          label="Recorded changes"
+          value={entries.length}
+          detail={scopeName ? scopeName : "All rooms"}
+        />
+        <KpiCard
+          icon={User}
+          tone="neutral"
+          label="Manual / grower"
+          value={userChanges}
+          detail="Direct edits & saves"
+        />
+        <KpiCard
+          icon={Sparkles}
+          tone={aiChanges > 0 ? "primary" : "neutral"}
+          label="AI & automation"
+          value={aiChanges}
+          detail="Automated adjustments"
+        />
+      </KpiGrid>
       <div className="changes" data-changes-backend={backend}>
         <p className="changes-scope" data-changes-scope>
           {backend === "3.17" ? (

@@ -208,21 +208,9 @@ export function Grows({
         <div>
           <h1>Grows</h1>
           <p className="muted small">
-            Grows side by side by grow day, from the summary the controller records at each
-            lights-on. Summary recording and run records are managed here; they do not change
-            watering.
+            Side-by-side grow summaries and run records.
           </p>
         </div>
-        {navigate && (
-          <nav className="history-toggle" aria-label="Runs views">
-            <button type="button" aria-pressed="false" onClick={() => navigate("history/compare")}>
-              Compare runs
-            </button>
-            <button type="button" aria-pressed="true" aria-current="page" onClick={() => navigate("history/grows")}>
-              All grows
-            </button>
-          </nav>
-        )}
       </header>
       {error && (
         <p role="alert" className="grows-notice">

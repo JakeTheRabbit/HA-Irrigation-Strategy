@@ -1,5 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
+import { Activity, AlertTriangle, Cpu, Layers } from "lucide-react";
 import { FaultSummary, Heading } from "@/components/dashboard";
+import { KpiCard, KpiGrid } from "@/components/ha-primitives";
 import { NeedsIntegration } from "@/components/needs-integration";
 import { UpgradeReports } from "@/components/upgrade-report";
 import { HealthRing } from "@/components/primitives/ring";
@@ -182,9 +184,40 @@ export function SystemStatus({ controller }: PageProps) {
       <AlertCard key={alert.eventId ?? `${alert.roomId}:${alert.code}:${alert.zone}`} alert={alert} ack={alert.eventId ? acks[alert.eventId] : undefined} onAck={acknowledge} />
     ));
 
+  const onlineCount = rows.length - offline.length;
   return (
     <>
-      <Heading title="System status" action={<Capabilities />} />
+      <Heading title="System status" />
+      <KpiGrid>
+        <KpiCard
+          icon={Activity}
+          tone={fault ? "error" : "success"}
+          label="Controller"
+          value={fault ? "Not running" : "Running"}
+          detail={checked ? `Checked ${clock(checked, controller.timeZone)}` : "Live heartbeat"}
+        />
+        <KpiCard
+          icon={Cpu}
+          tone={offline.length > 0 ? "warning" : "success"}
+          label="Mapped devices"
+          value={`${onlineCount} / ${rows.length}`}
+          detail={offline.length > 0 ? `${offline.length} offline` : "All devices reporting"}
+        />
+        <KpiCard
+          icon={AlertTriangle}
+          tone={alerts.length > 0 ? "warning" : "success"}
+          label="Open alerts"
+          value={alerts.length}
+          detail={alerts.length > 0 ? "Review below" : "All clear"}
+        />
+        <KpiCard
+          icon={Layers}
+          tone="neutral"
+          label="Rooms monitored"
+          value={status.rooms.length}
+          detail={status.rooms.map((r) => roomName(r.room_id)).join(" · ")}
+        />
+      </KpiGrid>
       {(fault || attention.length > 0) && (
         <FaultSummary tone={fault ? "fault" : "warning"} title={attentionTitle}>
           {attention.length > 0 && (

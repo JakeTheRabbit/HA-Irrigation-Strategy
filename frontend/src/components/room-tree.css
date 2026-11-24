@@ -1,6 +1,8 @@
 /* The menu's live room list (room-tree.tsx): rooms, and the zones under each, in the sidebar. */
 .room-tree {
-  margin-top: 26px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
   gap: 1px;
 }
 .room-tree-heading {

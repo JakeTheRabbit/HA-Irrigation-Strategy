@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
+import { Bell, BellOff, ShieldAlert } from "lucide-react";
 import { toast } from "sonner";
 import { Heading } from "@/components/dashboard";
+import { KpiCard, KpiGrid } from "@/components/ha-primitives";
 import { NeedsIntegration } from "@/components/needs-integration";
 import { Sentence } from "@/components/primitives/sentence";
 import { Button } from "@/components/ui/button";
@@ -320,6 +322,9 @@ export function AlertRules({ controller, onDirtyChange }: PageProps) {
   const isNew = !editing;
   const title = phone && param !== null ? (isNew ? "New alert rule" : "Edit alert rule") : "Alert rules";
 
+  const activeRules = list.rules.filter((r) => r.active).length;
+  const pausedRules = list.rules.length - activeRules;
+
   return (
     <div className="alert-rules">
       <Heading
@@ -332,6 +337,31 @@ export function AlertRules({ controller, onDirtyChange }: PageProps) {
           ) : undefined
         }
       />
+      {showList && list.state === "ready" && (
+        <KpiGrid>
+          <KpiCard
+            icon={Bell}
+            tone={activeRules > 0 ? "success" : "neutral"}
+            label="Active rules"
+            value={activeRules}
+            detail={`of ${list.rules.length} configured`}
+          />
+          <KpiCard
+            icon={BellOff}
+            tone="neutral"
+            label="Paused rules"
+            value={pausedRules}
+            detail={pausedRules > 0 ? "Temporarily silenced" : "None paused"}
+          />
+          <KpiCard
+            icon={ShieldAlert}
+            tone="primary"
+            label="Active room"
+            value={room.room.name}
+            detail="Custom threshold alerts"
+          />
+        </KpiGrid>
+      )}
       {showBuilder &&
         (list.state === "missing" ? (
           <section className="panel ar-builder" aria-labelledby="ar-builder-title">

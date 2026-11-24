@@ -220,10 +220,10 @@ input[type="number"] {
   min-height: 100vh;
 }
 .desktop-sidebar {
-  width: 232px;
+  width: 236px;
   position: fixed;
   inset: 0 auto 0 0;
-  padding: 28px 16px 20px;
+  padding: 18px 12px 16px;
   background: var(--surface);
   border-right: 1px solid var(--border);
   display: flex;
@@ -241,20 +241,20 @@ input[type="number"] {
 .brand {
   display: flex;
   align-items: center;
-  gap: 11px;
-  margin: 0 9px 32px;
+  gap: 10px;
+  margin: 0 6px 16px;
   font-weight: 600;
-  font-size: 17px;
-  letter-spacing: -0.35px;
+  font-size: 16px;
+  letter-spacing: -0.3px;
 }
 .brand-mark {
   background: var(--primary);
   color: var(--primary-foreground);
-  height: 38px;
-  width: 38px;
+  height: 34px;
+  width: 34px;
   display: grid;
   place-items: center;
-  border-radius: 10px;
+  border-radius: 9px;
 }
 .brand small {
   display: block;
@@ -368,20 +368,20 @@ nav button.nav-separated {
   color: var(--foreground);
 }
 .app-main {
-  margin-left: 232px;
+  margin-left: 236px;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
 }
 /* The frame's top bar (components/app-header.css draws what is in it). */
 .topbar {
-  height: 56px;
+  height: 54px;
   background: var(--surface);
   border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 0 28px;
+  padding: 0 24px;
   min-width: 0;
 }
 .connection-info {
@@ -401,12 +401,12 @@ nav button.nav-separated {
   }
 }
 #main-content {
-  padding: 20px 32px 36px;
+  padding: 14px 24px 36px;
   flex: 1;
   outline: none;
 }
 .main-inner {
-  max-width: 1370px;
+  max-width: 1400px;
   margin: auto;
 }
 .page-heading {
@@ -414,23 +414,23 @@ nav button.nav-separated {
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: 10px 20px;
-  margin: 16px 0;
+  gap: 8px 16px;
+  margin: 4px 0 14px;
 }
 @media (max-width: 720px) {
   .page-heading {
-    margin: 8px 0 10px;
+    margin: 2px 0 10px;
     gap: 8px 12px;
   }
   .page-heading p {
-    margin-top: 4px;
+    margin-top: 3px;
   }
 }
 .page-heading p {
   color: var(--muted-foreground);
   font-size: var(--text-sm);
-  margin-top: 7px;
-  max-width: 760px;
+  margin-top: 4px;
+  max-width: 720px;
 }
 .page-heading > button {
   flex-shrink: 0;
@@ -612,18 +612,18 @@ nav.zone-switcher button[aria-current="page"] {
 }
 .panel {
   background: var(--surface);
-  border: 1px solid color-mix(in srgb, var(--border) 75%, transparent);
+  border: 1px solid var(--border);
   border-radius: var(--radius);
-  margin-bottom: 22px;
+  margin-bottom: 16px;
   overflow: hidden;
-  box-shadow: var(--ha-native-shadow, 0 1px 2px rgb(0 0 0 / 4%));
+  box-shadow: var(--ha-native-shadow, none);
 }
 .panel-heading {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  padding: 16px 20px;
+  gap: 14px;
+  padding: 14px 18px;
 }
 .panel-heading p {
   font-size: var(--text-xs);
@@ -1974,11 +1974,8 @@ nav button.active > svg {
   }
 }
 
-/* Where the menu shows the room tree (wider than a phone), the Status tabs (All rooms / Room) and
-   a zone page's zone switcher repeat it: the tree is the one place to choose a room or zone. A
-   phone, with the tree in its drawer, keeps them. */
+/* On desktop the sidebar room tree already selects zones; on a phone the inline bar stays visible. */
 @media (min-width: 721px) {
-  .page-tabs[data-section="today"],
   .zone-page-bar {
     display: none;
   }
