@@ -1248,6 +1248,12 @@ export function Dosing({
   const ec = (value: number) => formatEc(value, 2);
 
   const lowStockCount = stock ? stock.tanks.filter((t) => stockState(t) !== "ok").length : 0;
+  const fallbackTankPct =
+    level.pct !== null
+      ? level.pct
+      : typeof engine.water_level_sensor === "string" && engine.water_level_sensor
+        ? numeric(states[engine.water_level_sensor])
+        : null;
 
   return (
     <div className="dosing-page">
@@ -1265,9 +1271,9 @@ export function Dosing({
         <KpiGrid>
           <KpiCard
             icon={Gauge}
-            tone={level.pct !== null && atPct !== null && level.pct <= atPct ? "warning" : "primary"}
+            tone={fallbackTankPct !== null && atPct !== null && fallbackTankPct <= atPct ? "warning" : "primary"}
             label="Batch tank"
-            value={level.pct === null ? "—" : `${Math.round(level.pct)}%`}
+            value={fallbackTankPct === null ? "—" : `${Math.round(fallbackTankPct)}%`}
             detail={atPct !== null ? `Refill at ${Math.round(atPct)}%` : "Batch reservoir"}
           />
           <KpiCard
@@ -1308,11 +1314,6 @@ export function Dosing({
           }
         />
       )}
-      <CanonicalControls
-        controller={controller}
-        owner="dosing"
-        onDirtyChange={setPermissionsDirty}
-      />
       {loadError && !config && (
         <Empty
           title="Dosing not available"
@@ -1661,6 +1662,11 @@ export function Dosing({
       )}
       {/* The tank's level over time, with the shots, pump runs and fills that moved it. */}
       <TankLevel controller={controller} onConfigure={configure} />
+      <CanonicalControls
+        controller={controller}
+        owner="dosing"
+        onDirtyChange={setPermissionsDirty}
+      />
       {(config || doc) && (
         <details
           id={`${formId}-setup`}

@@ -228,7 +228,6 @@ export function Probes({
           onClick={() => navigate("today/ai")}
         />
       </KpiGrid>
-      <CanonicalControls controller={controller} owner="probes" onDirtyChange={onDirtyChange} />
       {jev && <JevTrouble jev={jev} />}
       {room.alerts.length > 0 && (
         <div className="attention-list">
@@ -360,6 +359,7 @@ export function Probes({
         <a href="#/equipment/feed-calibration">Feed pH and EC probes: Calibrate →</a>
       </p>
       <RoomMap controller={controller} navigate={navigate} />
+      <CanonicalControls controller={controller} owner="probes" onDirtyChange={onDirtyChange} />
       <ControllerInternals controller={controller} />
       <p className="footnote">
         A probe the zone’s reading leaves out does not steer watering while another one reports.

@@ -218,11 +218,6 @@ export function Grows({
         </p>
       )}
       <RunRecords controller={controller} onDirtyChange={setRecordsDirty} />
-      <CanonicalControls
-        controller={controller}
-        owner="history"
-        onDirtyChange={setRecordingDirty}
-      />
       <section className="panel grows-pick">
         <fieldset>
           <legend>Grows (2 to {MAX_GROWS})</legend>
@@ -537,6 +532,11 @@ export function Grows({
           }}
         />
       )}
+      <CanonicalControls
+        controller={controller}
+        owner="history"
+        onDirtyChange={setRecordingDirty}
+      />
     </div>
   );
 }

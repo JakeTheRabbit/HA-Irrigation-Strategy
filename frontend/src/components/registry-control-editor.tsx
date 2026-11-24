@@ -32,72 +32,101 @@ export function ControlEditor({
 }) {
   const label = controlLabel(row);
   const cells = [row.room, ...row.zones].filter((c): c is Cell => c !== null);
+  const defaultMeta = [
+    shown(row.control.default) !== "—" && `Default: ${shown(row.control.default)}`,
+    readOnly && "read-only",
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
+  const renderInput = (cell: Cell) => {
+    const value = staged[cell.entityId] ?? cell.value;
+    const unit = String(cell.entity.attributes.unit_of_measurement || "");
+    if (row.control.domain === "switch") {
+      return (
+        <input
+          type="checkbox"
+          role="switch"
+          aria-label={`${label} ${zoneName(cell.zone)}`}
+          checked={value === true}
+          disabled={readOnly}
+          onChange={(e) => onChange(cell, e.target.checked)}
+        />
+      );
+    }
+    if (row.control.domain === "select") {
+      return (
+        <select
+          aria-label={`${label} ${zoneName(cell.zone)}`}
+          value={String(value ?? "")}
+          disabled={readOnly}
+          onChange={(e) => onChange(cell, e.target.value)}
+        >
+          {(Array.isArray(cell.entity.attributes.options)
+            ? (cell.entity.attributes.options as string[])
+            : []
+          ).map((o) => (
+            <option key={o}>{o}</option>
+          ))}
+        </select>
+      );
+    }
+    return (
+      <span className="features-number">
+        <Input
+          type="number"
+          inputMode="decimal"
+          aria-label={`${label} ${zoneName(cell.zone)}`}
+          value={value === null ? "" : String(value)}
+          step={Number(cell.entity.attributes.step) || "any"}
+          min={Number(cell.entity.attributes.min)}
+          max={Number(cell.entity.attributes.max)}
+          disabled={readOnly}
+          onChange={(e) => {
+            const n = Number(e.target.value);
+            if (e.target.value !== "" && Number.isFinite(n)) onChange(cell, n);
+          }}
+        />
+        {unit && <span className="unit">{unit}</span>}
+      </span>
+    );
+  };
+
+  if (cells.length === 1) {
+    const cell = cells[0];
+    const value = staged[cell.entityId] ?? cell.value;
+    const off = !isDefault(row.control, value);
+    return (
+      <div
+        className="features-control features-single-row"
+        data-changed={off || undefined}
+        data-disabled={readOnly || undefined}
+      >
+        <div className="features-single-label">
+          <span className="features-single-title">{label}</span>
+          {defaultMeta && <span className="features-default">{defaultMeta}</span>}
+        </div>
+        <div className="features-single-input">{renderInput(cell)}</div>
+      </div>
+    );
+  }
+
   return (
     <fieldset className="features-control" disabled={readOnly}>
       <legend>
         {label}
         {/* A default is said only when there is one. */}
-        {(shown(row.control.default) !== "—" || readOnly) && (
-          <span className="features-default">
-            {[
-              shown(row.control.default) !== "—" && `Default: ${shown(row.control.default)}`,
-              readOnly && "read-only",
-            ]
-              .filter(Boolean)
-              .join(" · ")}
-          </span>
-        )}
+        {defaultMeta && <span className="features-default">{defaultMeta}</span>}
       </legend>
       <table>
         <tbody>
           {cells.map((cell) => {
             const value = staged[cell.entityId] ?? cell.value;
-            const unit = String(cell.entity.attributes.unit_of_measurement || "");
             const off = !isDefault(row.control, value);
             return (
               <tr key={cell.entityId} data-changed={off || undefined}>
                 <th scope="row">{zoneName(cell.zone)}</th>
-                <td>
-                  {row.control.domain === "switch" ? (
-                    <input
-                      type="checkbox"
-                      role="switch"
-                      aria-label={`${label} ${zoneName(cell.zone)}`}
-                      checked={value === true}
-                      onChange={(e) => onChange(cell, e.target.checked)}
-                    />
-                  ) : row.control.domain === "select" ? (
-                    <select
-                      aria-label={`${label} ${zoneName(cell.zone)}`}
-                      value={String(value ?? "")}
-                      onChange={(e) => onChange(cell, e.target.value)}
-                    >
-                      {(Array.isArray(cell.entity.attributes.options)
-                        ? (cell.entity.attributes.options as string[])
-                        : []
-                      ).map((o) => (
-                        <option key={o}>{o}</option>
-                      ))}
-                    </select>
-                  ) : (
-                    <span className="features-number">
-                      <Input
-                        type="number"
-                        inputMode="decimal"
-                        aria-label={`${label} ${zoneName(cell.zone)}`}
-                        value={value === null ? "" : String(value)}
-                        step={Number(cell.entity.attributes.step) || "any"}
-                        min={Number(cell.entity.attributes.min)}
-                        max={Number(cell.entity.attributes.max)}
-                        onChange={(e) => {
-                          const n = Number(e.target.value);
-                          if (e.target.value !== "" && Number.isFinite(n)) onChange(cell, n);
-                        }}
-                      />
-                      {unit && <span className="unit">{unit}</span>}
-                    </span>
-                  )}
-                </td>
+                <td>{renderInput(cell)}</td>
               </tr>
             );
           })}
