@@ -356,9 +356,13 @@ export default function App() {
         openZone={(room, zone) =>
           page === "history/changes"
             ? narrowChanges(room, zone)
-            : room === controller.roomId
-              ? navigate("zone", zone)
-              : openRoomPage(room, "zone", zone)
+            : ZONE_FOCUS_PAGES.includes(page)
+              ? room === controller.roomId
+                ? navigate(page, zone)
+                : openRoomPage(room, page, zone)
+              : room === controller.roomId
+                ? navigate("zone", zone)
+                : openRoomPage(room, "zone", zone)
         }
         pick={variant === "desktop" && !phone ? roomPick : null}
       />
@@ -468,7 +472,14 @@ export default function App() {
           />
         );
       case "history/grows":
-        return <Grows key={pageKey} controller={controller} onDirtyChange={setWorkspaceDirty} />;
+        return (
+          <Grows
+            key={pageKey}
+            controller={controller}
+            navigate={navigate}
+            onDirtyChange={setWorkspaceDirty}
+          />
+        );
       case "equipment/probes":
         return (
           <Probes
@@ -543,7 +554,12 @@ export default function App() {
         );
       case "settings/ai":
         return (
-          <AiSettings key={pageKey} controller={controller} onDirtyChange={setWorkspaceDirty} />
+          <AiSettings
+            key={pageKey}
+            controller={controller}
+            navigate={navigate}
+            onDirtyChange={setWorkspaceDirty}
+          />
         );
       case "settings/features":
         return <Features key={pageKey} controller={controller} />;

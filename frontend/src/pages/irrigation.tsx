@@ -88,6 +88,7 @@ export function Irrigation({
         <label htmlFor="irrigation-zone">Zone</label>
         <select
           id="irrigation-zone"
+          aria-label="Zone"
           value={roomScope && view === "current" ? "room" : zone}
           onChange={(event) => {
             const room = event.target.value === "room";

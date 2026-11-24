@@ -297,6 +297,23 @@ nav button {
   color: var(--muted-foreground);
   font-weight: 500;
 }
+nav.history-toggle {
+  flex-direction: row;
+  align-items: center;
+  gap: 2px;
+}
+nav.history-toggle button {
+  min-height: 32px;
+  padding: 0 12px;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+nav.history-toggle button[aria-pressed="true"] {
+  background: var(--muted);
+  color: var(--foreground);
+  font-weight: 600;
+  box-shadow: none;
+}
 nav button.active {
   background: var(--muted);
   box-shadow: inset 2px 0 0 var(--primary);
@@ -396,8 +413,18 @@ nav button.nav-separated {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 20px;
-  margin: 20px 0;
+  flex-wrap: wrap;
+  gap: 10px 20px;
+  margin: 16px 0;
+}
+@media (max-width: 720px) {
+  .page-heading {
+    margin: 8px 0 10px;
+    gap: 8px 12px;
+  }
+  .page-heading p {
+    margin-top: 4px;
+  }
 }
 .page-heading p {
   color: var(--muted-foreground);

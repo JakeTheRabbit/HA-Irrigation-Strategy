@@ -895,6 +895,11 @@
   .plumb-main {
     grid-template-columns: minmax(0, 1fr);
   }
+  /* Hoist any active mix-check fault card above the fill valve & tank on narrow phone screens so
+     operators see the fault and its Top up and re-check hold button immediately. */
+  .plumb-main > [data-mix-check] {
+    order: -1;
+  }
   .plumb-tank {
     grid-row: auto;
   }

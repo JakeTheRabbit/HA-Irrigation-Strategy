@@ -356,6 +356,27 @@ export function Watering({
     );
 
   const shows = timeline.state === "ready" ? bodyState(rows, all, q.problemsOnly, q.q) : "timeline";
+  // Surface failed/warning shots inline above the timeline so operators immediately see which zone
+  // failed and when, without hunting for a narrow bar (plain array: safe after the early return).
+  const problemBlocks: { block: TimelineBlock; roomName: string }[] = [];
+  for (const row of rows) {
+    if (row.zone === null) continue;
+    for (const b of row.blocks) {
+      if (b.glyph === "failed" || b.glyph === "warning") {
+        problemBlocks.push({ block: b, roomName: names.get(b.roomId) ?? b.roomId });
+      }
+    }
+  }
+  problemBlocks.sort((a, b) =>
+    a.block.glyph === b.block.glyph ? b.block.start - a.block.start : a.block.glyph === "failed" ? -1 : 1,
+  );
+  const jumpToBlock = (b: TimelineBlock) => {
+    if (collapsed.has(b.roomId)) toggleRoom(b.roomId);
+    setFocusIds([b.id]);
+    requestAnimationFrame(() =>
+      body.current?.querySelector<HTMLButtonElement>(`.st-block[data-id="${CSS.escape(b.id)}"]`)?.focus(),
+    );
+  };
   return (
     <>
       <Heading title="Timeline" description={phone ? "All rooms · swipe for more" : undefined} action={phone ? spanToggle : undefined} />
@@ -466,6 +487,26 @@ export function Watering({
           </div>
         )}
         {data?.truncated && <p className="wt-note">Showing the newest shots only</p>}
+        {problemBlocks.length > 0 && (
+          <ul className="wt-problem-strip" aria-label="Shots with problems">
+            {problemBlocks.slice(0, 4).map(({ block, roomName }) => (
+              <li key={block.id} data-glyph={block.glyph}>
+                <button type="button" onClick={() => jumpToBlock(block)}>
+                  <strong>
+                    {roomName} Zone {block.zone}
+                  </strong>{" "}
+                  <span>
+                    {clock(block.start, timeZone)} · {block.glyph === "failed" ? "failed" : "warning"}
+                    {block.reason ? ` — ${block.reason}` : ""}
+                  </span>
+                </button>
+              </li>
+            ))}
+            {problemBlocks.length > 4 && (
+              <li className="wt-problem-more">+{problemBlocks.length - 4} more</li>
+            )}
+          </ul>
+        )}
 
         <div className="wt-body" ref={body}>
           {!data && timeline.state !== "error" ? (

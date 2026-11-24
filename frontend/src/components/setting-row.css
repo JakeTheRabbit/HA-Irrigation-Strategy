@@ -25,9 +25,25 @@
 .targets-table tbody tr:not(.targets-phase):not(.targets-note) th label {
   cursor: pointer;
 }
-.targets-table .setting-help-trigger {
+.targets-table .setting-help-trigger,
+.targets-table .setting-history-trigger {
   margin-left: 4px;
   vertical-align: -2px;
+}
+/* Quiet the per-row help and history icons until the row is hovered or focused, cutting visual noise
+   without reducing keyboard or touch discoverability. */
+@media (hover: hover) {
+  .targets-table tbody tr[data-setting-row] .setting-help-trigger,
+  .targets-table tbody tr[data-setting-row] .setting-history-trigger {
+    opacity: 0.32;
+    transition: opacity 0.14s ease;
+  }
+  .targets-table tbody tr[data-setting-row]:hover .setting-help-trigger,
+  .targets-table tbody tr[data-setting-row]:hover .setting-history-trigger,
+  .targets-table tbody tr[data-setting-row]:focus-within .setting-help-trigger,
+  .targets-table tbody tr[data-setting-row]:focus-within .setting-history-trigger {
+    opacity: 1;
+  }
 }
 .targets-phase th {
   padding-top: 14px;

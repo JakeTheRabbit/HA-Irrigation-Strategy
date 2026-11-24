@@ -586,15 +586,17 @@ export function Setup({
           </Button>
         }
       />
-      {connected && <SupplyEditor key={controller.roomId} controller={controller} onDirtyChange={setSupplyDirty} />}
       <div className="workspace-tabs" role="tablist" aria-label="Setup view">
         <button role="tab" aria-selected={tab === "rooms"} onClick={() => setTab("rooms")}>
-          Rooms & mappings
+          Rooms &amp; mappings
         </button>
         <button role="tab" aria-selected={tab === "install"} onClick={() => setTab("install")}>
           Installation
         </button>
       </div>
+      {tab === "rooms" && connected && (
+        <SupplyEditor key={controller.roomId} controller={controller} onDirtyChange={setSupplyDirty} />
+      )}
       {error && (
         <div className="workspace-message error" role="alert">
           {error}

@@ -233,10 +233,9 @@
   header.topbar {
     flex-wrap: wrap;
     height: auto;
-    min-height: 56px;
-    row-gap: 6px;
-    padding-top: 6px;
-    padding-bottom: 6px;
+    min-height: 52px;
+    row-gap: 4px;
+    padding: 4px 12px 6px;
   }
   .topbar .connection-info {
     display: contents;

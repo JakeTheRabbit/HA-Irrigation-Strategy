@@ -66,6 +66,35 @@
 .notify-table tr > :last-child {
   padding-right: 16px;
 }
+/* Subtle cluster boundaries separating Critical & safety / Irrigation & sensors / Stock, dosing & AI / Rooms. */
+.notify-table [data-group-start] {
+  border-left: 1px solid color-mix(in srgb, var(--border) 85%, transparent);
+}
+.notify-table tbody tr:hover > td,
+.notify-table tbody tr:hover > th {
+  background: color-mix(in srgb, var(--foreground) 3%, var(--surface));
+}
+.notify-vitals-section {
+  display: grid;
+  gap: 16px;
+  margin-top: 16px;
+}
+.notify-card-group-tag {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 0 4px 0 6px;
+  border-left: 1px solid var(--border);
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.notify-card-group-tag[data-first] {
+  padding-left: 0;
+  border-left: 0;
+}
 .notify-phone-head,
 .notify-phone {
   position: sticky;
@@ -552,8 +581,8 @@
   }
   .notify-card {
     display: grid;
-    gap: 10px;
-    padding: 12px 14px;
+    gap: 6px;
+    padding: 9px 11px;
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
     background: var(--surface);
@@ -565,10 +594,10 @@
     display: flex;
     align-items: flex-start;
     flex-wrap: wrap;
-    gap: 8px;
+    gap: 6px 10px;
   }
   .notify-card-head > div:first-child {
-    flex: 1;
+    flex: 1 1 160px;
     min-width: 0;
   }
   .notify-card-head .notify-test {
@@ -586,7 +615,7 @@
   .notify-card-kinds {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
+    gap: 4px;
     margin: 0;
     padding: 0;
     list-style: none;
@@ -597,7 +626,7 @@
     align-items: center;
     gap: 4px;
     min-height: 30px;
-    padding: 2px 10px;
+    padding: 2px 7px;
     border: 1px solid var(--border);
     border-radius: 999px;
     background: var(--surface);

@@ -51,12 +51,47 @@
 .irrigation-workspace [hidden] {
   display: none !important;
 }
-@media (max-width: 600px) {
-  .irrigation-context .zone-switcher {
-    width: 100%;
+@media (max-width: 720px) {
+  /* Compact mobile header & single-row context bar bring live VWC/EC gauges above the fold. */
+  .irrigation-workspace > .page-heading {
+    margin: 2px 0 6px;
+  }
+  .irrigation-workspace > .page-heading p {
+    display: none;
+  }
+  .irrigation-context {
+    flex-wrap: nowrap;
+    margin-bottom: 8px;
+    gap: 6px;
+  }
+  .irrigation-context label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
   .irrigation-context select {
-    flex: 1;
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 36px;
+    padding: 4px 8px;
+  }
+  .irrigation-context .zone-switcher {
+    flex: none;
+  }
+  .irrigation-context .zone-switcher button {
+    min-height: 36px;
+    padding: 4px 9px;
+    font-size: var(--text-xs);
+    white-space: nowrap;
+  }
+  .irrigation-source {
+    padding: 6px 10px;
+    margin-bottom: 8px;
+    font-size: var(--text-xs);
+    line-height: 1.35;
   }
 }
 

@@ -853,7 +853,7 @@ function ZoneRow({
               lightsOff={steer.day.lightsOff}
               now={now}
               abnormal={row.gauges[0]?.state === "abnormal"}
-              height={102}
+              height={68}
             />
             <EcLane
               span={steer.span}
@@ -865,7 +865,7 @@ function ZoneRow({
               lightsOff={steer.day.lightsOff}
               now={now}
               abnormal={row.gauges[2]?.state === "abnormal"}
-              height={42}
+              height={26}
             />
           </>
         ) : (
