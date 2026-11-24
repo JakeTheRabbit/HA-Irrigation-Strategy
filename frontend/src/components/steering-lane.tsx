@@ -7,6 +7,69 @@ const PHASE_NAME: Record<string, string> = { P0: "Hold", P1: "Ramp", P2: "Mainte
 const at = (span: Span, time: number) => ((time - span.start) / (span.end - span.start)) * 100;
 const pct = (span: Span, time: number) => `${Math.max(0, Math.min(100, at(span, time))).toFixed(2)}%`;
 
+export type SteeringTone = "vwc" | "ec" | "neutral";
+
+/** A compact horizontal position-vs-band bar shared across All rooms, Room, Zone and Current day:
+ * shows where a live value sits relative to its target band or single target, using each series's
+ * own calm hue on stock Home Assistant neutral surfaces and warning amber only when out of band. */
+export function TargetTrack({
+  value,
+  band,
+  target,
+  min,
+  max,
+  tone = "neutral",
+  abnormal = false,
+}: {
+  value: number | null;
+  band?: readonly [number, number] | null;
+  target?: number | null;
+  min?: number;
+  max?: number;
+  tone?: SteeringTone;
+  abnormal?: boolean;
+}) {
+  const known = [
+    value,
+    target ?? null,
+    ...(band ?? []),
+  ].filter((v): v is number => typeof v === "number" && Number.isFinite(v));
+  if (!known.length || (!band && (target == null || !Number.isFinite(target)))) return null;
+  const loKnown = Math.min(...known);
+  const hiKnown = Math.max(...known);
+  const pad = Math.max((hiKnown - loKnown) * 0.25, hiKnown * 0.06, 0.5);
+  const lo = min ?? Math.max(0, loKnown - pad);
+  const hi = max ?? hiKnown + pad;
+  const span = Math.max(hi - lo, 1e-6);
+  const pos = (v: number) => `${Math.max(0, Math.min(100, ((v - lo) / span) * 100)).toFixed(2)}%`;
+  const bandLeft = band ? Math.max(0, Math.min(100, ((band[0] - lo) / span) * 100)) : null;
+  const bandRight = band ? Math.max(0, Math.min(100, ((band[1] - lo) / span) * 100)) : null;
+  return (
+    <span
+      className="target-track"
+      data-tone={tone}
+      data-abnormal={abnormal ? "" : undefined}
+      aria-hidden="true"
+    >
+      {bandLeft !== null && bandRight !== null && (
+        <span
+          className="target-track-band"
+          style={{
+            left: `${bandLeft.toFixed(2)}%`,
+            width: `${Math.max(3, bandRight - bandLeft).toFixed(2)}%`,
+          }}
+        />
+      )}
+      {!band && target != null && Number.isFinite(target) && (
+        <span className="target-track-mark" style={{ left: pos(target) }} />
+      )}
+      {value !== null && Number.isFinite(value) && (
+        <span className="target-track-pip" style={{ left: pos(value) }} />
+      )}
+    </span>
+  );
+}
+
 /** The room's clock above its zones: lights-on, the phases, the hours and now. Every lane below
  * shares its axis. */
 export function DayRail({
@@ -74,7 +137,7 @@ export function DayRail({
 }
 
 /** A zone's moisture through the day on the room's axis: its target band labelled in place, the
- * recorded VWC, a tick per shot and now. `readings` null while the recorder has not answered. */
+ * recorded VWC with a live endpoint dot, a tick per shot and now. `readings` null while loading. */
 export function VwcLane({
   span,
   readings,
@@ -85,6 +148,7 @@ export function VwcLane({
   lightsOn,
   lightsOff,
   now,
+  abnormal = false,
   flag,
   height,
 }: {
@@ -97,16 +161,22 @@ export function VwcLane({
   lightsOn: number;
   lightsOff: number;
   now: number;
+  abnormal?: boolean;
   flag?: { level: "warning" | "critical"; text: ReactNode } | null;
   height?: number;
 }) {
   const [lo, hi] = domain;
   const y = (v: number) => 100 - ((Math.max(lo, Math.min(hi, v)) - lo) / (hi - lo)) * 100;
   const x = (t: number) => at(span, t) * 10;
-  const d = (readings ?? [])
-    .filter((r) => r.time >= span.start && r.time <= span.end)
-    .map((r, i) => `${i ? "L" : "M"}${x(r.time).toFixed(1)},${y(r.value).toFixed(2)}`)
+  const inSpan = (readings ?? []).filter((r) => r.time >= span.start && r.time <= span.end);
+  // Break the trace across long probe gaps (> 30 min) instead of drawing a false straight line.
+  const d = inSpan
+    .map((r, i) => {
+      const gap = i > 0 && r.time - inSpan[i - 1].time > 30 * 60_000;
+      return `${i && !gap ? "L" : "M"}${x(r.time).toFixed(1)},${y(r.value).toFixed(2)}`;
+    })
     .join("");
+  const last = inSpan.at(-1) ?? null;
   const nowIn = now > span.start && now < span.end;
   return (
     <div className="vwc-lane" style={height ? { height } : undefined}>
@@ -116,15 +186,24 @@ export function VwcLane({
           <rect className="lane-night" x={x(lightsOff)} y="0" width={Math.max(0, 1000 - x(lightsOff))} height="100" />
           {band && (
             <>
-              <rect className="lane-band" x="0" y={y(band[1])} width="1000" height={Math.max(0.5, y(band[0]) - y(band[1]))} />
-              <line className="lane-band-edge" x1="0" x2="1000" y1={y(band[1])} y2={y(band[1])} vectorEffect="non-scaling-stroke" />
-              <line className="lane-band-edge" x1="0" x2="1000" y1={y(band[0])} y2={y(band[0])} vectorEffect="non-scaling-stroke" />
+              <rect className="lane-band lane-band-vwc" x="0" y={y(band[1])} width="1000" height={Math.max(0.5, y(band[0]) - y(band[1]))} />
+              <line className="lane-band-edge lane-band-edge-vwc" x1="0" x2="1000" y1={y(band[1])} y2={y(band[1])} vectorEffect="non-scaling-stroke" />
+              <line className="lane-band-edge lane-band-edge-vwc" x1="0" x2="1000" y1={y(band[0])} y2={y(band[0])} vectorEffect="non-scaling-stroke" />
             </>
           )}
           {d && <path className="lane-vwc" d={d} vectorEffect="non-scaling-stroke" />}
         </svg>
+        {last && (
+          <span
+            className="lane-live-dot"
+            data-series="vwc"
+            data-abnormal={abnormal ? "" : undefined}
+            style={{ left: pct(span, last.time), top: `${y(last.value).toFixed(2)}%` }}
+            aria-hidden="true"
+          />
+        )}
         {band && bandText && (
-          <span className="lane-band-label" style={{ top: `${y((band[0] + band[1]) / 2)}%` }}>
+          <span className="lane-band-label lane-band-label-vwc" style={{ top: `${y((band[0] + band[1]) / 2)}%` }}>
             {bandText}
           </span>
         )}
@@ -154,6 +233,81 @@ export function VwcLane({
   );
 }
 
+/** A zone's pore EC through the day on the exact same room clock as VwcLane: green target band,
+ * recorded pore EC curve and live endpoint dot. */
+export function EcLane({
+  span,
+  readings,
+  band,
+  bandText,
+  domain,
+  lightsOn,
+  lightsOff,
+  now,
+  abnormal = false,
+  height = 38,
+}: {
+  span: Span;
+  readings: Reading[] | null;
+  band: [number, number] | null;
+  bandText: string | null;
+  domain: [number, number];
+  lightsOn: number;
+  lightsOff: number;
+  now: number;
+  abnormal?: boolean;
+  height?: number;
+}) {
+  const [lo, hi] = domain;
+  const y = (v: number) => 100 - ((Math.max(lo, Math.min(hi, v)) - lo) / (hi - lo)) * 100;
+  const x = (t: number) => at(span, t) * 10;
+  const inSpan = (readings ?? []).filter((r) => r.time >= span.start && r.time <= span.end);
+  if (readings !== null && inSpan.length === 0) return null;
+  const d = inSpan
+    .map((r, i) => `${i ? "L" : "M"}${x(r.time).toFixed(1)},${y(r.value).toFixed(2)}`)
+    .join("");
+  const last = inSpan.at(-1) ?? null;
+  const nowIn = now > span.start && now < span.end;
+  return (
+    <div
+      className="ec-lane"
+      style={{ height }}
+      role="img"
+      aria-label={`Pore EC through the day${bandText ? `, ${bandText}` : ""}`}
+    >
+      <div className="ec-lane-plot">
+        <svg viewBox="0 0 1000 100" preserveAspectRatio="none" aria-hidden="true">
+          <rect className="lane-night" x="0" y="0" width={x(lightsOn)} height="100" />
+          <rect className="lane-night" x={x(lightsOff)} y="0" width={Math.max(0, 1000 - x(lightsOff))} height="100" />
+          {band && (
+            <>
+              <rect className="lane-band lane-band-ec" x="0" y={y(band[1])} width="1000" height={Math.max(0.5, y(band[0]) - y(band[1]))} />
+              <line className="lane-band-edge lane-band-edge-ec" x1="0" x2="1000" y1={y(band[1])} y2={y(band[1])} vectorEffect="non-scaling-stroke" />
+              <line className="lane-band-edge lane-band-edge-ec" x1="0" x2="1000" y1={y(band[0])} y2={y(band[0])} vectorEffect="non-scaling-stroke" />
+            </>
+          )}
+          {d && <path className="lane-ec" d={d} vectorEffect="non-scaling-stroke" />}
+        </svg>
+        {last && (
+          <span
+            className="lane-live-dot"
+            data-series="ec"
+            data-abnormal={abnormal ? "" : undefined}
+            style={{ left: pct(span, last.time), top: `${y(last.value).toFixed(2)}%` }}
+            aria-hidden="true"
+          />
+        )}
+        {band && bandText && (
+          <span className="lane-band-label lane-band-label-ec" style={{ top: `${y((band[0] + band[1]) / 2)}%` }}>
+            {bandText}
+          </span>
+        )}
+        {nowIn && <span className="lane-now" style={{ left: pct(span, now) }} />}
+      </div>
+    </div>
+  );
+}
+
 /** One VWC scale for every lane of a room, so the zones compare by eye: the readings and bands,
  * padded, never narrower than ten points. */
 export function vwcDomain(values: (number | null)[]): [number, number] {
@@ -167,4 +321,18 @@ export function vwcDomain(values: (number | null)[]): [number, number] {
     hi = Math.ceil(mid + 5);
   }
   return [Math.max(0, lo), Math.min(100, hi)];
+}
+
+/** One pore EC scale for every lane of a room, so the zones compare by eye. */
+export function ecDomain(values: (number | null)[]): [number, number] {
+  const known = values.filter((v): v is number => v !== null && Number.isFinite(v));
+  if (!known.length) return [0, 6];
+  let lo = Math.max(0, Math.floor((Math.min(...known) - 0.5) * 2) / 2),
+    hi = Math.ceil((Math.max(...known) + 0.5) * 2) / 2;
+  if (hi - lo < 1.5) {
+    const mid = (hi + lo) / 2;
+    lo = Math.max(0, mid - 0.75);
+    hi = mid + 0.75;
+  }
+  return [lo, hi];
 }

@@ -265,8 +265,8 @@
     fill-opacity: 0.95;
   }
 }
-/* Not part of the automation right now: a hatched strip along the top and a greyed slab, so it
-   reads as out of play; the readings stay on a solid surface at full contrast. */
+/* Not part of the automation right now: a clean muted status stripe along the top so it reads as
+   out of play while keeping readings on a solid stock-HA surface at full contrast. */
 .facility-zone[data-mode="room-off"]::before,
 .facility-zone[data-mode="offline"]::before,
 .facility-zone[data-mode="paused"]::before,
@@ -280,15 +280,9 @@
   top: 0;
   left: 0;
   right: 0;
-  height: 6px;
+  height: 3px;
   border-radius: var(--radius) var(--radius) 0 0;
-  background: repeating-linear-gradient(
-    -45deg,
-    transparent,
-    transparent 4px,
-    color-mix(in srgb, var(--muted-foreground) 45%, transparent) 4px,
-    color-mix(in srgb, var(--muted-foreground) 45%, transparent) 8px
-  );
+  background: color-mix(in srgb, var(--muted-foreground) 50%, transparent);
   pointer-events: none;
 }
 .facility-zone[data-mode="room-off"] .zone-slab,

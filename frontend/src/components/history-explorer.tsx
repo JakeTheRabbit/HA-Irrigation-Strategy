@@ -1360,19 +1360,35 @@ export function RoomExplorer({ controller, zone }: { controller: Controller; zon
 
   // Notes in place (3.18): band excursions on the saved band, refills, alerts on a charted sensor.
   const view = useMemo(() => roomView(controller, now), [controller.roomId, controller.states, now]); // eslint-disable-line react-hooks/exhaustive-deps
+  const vwcRow =
+    (zone !== undefined ? view?.rows.find((row) => row.zone === zone) : null) ??
+    view?.rows.find((row) => !row.view.timer && row.view.rewater !== null && row.view.target !== null) ??
+    null;
+  const vwcBand: [number, number] | null =
+    vwcRow && !vwcRow.view.timer && vwcRow.view.rewater !== null && vwcRow.view.target !== null
+      ? [vwcRow.view.rewater, vwcRow.view.target]
+      : null;
   const poreBand = view?.room.stage?.poreEc ?? null;
   const ecMin = numeric(states[`number.crop_steering_${prefix}irrigation_ec_min`]);
   const ecMax = numeric(states[`number.crop_steering_${prefix}irrigation_ec_max`]);
   const feedBand: [number, number] | null = ecMin !== null && ecMax !== null && ecMax > ecMin ? [ecMin, ecMax] : null;
   const bandOf = (series: ExplorerSeries) =>
+    series.kind === "vwc"
+      ? vwcBand
+      : series.chart === "ec" && series.chartTitle === "Pore EC"
+        ? poreBand
+        : series.chart === "Feed EC"
+          ? feedBand
+          : null;
+  const noteBandOf = (series: ExplorerSeries) =>
     series.chart === "ec" && series.chartTitle === "Pore EC" ? poreBand : series.chart === "Feed EC" ? feedBand : null;
   const readings: NoteReading[] = shown
-    .filter((series) => bandOf(series) || series.chart === "Tank level")
+    .filter((series) => noteBandOf(series) || series.chart === "Tank level")
     .map((series) => ({
       key: series.key,
       label: series.groupLabel,
       entityId: series.entityId,
-      band: bandOf(series),
+      band: noteBandOf(series),
       kind: series.chart === "Tank level" ? "level" : "value",
       points:
         series.chart === "Tank level"
@@ -1624,6 +1640,7 @@ export function RoomExplorer({ controller, zone }: { controller: Controller; zon
               values={values}
               before={before}
               band={bandOf(series[0])}
+              bandKind={series[0].kind === "vwc" ? "vwc" : series[0].kind === "ec" ? "ec" : "neutral"}
               axis={axis}
               data={data}
               times={times}
@@ -1691,6 +1708,7 @@ function ExplorerChart({
   values,
   before,
   band,
+  bandKind = "neutral",
   axis,
   data,
   times,
@@ -1713,6 +1731,7 @@ function ExplorerChart({
   values: (series: ExplorerSeries) => (number | null)[] | null;
   before: Map<string, (number | null)[]> | null;
   band: readonly [number, number] | null;
+  bandKind?: "vwc" | "ec" | "neutral";
   axis: Board;
   data: Board;
   times: number[];
@@ -1846,13 +1865,25 @@ function ExplorerChart({
             {band && (
               <rect
                 className="explorer-band"
+                data-band-kind={bandKind}
                 x={0}
                 width={width}
                 y={y(band[1])}
                 height={Math.max(1, y(band[0]) - y(band[1]))}
               />
             )}
-            {band && [band[0], band[1]].map((v) => <line key={v} className="explorer-band-edge" x1={0} x2={width} y1={y(v)} y2={y(v)} />)}
+            {band &&
+              [band[0], band[1]].map((v) => (
+                <line
+                  key={v}
+                  className="explorer-band-edge"
+                  data-band-kind={bandKind}
+                  x1={0}
+                  x2={width}
+                  y1={y(v)}
+                  y2={y(v)}
+                />
+              ))}
             {markers.map((marker) => (
               <line key={marker.from} className="explorer-marker" x1={x(marker.from)} x2={x(marker.from)} y1={0} y2={height} />
             ))}

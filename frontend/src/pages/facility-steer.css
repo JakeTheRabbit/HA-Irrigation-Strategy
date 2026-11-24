@@ -116,6 +116,27 @@
   color: var(--foreground);
   font-weight: 500;
 }
+/* Paused / watering-off / offline rows: quiet muted stripe and softer curve, zero noisy hatch. */
+.steer-zone[data-mode="paused"] .steer-who,
+.steer-zone[data-mode="room-off"] .steer-who,
+.steer-zone[data-mode="watering-off"] .steer-who,
+.steer-zone[data-mode="offline"] .steer-who {
+  padding-left: 10px;
+  border-left: 3px solid color-mix(in srgb, var(--muted-foreground) 45%, transparent);
+}
+.steer-zone[data-mode="paused"] .vwc-lane,
+.steer-zone[data-mode="room-off"] .vwc-lane,
+.steer-zone[data-mode="watering-off"] .vwc-lane,
+.steer-zone[data-mode="offline"] .vwc-lane,
+.steer-zone[data-mode="paused"] .ec-lane,
+.steer-zone[data-mode="room-off"] .ec-lane,
+.steer-zone[data-mode="watering-off"] .ec-lane,
+.steer-zone[data-mode="offline"] .ec-lane {
+  opacity: 0.68;
+}
+.steer-metric-track {
+  max-width: 140px;
+}
 
 .steer-lane {
   grid-column: 2;

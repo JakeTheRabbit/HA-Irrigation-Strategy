@@ -354,11 +354,17 @@
   display: block;
 }
 .explorer-band {
-  fill: color-mix(in srgb, var(--success) 9%, transparent);
+  fill: var(--band-ec);
+}
+.explorer-band[data-band-kind="vwc"] {
+  fill: var(--band-vwc);
 }
 .explorer-band-edge {
-  stroke: var(--border);
+  stroke: var(--band-ec-edge);
   stroke-dasharray: 4 4;
+}
+.explorer-band-edge[data-band-kind="vwc"] {
+  stroke: var(--band-vwc-edge);
 }
 /* What is still ahead: a sparse, quiet hatch and the plain word. */
 .explorer-ahead {

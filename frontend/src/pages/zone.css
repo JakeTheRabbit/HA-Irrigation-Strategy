@@ -111,24 +111,38 @@
   font-weight: 600;
 }
 
-/* Pore EC through the day: the stage's band green, the lights-off hours dark. */
+/* Pore EC through the day: unified green target band and series stroke matching EcLane & Explorer. */
 .zone-ec-plot {
   padding: 0 16px 12px;
 }
 .zone-ec-band {
-  fill: color-mix(in srgb, var(--success) 18%, transparent);
+  fill: var(--band-ec);
+}
+.zone-ec-band-edge {
+  stroke: var(--band-ec-edge);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
 }
 .zone-ec-dark {
-  fill: color-mix(in srgb, var(--foreground) 7%, transparent);
+  fill: color-mix(in srgb, var(--foreground) 6%, transparent);
 }
 .zone-ec-line {
   fill: none;
-  stroke: var(--foreground);
-  stroke-width: 2;
+  stroke: var(--series-ec);
+  stroke-width: 2.1;
   stroke-linejoin: round;
 }
+.zone-ec-live {
+  fill: var(--series-ec);
+  stroke: var(--surface);
+  stroke-width: 2;
+}
+.zone-ec-live[data-abnormal] {
+  fill: var(--warning-mark);
+}
 .zone-ec-now {
-  stroke: var(--muted-foreground);
+  stroke: var(--foreground);
+  stroke-opacity: 0.65;
   stroke-width: 1.5;
 }
 .zone-ec-axis {

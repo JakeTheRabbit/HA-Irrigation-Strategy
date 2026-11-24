@@ -10,10 +10,11 @@ import { NeedsIntegration } from "@/components/needs-integration";
 import { PlanAndFeed } from "@/components/run-progress";
 import { PlantStressStrip } from "@/components/sensing";
 import { ShotTimeline } from "@/components/shot-timeline";
-import { DayRail, VwcLane, vwcDomain } from "@/components/steering-lane";
+import { AlertCodeText } from "@/components/alert-code-text";
+import { DayRail, EcLane, ecDomain, TargetTrack, VwcLane, vwcDomain, type SteeringTone } from "@/components/steering-lane";
 import { zoneAttention, type AttentionLevel, type AttentionReason, type ZoneFacts } from "@/lib/attention";
 import { growDay, type GrowDay } from "@/lib/day-timeline";
-import { formatTemp, formatVolume } from "@/lib/display-units";
+import { formatEc, formatTemp, formatVolume } from "@/lib/display-units";
 import { pickKey } from "@/lib/facility";
 import { drinkLine, excludedProbes, isRescue, readingIssue, roomAttention, ZONE_MODE, zoneHref } from "@/lib/facility-view";
 import type { GaugeModel } from "@/lib/hmi";
@@ -158,7 +159,7 @@ export function Today({
         </section>
       </>
     );
-  // One VWC scale for the room's curves, so its zones compare by eye.
+  // One VWC scale and one pore EC scale for the room's curves, so its zones compare by eye.
   const domain = vwcDomain(
     view.rows.flatMap((row) => [
       row.view.zone.vwc.value,
@@ -166,6 +167,13 @@ export function Today({
       ...(steer?.zones?.get(row.zone)?.vwc.map((point) => point.value) ?? []),
     ]),
   );
+  const ecDom = ecDomain([
+    ...(stage?.poreEc ?? []),
+    ...view.rows.flatMap((row) => [
+      row.view.zone.ec.value,
+      ...(steer?.zones?.get(row.zone)?.ec.map((point) => point.value) ?? []),
+    ]),
+  ]);
   return (
     <div className="today" data-today>
       <RoomHead controller={controller} view={view} day={day} now={now} navigate={navigate} />
@@ -198,6 +206,8 @@ export function Today({
             )}
             steer={steer}
             domain={domain}
+            ecDom={ecDom}
+            poreEc={stage?.poreEc ?? null}
             now={now}
             open={() => navigate("zone", row.zone)}
             navigate={navigate}
@@ -419,7 +429,7 @@ function NoticeLine({
       className={plain ? "today-notice" : "today-notice today-critical"}
       role={plain ? undefined : "alert"}
     >
-      <strong>{notice.title}.</strong> {notice.detail}
+      <strong>{notice.title}.</strong> <AlertCodeText text={notice.detail} />
       {linked.map((zone) => (
         <button
           key={zone.id}
@@ -600,18 +610,20 @@ function TodayStrip({
   );
 }
 
-/** One gauge as its row reads it: the name and its target, a bar with the band and a tick, the value. */
+/** One gauge as its row reads it: the name and its target, a shared target-band track, the value. */
 function RoomGauge({
   model,
   value,
   phase,
   timer = false,
+  tone = "neutral",
 }: {
   model: GaugeModel;
   value: string;
   phase?: string;
   /** A timer zone: watered by its programs, its moisture never held to the band. */
   timer?: boolean;
+  tone?: SteeringTone;
 }) {
   // VWC is held in its band only in P2: before then it is ramping to it, after it dries back from
   // it, so outside P2 its target says so and a value outside it is not a warning.
@@ -665,6 +677,19 @@ function RoomGauge({
         )}
         {model.state === "abnormal" && <span className="sr-only">, {model.words}</span>}
       </span>
+      {(model.band || model.target !== null) && (
+        <span className="today-gauge-track">
+          <TargetTrack
+            value={model.value}
+            band={model.band}
+            target={model.target}
+            min={model.min}
+            max={model.max}
+            tone={tone}
+            abnormal={model.state === "abnormal"}
+          />
+        </span>
+      )}
     </div>
   );
 }
@@ -678,6 +703,8 @@ function ZoneRow({
   reasons,
   steer,
   domain,
+  ecDom,
+  poreEc,
   now,
   open,
   navigate,
@@ -687,6 +714,8 @@ function ZoneRow({
   reasons: AttentionReason[];
   steer: RoomDay | undefined;
   domain: [number, number];
+  ecDom: [number, number];
+  poreEc: [number, number] | null;
   now: number;
   open: () => void;
   navigate: (page: Page) => void;
@@ -748,7 +777,8 @@ function ZoneRow({
     event.preventDefault();
     open();
   };
-  const ecText = (value: number | null) => (value === null ? "—" : value.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 }));
+  const ecText = (value: number | null) =>
+    value === null ? "—" : formatEc(value, 1).replace(/ mS\/cm$/, "");
   return (
     <article
       className="today-zone"
@@ -811,18 +841,33 @@ function ZoneRow({
       </div>
       <div className="today-zone-lane">
         {steer ? (
-          <VwcLane
-            span={steer.span}
-            readings={lane ? lane.vwc : steer.zones ? [] : null}
-            shots={lane?.shots ?? []}
-            band={band}
-            bandText={band ? `Target ${number(band[0], 0)}–${number(band[1], 0)}%` : null}
-            domain={domain}
-            lightsOn={steer.day.start}
-            lightsOff={steer.day.lightsOff}
-            now={now}
-            height={130}
-          />
+          <>
+            <VwcLane
+              span={steer.span}
+              readings={lane ? lane.vwc : steer.zones ? [] : null}
+              shots={lane?.shots ?? []}
+              band={band}
+              bandText={band ? `VWC ${number(band[0], 0)}–${number(band[1], 0)}%` : null}
+              domain={domain}
+              lightsOn={steer.day.start}
+              lightsOff={steer.day.lightsOff}
+              now={now}
+              abnormal={row.gauges[0]?.state === "abnormal"}
+              height={102}
+            />
+            <EcLane
+              span={steer.span}
+              readings={lane ? lane.ec : steer.zones ? [] : null}
+              band={poreEc}
+              bandText={poreEc ? `EC ${ecText(poreEc[0])}–${ecText(poreEc[1])}` : null}
+              domain={ecDom}
+              lightsOn={steer.day.start}
+              lightsOff={steer.day.lightsOff}
+              now={now}
+              abnormal={row.gauges[2]?.state === "abnormal"}
+              height={42}
+            />
+          </>
         ) : (
           <p className="muted">No photoperiod set: the curve needs the room's lights-on and lights-off hours.</p>
         )}
@@ -833,12 +878,14 @@ function ZoneRow({
           value={zone.vwc.value === null ? "—" : `${number(zone.vwc.value, 1)}%`}
           phase={zone.phase}
           timer={z.timer}
+          tone="vwc"
         />
         <RoomGauge
           model={row.gauges[1]}
           value={z.drybackPoints === null ? "—" : `${number(z.drybackPoints, 1)} pt`}
+          tone="vwc"
         />
-        <RoomGauge model={row.gauges[2]} value={ecText(zone.ec.value)} />
+        <RoomGauge model={row.gauges[2]} value={ecText(zone.ec.value)} tone="ec" />
         {row.paused && zone.enabledEntity && (
           <div className="today-paused" data-today-paused>
             <p>{pausedText(row.paused, timeZone, now)}</p>
@@ -904,7 +951,9 @@ function ZoneRow({
           {flags.map((flag) => (
             <p key={flag.key} className="today-flag" data-level={flag.level} data-today-problem>
               <TriangleAlert size={15} aria-hidden="true" />
-              <span>{flag.text}</span>
+              <span>
+                <AlertCodeText text={flag.text} />
+              </span>
             </p>
           ))}
         </div>

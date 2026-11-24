@@ -87,3 +87,14 @@
     font-size: var(--text-xs);
   }
 }
+/* Calm drag handles on the setpoint preview until hovered, focused or edited. */
+.planning-handle {
+  opacity: 0.72;
+  transition: opacity 0.14s ease, stroke-width 0.14s ease;
+}
+.planning-handle:hover,
+.planning-handle:focus-visible {
+  opacity: 1;
+  stroke: var(--primary);
+  stroke-width: 2.75;
+}

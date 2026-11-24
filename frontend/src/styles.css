@@ -81,9 +81,14 @@
   --zone-5: #be185d;
   --zone-6: #78716c;
   /* Chart series, apart from severity: VWC in the brand blue (as on the zone's day chart), pore EC
-     in the steering green the zone's day chart draws it in. */
+     in the steering green the zone's day chart draws it in. Target bands share each series hue on
+     stock Home Assistant neutral surfaces. */
   --series-vwc: var(--primary);
+  --band-vwc: color-mix(in srgb, var(--series-vwc) 12%, transparent);
+  --band-vwc-edge: color-mix(in srgb, var(--series-vwc) 52%, transparent);
   --series-ec: #16a34a;
+  --band-ec: color-mix(in srgb, var(--series-ec) 14%, transparent);
+  --band-ec-edge: color-mix(in srgb, var(--series-ec) 52%, transparent);
   /* Type: 12 is the floor, kept for chips, units, axis ticks and footnotes. What an operator reads
      from across the room is a label (sensor and setting names, target ranges, descriptions,
      helper text: 14/20) or a reading (16/24, weight 600). Space: a 4 px grid. */
@@ -124,6 +129,8 @@
   --native-warning-mark-default: #ffca5b;
   --phase-p3: #4a5a85;
   --series-ec: #4ade80;
+  --band-vwc: color-mix(in srgb, var(--series-vwc) 16%, transparent);
+  --band-ec: color-mix(in srgb, var(--series-ec) 16%, transparent);
   --warning-bg: color-mix(in srgb, var(--warning) 8%, var(--surface));
   --native-error-default: #f28b82;
   --native-success-default: #81c995;
@@ -358,6 +365,7 @@ nav button.nav-separated {
   align-items: center;
   gap: 12px;
   padding: 0 28px;
+  min-width: 0;
 }
 .connection-info {
   display: flex;
@@ -365,6 +373,15 @@ nav button.nav-separated {
   gap: 10px;
   flex-shrink: 0;
   font-size: var(--text-xs);
+}
+@media (max-width: 1360px) and (min-width: 721px) {
+  .topbar {
+    gap: 8px;
+    padding: 0 16px;
+  }
+  .connection-info {
+    gap: 6px;
+  }
 }
 #main-content {
   padding: 20px 32px 36px;

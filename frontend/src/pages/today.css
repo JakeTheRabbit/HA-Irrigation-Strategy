@@ -708,10 +708,10 @@
 /* Steering lanes: each zone's moisture today on the room's clock, the rail above them all, lined
  * up with the curves. Name and VWC | curve | readings | sensors, one band per zone. */
 .today-rail {
-  margin: 0 calc(20px + 22px + 190px + 22px + 240px) 4px calc(20px + 190px + 22px);
+  margin: 0 calc(20px + 22px + 224px + 22px + 228px) 4px calc(20px + 184px + 22px);
 }
 .today-zone {
-  grid-template-columns: 190px minmax(0, 1fr) 190px 240px;
+  grid-template-columns: 184px minmax(0, 1fr) 224px 228px;
   grid-template-areas:
     "main lane gauges sensors"
     "flags flags flags flags";
@@ -721,12 +721,25 @@
 }
 .today-zone-lane {
   grid-area: lane;
+  display: grid;
+  gap: 6px;
   min-width: 0;
+}
+.today-gauge-track {
+  grid-column: 1 / -1;
 }
 .today-zone-gauges {
   grid-area: gauges;
-  grid-template-columns: minmax(max-content, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 6px;
+}
+.today-zone-gauges .today-gauge-value {
+  display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: baseline;
+  gap: 4px;
+  white-space: normal;
 }
 .today-sensors {
   grid-area: sensors;
@@ -759,10 +772,10 @@
 }
 @container (max-width: 1100px) {
   .today-rail {
-    margin: 0 20px 4px calc(20px + 190px + 22px);
+    margin: 0 20px 4px calc(20px + 184px + 22px);
   }
   .today-zone {
-    grid-template-columns: 190px minmax(0, 1fr);
+    grid-template-columns: 184px minmax(0, 1fr);
     grid-template-areas:
       "main lane"
       "gauges sensors"

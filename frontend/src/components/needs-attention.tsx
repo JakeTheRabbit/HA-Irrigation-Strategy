@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { ChevronDown, CircleAlert, TriangleAlert } from "lucide-react";
+import { extractAlertCodes } from "@/components/alert-code-text";
 import type { roomAttention } from "@/lib/facility-view";
 import "./needs-attention.css";
 
@@ -64,20 +65,33 @@ export function NeedsAttention({
       )}
       {shown.length > 0 && (
         <ul aria-label="Needs attention">
-          {shown.map((item) => (
-            <li key={item.key} data-level={item.level}>
-              <button type="button" className="inline-action" onClick={() => open(item)}>
-                {item.level === "critical" ? (
-                  <CircleAlert size={15} aria-hidden="true" />
-                ) : (
-                  <TriangleAlert size={15} aria-hidden="true" />
-                )}
-                <span className="sr-only">{item.level === "critical" ? "Fault: " : "Warning: "}</span>
-                {item.text}
-              </button>
-              {item.alert && <span className="needs-attention-tag">Open alert</span>}
-            </li>
-          ))}
+          {shown.map((item) => {
+            const codes = extractAlertCodes(item.text);
+            return (
+              <li key={item.key} data-level={item.level}>
+                <button type="button" className="inline-action" onClick={() => open(item)}>
+                  {item.level === "critical" ? (
+                    <CircleAlert size={15} aria-hidden="true" />
+                  ) : (
+                    <TriangleAlert size={15} aria-hidden="true" />
+                  )}
+                  <span className="sr-only">{item.level === "critical" ? "Fault: " : "Warning: "}</span>
+                  {item.text}
+                </button>
+                {codes.map((code) => (
+                  <a
+                    key={code}
+                    href={`#/settings/help?code=${encodeURIComponent(code)}`}
+                    className="needs-attention-tag alert-code-link"
+                    title={`Look up ${code} in Help`}
+                  >
+                    {code}
+                  </a>
+                ))}
+                {item.alert && <span className="needs-attention-tag">Open alert</span>}
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>

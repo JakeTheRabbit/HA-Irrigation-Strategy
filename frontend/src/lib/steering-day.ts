@@ -13,13 +13,15 @@ import {
   type TimelineRows,
 } from "./day-timeline";
 import { numeric } from "./model";
+import { probeGaps } from "./hmi";
 import type { Controller, Room, Zone } from "./types";
 
 const H = 3_600_000;
 
-/** One zone's grow-day so far: its recorded VWC, its shots (valve open) and its phases. */
+/** One zone's grow-day so far: its recorded VWC and pore EC, its shots (valve open) and its phases. */
 export interface ZoneDay {
   vwc: Reading[];
+  ec: Reading[];
   shots: Shot[];
   phases: PhaseBand[];
 }
@@ -42,6 +44,7 @@ const lightsDay = (controller: Controller, prefix: string, now: number) =>
 const idsOf = (room: Room, zones: Zone[], states: Controller["states"]) =>
   zones.flatMap((zone) => [
     ...(zone.vwc.entityId ? [zone.vwc.entityId] : []),
+    ...(zone.ec.entityId ? [zone.ec.entityId] : []),
     ...(zone.valveEntity ? [zone.valveEntity] : []),
     ...(states[phaseId(room.prefix, zone.id)] ? [phaseId(room.prefix, zone.id)] : []),
   ]);
@@ -90,13 +93,19 @@ export function useSteeringDays(
       const zones = rows
         ? new Map(
             p.zones.map((zone): [number, ZoneDay] => {
-              const vwc = readings(zone.vwc.entityId ? rows[zone.vwc.entityId] : [], p.span.start, to);
-              if (zone.vwc.value !== null && (!vwc.length || vwc.at(-1)!.time < now - 60_000))
+              const rawVwc = readings(zone.vwc.entityId ? rows[zone.vwc.entityId] : [], p.span.start, to);
+              const vwc = probeGaps(rawVwc).clean;
+              if (zone.vwc.value !== null && zone.vwc.value > 1 && (!vwc.length || vwc.at(-1)!.time < now - 60_000))
                 vwc.push({ time: now, value: zone.vwc.value });
+              const rawEc = readings(zone.ec.entityId ? rows[zone.ec.entityId] : [], p.span.start, to);
+              const ec = probeGaps(rawEc, 0).clean;
+              if (zone.ec.value !== null && zone.ec.value > 0 && (!ec.length || ec.at(-1)!.time < now - 60_000))
+                ec.push({ time: now, value: zone.ec.value });
               return [
                 zone.id,
                 {
                   vwc,
+                  ec,
                   shots: valveShots(zone.valveEntity ? rows[zone.valveEntity] : [], [], zone.id, p.span.start, to),
                   phases: phaseBands(rows[phaseId(p.room.prefix, zone.id)], p.span.start, to),
                 },

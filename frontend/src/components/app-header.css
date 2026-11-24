@@ -137,6 +137,7 @@
 .safety-switches {
   display: inline-flex;
   align-items: center;
+  flex-shrink: 0;
   gap: 6px;
   padding-left: 10px;
   border-left: 1px solid var(--border);
@@ -335,5 +336,33 @@
     content: "Controls for ";
     color: var(--muted-foreground);
     font-weight: 400;
+  }
+}
+/* Medium desktop / split-pane inside Home Assistant: compact secondary header chrome so the room's
+   Stop all switch never clips off the right edge of the viewport. */
+@media (max-width: 1360px) and (min-width: 721px) {
+  .header-safety-scope {
+    padding-left: 8px;
+  }
+  .header-safety-scope::before {
+    content: "";
+  }
+  .safety-switches {
+    padding-left: 8px;
+  }
+  .safety-switch {
+    padding: 0 9px;
+  }
+}
+@media (max-width: 1180px) and (min-width: 721px) {
+  .topbar .jump-to kbd,
+  .topbar .wide-only {
+    display: none;
+  }
+  .topbar .jump-to {
+    padding: 0 9px;
+  }
+  .topbar-facts {
+    gap: 6px;
   }
 }

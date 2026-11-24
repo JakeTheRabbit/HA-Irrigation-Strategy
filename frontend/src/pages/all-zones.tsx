@@ -3,11 +3,12 @@ import { ArrowRight, Clock, Pause, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Empty, number, time as clock } from "@/components/dashboard";
 import { FeedTankDrawing } from "@/components/zone-slab";
-import { DayRail, VwcLane, vwcDomain } from "@/components/steering-lane";
+import { AlertCodeText } from "@/components/alert-code-text";
+import { DayRail, EcLane, ecDomain, TargetTrack, VwcLane, vwcDomain, type SteeringTone } from "@/components/steering-lane";
 import { StockBottle } from "@/components/stock-bottle";
 import { NeedsAttention } from "@/components/needs-attention";
 import { STOCK_STATES } from "@/lib/dosing";
-import { formatEc, formatVolume } from "@/lib/display-units";
+import { formatEc, formatTemp, formatVolume } from "@/lib/display-units";
 import {
   drinkLine,
   facilityView,
@@ -144,7 +145,7 @@ function RoomCard({
   const problem = status.tone === "stopped" || status.tone === "off" || stale;
   const drink = drinkLine(r.waterL, r.litresPerPlant);
   const now = Date.now();
-  // One VWC scale for the room's lanes, so its zones compare by eye.
+  // One VWC scale and one pore EC scale for the room's lanes, so its zones compare by eye.
   const domain = vwcDomain(
     r.zones.flatMap((z) => [
       z.zone.vwc.value,
@@ -152,6 +153,13 @@ function RoomCard({
       ...(day?.zones?.get(z.zone.id)?.vwc.map((point) => point.value) ?? []),
     ]),
   );
+  const ecDom = ecDomain([
+    ...(r.stage?.poreEc ?? []),
+    ...r.zones.flatMap((z) => [
+      z.zone.ec.value,
+      ...(day?.zones?.get(z.zone.id)?.ec.map((point) => point.value) ?? []),
+    ]),
+  ]);
   return (
     <section
       className="facility-room panel"
@@ -217,7 +225,8 @@ function RoomCard({
         />
         {problem && !stale && (
           <p className="facility-flag" data-level="critical" role="status">
-            <TriangleAlert size={15} aria-hidden="true" /> {status.text}: {status.detail}
+            <TriangleAlert size={15} aria-hidden="true" /> {status.text}:{" "}
+            <AlertCodeText text={status.detail} />
           </p>
         )}
       </header>
@@ -243,6 +252,7 @@ function RoomCard({
             open={open}
             day={day}
             domain={domain}
+            ecDom={ecDom}
             now={now}
           />
         ))}
@@ -315,6 +325,7 @@ function ZoneRow({
   open,
   day,
   domain,
+  ecDom,
   now,
 }: {
   r: FacilityRoom;
@@ -323,6 +334,7 @@ function ZoneRow({
   open: Open;
   day: RoomDay | undefined;
   domain: [number, number];
+  ecDom: [number, number];
   now: number;
 }) {
   const { zone } = z;
@@ -400,29 +412,47 @@ function ZoneRow({
       </div>
       <div className="steer-lane">
         {day ? (
-          <VwcLane
-            span={day.span}
-            readings={lane ? lane.vwc : day.zones ? [] : null}
-            shots={lane?.shots ?? []}
-            band={band}
-            bandText={band ? `Target ${number(band[0], 0)}–${number(band[1], 0)}%` : null}
-            domain={domain}
-            lightsOn={day.day.start}
-            lightsOff={day.day.lightsOff}
-            now={now}
-            flag={
-              z.problem
-                ? {
-                    level: z.problemIsAlert ? "critical" : "warning",
-                    text: <span data-facility-problem>{z.problem}</span>,
-                  }
-                : null
-            }
-          />
+          <>
+            <VwcLane
+              span={day.span}
+              readings={lane ? lane.vwc : day.zones ? [] : null}
+              shots={lane?.shots ?? []}
+              band={band}
+              bandText={band ? `VWC ${number(band[0], 0)}–${number(band[1], 0)}%` : null}
+              domain={domain}
+              lightsOn={day.day.start}
+              lightsOff={day.day.lightsOff}
+              now={now}
+              abnormal={state === "Low" || state === "High"}
+              flag={
+                z.problem
+                  ? {
+                      level: z.problemIsAlert ? "critical" : "warning",
+                      text: (
+                        <span data-facility-problem>
+                          <AlertCodeText text={z.problem} />
+                        </span>
+                      ),
+                    }
+                  : null
+              }
+            />
+            <EcLane
+              span={day.span}
+              readings={lane ? lane.ec : day.zones ? [] : null}
+              band={poreEc}
+              bandText={poreEc ? `EC ${ec(poreEc[0])}–${ec(poreEc[1])}` : null}
+              domain={ecDom}
+              lightsOn={day.day.start}
+              lightsOff={day.day.lightsOff}
+              now={now}
+              abnormal={outside(zone.ec.value, poreEc) !== null}
+            />
+          </>
         ) : (
           z.problem && (
             <p className="facility-flag" data-level={level ?? "warning"} data-facility-problem>
-              <TriangleAlert size={14} aria-hidden="true" /> {z.problem}
+              <TriangleAlert size={14} aria-hidden="true" /> <AlertCodeText text={z.problem} />
             </p>
           )
         )}
@@ -436,7 +466,7 @@ function ZoneRow({
             {z.lastShotText && <li data-facility-flow>{z.lastShotText}</li>}
             {others.map((reason) => (
               <li key={reason.rule} data-level={reason.level}>
-                <TriangleAlert size={13} aria-hidden="true" /> {reason.text}
+                <TriangleAlert size={13} aria-hidden="true" /> <AlertCodeText text={reason.text} />
               </li>
             ))}
             {troubled.map((s) => (
@@ -446,7 +476,8 @@ function ZoneRow({
                   s.health === "no-reading" || s.health === "out-of-range" ? "critical" : "warning"
                 }
               >
-                <TriangleAlert size={13} aria-hidden="true" /> {sensorName(s, context)} sensor: {s.text}
+                <TriangleAlert size={13} aria-hidden="true" /> {sensorName(s, context)} sensor:{" "}
+                <AlertCodeText text={s.text} />
               </li>
             ))}
           </ul>
@@ -459,27 +490,36 @@ function ZoneRow({
           unit="pt"
           state={outside(z.drybackPoints, drybackBand)}
           target={drybackBand ? `target ${number(drybackBand[0], 0)}–${number(drybackBand[1], 0)}` : null}
+          valueNum={z.drybackPoints}
+          band={drybackBand}
+          tone="vwc"
         />
         <Metric
           label="Pore EC"
           value={zone.ec.value === null ? "—" : ec(zone.ec.value)}
           unit=""
           state={outside(zone.ec.value, poreEc)}
-          target={poreEc ? `target ${number(poreEc[0], 1)}–${number(poreEc[1], 1)}` : null}
+          target={poreEc ? `target ${ec(poreEc[0])}–${ec(poreEc[1])}` : null}
+          valueNum={zone.ec.value}
+          band={poreEc}
+          tone="ec"
         />
         <Metric
           label="Water today"
           value={z.mlPerPlant === null ? "—" : perPlant(z.mlPerPlant)}
           unit="/plant"
           target={`${zone.shots.value === null ? "—" : Math.round(zone.shots.value)} shots${
-            z.waterL !== null ? `, ${number(z.waterL, 1)} L` : ""
+            z.waterL !== null ? `, ${formatVolume(z.waterL, 1)}` : ""
           }`}
         />
         <Metric
           label="Root"
-          value={z.rootTemp === null ? "—" : number(z.rootTemp, 1)}
-          unit={z.rootTemp === null ? "" : "°C"}
+          value={z.rootTemp === null ? "—" : formatTemp(z.rootTemp, 1)}
+          unit=""
           state={outside(z.rootTemp, ROOT_BAND)}
+          valueNum={z.rootTemp}
+          band={ROOT_BAND}
+          tone="neutral"
         />
       </dl>
     </div>
@@ -492,12 +532,18 @@ function Metric({
   unit,
   state,
   target,
+  valueNum,
+  band,
+  tone = "neutral",
 }: {
   label: string;
   value: string;
   unit: string;
   state?: string | null;
   target?: string | null;
+  valueNum?: number | null;
+  band?: readonly [number, number] | null;
+  tone?: SteeringTone;
 }) {
   return (
     <div className="steer-metric" data-off={state ? "" : undefined}>
@@ -507,6 +553,11 @@ function Metric({
         {unit && <small>{unit}</small>}
         {state && <span className="steer-metric-state"> {state}</span>}
       </dd>
+      {band && (
+        <dd className="steer-metric-track">
+          <TargetTrack value={valueNum ?? null} band={band} tone={tone} abnormal={!!state} />
+        </dd>
+      )}
       {target && <dd className="steer-metric-target">{target}</dd>}
     </div>
   );

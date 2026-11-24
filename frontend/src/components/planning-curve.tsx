@@ -25,6 +25,7 @@ import {
   type RecordedReading,
 } from "@/lib/planning-curve";
 import { ecTargetBand, type EcRatios } from "@/lib/ec-band";
+import { formatEc } from "@/lib/display-units";
 import { settingWords } from "@/lib/setting-words";
 
 export interface PlanningCurveProps {
@@ -606,7 +607,7 @@ export function PlanningCurve({
           </text>
           {showEc && (
             <text x={width - 2} y={TOP - 9} textAnchor="end" className="planning-axis-title">
-              EC mS/cm
+              EC {formatEc(1, 0).replace(/^[\d.,]+\s*/, "")}
             </text>
           )}
           {[0, 25, 50, 75, 100].map((tick) => {
@@ -739,8 +740,7 @@ export function PlanningCurve({
                   y={y(plan.p2Envelope[1])}
                   width={Math.max(0, x(p2.end) - x(p2.start))}
                   height={y(plan.p2Envelope[0]) - y(plan.p2Envelope[1])}
-                  fill="var(--muted-foreground)"
-                  fillOpacity={0.12}
+                  fill="var(--band-vwc)"
                 >
                   <title>Nominal P2 shot envelope assuming full retention</title>
                 </rect>
@@ -857,6 +857,34 @@ export function PlanningCurve({
                 );
               })}
               <g data-planning-ec display={showEc ? undefined : "none"}>
+                {poreBand && (
+                  <>
+                    <rect
+                      data-planning-line="ec-band"
+                      x={left}
+                      y={ey(poreBand[1])}
+                      width={plotWidth}
+                      height={Math.max(1, ey(poreBand[0]) - ey(poreBand[1]))}
+                      fill="var(--band-ec)"
+                    />
+                    <line
+                      x1={left}
+                      x2={left + plotWidth}
+                      y1={ey(poreBand[1])}
+                      y2={ey(poreBand[1])}
+                      stroke="var(--band-ec-edge)"
+                      strokeDasharray="3 3"
+                    />
+                    <line
+                      x1={left}
+                      x2={left + plotWidth}
+                      y1={ey(poreBand[0])}
+                      y2={ey(poreBand[0])}
+                      stroke="var(--band-ec-edge)"
+                      strokeDasharray="3 3"
+                    />
+                  </>
+                )}
                 {ecToday.length > 1 && (
                   <path
                     data-planning-line="recorded-ec"

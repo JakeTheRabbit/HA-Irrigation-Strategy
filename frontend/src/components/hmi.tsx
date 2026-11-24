@@ -4,6 +4,7 @@
 import type { HTMLAttributes, ReactNode } from "react";
 import { CircleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { TargetTrack, type SteeringTone } from "@/components/steering-lane";
 import { gaugeSpeech, type GaugeModel } from "@/lib/hmi";
 import { trimNumber as fix } from "@/lib/utils";
 import "./hmi.css";
@@ -49,6 +50,13 @@ export function QualityChip({ children, ...rest }: HTMLAttributes<HTMLSpanElemen
   );
 }
 
+function gaugeTone(label: string, id?: string): SteeringTone {
+  const key = `${id ?? ""} ${label}`.toLowerCase();
+  if (key.includes("ec")) return "ec";
+  if (key.includes("vwc") || key.includes("peak")) return "vwc";
+  return "neutral";
+}
+
 /** One analog indicator: the value, a bar with its target or band, and the deviation. */
 export function Gauge({
   model,
@@ -61,6 +69,7 @@ export function Gauge({
   marksKey?: boolean;
 }) {
   const unit = (value: number) => `${fix(value, model.digits)}${model.unit}`;
+  const tone = gaugeTone(model.label, id);
   return (
     <div
       className="hmi-gauge"
@@ -76,6 +85,15 @@ export function Gauge({
           {model.value !== null && model.unit && <span className="unit">{model.unit}</span>}
         </strong>
       </div>
+      <TargetTrack
+        value={model.value}
+        band={model.band}
+        target={model.target}
+        min={model.min}
+        max={model.max}
+        tone={tone}
+        abnormal={model.state === "abnormal"}
+      />
       <div className="hmi-gauge-foot">
         <span>
           {model.band
