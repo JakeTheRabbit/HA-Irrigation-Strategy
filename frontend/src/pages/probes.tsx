@@ -331,33 +331,40 @@ export function Probes({
               <h2 id="probes-room-title">Pump, main line and feed</h2>
               <p>As Home Assistant reports them. “Off” does not prove a valve closed or no flow.</p>
             </div>
+            <p className="probes-feed-cal">
+              <a href="#/equipment/feed-calibration">Calibrate feed pH &amp; EC →</a>
+            </p>
           </div>
           <ul className="probes-hardware">
             {hardware.map(([label, id]) => {
               const entity = states[id];
               return (
                 <li key={id}>
-                  <span>
+                  <div className="probes-hw-head">
                     <strong>{label}</strong>
+                    <span className="numeric probes-hw-val">
+                      {entity
+                        ? `${formatState(entity.state)} ${String(entity.attributes.unit_of_measurement ?? "")}`.trim()
+                        : "Not in HA"}
+                    </span>
+                  </div>
+                  <div className="probes-hw-meta">
                     <code>{id}</code>
-                  </span>
-                  <span className="numeric">
-                    {entity
-                      ? `${formatState(entity.state)} ${String(entity.attributes.unit_of_measurement ?? "")}`.trim()
-                      : "Not in Home Assistant"}
-                  </span>
-                  <span className="muted small">
-                    {entity?.last_updated ? time(entity.last_updated) : ""}
-                  </span>
+                    <span className="muted small">
+                      {entity?.last_updated ? time(entity.last_updated) : ""}
+                    </span>
+                  </div>
                 </li>
               );
             })}
           </ul>
         </section>
       )}
-      <p className="probes-feed-cal">
-        <a href="#/equipment/feed-calibration">Feed pH and EC probes: Calibrate →</a>
-      </p>
+      {hardware.length === 0 && (
+        <p className="probes-feed-cal">
+          <a href="#/equipment/feed-calibration">Feed pH and EC probes: Calibrate →</a>
+        </p>
+      )}
       <RoomMap controller={controller} navigate={navigate} />
       <CanonicalControls controller={controller} owner="probes" onDirtyChange={onDirtyChange} />
       <ControllerInternals controller={controller} />

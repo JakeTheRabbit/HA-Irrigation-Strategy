@@ -2,13 +2,17 @@ import { Input } from "@/components/ui/input";
 import { isDefault, type ControlRow, type Cell, type Value } from "@/lib/features";
 import { settingWords } from "@/lib/setting-words";
 type Staged = Record<string, Value>;
+function formatKeyLabel(key: string): string {
+  return key
+    .replace(/_/g, " ")
+    .replace(/^./, (c) => c.toUpperCase())
+    .replace(/\b(vwc|ec|co2|vpd|ppfd|dli|hvac)\b/gi, (m) => m.toUpperCase())
+    .replace(/\bph\b/gi, "pH");
+}
+
 function controlLabel(row: ControlRow): string {
   const key = row.control.key;
-  return (
-    row.control.label ??
-    settingWords(key)?.label ??
-    key.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase())
-  );
+  return row.control.label ?? settingWords(key)?.label ?? formatKeyLabel(key);
 }
 
 function shown(value: Value | null | undefined, unit = ""): string {

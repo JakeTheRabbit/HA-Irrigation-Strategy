@@ -88,25 +88,29 @@ export function CanonicalControls({
           masterCells.every((c) => c && (staged[c.entityId] ?? c.value) === false);
         const collapsible = masterOff && f.controls.length > 1;
         const title = `${f.feature.label}${f.feature.id === "sizing" ? " · room defaults" : ""}`;
-        const body = f.controls.map((r) => (
-          <ControlEditor
-            key={r.control.key}
-            row={r}
-            staged={staged}
-            zoneName={name}
-            readOnly={
-              locked || (room.strategy.engaged && ["number", "select"].includes(r.control.domain))
-            }
-            onChange={(cell, value) =>
-              setStaged((current) => {
-                const next = { ...current };
-                if (cell.value === value) delete next[cell.entityId];
-                else next[cell.entityId] = value;
-                return next;
-              })
-            }
-          />
-        ));
+        const body = (
+          <div className="canonical-controls-grid">
+            {f.controls.map((r) => (
+              <ControlEditor
+                key={r.control.key}
+                row={r}
+                staged={staged}
+                zoneName={name}
+                readOnly={
+                  locked || (room.strategy.engaged && ["number", "select"].includes(r.control.domain))
+                }
+                onChange={(cell, value) =>
+                  setStaged((current) => {
+                    const next = { ...current };
+                    if (cell.value === value) delete next[cell.entityId];
+                    else next[cell.entityId] = value;
+                    return next;
+                  })
+                }
+              />
+            ))}
+          </div>
+        );
         if (collapsible) {
           return (
             <details

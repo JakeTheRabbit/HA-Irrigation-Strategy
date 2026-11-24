@@ -151,11 +151,11 @@
    sits over its help, rows run edge to edge with a rule between, the control on the right, and a
    switch is drawn as a switch. */
 .panel.canonical-card {
-  padding: 0 18px 10px;
+  padding: 0 18px 14px;
 }
 .panel.canonical-card .panel-heading {
   display: block;
-  padding: 14px 0 8px;
+  padding: 14px 0 10px;
 }
 .canonical-card .panel-heading h2 {
   margin: 0;
@@ -166,29 +166,33 @@
   font-size: var(--text-xs, 0.8rem);
   color: var(--muted-foreground);
 }
+.canonical-controls-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr));
+  gap: 10px 14px;
+  align-items: start;
+}
 .canonical-card .features-control {
   margin: 0;
-  padding: 0;
-  border: 0;
   min-width: 0;
 }
-.canonical-card .features-control + .features-control {
-  margin-top: 0;
-}
-.canonical-card fieldset.features-control + fieldset.features-control {
-  margin-top: 10px;
+.canonical-card fieldset.features-control {
+  padding: 10px 14px 6px;
+  border: 1px solid color-mix(in srgb, var(--border) 65%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--foreground) 3%, transparent);
 }
 .canonical-card .features-control legend {
-  padding: 8px 0 4px;
+  padding: 0 0 6px;
   font-size: var(--text-sm);
 }
 .canonical-card .features-control tr {
-  border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  border-top: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
 }
 .canonical-card .features-control th,
 .canonical-card .features-control td {
-  height: 44px;
-  padding: 4px 0;
+  height: 38px;
+  padding: 3px 0;
   vertical-align: middle;
 }
 .canonical-card .features-control td {
@@ -197,23 +201,17 @@
 .canonical-card .features-number {
   justify-content: flex-end;
 }
-/* Compact single-row setting (room-only or single-zone): one crisp HA row instead of legend + "Room default" table. */
+/* Compact single-row setting (room-only or single-zone): clean HA tile in the grid, no stretched void. */
 .features-single-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 14px;
-  min-height: 44px;
-  padding: 8px 0;
-  border-top: 1px solid color-mix(in srgb, var(--border) 65%, transparent);
-}
-.features-single-row:first-of-type {
-  border-top: 1px solid color-mix(in srgb, var(--border) 65%, transparent);
-}
-.features-sheet-body .features-single-row {
-  padding: 10px 12px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
+  gap: 12px;
+  min-height: 48px;
+  padding: 10px 14px;
+  border: 1px solid color-mix(in srgb, var(--border) 65%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--foreground) 3%, transparent);
 }
 .features-single-label {
   display: flex;
@@ -290,7 +288,7 @@
   transform: rotate(90deg);
 }
 .canonical-collapsible-body {
-  padding: 0 18px 10px;
+  padding: 0 18px 14px;
 }
 .features-control input[role="switch"] {
   appearance: none;

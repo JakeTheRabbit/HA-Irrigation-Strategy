@@ -12,27 +12,47 @@
   color: color-mix(in srgb, var(--warning) 70%, var(--foreground));
 }
 .probes-hardware {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 10px;
   margin: 0;
-  padding: 0 20px 14px;
+  padding: 0 18px 16px;
   list-style: none;
 }
 .probes-hardware li {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto 90px;
-  align-items: center;
-  gap: 12px;
-  padding: 8px 0;
-  border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px;
+  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--foreground) 3%, transparent);
   font-size: var(--text-sm);
-}
-.probes-hardware li > span:first-child {
-  display: grid;
   min-width: 0;
+}
+.probes-hw-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+.probes-hw-val {
+  font-weight: 600;
+  white-space: nowrap;
+}
+.probes-hw-meta {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
 }
 .probes-hardware code {
   color: var(--muted-foreground);
   font-size: var(--text-xs);
-  overflow-wrap: anywhere;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
 }
 .probes-more {
   margin: 12px 0;
