@@ -36,10 +36,17 @@ export function ControlEditor({
     <fieldset className="features-control" disabled={readOnly}>
       <legend>
         {label}
-        <span className="features-default">
-          Default: {shown(row.control.default)}
-          {readOnly && " · read-only"}
-        </span>
+        {/* A default is said only when there is one. */}
+        {(shown(row.control.default) !== "—" || readOnly) && (
+          <span className="features-default">
+            {[
+              shown(row.control.default) !== "—" && `Default: ${shown(row.control.default)}`,
+              readOnly && "read-only",
+            ]
+              .filter(Boolean)
+              .join(" · ")}
+          </span>
+        )}
       </legend>
       <table>
         <tbody>

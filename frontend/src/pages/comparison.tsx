@@ -276,13 +276,23 @@ export function Comparison({
       <Heading
         title="Compare runs"
         action={
-          <Button
-            variant="outline"
-            onClick={() => setRefresh((value) => value + 1)}
-            disabled={loading}
-          >
-            <RefreshCw size={15} /> Refresh history
-          </Button>
+          <div className="heading-actions">
+            <nav className="history-toggle" aria-label="Runs views">
+              <button type="button" aria-pressed="true" aria-current="page" onClick={() => navigate("history/compare")}>
+                Compare runs
+              </button>
+              <button type="button" aria-pressed="false" onClick={() => navigate("history/grows")}>
+                All grows
+              </button>
+            </nav>
+            <Button
+              variant="outline"
+              onClick={() => setRefresh((value) => value + 1)}
+              disabled={loading}
+            >
+              <RefreshCw size={15} /> Refresh history
+            </Button>
+          </div>
         }
       />
       <RunCompare controller={controller} runs={document} refresh={refresh} />

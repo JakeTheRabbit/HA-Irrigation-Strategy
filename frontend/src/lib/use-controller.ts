@@ -820,7 +820,13 @@ export class ControllerStore {
   /** The selected room's grow-day, once: over Home Assistant's websocket inside Home Assistant,
    * over REST standalone. Live updates extend it from there (day-timeline.ts appendLive). */
   timeline = async (request: TimelineRequest) => {
-    const allowed = allowedHistoryIds(this.snapshot.room, this.states);
+    const allowed = request.allRooms
+      ? new Set(
+          discoverRooms(this.states).flatMap((room) => [
+            ...allowedHistoryIds(buildRoom(this.states, room), this.states),
+          ]),
+        )
+      : allowedHistoryIds(this.snapshot.room, this.states);
 
     const ids = [...request.entityIds, ...request.attributeIds];
     if (!ids.length || ids.some((id) => !allowed.has(id)))

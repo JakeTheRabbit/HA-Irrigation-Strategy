@@ -11,6 +11,15 @@ describe("probe gaps", () => {
     expect(clean.map((reading) => reading.value)).toEqual([55, 54.5, 53.8, 53.5]);
     expect(gaps).toEqual([{ start: 600_000, end: 1_200_000 }]);
   });
+  it("takes the part-dropped samples either side of a dropout into the gap", () => {
+    const readings = [55, 54.5, 5.2, 0, 0, 3.1, 53.8].map((value, index) => ({
+      time: index,
+      value,
+    }));
+    const { clean, gaps } = probeGaps(readings);
+    expect(clean.map((reading) => reading.value)).toEqual([55, 54.5, 53.8]);
+    expect(gaps).toEqual([{ start: 2, end: 5 }]);
+  });
   it("finds nothing in a good probe, and each separate dropout once", () => {
     expect(probeGaps([{ time: 0, value: 30 }]).gaps).toEqual([]);
     const two = [40, 0, 40, 0].map((value, index) => ({ time: index, value }));
@@ -91,12 +100,12 @@ describe("a reference band and named levels", () => {
       target: 8,
       reference: [10, 15],
       unit: "%",
-      points: "%",
+      points: "pt",
       tolerance: 3,
     });
     expect(model.reference).toEqual([10, 15]);
     expect(gaugeSpeech(model)).toBe(
-      "Last night’s dryback 12%, target 8%, 4% over, reference 10% to 15%",
+      "Last night’s dryback 12%, target 8%, 4 pt over, reference 10% to 15%",
     );
   });
   it("draws the rescue floor, the re-water point and the peak on the VWC bar", () => {

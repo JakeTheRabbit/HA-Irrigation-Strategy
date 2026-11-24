@@ -158,13 +158,44 @@
 .tank-note {
   grid-column: 1 / -1;
   margin: 0;
-  font-size: var(--text-xs);
-  line-height: 1.5;
+  font-size: var(--text-label);
+  line-height: var(--leading-label);
   color: var(--muted-foreground);
 }
 @media (max-width: 480px) {
   .tank-layout {
     padding: 16px;
     gap: 16px;
+  }
+}
+.tank-quality .tank-updated {
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+  font-weight: 400;
+  white-space: nowrap;
+}
+/* A phone stacks each reading: its label and time on one line, the value large under it. The
+   last day's line has no room beside it there; History draws it. */
+@media (max-width: 599px) {
+  .tank-quality > div {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 2px;
+  }
+  .tank-quality dt,
+  .tank-quality .tank-updated {
+    font-size: 13px;
+  }
+  .tank-quality dd {
+    justify-content: flex-start;
+    font-size: var(--text-2xl);
+    line-height: 1.2;
+  }
+  .tank-value {
+    min-width: 0;
+    text-align: left;
+  }
+  .tank-spark {
+    display: none;
   }
 }

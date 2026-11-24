@@ -35,6 +35,7 @@ import { clock, dayKey, dayLabel, hourTicks, startOfDay } from "@/lib/time";
 import type { Controller, Zone } from "@/lib/types";
 import { errorText } from "@/lib/utils";
 import { zonePlants } from "@/lib/water-view";
+import { useNarrow } from "@/lib/use-narrow";
 import "./water-use.css";
 
 const DAY = 86_400_000;
@@ -184,6 +185,7 @@ function FlowCheck({
   const dayStart = startOfDay(now, tz);
   const since = startOfDay(dayStart - 6 * DAY + 12 * 3_600_000, tz);
   const read = useFlowEvents(controller, since, meter, alertRooms);
+  const narrow = useNarrow(720);
   const events = read?.kind === "ok" ? read.data.events : [];
   const zones = controller.room.zones;
   const flows = useMemo(
@@ -208,6 +210,17 @@ function FlowCheck({
     );
   const shotsToday = (zone: number) =>
     events.filter((e) => e.kind === "shot.completed" && e.zone === zone && Date.parse(e.ts) >= dayStart).length;
+  // The zones whose water did not arrive as asked lead the page, each a jump to its card.
+  const faults = zones.flatMap((zone, i) => {
+    const flow = flows[i];
+    if ((flow.verdict !== "low" && flow.verdict !== "high") || flow.last3Pct === null) return [];
+    return [
+      {
+        zone,
+        text: `${zone.name}: ${flow.verdict === "low" ? "delivery below requested" : "more water than asked"} — ${pct(flow.last3Pct)} of requested over the last 3 shots`,
+      },
+    ];
+  });
   return (
     <>
       <div className="wf-intro">
@@ -217,18 +230,51 @@ function FlowCheck({
           {oneAtATime && !shared ? " Shots run one zone at a time, so every litre is counted against its own zone." : ""}
         </p>
       </div>
+      {faults.length > 0 && (
+        <ul className="wf-faults" data-flow-faults>
+          {faults.map(({ zone, text }) => (
+            <li key={zone.id}>
+              <span>{text}</span>
+              <button
+                type="button"
+                className="wf-link"
+                onClick={() => {
+                  const card = document.getElementById(`wf-zone-${zone.id}`)?.closest("section");
+                  card?.scrollIntoView({ behavior: "smooth", block: "start" });
+                }}
+              >
+                View {zone.name}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
       <div className="wf-zones">
-        {zones.map((zone, i) => (
-          <ZoneCard
-            key={zone.id}
-            controller={controller}
-            zone={zone}
-            flow={flows[i]}
-            metered={!!meters[i]}
-            shots={shotsToday(zone.id)}
-            days={dailyRatios(events, zone.id, now, tz)}
-          />
-        ))}
+        {zones.map((zone, i) => {
+          const card = (
+            <ZoneCard
+              key={zone.id}
+              controller={controller}
+              zone={zone}
+              flow={flows[i]}
+              metered={!!meters[i]}
+              shots={shotsToday(zone.id)}
+              days={dailyRatios(events, zone.id, now, tz)}
+              since={dayStart}
+            />
+          );
+          // A phone folds a zone whose water arrived as asked to one line; the order stays.
+          return narrow && flows[i].verdict === "on_target" && flows[i].last3Pct !== null ? (
+            <details key={zone.id} className="wf-zone-fold">
+              <summary>
+                <b>{zone.name}</b> On target · {pct(flows[i].last3Pct!)} metered vs asked, last 3 shots
+              </summary>
+              {card}
+            </details>
+          ) : (
+            card
+          );
+        })}
       </div>
       <div className="wf-lower">
         <LeakCheck
@@ -242,7 +288,7 @@ function FlowCheck({
           now={now}
           dayStart={dayStart}
         />
-        <WaterPerPlant controller={controller} flows={flows} />
+        <WaterPerPlant controller={controller} flows={flows} since={dayStart} />
       </div>
     </>
   );
@@ -257,6 +303,7 @@ function ZoneCard({
   metered,
   shots,
   days,
+  since,
 }: {
   controller: Controller;
   zone: Zone;
@@ -264,6 +311,8 @@ function ZoneCard({
   metered: boolean;
   shots: number;
   days: (number | null)[];
+  /** Where "today" starts for the metered figures: local midnight. */
+  since: number;
 }) {
   const plants = zonePlants(controller, zone.id);
   const facts = [plants ? `${plants} plants` : null, `${shots} ${shots === 1 ? "shot" : "shots"}`].filter(Boolean).join(" · ");
@@ -302,7 +351,8 @@ function ZoneCard({
               <span>metered vs asked, last 3 shots</span>
               {flow.todayPct !== null && (
                 <span className="wf-today">
-                  <b>Today {pct(flow.todayPct)}</b> · {formatVolume(got, 3).replace(/\s\S+$/, "")} of {formatVolume(asked, 3)}
+                  <b>Today {pct(flow.todayPct)}</b> · metered {formatVolume(got, 1).replace(/\s\S+$/, "")} of {formatVolume(asked, 1)} ·
+                  from {clock(since, controller.timeZone)}
                 </span>
               )}
             </div>
@@ -331,7 +381,7 @@ function VerdictChip({ verdict, metered }: { verdict: ZoneFlow["verdict"]; meter
   if (verdict === "no_meter") return <Pill tone="neutral">{metered ? "Not counted yet" : "No meter"}</Pill>;
   return (
     <Pill dot tone={verdict === "on_target" ? "on" : "warn"} data-flow-chip>
-      {verdict === "on_target" ? "On target" : verdict === "low" ? "Blocked line?" : "More than asked"}
+      {verdict === "on_target" ? "On target" : verdict === "low" ? "Low delivery · possible blockage" : "More than asked"}
     </Pill>
   );
 }
@@ -427,7 +477,7 @@ function BlockedCard({ controller, zone, since }: { controller: Controller; zone
   return (
     <div className="wf-blocked" role="note" data-blocked-card>
       <p>
-        <b>Blocked line?</b>{" "}
+        <b>Low delivery · possible blockage.</b>{" "}
         {since !== null ? `Metered water dropped from the ${clock(since, controller.timeZone)} shot on. ` : "Metered water is under 80% of what the shots asked for. "}
         Check the {zone.name} drippers and line filter.
       </p>
@@ -625,7 +675,7 @@ function LeakCheck({
 const perPlant = (ml: number) => formatVolume(ml / 1000, 3);
 
 /** Metered water per plant today, zone against zone, the room's median marked. */
-function WaterPerPlant({ controller, flows }: { controller: Controller; flows: ZoneFlow[] }) {
+function WaterPerPlant({ controller, flows, since }: { controller: Controller; flows: ZoneFlow[]; since: number }) {
   const rows = controller.room.zones.flatMap((zone, i) => {
     const plants = zonePlants(controller, zone.id);
     const shots = flows[i].shots;
@@ -645,7 +695,7 @@ function WaterPerPlant({ controller, flows }: { controller: Controller; flows: Z
     <section className="panel wf-plant" data-water-per-plant aria-labelledby="wf-plant-title">
       <header className="wf-card-head">
         <h3 id="wf-plant-title">
-          Water per plant <small>metered today, against the room median</small>
+          Water per plant <small>metered from {clock(since, controller.timeZone)}, against the room median</small>
         </h3>
       </header>
       <ul className="wf-plant-rows">

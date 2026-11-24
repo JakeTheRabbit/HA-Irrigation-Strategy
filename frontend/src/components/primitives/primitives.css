@@ -29,10 +29,10 @@
   fill: var(--foreground);
 }
 .arc-gauge[data-tone="warn"] .arc-gauge-needle {
-  stroke: var(--warning);
+  stroke: var(--warning-mark);
 }
 .arc-gauge[data-tone="warn"] .arc-gauge-hub {
-  fill: var(--warning);
+  fill: var(--warning-mark);
 }
 .arc-gauge[data-tone="bad"] .arc-gauge-needle {
   stroke: var(--destructive);
@@ -74,7 +74,7 @@
   stroke: var(--success);
 }
 .health-ring[data-tone="warn"] .ring-fill {
-  stroke: var(--warning);
+  stroke: var(--warning-mark);
 }
 .health-ring[data-tone="bad"] .ring-fill {
   stroke: var(--destructive);
@@ -95,7 +95,7 @@
   height: 100%;
 }
 .stability-ring[data-state="settling"] .ring-fill {
-  stroke: var(--warning);
+  stroke: var(--warning-mark);
 }
 .stability-ring[data-state="steady"] .ring-fill {
   stroke: var(--success);
@@ -146,7 +146,7 @@
 }
 @keyframes stability-breathe {
   50% {
-    stroke: color-mix(in srgb, var(--warning) 22%, var(--surface));
+    stroke: color-mix(in srgb, var(--warning-mark) 22%, var(--surface));
   }
 }
 
@@ -171,7 +171,7 @@
   background: var(--success);
 }
 .capacity-segment[data-tone="warn"] {
-  background: var(--warning);
+  background: var(--warning-mark);
 }
 .capacity-segment[data-tone="bad"] {
   background: var(--destructive);

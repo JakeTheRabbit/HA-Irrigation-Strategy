@@ -56,13 +56,13 @@ describe("healthSentence", () => {
       ],
     };
     expect(healthSentence(status, [alert("CS-102", 2), alert("CS-608", null), alert("CS-706", null)])).toBe(
-      "System health 94%: 34 of 35 devices online, controller running, 3 open alerts, each shown below where it happens.",
+      "Devices online 34/35 (94%): controller running, 3 open alerts, each shown below where it happens.",
     );
     expect(healthSentence({ ...status, controller: "stale" }, [alert("CS-102", 2)])).toBe(
-      "System health 94%: 34 of 35 devices online, controller not reporting, 1 open alert, shown below where it happens.",
+      "Devices online 34/35 (94%): controller not reporting, 1 open alert, shown below where it happens.",
     );
     expect(healthSentence({ ...status, controller: "absent", pct_online: null, rooms: [] }, [])).toBe(
-      "System health not known: no mapped devices, no controller heartbeat, no open alerts.",
+      "No mapped devices: no controller heartbeat, no open alerts.",
     );
   });
 });
@@ -278,7 +278,7 @@ describe("healthSentence per room", () => {
       ],
     };
     expect(healthSentence(status, [])).toBe(
-      "System health 100%: 2 of 2 devices online, controller not reporting in 1 of 2 rooms, no open alerts.",
+      "Devices online 2/2 (100%): controller not reporting in 1 of 2 rooms, no open alerts.",
     );
   });
 });
@@ -328,7 +328,7 @@ describe("statusFromEntities", () => {
     expect(status.addon_version).toBe("3.17.1");
     expect(room.heartbeat.beats).toEqual([]);
     expect(healthSentence(status, [])).toBe(
-      "System health 66.7%: 4 of 6 devices online, controller running, no open alerts.",
+      "Devices online 4/6 (66.7%): controller running, no open alerts.",
     );
   });
 

@@ -196,7 +196,7 @@
 .tm-chip {
   padding: 2px 8px;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--warning) 18%, var(--surface));
+  background: color-mix(in srgb, var(--warning-mark) 18%, var(--surface));
   color: var(--foreground);
   letter-spacing: 0;
   text-transform: none;
@@ -279,7 +279,7 @@
   font-size: var(--text-xs);
 }
 .tm-legend [data-glyph="lights"]::before {
-  background: color-mix(in srgb, var(--warning) 16%, transparent);
+  background: color-mix(in srgb, var(--warning-mark) 16%, transparent);
 }
 
 /* Daily max, pump and safety cards. */

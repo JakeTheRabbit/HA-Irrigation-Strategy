@@ -497,7 +497,7 @@ export function FeedCalibration({ controller, navigate }: PageProps) {
   const captured = point !== null && points[point] !== null;
   const ringState: "settling" | "steady" | "offline" = cap.reason ? "offline" : steady ? "steady" : "settling";
   const temp = session?.temperature_entity_id ? controller.states[session.temperature_entity_id] : undefined;
-  const tempText = temp && temp.state !== "" && Number.isFinite(Number(temp.state)) ? formatTemp(Number(temp.state), digitsOf(temp.state)) : null;
+  const tempText = temp && temp.state !== "" && Number.isFinite(Number(temp.state)) ? formatTemp(Number(temp.state), 1) : null;
   const liveText = Number.isFinite(rawValue) ? feedValue(rawValue, kind, digitsOf(raw?.state)) : "—";
   const stabWord = cap.reason
     ? "Offline"

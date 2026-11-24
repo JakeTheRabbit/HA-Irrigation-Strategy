@@ -56,6 +56,8 @@ await runParity({
     const sub = panel.locator(".review-apply-sub");
     const maxFlow = editor.getByLabel("Max flow", { exact: true });
     const dripper = editor.getByLabel("Zone 3 dripper flow", { exact: true });
+    // A phone shows each zone as one line; Edit opens it.
+    if (width <= 640) await editor.getByRole("button", { name: "Edit Zone 3", exact: true }).click();
     await dripper.waitFor();
     assert.equal(await maxFlow.inputValue(), "1200", `${label}: saved max flow`);
     assert.equal(await dripper.inputValue(), "4.0", `${label}: saved dripper flow`);
@@ -123,6 +125,7 @@ await runParity({
     const reason = row3.locator(".supply-error");
     await reason.waitFor();
     assert.equal(await dripper.getAttribute("aria-describedby"), await reason.getAttribute("id"), `${label}: reason tied to field`);
+    if (width <= 640) await editor.getByRole("button", { name: "Edit Zone 2", exact: true }).click();
     await editor.getByLabel("Zone 2 dripper flow", { exact: true }).fill("3.5");
     assert.equal(await editor.locator('tr[data-zone="2"] .supply-error').count(), 0, `${label}: reason not on zone 2`);
     await dripper.fill("3.1");

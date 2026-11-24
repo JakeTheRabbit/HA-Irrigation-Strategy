@@ -5,6 +5,7 @@ import type { Controller } from "@/lib/types";
 import { tankTelemetry, type TankReading } from "@/lib/tank-telemetry";
 import { TankHistory, TankSparkline, useTankHistory, useTankLines } from "./tank-history";
 import { formatDateTime } from "@/lib/clock";
+import { clock } from "@/lib/time";
 import "./tank-status.css";
 
 export function TankStatus({
@@ -85,19 +86,30 @@ export function TankStatus({
         <dl className="tank-quality">
           {(
             [
-              { key: "ec", label: "EC", reading: tank.ec, digits: 2 },
-              { key: "ph", label: "pH", reading: tank.ph, digits: 2 },
+              // Live: what the tank reads now, apart from a batch's mix-check sample.
+              { key: "ec", label: "Live tank EC", reading: tank.ec, digits: 2 },
+              { key: "ph", label: "Live tank pH", reading: tank.ph, digits: 2 },
               { key: null, label: "Temperature", reading: tank.temperature, digits: 1 },
             ] as const
-          ).map(({ key, label, reading, digits }) => (
+          ).map(({ key, label, reading, digits }) => {
+            const updated = Date.parse(
+              (reading.entityId && controller.states[reading.entityId]?.last_updated) || "",
+            );
+            return (
             <div key={label} title={reading.entityId || undefined}>
-              <dt>{label}</dt>
+              <dt>
+                {label}
+                {key && Number.isFinite(updated) && (
+                  <small className="tank-updated"> · updated {clock(updated, controller.timeZone)}</small>
+                )}
+              </dt>
               <dd>
                 {key && <TankSparkline which={key} line={spark[key]} end={recent.at} />}
                 <span className="tank-value">{value(reading, digits)}</span>
               </dd>
             </div>
-          ))}
+            );
+          })}
         </dl>
         <dl className="tank-equipment">
           <div
@@ -134,8 +146,7 @@ export function TankStatus({
           </div>
         </dl>
         <p className="tank-note">
-          Pump is the switch’s report, not measured flow. Last fill is a recorded fill, not a sensor
-          update.
+          Pump: the switch’s report, not measured flow. Last fill: a recorded fill.
         </p>
       </div>
     </section>

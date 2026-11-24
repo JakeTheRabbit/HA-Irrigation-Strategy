@@ -25,6 +25,7 @@ import {
   type RecordedReading,
 } from "@/lib/planning-curve";
 import { ecTargetBand, type EcRatios } from "@/lib/ec-band";
+import { formatEc } from "@/lib/display-units";
 import { settingWords } from "@/lib/setting-words";
 
 export interface PlanningCurveProps {
@@ -380,7 +381,9 @@ export function PlanningCurve({
             target: parameters.dryback_target,
             reference: referenceDryback(drybackPoints, dryback?.peak),
             unit: "%",
-            points: "%",
+            points: "pt",
+            // Dryback is a share of the peak ((peak − VWC) / peak), said once.
+            basis: "of peak",
             tolerance: 3,
             underIsNormal: true,
             quality: dryback?.reason ?? undefined,
@@ -582,20 +585,31 @@ export function PlanningCurve({
                 fill="var(--muted-foreground)"
                 fillOpacity={selectedPhase === phase.id ? 0.14 : index % 2 ? 0.07 : 0.025}
               />
+              {/* The phase chip as everywhere else: its own hue, white text. */}
               {x(phase.end) - x(phase.start) > 20 && (
-                <text
-                  x={(x(phase.start) + x(phase.end)) / 2}
-                  y={TOP - 8}
-                  textAnchor="middle"
-                  fill="var(--muted-foreground)"
-                  fontSize="12"
-                  fontWeight="600"
-                >
-                  {phase.id}
-                </text>
+                <g className="planning-phase-chip" data-phase={phase.id}>
+                  <rect
+                    x={(x(phase.start) + x(phase.end)) / 2 - 11}
+                    y={TOP - 22}
+                    width={22}
+                    height={17}
+                    rx={4}
+                  />
+                  <text x={(x(phase.start) + x(phase.end)) / 2} y={TOP - 9} textAnchor="middle">
+                    {phase.id}
+                  </text>
+                </g>
               )}
             </g>
           ))}
+          <text x={left - 7} y={TOP - 9} textAnchor="end" className="planning-axis-title">
+            VWC %
+          </text>
+          {showEc && (
+            <text x={width - 2} y={TOP - 9} textAnchor="end" className="planning-axis-title">
+              EC {formatEc(1, 0).replace(/^[\d.,]+\s*/, "")}
+            </text>
+          )}
           {[0, 25, 50, 75, 100].map((tick) => {
             const line = TOP + HEIGHT * (1 - tick / 100);
             return (
@@ -643,14 +657,14 @@ export function PlanningCurve({
                 <title>{`Probe gap ${at(gap.from)}–${at(gap.to)}: no usable reading`}</title>
               </rect>
               <text
-                x={x(gap.from)}
+                x={x(gap.to) + 4}
                 y={TOP + HEIGHT - 6}
-                textAnchor="middle"
+                textAnchor="start"
                 fill="var(--muted-foreground)"
                 fontSize="12"
                 fontStyle="italic"
               >
-                gap
+                No probe data
               </text>
             </g>
           ))}
@@ -660,9 +674,9 @@ export function PlanningCurve({
               d={recordedPath(previousDay, y)}
               display={showEarlier ? undefined : "none"}
               fill="none"
-              stroke="var(--foreground)"
+              stroke="var(--muted-foreground)"
               strokeWidth="1.25"
-              opacity="0.22"
+              opacity="0.45"
             >
               <title>Recorded VWC, previous grow-day</title>
             </path>
@@ -726,8 +740,7 @@ export function PlanningCurve({
                   y={y(plan.p2Envelope[1])}
                   width={Math.max(0, x(p2.end) - x(p2.start))}
                   height={y(plan.p2Envelope[0]) - y(plan.p2Envelope[1])}
-                  fill="var(--muted-foreground)"
-                  fillOpacity={0.12}
+                  fill="var(--band-vwc)"
                 >
                   <title>Nominal P2 shot envelope assuming full retention</title>
                 </rect>
@@ -743,7 +756,7 @@ export function PlanningCurve({
                   y1={y(plan.emergencyFloor)}
                   y2={y(plan.emergencyFloor)}
                   stroke={
-                    plan.emergencyReferenceActive ? "var(--warning)" : "var(--muted-foreground)"
+                    plan.emergencyReferenceActive ? "var(--warning-mark)" : "var(--muted-foreground)"
                   }
                   strokeDasharray="2 4"
                 >
@@ -757,8 +770,9 @@ export function PlanningCurve({
                   data-planning-values={plottedValues(targetPoints)}
                   d={targetPath}
                   fill="none"
-                  stroke={dirty ? "var(--primary)" : "var(--muted-foreground)"}
-                  strokeWidth={dirty ? 2.25 : 1.75}
+                  stroke="var(--series-vwc)"
+                  strokeWidth={dirty ? 2.25 : 1.5}
+                  strokeOpacity={dirty ? 1 : 0.85}
                   strokeDasharray="6 4"
                 />
               )}
@@ -829,7 +843,7 @@ export function PlanningCurve({
                     x2={x(shot.hour)}
                     y1={SHOT_Y - 6}
                     y2={SHOT_Y + 6}
-                    stroke={shot.emergency ? "var(--warning)" : "var(--muted-foreground)"}
+                    stroke={shot.emergency ? "var(--warning-mark)" : "var(--muted-foreground)"}
                     strokeWidth="2"
                   >
                     <title>
@@ -843,14 +857,41 @@ export function PlanningCurve({
                 );
               })}
               <g data-planning-ec display={showEc ? undefined : "none"}>
+                {poreBand && (
+                  <>
+                    <rect
+                      data-planning-line="ec-band"
+                      x={left}
+                      y={ey(poreBand[1])}
+                      width={plotWidth}
+                      height={Math.max(1, ey(poreBand[0]) - ey(poreBand[1]))}
+                      fill="var(--band-ec)"
+                    />
+                    <line
+                      x1={left}
+                      x2={left + plotWidth}
+                      y1={ey(poreBand[1])}
+                      y2={ey(poreBand[1])}
+                      stroke="var(--band-ec-edge)"
+                      strokeDasharray="3 3"
+                    />
+                    <line
+                      x1={left}
+                      x2={left + plotWidth}
+                      y1={ey(poreBand[0])}
+                      y2={ey(poreBand[0])}
+                      stroke="var(--band-ec-edge)"
+                      strokeDasharray="3 3"
+                    />
+                  </>
+                )}
                 {ecToday.length > 1 && (
                   <path
                     data-planning-line="recorded-ec"
                     d={recordedPath(ecToday, ey)}
                     fill="none"
-                    stroke="var(--foreground)"
-                    strokeWidth="1"
-                    strokeOpacity="0.55"
+                    stroke="var(--series-ec)"
+                    strokeWidth="1.5"
                   >
                     <title>Recorded pore EC, this grow-day</title>
                   </path>
@@ -860,7 +901,7 @@ export function PlanningCurve({
                     data-planning-line="ec"
                     d={ecPath(plan.ec)}
                     fill="none"
-                    stroke="var(--muted-foreground)"
+                    stroke="var(--series-ec)"
                     strokeWidth="1.5"
                     strokeDasharray="1 4"
                     strokeLinecap="round"
@@ -877,8 +918,8 @@ export function PlanningCurve({
                   data-planning-line="recorded-vwc"
                   d={recordedPath(vwcRecorded.today, y)}
                   fill="none"
-                  stroke="var(--foreground)"
-                  strokeWidth="1.75"
+                  stroke="var(--series-vwc)"
+                  strokeWidth="2.5"
                 >
                   <title>Recorded VWC, this grow-day (lights-on to lights-on)</title>
                 </path>
@@ -889,7 +930,7 @@ export function PlanningCurve({
                   cx={x(nowVwc.hour)}
                   cy={y(nowVwc.value)}
                   r="3.5"
-                  fill="var(--foreground)"
+                  fill="var(--series-vwc)"
                 >
                   <title>{`Now ${trim(nowVwc.value)}%`}</title>
                 </circle>

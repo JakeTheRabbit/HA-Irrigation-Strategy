@@ -13,7 +13,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { Empty, number } from "@/components/dashboard";
+import { Empty, number, type Page } from "@/components/dashboard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Pill } from "@/components/mini-visuals";
@@ -111,9 +111,11 @@ const METRICS: Metric[] = [
  * grow's statistics and its yield. Read-only: nothing here changes watering. */
 export function Grows({
   controller,
+  navigate,
   onDirtyChange,
 }: {
   controller: Controller;
+  navigate?: (page: Page) => void;
   onDirtyChange?: (dirty: boolean) => void;
 }) {
   const [recordsDirty, setRecordsDirty] = useState(false);
@@ -211,6 +213,16 @@ export function Grows({
             watering.
           </p>
         </div>
+        {navigate && (
+          <nav className="history-toggle" aria-label="Runs views">
+            <button type="button" aria-pressed="false" onClick={() => navigate("history/compare")}>
+              Compare runs
+            </button>
+            <button type="button" aria-pressed="true" aria-current="page" onClick={() => navigate("history/grows")}>
+              All grows
+            </button>
+          </nav>
+        )}
       </header>
       {error && (
         <p role="alert" className="grows-notice">

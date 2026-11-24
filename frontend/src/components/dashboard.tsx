@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { Activity, Droplets, Info, LoaderCircle } from "lucide-react";
+import { Activity, AlertTriangle, Droplets, Info, LoaderCircle } from "lucide-react";
 import {
   CartesianGrid,
   ComposedChart,
@@ -26,6 +26,7 @@ import { plantAmount } from "@/lib/water-view";
 import { Notice, UiTip } from "@/components/info-tip";
 import { Pill, type PillTone } from "./mini-visuals";
 import { DATE_TIME, formatClock, formatDateTime } from "@/lib/clock";
+import { ZONE_COLOURS } from "@/lib/zone-colours";
 
 export type { Page };
 export const number = (value: number | null, digits = 1) =>
@@ -56,6 +57,43 @@ export function Heading({
       </div>
       {action}
     </div>
+  );
+}
+/** What is wrong right now, directly under a page heading: the fault's name and time, the reading
+ * against what is allowed, what it costs and the way out. Fault is red; anything less is amber. */
+export function FaultSummary({
+  tone,
+  title,
+  value,
+  allowed,
+  children,
+  action,
+}: {
+  tone: "fault" | "warning";
+  title: string;
+  value?: string;
+  allowed?: string;
+  children: ReactNode;
+  action?: ReactNode;
+}) {
+  return (
+    <section className="fault-summary" data-tone={tone} aria-label={title}>
+      <AlertTriangle className="fault-summary-icon" size={22} aria-hidden="true" />
+      <div className="fault-summary-body">
+        {/* The reading shares the title's line when there is room. */}
+        <div className="fault-summary-head">
+          <h2>{title}</h2>
+          {value && (
+            <p className="fault-summary-value">
+              <b>{value}</b>
+              {allowed && <span>{allowed}</span>}
+            </p>
+          )}
+        </div>
+        <div className="fault-summary-detail">{children}</div>
+      </div>
+      {action && <div className="fault-summary-action">{action}</div>}
+    </section>
   );
 }
 export function Empty({
@@ -164,7 +202,7 @@ export function HistoryChart({
       current = false;
     };
   }, [controller.roomId, controller.connection, key, hours, retry]);
-  const palette = ["#03a9f4", "#e5a43b", "#a57bf3", "#e97d98", "#43bdab"];
+  const palette = ZONE_COLOURS;
   const visibleZones = zones.filter((zone) => !hiddenZones.includes(zone.id));
   const lines = visibleZones.flatMap((zone) =>
     (["vwc", "ec"] as const).map((kind) => {

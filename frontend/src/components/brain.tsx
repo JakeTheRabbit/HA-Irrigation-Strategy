@@ -233,6 +233,38 @@ function DemoSwitcher({ demo }: { demo: BrainDemoState }) {
   );
 }
 
+/** Shared view switcher unifying Status › AI assistant (#/today/ai) and Settings › AI assistant
+ * (#/settings/ai) into one workspace without breaking either route. */
+function AiTabs({
+  active,
+  navigate,
+}: {
+  active: "overview" | "settings";
+  navigate?: Navigate;
+}) {
+  if (!navigate) return null;
+  return (
+    <nav className="history-toggle ai-view-tabs" aria-label="AI assistant views">
+      <button
+        type="button"
+        aria-pressed={active === "overview"}
+        aria-current={active === "overview" ? "page" : undefined}
+        onClick={() => navigate("today/ai")}
+      >
+        Live status &amp; decisions
+      </button>
+      <button
+        type="button"
+        aria-pressed={active === "settings"}
+        aria-current={active === "settings" ? "page" : undefined}
+        onClick={() => navigate("settings/ai")}
+      >
+        Judges, budget &amp; settings
+      </button>
+    </nav>
+  );
+}
+
 /** The AI assistant page: its state, budget, last decision, what it may do and its latest decisions. */
 export function BrainPage({
   controller,
@@ -249,7 +281,7 @@ export function BrainPage({
   const budget = panel && budgetLine(panel);
   return (
     <div className="brain-page" data-brain-page={panel?.state ?? "none"}>
-      <Heading title="AI assistant" />
+      <Heading title="AI assistant" action={<AiTabs active="overview" navigate={navigate} />} />
       {controller.demo && <DemoSwitcher demo={demo} />}
       <section className="panel" aria-labelledby="brain-status-title">
         <div className="panel-heading">
@@ -879,9 +911,11 @@ function BandTick({ band, value }: { band: [number, number]; value: number }) {
  * in controller options. */
 export function AiSettings({
   controller,
+  navigate,
   onDirtyChange,
 }: {
   controller: Controller;
+  navigate?: Navigate;
   onDirtyChange?: (dirty: boolean) => void;
 }) {
   const [instructionsDirty, setInstructionsDirty] = useState(false);
@@ -902,7 +936,7 @@ export function AiSettings({
   );
   return (
     <>
-      <Heading title="AI assistant" />
+      <Heading title="AI assistant" action={<AiTabs active="settings" navigate={navigate} />} />
       <div className="ai-settings" data-ai-settings>
         <div className="ai-grid">
           <JudgesCard controller={controller} />

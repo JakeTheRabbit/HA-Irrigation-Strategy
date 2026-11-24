@@ -113,7 +113,7 @@
 }
 .demo-pill {
   padding: 1px 9px;
-  border: 1px solid color-mix(in srgb, var(--warning) 40%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--warning-mark) 40%, var(--surface));
   border-radius: 999px;
   background: var(--warning-bg);
   color: var(--warning);
@@ -137,6 +137,7 @@
 .safety-switches {
   display: inline-flex;
   align-items: center;
+  flex-shrink: 0;
   gap: 6px;
   padding-left: 10px;
   border-left: 1px solid var(--border);
@@ -196,7 +197,7 @@
   align-items: flex-start;
   gap: 9px;
   padding: 9px 28px;
-  border-bottom: 1px solid color-mix(in srgb, var(--warning) 40%, var(--border));
+  border-bottom: 1px solid color-mix(in srgb, var(--warning-mark) 40%, var(--border));
   background: var(--warning-bg);
   color: var(--foreground);
   font-size: var(--text-sm);
@@ -232,10 +233,9 @@
   header.topbar {
     flex-wrap: wrap;
     height: auto;
-    min-height: 56px;
-    row-gap: 6px;
-    padding-top: 6px;
-    padding-bottom: 6px;
+    min-height: 52px;
+    row-gap: 4px;
+    padding: 4px 12px 6px;
   }
   .topbar .connection-info {
     display: contents;
@@ -298,9 +298,20 @@
   }
   .safety-switch {
     flex: 1;
+    min-width: 0;
     justify-content: center;
-    height: 32px;
+    height: 44px;
     padding: 0 8px;
+  }
+  .safety-switch-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+/* Beside "Controls for <room>" the room need not ride in the watering switch's words. */
+@media (min-width: 721px) {
+  .safety-switch-room {
+    display: none;
   }
 }
 
@@ -308,4 +319,49 @@
   font-size: var(--text-xs);
   color: var(--muted-foreground);
   white-space: nowrap;
+}
+/* Wider than a phone: the room the safety controls act on reads as their label, grouped with
+   them, so Stop all is never taken for the whole facility. */
+@media (min-width: 721px) {
+  .header-safety-scope {
+    margin-left: 4px;
+    padding-left: 12px;
+    border-left: 1px solid var(--border);
+    color: var(--foreground);
+    font-size: var(--text-sm);
+    font-weight: 600;
+  }
+  .header-safety-scope::before {
+    content: "Controls for ";
+    color: var(--muted-foreground);
+    font-weight: 400;
+  }
+}
+/* Medium desktop / split-pane inside Home Assistant: compact secondary header chrome so the room's
+   Stop all switch never clips off the right edge of the viewport. */
+@media (max-width: 1360px) and (min-width: 721px) {
+  .header-safety-scope {
+    padding-left: 8px;
+  }
+  .header-safety-scope::before {
+    content: "";
+  }
+  .safety-switches {
+    padding-left: 8px;
+  }
+  .safety-switch {
+    padding: 0 9px;
+  }
+}
+@media (max-width: 1180px) and (min-width: 721px) {
+  .topbar .jump-to kbd,
+  .topbar .wide-only {
+    display: none;
+  }
+  .topbar .jump-to {
+    padding: 0 9px;
+  }
+  .topbar-facts {
+    gap: 6px;
+  }
 }

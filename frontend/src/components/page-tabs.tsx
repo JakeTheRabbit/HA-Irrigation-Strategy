@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { NAV_TREE } from "@/lib/nav-tree";
 import { sectionOf, type Page, type Section } from "@/lib/routes";
 import "./page-tabs.css";
@@ -10,7 +11,7 @@ export const SECTION_LABELS = Object.fromEntries(
 ) as Record<Section, string>;
 export const TABS = Object.fromEntries(
   NAV_TREE.map((group) => [group.section, group.items]),
-) as Record<Section, { page: Page; label: string }[]>;
+) as Record<Section, { page: Page; label: string; short?: string }[]>;
 /** Pages reached from another page rather than the menu. */
 const OFF_MENU_LABELS: Partial<Record<Page, string>> = {
   today: "Today",
@@ -41,9 +42,19 @@ export function PageTabs({
 }) {
   const section = sectionOf(page);
   const tabs = TABS[section];
+  const row = useRef<HTMLElement>(null);
+  // On a phone the row scrolls sideways: the open page's tab is brought into view, never left
+  // cut off at the edge.
+  useEffect(() => {
+    const nav = row.current;
+    const active = nav?.querySelector<HTMLElement>('[aria-current="page"]');
+    if (!nav || !active || nav.scrollWidth <= nav.clientWidth) return;
+    nav.scrollLeft = active.offsetLeft - (nav.clientWidth - active.offsetWidth) / 2;
+  }, [page]);
   if (tabs.length < 2) return null;
   return (
     <nav
+      ref={row}
       className="page-tabs"
       data-section={section}
       aria-label={`${SECTION_LABELS[section]} pages`}
@@ -53,9 +64,11 @@ export function PageTabs({
           type="button"
           key={tab.page}
           aria-current={tab.page === page ? "page" : undefined}
+          // The tabs show only on a phone: the short word, the page's full name to a screen reader.
+          aria-label={tab.short && `${tab.label}${badges[tab.page] ? ` ${badges[tab.page]}` : ""}`}
           onClick={() => navigate(tab.page)}
         >
-          {tab.label}
+          {tab.short ?? tab.label}
           {!!badges[tab.page] && <i className="page-tab-count">{badges[tab.page]}</i>}
         </button>
       ))}

@@ -109,7 +109,8 @@
 }
 .system-note {
   grid-column: 1 / -1;
-  font-size: var(--text-xs);
+  font-size: var(--text-label);
+  line-height: var(--leading-label);
   color: var(--success);
 }
 .system-note::before,
@@ -167,12 +168,13 @@
 }
 .system-strip span[data-missed] {
   height: 35%;
-  background: var(--warning);
+  background: var(--warning-mark);
 }
 .system-beat-note {
   margin: 0;
   color: var(--muted-foreground);
-  font-size: var(--text-xs);
+  font-size: var(--text-label);
+  line-height: var(--leading-label);
 }
 
 /* Every mapped device. */
@@ -221,7 +223,7 @@
   color: var(--success);
 }
 .system-row[data-tone="warn"] .system-dot {
-  color: var(--warning);
+  color: var(--warning-mark);
 }
 .system-row[data-tone="bad"] .system-dot,
 .system-row[data-tone="bad"] .system-row-seen {
@@ -232,8 +234,46 @@
 }
 .system-row-entity {
   display: block;
+  overflow: hidden;
   color: var(--muted-foreground);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: var(--text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Healthy rows fold under the exceptions. */
+.system-healthy > summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  list-style: none;
+}
+.system-healthy > summary::-webkit-details-marker {
+  display: none;
+}
+.system-healthy > summary::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--success);
+}
+.system-healthy > summary::after {
+  content: "▸";
+}
+.system-healthy[open] > summary::after {
+  content: "▾";
+}
+/* The attention summary's list: one line per problem. */
+.system-attention {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding-left: 18px;
 }
 .system-poll-error {
   margin: 8px 0 0;
@@ -258,7 +298,7 @@
   background: var(--success);
 }
 .system-bar[data-low] span {
-  background: var(--warning);
+  background: var(--warning-mark);
 }
 .system-row-pct {
   color: var(--muted-foreground);
@@ -329,4 +369,25 @@
   .system-alert {
     margin-left: 0;
   }
+}
+/* An affected device's own actions, under the warning: 44 px targets. */
+.system-attention li {
+  display: grid;
+  gap: 4px;
+}
+.system-attention-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 16px;
+}
+.system-attention-actions a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--primary-strong);
+  font-weight: 600;
+}
+.system-attention-actions button {
+  min-height: 44px;
 }

@@ -1,0 +1,1887 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0a0c10">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<title>AiGrow Ops · Live Crop Steering</title>
+<!--
+  AiGrow Ops — LIVE Home Assistant crop-steering panel
+  =====================================================
+  Feature layout mirrors AROYA / Growlink product surfaces.
+  Data path mirrors F2 / HA-Irrigation-Strategy (NOT a marketing mock):
+
+    states  → GET  /api/states
+    writes  → POST /api/services/{domain}/{service}
+    history → agency_sensor_analytics Influx proxy → /api/history/period → WS statistics
+    schedule→ valve/pump state history + activity_log.feed + zone phase/last shot
+    export  → batches.cropSteeringSummary (AiGrowApp cropSteering.ingestRunSummary)
+
+  Deploy:  /config/www/aigrow-ops.html  →  /local/aigrow-ops.html
+  Scope:   ?room=f2  aliases crop_steering_f2_* → crop_steering_*
+  Demo:    ?demo only (offline fixture) — never used as live fallback.
+
+  Auth: localStorage.hassTokens (preferred). CONFIG.LL_TOKEN keep blank in repo.
+-->
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<style>
+:root{color-scheme:dark;--bg:#0a0c10;--bg2:#0f1318;--card:#141a21;--card2:#19212a;--hair:rgba(255,255,255,.08);
+  --ink:#e7ecf2;--ink2:#aab4c0;--ink3:#727d8a;--ok:#34d399;--okdim:#10b981;--warn:#fbbf24;--crit:#f87171;
+  --info:#38bdf8;--cyan:#22d3ee;--pink:#f472b6;--violet:#a78bfa;--p0:#8b93a1;--p1:#38bdf8;--p2:#34d399;--p3:#fbbf24;--maxw:1520px}
+*{box-sizing:border-box}html,body{margin:0;min-height:100%;background:radial-gradient(1100px 520px at 85% -8%,rgba(34,211,238,.05),transparent 55%),var(--bg);
+  color:var(--ink);font-family:Inter,ui-sans-serif,system-ui,sans-serif;font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased}
+::-webkit-scrollbar{width:10px;height:10px}::-webkit-scrollbar-thumb{background:#1f2630;border-radius:9px;border:2px solid var(--bg)}
+.wrap{max-width:var(--maxw);margin:0 auto;padding:clamp(12px,2vw,20px)}
+.glass{background:linear-gradient(180deg,var(--card),var(--bg2));border:1px solid var(--hair);border-radius:16px;box-shadow:0 10px 40px -22px #000}
+.grad{background:linear-gradient(135deg,#6ee7b7,#34d399 45%,#22d3ee);-webkit-background-clip:text;background-clip:text;color:transparent}
+.kicker{display:inline-flex;align-items:center;gap:7px;font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--ok);
+  background:rgba(52,211,153,.1);border:1px solid rgba(52,211,153,.25);padding:4px 10px;border-radius:999px;font-weight:700}
+.tabs{display:flex;gap:5px;flex-wrap:wrap}
+.tab{padding:8px 12px;border-radius:10px;font-size:12.5px;font-weight:700;color:var(--ink3);background:rgba(255,255,255,.03);
+  border:1px solid var(--hair);cursor:pointer}.tab:hover{color:var(--ink2)}.tab.on{color:#06281c;background:linear-gradient(135deg,var(--ok),var(--okdim));border-color:transparent}
+.panel{display:none}.panel.on{display:block}
+.metric{padding:12px 14px;border-radius:12px;background:var(--card2);border:1px solid var(--hair)}
+.metric .ml{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink3);font-weight:700}
+.metric .mv{font-size:1.4rem;font-weight:800;margin-top:3px;line-height:1.1}
+.metric .mu{font-size:.68rem;color:var(--ink3);font-weight:600;margin-left:2px}
+.metric .ms{font-size:11px;color:var(--ink3);margin-top:4px}
+.btn{display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 12px;border-radius:9px;font-weight:700;font-size:12px;
+  border:1px solid var(--hair);background:var(--card2);color:var(--ink);cursor:pointer}.btn:hover{border-color:rgba(255,255,255,.18)}
+.btn.primary{background:linear-gradient(135deg,var(--ok),var(--okdim));color:#06281c;border-color:transparent}
+.btn.danger{background:rgba(248,113,113,.12);color:var(--crit);border-color:rgba(248,113,113,.3)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.pill{display:inline-flex;align-items:center;gap:5px;padding:3px 8px;border-radius:999px;font-size:11px;font-weight:700;
+  background:var(--card2);border:1px solid var(--hair);color:var(--ink2)}
+.pill.ok{color:var(--ok);border-color:rgba(52,211,153,.3);background:rgba(52,211,153,.1)}
+.pill.warn{color:var(--warn);border-color:rgba(251,191,36,.3);background:rgba(251,191,36,.1)}
+.pill.crit{color:var(--crit);border-color:rgba(248,113,113,.3);background:rgba(248,113,113,.1)}
+.pill.info{color:var(--info);border-color:rgba(56,189,248,.3);background:rgba(56,189,248,.1)}
+.room{padding:13px;border-radius:13px;background:var(--card2);border:1px solid var(--hair);cursor:pointer;position:relative;overflow:hidden}
+.room.on{border-color:rgba(52,211,153,.45);box-shadow:0 0 0 1px rgba(52,211,153,.12)}
+.room .bar{position:absolute;left:0;bottom:0;height:3px;width:100%;background:var(--cg,var(--ok))}
+.gantt-row{display:grid;grid-template-columns:150px 1fr;gap:10px;align-items:center;min-height:48px;border-top:1px solid rgba(255,255,255,.05);padding:7px 0}
+.gantt-row:first-child{border-top:0}
+.gantt-track{position:relative;height:26px;border-radius:7px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.05);overflow:hidden}
+.gantt-block{position:absolute;top:3px;bottom:3px;border-radius:5px;min-width:2px}
+.gantt-now{position:absolute;top:0;bottom:0;width:2px;background:#fff;z-index:3;box-shadow:0 0 8px #fff6}
+.steer-range{width:100%;height:14px;-webkit-appearance:none;border-radius:999px;outline:none;cursor:pointer;
+  background:linear-gradient(90deg,#a855f7,#a3e635 45%,#34d399)}
+.steer-range::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;border-radius:50%;background:#fff;border:3px solid #0a0c10}
+.field{display:flex;flex-direction:column;gap:4px}
+.field label{font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink3);font-weight:700}
+.field input,.field select{background:var(--card2);border:1px solid var(--hair);border-radius:8px;color:var(--ink);padding:8px 10px;font:inherit;font-size:13px}
+.field input:focus,.field select:focus{outline:1px solid rgba(52,211,153,.45)}
+.field.dirty input{border-color:rgba(251,191,36,.55)}
+.rule{display:flex;gap:12px;align-items:flex-start;padding:11px 13px;border-radius:12px;background:var(--card2);border:1px solid var(--hair)}
+.tog{flex:none;width:42px;height:24px;border-radius:999px;background:rgba(255,255,255,.08);position:relative;cursor:pointer;border:1px solid var(--hair)}
+.tog.on{background:rgba(52,211,153,.35);border-color:rgba(52,211,153,.5)}
+.tog i{position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:#fff;transition:left .15s}
+.tog.on i{left:20px}
+.chart-box{position:relative;height:260px}.chart-box.lg{height:320px}.chart-box.sm{height:200px}
+pre.export{font-size:11.5px;line-height:1.45;background:#0c1016;border:1px solid var(--hair);border-radius:12px;padding:14px;overflow:auto;max-height:440px;color:#cbd5e1}
+.toast{position:fixed;bottom:18px;right:14px;z-index:90;display:flex;flex-direction:column;gap:8px}
+.toast .t{background:var(--card);border:1px solid rgba(52,211,153,.25);border-radius:11px;padding:10px 13px;font-size:12.5px;box-shadow:0 10px 28px -12px #000}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 3px rgba(52,211,153,.2)}.dot.off{background:var(--crit);box-shadow:0 0 0 3px rgba(248,113,113,.2)}.dot.demo{background:var(--info)}
+h2.sec{font-size:.92rem;font-weight:800;margin:0 0 10px;display:flex;align-items:center;gap:8px}
+h2.sec::before{content:"";width:4px;height:1.05em;border-radius:3px;background:linear-gradient(180deg,var(--ok),var(--cyan));flex:none}
+.empty{padding:28px;text-align:center;color:var(--ink3);font-size:13px;border:1px dashed var(--hair);border-radius:12px}
+.feed{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11.5px;line-height:1.45;max-height:280px;overflow:auto;
+  background:#0c1016;border:1px solid var(--hair);border-radius:12px;padding:10px 12px}
+.feed .ln{padding:2px 0;border-bottom:1px solid rgba(255,255,255,.03)}
+.banner{padding:10px 14px;border-radius:12px;margin-bottom:12px;font-size:13px;font-weight:600}
+.banner.err{background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.35);color:#fecaca}
+.banner.warn{background:rgba(251,191,36,.1);border:1px solid rgba(251,191,36,.35);color:#fde68a}
+.banner.info{background:rgba(56,189,248,.1);border:1px solid rgba(56,189,248,.3);color:#bae6fd}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap" id="app">
+  <div id="banner"></div>
+
+  <header class="flex flex-wrap items-start justify-between gap-3 mb-3">
+    <div>
+      <div class="kicker">AiGrowApp · Live Control</div>
+      <h1 class="text-[1.5rem] sm:text-[1.75rem] font-extrabold tracking-tight mt-2 mb-1"><span class="grad">AiGrow Ops</span></h1>
+      <p class="text-sm text-[var(--ink2)] m-0 max-w-[70ch]">
+        AROYA/Growlink surface parity on the live crop-steering stack — history, setpoints, valves, activity feed.
+        Export matches AiGrowApp <code class="text-[var(--ok)]">cropSteeringSummary</code>.
+      </p>
+    </div>
+    <div class="flex flex-col items-end gap-2">
+      <div class="flex items-center gap-2 text-xs text-[var(--ink2)]">
+        <span class="dot" id="liveDot"></span>
+        <span id="liveLabel">connecting…</span>
+        <span class="pill" id="roomPill" style="display:none"></span>
+      </div>
+      <div class="flex gap-2 flex-wrap justify-end">
+        <select id="rangeSel" class="btn" title="History window">
+          <option value="24">24h</option>
+          <option value="72">3d</option>
+          <option value="168">7d</option>
+        </select>
+        <button class="btn" id="btnRefresh" type="button">Refresh</button>
+        <button class="btn primary" id="btnSaveDirty" type="button" disabled>Save setpoints</button>
+      </div>
+    </div>
+  </header>
+
+  <nav class="tabs mb-3" id="tabs"></nav>
+
+  <!-- FACILITY -->
+  <section class="panel" data-panel="facility">
+    <div class="glass p-4 mb-3">
+      <h2 class="sec">Zones · live</h2>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3" id="zoneGrid"></div>
+      <div id="zoneEmpty" class="empty" style="display:none">No <code>sensor.crop_steering_zone_*_vwc</code> entities found. Is the crop_steering integration / f2-control engine loaded?</div>
+    </div>
+    <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-2" id="facilityMetrics"></div>
+  </section>
+
+  <!-- SCHEDULE -->
+  <section class="panel" data-panel="schedule">
+    <div class="glass p-4 mb-3">
+      <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+        <h2 class="sec m-0">Irrigation schedule · today</h2>
+        <div id="schedAlerts"></div>
+      </div>
+      <p class="text-xs text-[var(--ink3)] mb-3">Valve ON segments from HA history + lights window from <code>lights_on/off_hour</code>. Errors from zone status / safety / activity feed.</p>
+      <div id="gantt"></div>
+      <div id="ganttEmpty" class="empty" style="display:none">No valve history yet. Map valves in CONFIG.HARDWARE or wait for recorder data.</div>
+    </div>
+    <div class="glass p-4">
+      <h2 class="sec">Engine activity feed</h2>
+      <div class="feed" id="activityFeed"><div class="empty" style="border:0;padding:12px">Waiting for sensor.crop_steering_activity_log…</div></div>
+    </div>
+  </section>
+
+  <!-- STEER -->
+  <section class="panel" data-panel="steer">
+    <div class="grid grid-cols-1 lg:grid-cols-5 gap-3">
+      <div class="glass p-4 lg:col-span-2">
+        <h2 class="sec">Steering strategy</h2>
+        <p class="text-xs text-[var(--ink3)] mb-2" id="steerZoneLabel">Zone —</p>
+        <div class="flex justify-between text-xs text-[var(--ink3)] mb-1">
+          <span>GEN 1</span><span class="text-[var(--ink)] font-bold" id="dialLabel">—</span><span>VEG 10</span>
+        </div>
+        <input type="range" min="1" max="10" step="1" value="5" class="steer-range" id="steerDial">
+        <p class="text-xs text-[var(--ink3)] mt-2 leading-relaxed" id="dialHelp"></p>
+        <div class="flex gap-2 mt-3 flex-wrap">
+          <button class="btn primary" id="btnApplyDial" type="button">Apply dial → HA</button>
+          <button class="btn" id="btnManualShot" type="button">Manual shot 60s</button>
+        </div>
+        <div class="grid grid-cols-2 gap-2 mt-3" id="steerMetrics"></div>
+        <div class="grid grid-cols-2 gap-2 mt-3" id="steerSetpoints"></div>
+      </div>
+      <div class="glass p-4 lg:col-span-3">
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+          <h2 class="sec m-0">Substrate · VWC + drybacks</h2>
+          <span class="pill" id="histBadge">history…</span>
+        </div>
+        <div class="chart-box lg"><canvas id="subChart"></canvas></div>
+        <div id="subEmpty" class="empty mt-2" style="display:none">No VWC history for this window.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CLIMATE -->
+  <section class="panel" data-panel="climate">
+    <div class="glass p-4 mb-3">
+      <h2 class="sec">Climate · live + history</h2>
+      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 mb-3" id="climateNow"></div>
+      <div class="chart-box lg"><canvas id="climateChart"></canvas></div>
+      <div id="climateEmpty" class="empty mt-2" style="display:none">No climate history. Check CONFIG.E climate entity ids against your HA registry.</div>
+    </div>
+  </section>
+
+  <!-- IRRIGATION -->
+  <section class="panel" data-panel="irrigation">
+    <div class="glass p-4 mb-3">
+      <h2 class="sec">Irrigation Blueprint · P0–P3 setpoints</h2>
+      <p class="text-xs text-[var(--ink3)] mb-3">Live <code>number.crop_steering_*</code> / zone overrides. Dirty fields highlight amber — Save setpoints writes HA.</p>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3" id="phaseFields"></div>
+    </div>
+    <div class="glass p-4">
+      <h2 class="sec">VWC vs field capacity (history)</h2>
+      <div class="chart-box"><canvas id="irrigChart"></canvas></div>
+    </div>
+  </section>
+
+  <!-- FERTIGATION -->
+  <section class="panel" data-panel="fertigation">
+    <div class="glass p-4">
+      <h2 class="sec">Fertigation · EC targets by phase / mode</h2>
+      <div class="overflow-x-auto mb-3">
+        <table class="w-full text-sm" id="fertTable">
+          <thead><tr class="text-left text-[10px] uppercase tracking-wider text-[var(--ink3)] border-b border-white/10">
+            <th class="py-2 pr-2">Phase</th><th class="py-2 pr-2">EC veg</th><th class="py-2 pr-2">EC gen</th><th class="py-2">Active target</th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-2" id="fertNow"></div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mt-3" id="fertFields"></div>
+    </div>
+  </section>
+
+  <!-- ENVIRONMENT -->
+  <section class="panel" data-panel="environment">
+    <div class="glass p-4 mb-3">
+      <h2 class="sec">Production environment · multi-series history</h2>
+      <div class="chart-box lg"><canvas id="envChart"></canvas></div>
+      <div id="envEmpty" class="empty mt-2" style="display:none">No multi-metric history available.</div>
+    </div>
+    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2" id="envMetrics"></div>
+  </section>
+
+  <!-- TASKS / ACTIONS -->
+  <section class="panel" data-panel="tasks">
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-3">
+      <div class="glass p-4">
+        <h2 class="sec">Operator actions</h2>
+        <p class="text-xs text-[var(--ink3)] mb-3">Live engine controls — same event path F2 uses (safety interlocks still apply).</p>
+        <div class="flex flex-col gap-2" id="actionList"></div>
+      </div>
+      <div class="glass p-4">
+        <h2 class="sec">Recent engine decisions</h2>
+        <div class="feed" id="taskFeed"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- LOGIC -->
+  <section class="panel" data-panel="logic">
+    <div class="glass p-4">
+      <h2 class="sec">Automation logic · live switches</h2>
+      <div class="flex flex-col gap-2" id="ruleList"></div>
+    </div>
+  </section>
+
+  <!-- EXPORT -->
+  <section class="panel" data-panel="export">
+    <div class="glass p-4">
+      <h2 class="sec">AiGrowApp cropSteeringSummary</h2>
+      <p class="text-xs text-[var(--ink3)] mb-3">Built from live zone sensors + optional history aggregates. Shape = <code>batches.cropSteeringSummary</code> / <code>cropSteering.ingestRunSummary</code>.</p>
+      <div class="flex gap-2 mb-3 flex-wrap">
+        <button class="btn primary" id="btnCopyJson" type="button">Copy JSON</button>
+        <button class="btn" id="btnDownloadJson" type="button">Download</button>
+        <button class="btn" id="btnRebuildExport" type="button">Rebuild from live</button>
+      </div>
+      <pre class="export" id="exportPre">{}</pre>
+    </div>
+  </section>
+</div>
+<div class="toast" id="toasts"></div>
+
+<script>
+/* =============================================================================
+   CONFIG — entity map = HA-Irrigation-Strategy ENTITIES.md + F2 live bindings
+   ============================================================================= */
+const CONFIG = {
+  HA_BASE: "",
+  LL_TOKEN: "",
+  REFRESH_MS: 30000,
+  HIST_TTL_MS: 180000,
+  // Climate / feed — override to match your registry (F2 defaults)
+  E: {
+    sw_system: "switch.crop_steering_system_enabled",
+    sw_auto: "switch.crop_steering_auto_irrigation_enabled",
+    sw_ecstack: "switch.crop_steering_ec_stacking_enabled",
+    steering_mode: "select.crop_steering_steering_mode",
+    growth_stage: "select.crop_steering_growth_stage",
+    irrigation_phase: "select.crop_steering_irrigation_phase",
+    fused_vwc: "sensor.crop_steering_fused_vwc",
+    fused_ec: "sensor.crop_steering_fused_ec",
+    avg_vwc: "sensor.crop_steering_average_vwc_all_zones",
+    avg_ec: "sensor.crop_steering_average_ec_all_zones",
+    dryback_pct: "sensor.crop_steering_dryback_percentage",
+    dryback_target: "sensor.crop_steering_dryback_target",
+    decision: "sensor.crop_steering_current_decision",
+    activity: "sensor.crop_steering_activity_log",
+    next_irrig: "sensor.crop_steering_app_next_irrigation",
+    safety: "sensor.crop_steering_system_safety_status",
+    health: "sensor.crop_steering_system_health_score",
+    field_capacity: "number.crop_steering_field_capacity",
+    lights_on: "number.crop_steering_lights_on_hour",
+    lights_off: "number.crop_steering_lights_off_hour",
+    p0_dryback: "number.crop_steering_p0_dryback_drop_percent",
+    p0_min_wait: "number.crop_steering_p0_minimum_wait_time",
+    p0_max_wait: "number.crop_steering_p0_maximum_wait_time",
+    p1_target_vwc: "number.crop_steering_p1_target_vwc",
+    p1_init_shot: "number.crop_steering_p1_initial_shot_size",
+    p1_max_shot: "number.crop_steering_p1_maximum_shot_size",
+    p1_between: "number.crop_steering_p1_time_between_shots",
+    p2_vwc: "number.crop_steering_p2_vwc_threshold",
+    p2_shot: "number.crop_steering_p2_shot_size",
+    p3_emerg: "number.crop_steering_p3_emergency_vwc_threshold",
+    p3_emerg_shot: "number.crop_steering_p3_emergency_shot_size",
+    veg_db: "number.crop_steering_vegetative_dryback_target",
+    gen_db: "number.crop_steering_generative_dryback_target",
+    max_ec: "number.crop_steering_maximum_ec",
+    irr_ec_min: "number.crop_steering_irrigation_ec_min",
+    irr_ec_max: "number.crop_steering_irrigation_ec_max",
+    irr_ph_min: "number.crop_steering_irrigation_ph_min",
+    irr_ph_max: "number.crop_steering_irrigation_ph_max",
+    air_temp: "sensor.f2_scd41_env3_dlight_poe_temperature",
+    rh: "sensor.f2_sensor_humidity",
+    co2: "sensor.f2_scd41_env3_dlight_poe_co2",
+    vpd: "sensor.f2_air_vpd",
+    ppfd: "sensor.f2_scd41_env3_dlight_poe_ppfd",
+    dli: "sensor.f2_scd41_env3_dlight_poe_dli",
+    src_ec: "sensor.atlas_legacy_1_ec",
+    src_ph: "sensor.aquaponics_kit_f4f618_ph",
+  },
+  // Hardware used for schedule Gantt (override for your room)
+  HARDWARE: {
+    pump: "switch.veg_main_pump",
+    mainline: "switch.espoe_irrigation_relay_2_3",
+    valves: {
+      1: "switch.f2_row1",
+      2: "switch.f2_row2",
+      3: "switch.f2_row3",
+    },
+  },
+  ZONE: (z) => ({
+    vwc: `sensor.crop_steering_zone_${z}_vwc`,
+    ec: `sensor.crop_steering_zone_${z}_ec`,
+    phase: `sensor.crop_steering_zone_${z}_phase`,
+    status: `sensor.crop_steering_zone_${z}_status`,
+    safety: `sensor.crop_steering_zone_${z}_safety_status`,
+    enabled: `switch.crop_steering_zone_${z}_enabled`,
+    override: `switch.crop_steering_zone_${z}_manual_override`,
+    last: `sensor.crop_steering_zone_${z}_last_irrigation_app`,
+    last_fb: `sensor.crop_steering_zone_${z}_last_irrigation`,
+    shots: `sensor.crop_steering_zone_${z}_irrigation_count_app`,
+    daily: `sensor.crop_steering_zone_${z}_daily_water_app`,
+    daily_fb: `sensor.crop_steering_zone_${z}_daily_water_usage`,
+    mode: `select.crop_steering_zone_${z}_steering_mode`,
+    phase_ctl: `input_select.crop_steering_zone_${z}_phase_control`,
+    p2_vwc: `number.crop_steering_zone_${z}_p2_vwc_threshold`,
+    p2_shot: `number.crop_steering_zone_${z}_p2_shot_size`,
+    p0_db: `number.crop_steering_zone_${z}_p0_dryback_drop_percent`,
+    p1_tvwc: `number.crop_steering_zone_${z}_p1_target_vwc`,
+    p3_emerg: `number.crop_steering_zone_${z}_p3_emergency_vwc_threshold`,
+    field_capacity: `number.crop_steering_zone_${z}_field_capacity`,
+    gen_p0: `number.crop_steering_zone_${z}_ec_target_gen_p0`,
+    gen_p1: `number.crop_steering_zone_${z}_ec_target_gen_p1`,
+    gen_p2: `number.crop_steering_zone_${z}_ec_target_gen_p2`,
+    gen_p3: `number.crop_steering_zone_${z}_ec_target_gen_p3`,
+    veg_p0: `number.crop_steering_zone_${z}_ec_target_veg_p0`,
+    veg_p1: `number.crop_steering_zone_${z}_ec_target_veg_p1`,
+    veg_p2: `number.crop_steering_zone_${z}_ec_target_veg_p2`,
+    veg_p3: `number.crop_steering_zone_${z}_ec_target_veg_p3`,
+    gen_db: `number.crop_steering_zone_${z}_generative_dryback_target`,
+    veg_db: `number.crop_steering_zone_${z}_vegetative_dryback_target`,
+    next_h: `sensor.crop_steering_prediction_zone_${z}_next_irrigation_hours`,
+  }),
+};
+
+const DEMO = new URLSearchParams(location.search).has("demo");
+const ROOM = (new URLSearchParams(location.search).get("room") || "")
+  .toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+const RP = ROOM ? ROOM + "_" : "";
+
+const TABS = [
+  ["facility","Facility"],["schedule","Schedule"],["steer","Steer"],["climate","Climate"],
+  ["irrigation","Irrigation"],["fertigation","Fertigation"],["environment","Environment"],
+  ["tasks","Actions"],["logic","Logic"],["export","Export"],
+];
+
+const DIAL_HELP = {
+  low: "Generative: deeper P0 dryback, higher gen dryback target, EC gen targets active.",
+  mid: "Balanced: moderate dryback targets; mode follows dial side of 5.",
+  high: "Vegetative: shallower dryback, hold P2 wetter, EC veg targets active.",
+};
+
+/* ---- state ---- */
+let S = {};
+let ZONES = [];
+let selectedZone = 1;
+let dial = 5;
+let dirty = {}; // entity_id -> number value pending write
+let histCache = {}; // key -> {t, data}
+let histHours = 24;
+const CHARTS = {};
+
+/* ---- HA bridge (F2-compatible) ---- */
+function roomScope(id) {
+  if (!RP || typeof id !== "string") return id;
+  if (id.indexOf("crop_steering_" + RP) >= 0) return id;
+  return id.replace(/(^|\.)crop_steering_/, "$1crop_steering_" + RP);
+}
+function getToken() {
+  try {
+    const t = JSON.parse(localStorage.getItem("hassTokens"));
+    if (t?.access_token && (!t.expires || t.expires > Date.now() + 15000)) return t.access_token;
+  } catch (_) {}
+  return CONFIG.LL_TOKEN || "";
+}
+async function fetchStates() {
+  const r = await fetch((CONFIG.HA_BASE || "") + "/api/states", {
+    headers: { Authorization: "Bearer " + getToken() },
+    cache: "no-store",
+  });
+  if (!r.ok) throw new Error("states HTTP " + r.status);
+  const m = {};
+  for (const e of await r.json()) m[e.entity_id] = e;
+  if (RP) {
+    const seg = ".crop_steering_" + RP;
+    Object.keys(m).forEach((id) => {
+      const i = id.indexOf(seg);
+      if (i >= 0) m[id.slice(0, i) + ".crop_steering_" + id.slice(i + seg.length)] = m[id];
+    });
+  }
+  return m;
+}
+async function svc(domain, service, data) {
+  if (DEMO) return { demo: true };
+  const body = { ...(data || {}) };
+  if (body.entity_id) {
+    body.entity_id = Array.isArray(body.entity_id)
+      ? body.entity_id.map(roomScope)
+      : roomScope(body.entity_id);
+  }
+  const r = await fetch((CONFIG.HA_BASE || "") + `/api/services/${domain}/${service}`, {
+    method: "POST",
+    headers: { Authorization: "Bearer " + getToken(), "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    cache: "no-store",
+  });
+  if (!r.ok) throw new Error(`${domain}.${service} → HTTP ${r.status}`);
+  return r.json().catch(() => ({}));
+}
+async function evt(type, data) {
+  if (DEMO) return {};
+  const r = await fetch((CONFIG.HA_BASE || "") + "/api/events/" + type, {
+    method: "POST",
+    headers: { Authorization: "Bearer " + getToken(), "Content-Type": "application/json" },
+    body: JSON.stringify(data || {}),
+    cache: "no-store",
+  });
+  if (!r.ok) throw new Error("event " + type + " → " + r.status);
+  return r.json().catch(() => ({}));
+}
+async function loadInflux(ids, startMs, endMs) {
+  const tok = getToken();
+  if (!tok || !ids.length) return null;
+  const url =
+    (CONFIG.HA_BASE || "") +
+    "/api/agency_sensor_analytics/history?entities=" +
+    encodeURIComponent(ids.join(",")) +
+    "&start=" + encodeURIComponent(new Date(startMs).toISOString()) +
+    "&end=" + encodeURIComponent(new Date(endMs).toISOString());
+  const r = await fetch(url, { headers: { Authorization: "Bearer " + tok }, cache: "no-store" });
+  if (!r.ok) throw new Error("influx " + r.status);
+  const d = await r.json();
+  const out = { __start: startMs, __end: endMs };
+  let any = false;
+  ids.forEach((eid) => {
+    const pts = (d[eid] || [])
+      .map((p) => ({ t: +p.time, v: +p.value }))
+      .filter((p) => p.t && !isNaN(p.v));
+    out[eid] = pts;
+    if (pts.length) any = true;
+  });
+  return any ? out : null;
+}
+async function loadHist(ids, hours) {
+  ids = [...new Set(ids.filter(Boolean))];
+  if (!ids.length) return null;
+  const end = Date.now(), start = end - hours * 3600e3;
+  const key = ids.slice().sort().join(",") + "|" + hours;
+  if (histCache[key] && Date.now() - histCache[key].t < CONFIG.HIST_TTL_MS) return histCache[key].data;
+
+  if (DEMO) {
+    const data = demoHist(ids, start, end);
+    histCache[key] = { t: Date.now(), data };
+    return data;
+  }
+  const tok = getToken();
+  if (!tok) return null;
+
+  try {
+    const inf = await loadInflux(ids, start, end);
+    if (inf) {
+      histCache[key] = { t: Date.now(), data: inf };
+      return inf;
+    }
+  } catch (e) {
+    console.warn("influx fallback", e.message);
+  }
+
+  const url =
+    (CONFIG.HA_BASE || "") +
+    "/api/history/period/" +
+    new Date(start).toISOString() +
+    "?filter_entity_id=" +
+    ids.join(",") +
+    "&minimal_response&end_time=" +
+    encodeURIComponent(new Date(end).toISOString());
+  const r = await fetch(url, { headers: { Authorization: "Bearer " + tok }, cache: "no-store" });
+  if (!r.ok) throw new Error("history HTTP " + r.status);
+  const arr = await r.json();
+  const out = { __start: start, __end: end };
+  arr.forEach((series) => {
+    if (!series?.length) return;
+    const eid = series[0].entity_id;
+    out[eid] = series
+      .map((p) => ({ t: Date.parse(p.last_changed || p.last_updated), v: parseFloat(p.state) }))
+      .filter((p) => p.t && !isNaN(p.v));
+  });
+  histCache[key] = { t: Date.now(), data: out };
+  return out;
+}
+async function loadStateHist(ids, hours) {
+  ids = [...new Set(ids.filter(Boolean))];
+  const end = Date.now(), start = end - hours * 3600e3;
+  if (DEMO) return demoStateHist(ids, start, end);
+  const tok = getToken();
+  if (!tok || !ids.length) return { __start: start, __end: end };
+  const url =
+    (CONFIG.HA_BASE || "") +
+    "/api/history/period/" +
+    new Date(start).toISOString() +
+    "?filter_entity_id=" +
+    ids.join(",") +
+    "&minimal_response&end_time=" +
+    encodeURIComponent(new Date(end).toISOString());
+  try {
+    const r = await fetch(url, { headers: { Authorization: "Bearer " + tok }, cache: "no-store" });
+    if (!r.ok) throw 0;
+    const arr = await r.json();
+    const out = { __start: start, __end: end };
+    arr.forEach((series) => {
+      if (!series?.length) return;
+      const eid = series[0].entity_id;
+      const segs = [];
+      for (let i = 0; i < series.length; i++) {
+        const t0 = Math.max(Date.parse(series[i].last_changed || series[i].last_updated), start);
+        const t1 =
+          i + 1 < series.length
+            ? Date.parse(series[i + 1].last_changed || series[i + 1].last_updated)
+            : end;
+        if (t1 > t0 && series[i].state === "on") segs.push({ t0, t1 });
+      }
+      out[eid] = segs;
+    });
+    return out;
+  } catch {
+    return { __start: start, __end: end };
+  }
+}
+
+/* ---- entity helpers ---- */
+function ent(id) {
+  return S[roomScope(id)] || S[id] || null;
+}
+function st(id, fb = null) {
+  const e = ent(id);
+  return e ? e.state : fb;
+}
+function num(id, fb = null) {
+  const v = parseFloat(st(id, ""));
+  return Number.isFinite(v) ? v : fb;
+}
+function isOn(id) {
+  return st(id) === "on";
+}
+function discoverZones() {
+  const found = new Set();
+  Object.keys(S).forEach((id) => {
+    const m = id.match(/sensor\.crop_steering_(?:[a-z0-9]+_)?zone_(\d+)_vwc$/);
+    if (m) found.add(+m[1]);
+  });
+  // also un-aliased
+  Object.keys(S).forEach((id) => {
+    const m = id.match(/sensor\.crop_steering_zone_(\d+)_vwc$/);
+    if (m) found.add(+m[1]);
+  });
+  const zs = [...found].sort((a, b) => a - b);
+  return zs.length ? zs : [1, 2, 3]; // fall back to 1–3 only for UI skeleton when empty
+}
+function toast(msg) {
+  const el = document.createElement("div");
+  el.className = "t";
+  el.textContent = msg;
+  document.getElementById("toasts").appendChild(el);
+  setTimeout(() => el.remove(), 3200);
+}
+function fmt(n, d = 1) {
+  if (n == null || !Number.isFinite(+n)) return "—";
+  return (+n).toFixed(d);
+}
+function setLive(ok, label, mode) {
+  const dot = document.getElementById("liveDot");
+  document.getElementById("liveLabel").textContent = label;
+  dot.classList.remove("off", "demo");
+  if (mode === "demo") dot.classList.add("demo");
+  else if (!ok) dot.classList.add("off");
+}
+function banner(html, kind) {
+  const el = document.getElementById("banner");
+  if (!html) {
+    el.innerHTML = "";
+    return;
+  }
+  el.innerHTML = `<div class="banner ${kind || "info"}">${html}</div>`;
+}
+
+/* ---- demo fixtures (only when ?demo) ---- */
+function seedDemo() {
+  const D = {};
+  const set = (id, state, attrs = {}) => {
+    if (!id) return;
+    D[id] = {
+      entity_id: id,
+      state: String(state),
+      attributes: attrs,
+      last_changed: new Date(Date.now() - 12 * 60000).toISOString(),
+      last_updated: new Date().toISOString(),
+    };
+  };
+  const E = CONFIG.E;
+  set(E.sw_system, "on");
+  set(E.sw_auto, "on");
+  set(E.sw_ecstack, "off");
+  set(E.steering_mode, "Generative", { options: ["Vegetative", "Generative"] });
+  set(E.growth_stage, "Generative", { options: ["Vegetative", "Generative", "Transition"] });
+  set(E.irrigation_phase, "P2", { options: ["P0", "P1", "P2", "P3", "Manual"] });
+  set(E.fused_vwc, 57.4);
+  set(E.fused_ec, 5.2);
+  set(E.avg_vwc, 57.1);
+  set(E.avg_ec, 5.15);
+  set(E.dryback_pct, 13.8);
+  set(E.dryback_target, 15);
+  set(E.decision, "P2 maintain — pore EC on target");
+  set(E.next_irrig, new Date(Date.now() + 38 * 60000).toISOString());
+  set(E.safety, "safe");
+  set(E.health, 92);
+  set(E.field_capacity, 60);
+  set(E.lights_on, 8);
+  set(E.lights_off, 20);
+  set(E.p0_dryback, 15);
+  set(E.p0_min_wait, 30);
+  set(E.p0_max_wait, 120);
+  set(E.p1_target_vwc, 60);
+  set(E.p1_init_shot, 2);
+  set(E.p1_max_shot, 10);
+  set(E.p1_between, 5);
+  set(E.p2_vwc, 55);
+  set(E.p2_shot, 5);
+  set(E.p3_emerg, 40);
+  set(E.p3_emerg_shot, 2);
+  set(E.veg_db, 12);
+  set(E.gen_db, 18);
+  set(E.max_ec, 9);
+  set(E.irr_ec_min, 2.3);
+  set(E.irr_ec_max, 3.5);
+  set(E.irr_ph_min, 5.8);
+  set(E.irr_ph_max, 6.2);
+  set(E.air_temp, 25.1);
+  set(E.rh, 59);
+  set(E.co2, 1260);
+  set(E.vpd, 1.18);
+  set(E.ppfd, 960);
+  set(E.dli, 35.2);
+  set(E.src_ec, 2.55);
+  set(E.src_ph, 5.92);
+  set(CONFIG.HARDWARE.pump, "off");
+  set(CONFIG.HARDWARE.mainline, "off");
+  [1, 2, 3].forEach((z, i) => {
+    const Z = CONFIG.ZONE(z);
+    set(CONFIG.HARDWARE.valves[z], "off");
+    set(Z.vwc, [56.2, 58.1, 57.0][i]);
+    set(Z.ec, [5.1, 5.4, 5.0][i]);
+    set(Z.phase, "P2");
+    set(Z.status, i === 1 ? "Dry - Needs Water" : "Optimal");
+    set(Z.safety, "safe");
+    set(Z.enabled, "on");
+    set(Z.override, "off");
+    set(Z.last, new Date(Date.now() - (25 + i * 15) * 60000).toISOString());
+    set(Z.shots, 8 + i);
+    set(Z.daily, 46 + i * 5);
+    set(Z.mode, i === 2 ? "Vegetative" : "Generative", { options: ["Vegetative", "Generative"] });
+    set(Z.phase_ctl, "Auto", { options: ["Auto", "P0", "P1", "P2", "P3"] });
+    set(Z.p2_vwc, 55);
+    set(Z.p2_shot, 5);
+    set(Z.p0_db, 15);
+    set(Z.p1_tvwc, 60);
+    set(Z.p3_emerg, 40);
+    set(Z.field_capacity, 60);
+    set(Z.gen_db, 18);
+    set(Z.veg_db, 12);
+    set(Z.next_h, 0.55 + i * 0.2);
+    ["p0", "p1", "p2", "p3"].forEach((p, pi) => {
+      set(Z["gen_" + p], [4, 5, 6, 4.5][pi]);
+      set(Z["veg_" + p], [3, 3, 3.2, 3][pi]);
+      set(`number.crop_steering_ec_target_gen_${p}`, [4, 5, 6, 4.5][pi]);
+      set(`number.crop_steering_ec_target_veg_${p}`, [3, 3, 3.2, 3][pi]);
+    });
+  });
+  const feed = [
+    "2026-08-02 07:12:01 INFO engine: Z1 → P0 dryback start",
+    "2026-08-02 08:05:44 INFO engine: Z1 P1 shot 2.0% · 18s",
+    "2026-08-02 08:22:10 INFO engine: Z1 P1 shot 3.5% · 28s",
+    "2026-08-02 09:01:33 INFO engine: Z1 → P2 maintain",
+    "2026-08-02 10:18:02 INFO engine: Z2 P2 shot 5.0% · 42s",
+    "2026-08-02 11:40:19 WARNING engine: Z2 status Dry - Needs Water",
+    "2026-08-02 11:41:05 INFO engine: Z2 P2 shot 5.0% · 42s",
+    "2026-08-02 13:05:00 INFO engine: Z3 P2 shot 5.0% · 40s",
+  ].join("\n");
+  set(E.activity, "Z2 P2 shot 5% · 12m ago", { feed });
+  return D;
+}
+function demoHist(ids, start, end) {
+  const out = { __start: start, __end: end };
+  const span = end - start;
+  ids.forEach((id) => {
+    const pts = [];
+    const n = 96;
+    let base = 57;
+    if (/_ec($|_)/.test(id)) base = 5.2;
+    else if (/temp/.test(id)) base = 25;
+    else if (/humidity|_rh\b/.test(id) || id === CONFIG.E.rh) base = 59;
+    else if (/vpd/.test(id)) base = 1.2;
+    else if (/co2/.test(id)) base = 1260;
+    else if (/ppfd/.test(id)) base = 960;
+    else if (/dli/.test(id)) base = 35;
+    for (let i = 0; i <= n; i++) {
+      const t = start + (span * i) / n;
+      const h = new Date(t).getHours() + new Date(t).getMinutes() / 60;
+      let v = base;
+      if (/_vwc/.test(id)) {
+        // sawtooth irrigation day
+        if (h < 8) v = 48 + h * 0.4;
+        else if (h < 11) v = 52 + ((h - 8) % 0.7) * 8;
+        else if (h < 16) v = 56 + Math.sin(h * 3) * 1.5;
+        else v = 56 - (h - 16) * 1.1;
+      } else if (/_ec($|_)/.test(id)) {
+        v = base + Math.sin(h / 3) * 0.4 + (h > 12 ? 0.3 : 0);
+      } else {
+        v = base + Math.sin(i / 8) * base * 0.03;
+      }
+      pts.push({ t, v: +v.toFixed(3) });
+    }
+    out[id] = pts;
+  });
+  return out;
+}
+function demoStateHist(ids, start, end) {
+  const out = { __start: start, __end: end };
+  const span = end - start;
+  ids.forEach((id, k) => {
+    const segs = [];
+    // irrigation shots as short ON windows during day
+    let t = start + span * 0.22 + k * span * 0.01;
+    while (t < start + span * 0.72) {
+      segs.push({ t0: t, t1: t + span * 0.008 });
+      t += span * (0.06 + (k + 1) * 0.01);
+    }
+    out[id] = segs;
+  });
+  return out;
+}
+
+/* ---- chart utils ---- */
+function bucketize(series, start, end, N) {
+  const out = new Array(N).fill(null);
+  if (!series?.length) return out;
+  const span = (end - start) / N;
+  let si = 0, last = null;
+  for (let b = 0; b < N; b++) {
+    const bt = start + (b + 1) * span;
+    while (si < series.length && series[si].t <= bt) {
+      last = series[si].v;
+      si++;
+    }
+    out[b] = last;
+  }
+  const first = series[0].v;
+  for (let b = 0; b < N; b++) {
+    if (out[b] == null) out[b] = first;
+    else break;
+  }
+  return out;
+}
+function histLabels(start, end, N) {
+  const span = (end - start) / N;
+  const long = end - start > 2 * 864e5;
+  const out = [];
+  for (let b = 0; b < N; b++) {
+    const d = new Date(start + (b + 0.5) * span);
+    out.push(
+      long
+        ? d.getMonth() + 1 + "/" + d.getDate()
+        : String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0")
+    );
+  }
+  return out;
+}
+function detectDrybacks(arr) {
+  const out = [], n = arr.length;
+  if (n < 6) return out;
+  const W = Math.max(2, Math.round(n / 40));
+  const peaks = [];
+  for (let i = W; i < n - W; i++) {
+    if (arr[i] == null) continue;
+    let mx = true;
+    for (let j = i - W; j <= i + W; j++) {
+      if (arr[j] != null && arr[j] > arr[i] + 0.01) {
+        mx = false;
+        break;
+      }
+    }
+    if (mx && (!peaks.length || i - peaks[peaks.length - 1] > W * 2)) peaks.push(i);
+  }
+  for (let k = 0; k < peaks.length; k++) {
+    const pi = peaks[k], end = k + 1 < peaks.length ? peaks[k + 1] : n - 1;
+    let ti = pi, tv = arr[pi];
+    for (let j = pi; j <= end; j++) {
+      if (arr[j] != null && arr[j] < tv) {
+        tv = arr[j];
+        ti = j;
+      }
+    }
+    const db = arr[pi] - tv;
+    if (db >= 2) out.push({ pi, ti, pv: arr[pi], tv, db });
+  }
+  return out;
+}
+function destroyChart(k) {
+  if (CHARTS[k]) {
+    CHARTS[k].destroy();
+    delete CHARTS[k];
+  }
+}
+function lineDs(label, data, color, axis, dash) {
+  return {
+    label,
+    data,
+    borderColor: color,
+    backgroundColor: "transparent",
+    borderWidth: axis === "yE" ? 1.4 : 2,
+    tension: 0.15,
+    pointRadius: 0,
+    fill: false,
+    spanGaps: true,
+    yAxisID: axis || "y",
+    borderDash: dash || [],
+  };
+}
+
+/* ---- dial mapping (writes real HA entities) ---- */
+function dialFromLive() {
+  const mode = (st(CONFIG.E.steering_mode, "Generative") || "").toLowerCase();
+  const gen = num(CONFIG.E.gen_db, 18);
+  const veg = num(CONFIG.E.veg_db, 12);
+  if (mode.startsWith("veg")) {
+    // veg dryback 5–40 → dial 6–10
+    return Math.min(10, Math.max(6, Math.round(6 + (veg - 8) / 4)));
+  }
+  // gen dryback → dial 1–5
+  return Math.min(5, Math.max(1, Math.round(1 + (26 - gen) / 4)));
+}
+function dialTargets(d) {
+  const generative = d <= 5;
+  // GEN dial 1 = aggressive dryback 22, dial 5 = 14
+  // VEG dial 6 = dryback 10, dial 10 = 18 (shallower generative overnight bias inverted)
+  const gen_db = generative ? Math.round(24 - d * 2) : num(CONFIG.E.gen_db, 18);
+  const veg_db = !generative ? Math.round(8 + (d - 5) * 2) : num(CONFIG.E.veg_db, 12);
+  const p0 = generative ? Math.round(12 + (6 - d) * 1.5) : Math.round(10 + (d - 5));
+  return {
+    mode: generative ? "Generative" : "Vegetative",
+    gen_db: Math.max(5, Math.min(40, gen_db)),
+    veg_db: Math.max(5, Math.min(40, veg_db)),
+    p0_dryback: Math.max(2, Math.min(40, p0)),
+  };
+}
+async function applyDial() {
+  const t = dialTargets(dial);
+  try {
+    await svc("select", "select_option", { entity_id: CONFIG.E.steering_mode, option: t.mode });
+    await svc("number", "set_value", { entity_id: CONFIG.E.gen_db, value: t.gen_db });
+    await svc("number", "set_value", { entity_id: CONFIG.E.veg_db, value: t.veg_db });
+    await svc("number", "set_value", { entity_id: CONFIG.E.p0_dryback, value: t.p0_dryback });
+    // optimistic
+    if (ent(CONFIG.E.steering_mode)) ent(CONFIG.E.steering_mode).state = t.mode;
+    if (ent(CONFIG.E.gen_db)) ent(CONFIG.E.gen_db).state = String(t.gen_db);
+    if (ent(CONFIG.E.veg_db)) ent(CONFIG.E.veg_db).state = String(t.veg_db);
+    if (ent(CONFIG.E.p0_dryback)) ent(CONFIG.E.p0_dryback).state = String(t.p0_dryback);
+    toast(`Dial ${dial} → ${t.mode} · genDB ${t.gen_db}% · vegDB ${t.veg_db}% · P0 ${t.p0_dryback}%`);
+    renderSteer();
+  } catch (e) {
+    toast("Apply failed: " + e.message);
+  }
+}
+
+/* ---- dirty setpoints ---- */
+function markDirty(id, value) {
+  dirty[id] = value;
+  document.getElementById("btnSaveDirty").disabled = !Object.keys(dirty).length;
+}
+async function saveDirty() {
+  const ids = Object.keys(dirty);
+  if (!ids.length) return;
+  let ok = 0, fail = 0;
+  for (const id of ids) {
+    try {
+      await svc("number", "set_value", { entity_id: id, value: dirty[id] });
+      if (ent(id)) ent(id).state = String(dirty[id]);
+      ok++;
+      delete dirty[id];
+    } catch (e) {
+      fail++;
+      console.error(e);
+    }
+  }
+  document.getElementById("btnSaveDirty").disabled = !Object.keys(dirty).length;
+  toast(`Saved ${ok} setpoint${ok === 1 ? "" : "s"}${fail ? ` · ${fail} failed` : ""}`);
+  renderIrrigation();
+  renderFertigation();
+  renderSteer();
+}
+
+/* ---- RENDERERS ---- */
+function initTabs() {
+  const nav = document.getElementById("tabs");
+  nav.innerHTML = TABS.map(
+    ([id, lab], i) =>
+      `<button type="button" class="tab${i === 0 ? " on" : ""}" data-tab="${id}">${lab}</button>`
+  ).join("");
+  nav.onclick = (e) => {
+    const b = e.target.closest("[data-tab]");
+    if (!b) return;
+    nav.querySelectorAll(".tab").forEach((x) => x.classList.toggle("on", x === b));
+    document.querySelectorAll(".panel").forEach((p) =>
+      p.classList.toggle("on", p.dataset.panel === b.dataset.tab)
+    );
+    onTab(b.dataset.tab);
+  };
+  document.querySelector('[data-panel="facility"]').classList.add("on");
+}
+function onTab(id) {
+  if (id === "schedule") renderSchedule();
+  if (id === "steer") {
+    renderSteer();
+    loadAndMountSubstrate();
+  }
+  if (id === "climate") {
+    renderClimateNow();
+    loadAndMountClimate();
+  }
+  if (id === "irrigation") {
+    renderIrrigation();
+    loadAndMountIrrig();
+  }
+  if (id === "fertigation") renderFertigation();
+  if (id === "environment") {
+    renderEnvMetrics();
+    loadAndMountEnv();
+  }
+  if (id === "tasks") renderTasks();
+  if (id === "logic") renderLogic();
+  if (id === "export") renderExport();
+}
+
+function renderFacility() {
+  const has = Object.keys(S).some((id) => /zone_\d+_vwc$/.test(id));
+  document.getElementById("zoneEmpty").style.display = has || DEMO ? "none" : "";
+  const grid = document.getElementById("zoneGrid");
+  const cols = ["#22d3ee", "#34d399", "#a78bfa", "#fbbf24", "#f472b6"];
+  grid.innerHTML = ZONES.map((z, i) => {
+    const Z = CONFIG.ZONE(z);
+    const vwc = num(Z.vwc);
+    const ec = num(Z.ec);
+    const phase = st(Z.phase, "—");
+    const status = st(Z.status, "—");
+    const en = isOn(Z.enabled);
+    const bad = /error|fault|dry/i.test(status) || st(Z.safety) === "fault";
+    const cg = phase === "P3" ? "var(--p3)" : phase === "P1" ? "var(--p1)" : phase === "P0" ? "var(--p0)" : cols[i % cols.length];
+    return `<div class="room${selectedZone === z ? " on" : ""}" data-z="${z}" style="--cg:${cg}">
+      <div class="flex items-center justify-between gap-2">
+        <div class="font-bold">Zone ${z}</div>
+        <span class="pill ${bad ? "crit" : en ? "ok" : "warn"}">${bad ? status : en ? "on" : "disabled"}</span>
+      </div>
+      <div class="text-[10px] uppercase tracking-wider text-[var(--ink3)] mt-1">${phase} · ${st(Z.mode, "—")}</div>
+      <div class="flex gap-4 mt-2">
+        <div><div class="text-[10px] text-[var(--ink3)]">VWC</div><div class="text-xl font-extrabold">${fmt(vwc, 1)}%</div></div>
+        <div><div class="text-[10px] text-[var(--ink3)]">EC</div><div class="text-xl font-extrabold">${fmt(ec, 2)}</div></div>
+        <div><div class="text-[10px] text-[var(--ink3)]">Today</div><div class="text-xl font-extrabold">${fmt(num(Z.daily) ?? num(Z.daily_fb), 1)}L</div></div>
+      </div>
+      <div class="text-[11px] text-[var(--ink3)] mt-2">Last shot: ${fmtLast(Z)}</div>
+      <div class="bar"></div>
+    </div>`;
+  }).join("");
+  grid.querySelectorAll("[data-z]").forEach((el) => {
+    el.onclick = () => {
+      selectedZone = +el.dataset.z;
+      renderAll();
+      const active = document.querySelector(".panel.on")?.dataset.panel;
+      if (active === "steer") loadAndMountSubstrate();
+    };
+  });
+
+  document.getElementById("facilityMetrics").innerHTML = [
+    ["Fused VWC", fmt(num(CONFIG.E.fused_vwc) ?? num(CONFIG.E.avg_vwc)), "%"],
+    ["Fused EC", fmt(num(CONFIG.E.fused_ec) ?? num(CONFIG.E.avg_ec), 2), "mS"],
+    ["Dryback", fmt(num(CONFIG.E.dryback_pct)), "%"],
+    ["DB target", fmt(num(CONFIG.E.dryback_target)), "%"],
+    ["Phase", st(CONFIG.E.irrigation_phase, "—"), ""],
+    ["Health", fmt(num(CONFIG.E.health), 0), ""],
+  ]
+    .map(
+      ([l, v, u]) =>
+        `<div class="metric"><div class="ml">${l}</div><div class="mv">${v}<span class="mu">${u}</span></div></div>`
+    )
+    .join("");
+}
+function fmtLast(Z) {
+  const raw = st(Z.last) || st(Z.last_fb);
+  if (!raw || raw === "unknown" || raw === "unavailable") return "—";
+  const t = Date.parse(raw);
+  if (isNaN(t)) return String(raw).slice(0, 16);
+  const m = Math.round((Date.now() - t) / 60000);
+  if (m < 60) return m + "m ago";
+  if (m < 1440) return Math.round(m / 60) + "h ago";
+  return new Date(t).toLocaleString();
+}
+
+async function renderSchedule() {
+  const dayStart = new Date();
+  dayStart.setHours(0, 0, 0, 0);
+  const start = dayStart.getTime();
+  const end = Date.now();
+  const hours = Math.max(1, (end - start) / 3600e3);
+
+  const valveIds = ZONES.map((z) => CONFIG.HARDWARE.valves[z]).filter(Boolean);
+  const extra = [CONFIG.HARDWARE.pump, CONFIG.HARDWARE.mainline].filter(Boolean);
+  const St = await loadStateHist([...valveIds, ...extra], hours + 1);
+
+  const onH = num(CONFIG.E.lights_on, 8);
+  const offH = num(CONFIG.E.lights_off, 20);
+  const nowFrac = (Date.now() - start) / 864e5;
+
+  let html = `<div class="gantt-row" style="border:0;min-height:auto;padding-bottom:4px">
+    <div></div>
+    <div class="flex justify-between text-[10px] text-[var(--ink3)]">
+      ${[0, 4, 8, 12, 16, 20, 24].map((h) => `<span>${h}h</span>`).join("")}
+    </div></div>`;
+
+  // lights band helper
+  const lightsBand = () => {
+    const L = (onH / 24) * 100;
+    const W = (((offH > onH ? offH : offH + 24) - onH) / 24) * 100;
+    return `<div class="gantt-block" style="left:${L}%;width:${W}%;background:rgba(251,191,36,.12);top:0;bottom:0;border-radius:0" title="Lights window"></div>`;
+  };
+
+  let errCount = 0;
+  ZONES.forEach((z) => {
+    const Z = CONFIG.ZONE(z);
+    const valve = CONFIG.HARDWARE.valves[z];
+    const segs = (valve && St[valve]) || [];
+    const status = st(Z.status, "");
+    const bad = /error|fault|dry/i.test(status);
+    if (bad) errCount++;
+    const phase = st(Z.phase, "—");
+    const blocks = segs
+      .map((g) => {
+        const left = ((g.t0 - start) / 864e5) * 100;
+        const width = Math.max(0.35, ((g.t1 - g.t0) / 864e5) * 100);
+        return `<div class="gantt-block" style="left:${left}%;width:${width}%;background:var(--p2)" title="Valve ON"></div>`;
+      })
+      .join("");
+    html += `<div class="gantt-row">
+      <div>
+        <div class="font-bold text-sm">Zone ${z}</div>
+        <div class="text-[10px] text-[var(--ink3)]">${phase}${bad ? " · " + status : ""} · ${segs.length} shots</div>
+      </div>
+      <div class="gantt-track">
+        ${lightsBand()}
+        ${blocks}
+        <div class="gantt-now" style="left:${Math.min(100, nowFrac * 100)}%"></div>
+      </div>
+    </div>`;
+  });
+
+  // pump row
+  if (CONFIG.HARDWARE.pump) {
+    const segs = St[CONFIG.HARDWARE.pump] || [];
+    const blocks = segs
+      .map((g) => {
+        const left = ((g.t0 - start) / 864e5) * 100;
+        const width = Math.max(0.35, ((g.t1 - g.t0) / 864e5) * 100);
+        return `<div class="gantt-block" style="left:${left}%;width:${width}%;background:var(--info)"></div>`;
+      })
+      .join("");
+    html += `<div class="gantt-row">
+      <div><div class="font-bold text-sm">Pump</div><div class="text-[10px] text-[var(--ink3)]">${segs.length} runs</div></div>
+      <div class="gantt-track">${lightsBand()}${blocks}<div class="gantt-now" style="left:${Math.min(100, nowFrac * 100)}%"></div></div>
+    </div>`;
+  }
+
+  document.getElementById("gantt").innerHTML = html;
+  document.getElementById("ganttEmpty").style.display =
+    !valveIds.length && !DEMO ? "" : "none";
+  document.getElementById("schedAlerts").innerHTML = errCount
+    ? `<span class="pill crit">⚠ ${errCount} zone status alert${errCount > 1 ? "s" : ""}</span>`
+    : `<span class="pill ok">Zones healthy</span>`;
+
+  renderActivityFeed("activityFeed");
+}
+
+function renderActivityFeed(elId) {
+  const a = ent(CONFIG.E.activity);
+  const feed = (a?.attributes?.feed) || null;
+  const el = document.getElementById(elId);
+  if (!feed) {
+    el.innerHTML = `<div class="empty" style="border:0;padding:12px">${st(CONFIG.E.activity, "No activity_log feed")}</div>`;
+    return;
+  }
+  const lines = String(feed).split("\n").filter(Boolean).slice(-60).reverse();
+  el.innerHTML = lines
+    .map((l) => {
+      let col = "#94a3b8";
+      if (/error|exception|fault|fail/i.test(l)) col = "var(--crit)";
+      else if (/warn/i.test(l)) col = "var(--warn)";
+      else if (/shot|water|irrig|→\s*P[0-3]|FIRE/i.test(l)) col = "var(--cyan)";
+      return `<div class="ln" style="color:${col}">${esc(l)}</div>`;
+    })
+    .join("");
+}
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+function renderSteer() {
+  const Z = CONFIG.ZONE(selectedZone);
+  document.getElementById("steerZoneLabel").textContent =
+    `Zone ${selectedZone} · ${st(Z.mode, "—")} · phase ${st(Z.phase, "—")}`;
+  document.getElementById("steerDial").value = dial;
+  const t = dialTargets(dial);
+  document.getElementById("dialLabel").textContent = `${dial} · ${t.mode}`;
+  document.getElementById("dialHelp").textContent =
+    dial <= 3 ? DIAL_HELP.low : dial >= 8 ? DIAL_HELP.high : DIAL_HELP.mid;
+
+  document.getElementById("steerMetrics").innerHTML = [
+    ["Decision", st(CONFIG.E.decision, "—")],
+    ["Next irrig", fmtNext(CONFIG.E.next_irrig)],
+    ["Zone next", fmt(num(Z.next_h), 2) + " h"],
+    ["Last shot", fmtLast(Z)],
+  ]
+    .map(
+      ([l, v]) =>
+        `<div class="metric"><div class="ml">${l}</div><div class="mv" style="font-size:.95rem">${esc(String(v))}</div></div>`
+    )
+    .join("");
+
+  // live dryback setpoints (editable)
+  const fields = [
+    [CONFIG.E.gen_db, "Gen dryback %", num(CONFIG.E.gen_db)],
+    [CONFIG.E.veg_db, "Veg dryback %", num(CONFIG.E.veg_db)],
+    [CONFIG.E.p0_dryback, "P0 drop %", num(CONFIG.E.p0_dryback)],
+    [Z.p2_vwc, `Z${selectedZone} P2 VWC`, num(Z.p2_vwc) ?? num(CONFIG.E.p2_vwc)],
+  ];
+  document.getElementById("steerSetpoints").innerHTML = fields
+    .map(([id, lab, v]) => fieldHtml(id, lab, v, 0.1))
+    .join("");
+  bindFields(document.getElementById("steerSetpoints"));
+}
+function fmtNext(id) {
+  const raw = st(id);
+  if (!raw || raw === "unknown") return "—";
+  const t = Date.parse(raw);
+  if (isNaN(t)) return String(raw).slice(0, 19);
+  const m = Math.round((t - Date.now()) / 60000);
+  if (m < 0) return Math.abs(m) + "m overdue";
+  if (m < 60) return "in " + m + "m";
+  return "in " + Math.round(m / 60) + "h";
+}
+
+async function loadAndMountSubstrate() {
+  document.getElementById("histBadge").textContent = "loading history…";
+  const ids = ZONES.flatMap((z) => [CONFIG.ZONE(z).vwc, CONFIG.ZONE(z).ec]);
+  let H = null;
+  try {
+    H = await loadHist(ids, histHours);
+  } catch (e) {
+    document.getElementById("histBadge").textContent = "history error";
+    toast("History: " + e.message);
+  }
+  document.getElementById("histBadge").textContent = H
+    ? `history · ${histHours}h`
+    : "no history";
+  mountSubChart(H);
+}
+function mountSubChart(H) {
+  destroyChart("sub");
+  const canvas = document.getElementById("subChart");
+  const empty = document.getElementById("subEmpty");
+  if (!H) {
+    empty.style.display = "";
+    return;
+  }
+  empty.style.display = "none";
+  const s = H.__start, e = H.__end, N = 96;
+  const labels = histLabels(s, e, N);
+  const cols = ["#22d3ee", "#34d399", "#a78bfa", "#fbbf24", "#f472b6"];
+  const sets = [];
+  ZONES.forEach((z, i) => {
+    const Z = CONFIG.ZONE(z);
+    sets.push(lineDs(`Z${z} VWC`, bucketize(H[Z.vwc], s, e, N), cols[i % cols.length], "yV"));
+    sets.push(
+      lineDs(`Z${z} EC`, bucketize(H[Z.ec], s, e, N), cols[i % cols.length], "yE", [5, 3])
+    );
+  });
+  // target lines from selected zone
+  const Z = CONFIG.ZONE(selectedZone);
+  const vt = num(Z.p2_vwc) ?? num(CONFIG.E.p2_vwc);
+  const mode = (st(Z.mode, st(CONFIG.E.steering_mode, "gen")) || "").toLowerCase().startsWith("veg")
+    ? "veg"
+    : "gen";
+  const et = num(Z[mode + "_p2"]) ?? num(`number.crop_steering_ec_target_${mode}_p2`);
+  if (vt != null) sets.push(lineDs("P2 VWC tgt", Array(N).fill(vt), "rgba(103,232,249,.7)", "yV", [2, 4]));
+  if (et != null) sets.push(lineDs("EC tgt", Array(N).fill(et), "rgba(196,181,253,.7)", "yE", [2, 4]));
+
+  // dryback plugin on selected zone VWC
+  const vwcArr = bucketize(H[Z.vwc], s, e, N);
+  const dbs = detectDrybacks(vwcArr);
+  const drybackPlugin = {
+    id: "dryback",
+    afterDatasetsDraw(ch) {
+      if (!dbs.length) return;
+      const X = ch.scales.x, Y = ch.scales.yV, ctx = ch.ctx;
+      ctx.save();
+      dbs.forEach((d) => {
+        const px = X.getPixelForValue(d.pi),
+          py = Y.getPixelForValue(d.pv),
+          tx = X.getPixelForValue(d.ti),
+          ty = Y.getPixelForValue(d.tv);
+        ctx.fillStyle = "#22d3ee";
+        ctx.beginPath();
+        ctx.arc(px, py, 3, 0, 6.3);
+        ctx.fill();
+        ctx.fillStyle = "#fbbf24";
+        ctx.beginPath();
+        ctx.arc(tx, ty, 3, 0, 6.3);
+        ctx.fill();
+        ctx.fillStyle = "#fde68a";
+        ctx.font = "600 10px Inter,sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText("↓" + d.db.toFixed(0) + "%", tx, ty + 14);
+      });
+      ctx.restore();
+    },
+  };
+
+  Chart.defaults.color = "#727d8a";
+  Chart.defaults.borderColor = "rgba(255,255,255,.06)";
+  CHARTS.sub = new Chart(canvas, {
+    type: "line",
+    data: { labels, datasets: sets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 0 },
+      interaction: { mode: "index", intersect: false },
+      plugins: {
+        legend: { labels: { boxWidth: 12, font: { size: 10 } } },
+      },
+      scales: {
+        x: { grid: { display: false }, ticks: { maxTicksLimit: 8, font: { size: 9 } } },
+        yV: {
+          position: "left",
+          title: { display: true, text: "VWC %", color: "#67e8f9" },
+          ticks: { callback: (v) => v + "%" },
+          suggestedMin: 25,
+          suggestedMax: 70,
+        },
+        yE: {
+          position: "right",
+          title: { display: true, text: "pore EC", color: "#c4b5fd" },
+          grid: { drawOnChartArea: false },
+          suggestedMin: 0,
+          suggestedMax: 8,
+        },
+      },
+    },
+    plugins: [drybackPlugin],
+  });
+}
+
+function renderClimateNow() {
+  document.getElementById("climateNow").innerHTML = [
+    ["Temp", fmt(num(CONFIG.E.air_temp)), "°C", CONFIG.E.air_temp],
+    ["RH", fmt(num(CONFIG.E.rh), 0), "%", CONFIG.E.rh],
+    ["VPD", fmt(num(CONFIG.E.vpd), 2), "kPa", CONFIG.E.vpd],
+    ["CO₂", fmt(num(CONFIG.E.co2), 0), "ppm", CONFIG.E.co2],
+    ["PPFD", fmt(num(CONFIG.E.ppfd), 0), "", CONFIG.E.ppfd],
+    ["DLI", fmt(num(CONFIG.E.dli)), "", CONFIG.E.dli],
+  ]
+    .map(([l, v, u, id]) => {
+      const miss = !ent(id) && !DEMO;
+      return `<div class="metric"><div class="ml">${l}${miss ? " · missing" : ""}</div><div class="mv">${v}<span class="mu">${u}</span></div><div class="ms">${id.split(".").pop()}</div></div>`;
+    })
+    .join("");
+}
+async function loadAndMountClimate() {
+  const ids = [
+    CONFIG.E.air_temp,
+    CONFIG.E.rh,
+    CONFIG.E.vpd,
+    CONFIG.E.co2,
+    CONFIG.E.ppfd,
+  ].filter((id) => DEMO || ent(id));
+  let H = null;
+  try {
+    H = await loadHist(ids, histHours);
+  } catch (e) {
+    toast("Climate hist: " + e.message);
+  }
+  destroyChart("climate");
+  const empty = document.getElementById("climateEmpty");
+  if (!H || !ids.length) {
+    empty.style.display = "";
+    return;
+  }
+  empty.style.display = "none";
+  const s = H.__start, e = H.__end, N = 96;
+  const labels = histLabels(s, e, N);
+  const sets = [];
+  if (CONFIG.E.air_temp)
+    sets.push(lineDs("Temp", bucketize(H[CONFIG.E.air_temp], s, e, N), "#fb923c", "yT"));
+  if (CONFIG.E.rh)
+    sets.push(lineDs("RH", bucketize(H[CONFIG.E.rh], s, e, N), "#38bdf8", "yR"));
+  if (CONFIG.E.co2)
+    sets.push(lineDs("CO₂", bucketize(H[CONFIG.E.co2], s, e, N), "#34d399", "yC"));
+  if (CONFIG.E.vpd)
+    sets.push(lineDs("VPD", bucketize(H[CONFIG.E.vpd], s, e, N), "#fbbf24", "yV"));
+  CHARTS.climate = new Chart(document.getElementById("climateChart"), {
+    type: "line",
+    data: { labels, datasets: sets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 0 },
+      interaction: { mode: "index", intersect: false },
+      plugins: { legend: { labels: { boxWidth: 12, font: { size: 10 } } } },
+      scales: {
+        x: { ticks: { maxTicksLimit: 8, font: { size: 9 } }, grid: { display: false } },
+        yT: { position: "left", title: { display: true, text: "°C" } },
+        yR: { position: "right", title: { display: true, text: "RH%" }, grid: { drawOnChartArea: false } },
+        yC: { display: false },
+        yV: { display: false },
+      },
+    },
+  });
+}
+
+function fieldHtml(id, lab, value, step = 0.1) {
+  const d = dirty[id];
+  const v = d != null ? d : value;
+  const dirtyCls = d != null ? " dirty" : "";
+  const miss = value == null && d == null && !ent(id);
+  return `<div class="field${dirtyCls}" data-field="${id}">
+    <label>${lab}${miss ? " · not in HA" : ""}</label>
+    <input type="number" step="${step}" value="${v == null ? "" : v}" ${miss && !DEMO ? "disabled" : ""} data-eid="${id}">
+  </div>`;
+}
+function bindFields(root) {
+  root.querySelectorAll("input[data-eid]").forEach((inp) => {
+    inp.onchange = inp.oninput = () => {
+      const v = parseFloat(inp.value);
+      if (!Number.isFinite(v)) return;
+      markDirty(inp.dataset.eid, v);
+      inp.closest(".field")?.classList.add("dirty");
+    };
+  });
+}
+
+function renderIrrigation() {
+  const Z = CONFIG.ZONE(selectedZone);
+  const globals = [
+    [CONFIG.E.p0_dryback, "P0 dryback drop %", num(CONFIG.E.p0_dryback)],
+    [CONFIG.E.p0_min_wait, "P0 min wait min", num(CONFIG.E.p0_min_wait)],
+    [CONFIG.E.p0_max_wait, "P0 max wait min", num(CONFIG.E.p0_max_wait)],
+    [CONFIG.E.p1_target_vwc, "P1 target VWC %", num(CONFIG.E.p1_target_vwc)],
+    [CONFIG.E.p1_init_shot, "P1 initial shot %", num(CONFIG.E.p1_init_shot)],
+    [CONFIG.E.p1_max_shot, "P1 max shot %", num(CONFIG.E.p1_max_shot)],
+    [CONFIG.E.p1_between, "P1 between shots min", num(CONFIG.E.p1_between)],
+    [CONFIG.E.p2_vwc, "P2 VWC threshold %", num(CONFIG.E.p2_vwc)],
+    [CONFIG.E.p2_shot, "P2 shot size %", num(CONFIG.E.p2_shot)],
+    [CONFIG.E.p3_emerg, "P3 emergency VWC %", num(CONFIG.E.p3_emerg)],
+    [CONFIG.E.p3_emerg_shot, "P3 emergency shot %", num(CONFIG.E.p3_emerg_shot)],
+    [CONFIG.E.field_capacity, "Field capacity %", num(CONFIG.E.field_capacity)],
+    [CONFIG.E.lights_on, "Lights on hour", num(CONFIG.E.lights_on)],
+    [CONFIG.E.lights_off, "Lights off hour", num(CONFIG.E.lights_off)],
+    [Z.p2_vwc, `Z${selectedZone} P2 VWC override`, num(Z.p2_vwc)],
+    [Z.p2_shot, `Z${selectedZone} P2 shot override`, num(Z.p2_shot)],
+  ];
+  document.getElementById("phaseFields").innerHTML = globals
+    .map(([id, lab, v]) => fieldHtml(id, lab, v, lab.includes("hour") ? 1 : 0.1))
+    .join("");
+  bindFields(document.getElementById("phaseFields"));
+}
+async function loadAndMountIrrig() {
+  const Z = CONFIG.ZONE(selectedZone);
+  let H = null;
+  try {
+    H = await loadHist([Z.vwc], histHours);
+  } catch (_) {}
+  destroyChart("irrig");
+  if (!H) return;
+  const s = H.__start, e = H.__end, N = 96;
+  const labels = histLabels(s, e, N);
+  const vwc = bucketize(H[Z.vwc], s, e, N);
+  const fc = num(Z.field_capacity) ?? num(CONFIG.E.field_capacity);
+  const p2 = num(Z.p2_vwc) ?? num(CONFIG.E.p2_vwc);
+  const sets = [
+    lineDs(`Z${selectedZone} VWC`, vwc, "#67e8f9", "y"),
+  ];
+  if (fc != null) sets.push(lineDs("Field capacity", Array(N).fill(fc), "rgba(52,211,153,.75)", "y", [4, 4]));
+  if (p2 != null) sets.push(lineDs("P2 threshold", Array(N).fill(p2), "rgba(251,191,36,.75)", "y", [2, 3]));
+  CHARTS.irrig = new Chart(document.getElementById("irrigChart"), {
+    type: "line",
+    data: { labels, datasets: sets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 0 },
+      plugins: { legend: { labels: { boxWidth: 12, font: { size: 10 } } } },
+      scales: {
+        x: { ticks: { maxTicksLimit: 8, font: { size: 9 } }, grid: { display: false } },
+        y: { ticks: { callback: (v) => v + "%" }, suggestedMin: 30, suggestedMax: 70 },
+      },
+    },
+  });
+}
+
+function renderFertigation() {
+  const Z = CONFIG.ZONE(selectedZone);
+  const mode = (st(Z.mode, st(CONFIG.E.steering_mode, "gen")) || "").toLowerCase().startsWith("veg")
+    ? "veg"
+    : "gen";
+  const phases = ["p0", "p1", "p2", "p3"];
+  const tbody = document.querySelector("#fertTable tbody");
+  tbody.innerHTML = phases
+    .map((p) => {
+      const veg = num(Z["veg_" + p]) ?? num(`number.crop_steering_ec_target_veg_${p}`);
+      const gen = num(Z["gen_" + p]) ?? num(`number.crop_steering_ec_target_gen_${p}`);
+      const active = mode === "veg" ? veg : gen;
+      return `<tr class="border-b border-white/5">
+        <td class="py-2 pr-2 font-bold uppercase text-xs" style="color:var(--${p})">${p}</td>
+        <td class="py-2 pr-2">${fmt(veg, 2)}</td>
+        <td class="py-2 pr-2">${fmt(gen, 2)}</td>
+        <td class="py-2 font-bold">${fmt(active, 2)} <span class="text-[10px] text-[var(--ink3)]">${mode}</span></td>
+      </tr>`;
+    })
+    .join("");
+
+  document.getElementById("fertNow").innerHTML = [
+    ["Feed EC", fmt(num(CONFIG.E.src_ec), 2), "mS"],
+    ["Feed pH", fmt(num(CONFIG.E.src_ph), 2), ""],
+    ["Substrate EC", fmt(num(CONFIG.E.fused_ec) ?? num(Z.ec), 2), "mS"],
+    ["EC stacking", isOn(CONFIG.E.sw_ecstack) ? "ON" : "OFF", ""],
+  ]
+    .map(
+      ([l, v, u]) =>
+        `<div class="metric"><div class="ml">${l}</div><div class="mv">${v}<span class="mu">${u}</span></div></div>`
+    )
+    .join("");
+
+  // editable gen/veg p2 + gates
+  const fields = [
+    [Z.gen_p2 || `number.crop_steering_ec_target_gen_p2`, "EC gen P2", num(Z.gen_p2) ?? num("number.crop_steering_ec_target_gen_p2")],
+    [Z.veg_p2 || `number.crop_steering_ec_target_veg_p2`, "EC veg P2", num(Z.veg_p2) ?? num("number.crop_steering_ec_target_veg_p2")],
+    [CONFIG.E.irr_ec_min, "Feed EC min", num(CONFIG.E.irr_ec_min)],
+    [CONFIG.E.irr_ec_max, "Feed EC max", num(CONFIG.E.irr_ec_max)],
+    [CONFIG.E.irr_ph_min, "Feed pH min", num(CONFIG.E.irr_ph_min)],
+    [CONFIG.E.irr_ph_max, "Feed pH max", num(CONFIG.E.irr_ph_max)],
+    [CONFIG.E.max_ec, "Max substrate EC", num(CONFIG.E.max_ec)],
+  ];
+  // resolve zone keys properly
+  fields[0][0] = Z.gen_p2;
+  fields[1][0] = Z.veg_p2;
+  document.getElementById("fertFields").innerHTML = fields
+    .map(([id, lab, v]) => fieldHtml(id, lab, v, 0.1))
+    .join("");
+  bindFields(document.getElementById("fertFields"));
+}
+
+function renderEnvMetrics() {
+  document.getElementById("envMetrics").innerHTML = [
+    ["VWC", fmt(num(CONFIG.E.avg_vwc) ?? num(CONFIG.ZONE(selectedZone).vwc)), "%"],
+    ["ECpw", fmt(num(CONFIG.E.avg_ec) ?? num(CONFIG.ZONE(selectedZone).ec), 2), "mS"],
+    ["VPD", fmt(num(CONFIG.E.vpd), 2), "kPa"],
+    ["RH", fmt(num(CONFIG.E.rh), 0), "%"],
+    ["Temp", fmt(num(CONFIG.E.air_temp)), "°C"],
+    ["CO₂", fmt(num(CONFIG.E.co2), 0), "ppm"],
+  ]
+    .map(
+      ([l, v, u]) =>
+        `<div class="metric"><div class="ml">${l}</div><div class="mv">${v}<span class="mu">${u}</span></div></div>`
+    )
+    .join("");
+}
+async function loadAndMountEnv() {
+  const Z = CONFIG.ZONE(selectedZone);
+  const ids = [Z.vwc, Z.ec, CONFIG.E.vpd, CONFIG.E.rh, CONFIG.E.air_temp, CONFIG.E.co2].filter(
+    (id) => DEMO || ent(id)
+  );
+  let H = null;
+  try {
+    H = await loadHist(ids, histHours);
+  } catch (e) {
+    toast("Env hist: " + e.message);
+  }
+  destroyChart("env");
+  const empty = document.getElementById("envEmpty");
+  if (!H) {
+    empty.style.display = "";
+    return;
+  }
+  empty.style.display = "none";
+  const s = H.__start, e = H.__end, N = 96;
+  const labels = histLabels(s, e, N);
+  const sets = [];
+  if (H[Z.vwc]) sets.push(lineDs("VWC", bucketize(H[Z.vwc], s, e, N), "#38bdf8", "y"));
+  if (H[CONFIG.E.rh]) sets.push(lineDs("RH", bucketize(H[CONFIG.E.rh], s, e, N), "#34d399", "y", [3, 3]));
+  if (H[Z.ec]) sets.push(lineDs("ECpw", bucketize(H[Z.ec], s, e, N), "#c4b5fd", "y2"));
+  if (H[CONFIG.E.vpd]) sets.push(lineDs("VPD", bucketize(H[CONFIG.E.vpd], s, e, N), "#fbbf24", "y3"));
+  if (H[CONFIG.E.air_temp])
+    sets.push(lineDs("Temp", bucketize(H[CONFIG.E.air_temp], s, e, N), "#fb923c", "y4"));
+  CHARTS.env = new Chart(document.getElementById("envChart"), {
+    type: "line",
+    data: { labels, datasets: sets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 0 },
+      interaction: { mode: "index", intersect: false },
+      plugins: { legend: { labels: { boxWidth: 12, font: { size: 10 } } } },
+      scales: {
+        x: { ticks: { maxTicksLimit: 8, font: { size: 9 } }, grid: { display: false } },
+        y: { position: "left", title: { display: true, text: "VWC / RH %" } },
+        y2: { position: "right", title: { display: true, text: "EC" }, grid: { drawOnChartArea: false } },
+        y3: { display: false },
+        y4: { display: false },
+      },
+    },
+  });
+}
+
+function renderTasks() {
+  const Z = CONFIG.ZONE(selectedZone);
+  document.getElementById("actionList").innerHTML = [
+    {
+      lab: `Manual irrigation Z${selectedZone} · 60s`,
+      desc: "Fires crop_steering_manual_irrigation — engine safety still applies",
+      run: async () => {
+        await evt("crop_steering_manual_irrigation", { zone: selectedZone, duration: 60 });
+        toast(`Manual shot requested · zone ${selectedZone}`);
+      },
+    },
+    {
+      lab: isOn(CONFIG.E.sw_auto) ? "Pause auto irrigation" : "Enable auto irrigation",
+      desc: CONFIG.E.sw_auto,
+      run: async () => {
+        await svc("switch", isOn(CONFIG.E.sw_auto) ? "turn_off" : "turn_on", {
+          entity_id: CONFIG.E.sw_auto,
+        });
+        if (ent(CONFIG.E.sw_auto))
+          ent(CONFIG.E.sw_auto).state = isOn(CONFIG.E.sw_auto) ? "off" : "on";
+        toast("Auto irrigation toggled");
+        renderLogic();
+      },
+    },
+    {
+      lab: isOn(Z.enabled) ? `Disable zone ${selectedZone}` : `Enable zone ${selectedZone}`,
+      desc: Z.enabled,
+      run: async () => {
+        await svc("switch", isOn(Z.enabled) ? "turn_off" : "turn_on", { entity_id: Z.enabled });
+        if (ent(Z.enabled)) ent(Z.enabled).state = isOn(Z.enabled) ? "off" : "on";
+        toast(`Zone ${selectedZone} toggled`);
+        renderFacility();
+      },
+    },
+    {
+      lab: "Pin phase Auto",
+      desc: Z.phase_ctl,
+      run: async () => {
+        await svc("input_select", "select_option", { entity_id: Z.phase_ctl, option: "Auto" });
+        toast("Phase control → Auto");
+      },
+    },
+  ]
+    .map(
+      (a, i) =>
+        `<div class="rule">
+          <button class="btn primary" data-act="${i}" type="button">Run</button>
+          <div><div class="font-bold text-sm">${a.lab}</div><div class="text-xs text-[var(--ink3)] mt-0.5">${a.desc}</div></div>
+        </div>`
+    )
+    .join("");
+  const actions = [
+    async () => {
+      await evt("crop_steering_manual_irrigation", { zone: selectedZone, duration: 60 });
+      toast(`Manual shot · Z${selectedZone}`);
+    },
+    async () => {
+      await svc("switch", isOn(CONFIG.E.sw_auto) ? "turn_off" : "turn_on", {
+        entity_id: CONFIG.E.sw_auto,
+      });
+      toast("Auto toggled");
+      await refresh(false);
+    },
+    async () => {
+      await svc("switch", isOn(Z.enabled) ? "turn_off" : "turn_on", { entity_id: Z.enabled });
+      toast("Zone toggled");
+      await refresh(false);
+    },
+    async () => {
+      await svc("input_select", "select_option", { entity_id: Z.phase_ctl, option: "Auto" });
+      toast("Phase → Auto");
+    },
+  ];
+  document.querySelectorAll("#actionList [data-act]").forEach((btn) => {
+    btn.onclick = async () => {
+      try {
+        await actions[+btn.dataset.act]();
+      } catch (e) {
+        toast("Action failed: " + e.message);
+      }
+    };
+  });
+  renderActivityFeed("taskFeed");
+}
+
+function renderLogic() {
+  const rules = [
+    { id: CONFIG.E.sw_system, lab: "System enabled", desc: "Master irrigation enable" },
+    { id: CONFIG.E.sw_auto, lab: "Auto irrigation", desc: "Autonomous P0–P3 loop" },
+    { id: CONFIG.E.sw_ecstack, lab: "EC stacking", desc: "Build EC when below gen target" },
+    ...ZONES.map((z) => ({
+      id: CONFIG.ZONE(z).enabled,
+      lab: `Zone ${z} enabled`,
+      desc: CONFIG.ZONE(z).enabled,
+    })),
+    ...ZONES.map((z) => ({
+      id: CONFIG.ZONE(z).override,
+      lab: `Zone ${z} manual override`,
+      desc: "Absolute lockout when ON",
+      invert: true,
+    })),
+  ];
+  document.getElementById("ruleList").innerHTML = rules
+    .map((r) => {
+      const on = isOn(r.id);
+      const miss = !ent(r.id) && !DEMO;
+      return `<div class="rule" data-eid="${r.id}">
+        <div class="tog${on ? " on" : ""}${miss ? " opacity-40" : ""}" data-tog><i></i></div>
+        <div class="flex-1">
+          <div class="font-bold text-sm">${r.lab}${miss ? " · missing" : ""}</div>
+          <div class="text-xs text-[var(--ink3)] mt-0.5">${r.desc}</div>
+        </div>
+        <span class="pill ${on ? "ok" : ""}">${on ? "on" : "off"}</span>
+      </div>`;
+    })
+    .join("");
+  document.querySelectorAll("#ruleList [data-tog]").forEach((el) => {
+    el.onclick = async () => {
+      const id = el.closest(".rule").dataset.eid;
+      if (!ent(id) && !DEMO) {
+        toast("Entity not in HA");
+        return;
+      }
+      const next = !isOn(id);
+      try {
+        await svc("switch", next ? "turn_on" : "turn_off", { entity_id: id });
+        if (ent(id)) ent(id).state = next ? "on" : "off";
+        toast((next ? "ON · " : "OFF · ") + id.split(".").pop());
+        renderLogic();
+        renderFacility();
+      } catch (e) {
+        toast("Toggle failed: " + e.message);
+      }
+    };
+  });
+}
+
+function buildSummary() {
+  const now = Date.now();
+  const zones = ZONES.map((z) => {
+    const Z = CONFIG.ZONE(z);
+    return {
+      zone: z,
+      vwcAvg: num(Z.vwc) ?? undefined,
+      poreEcAvg: num(Z.ec) ?? undefined,
+      drybackAvgPct: num(CONFIG.E.dryback_pct) ?? undefined,
+      totalWaterLitres: num(Z.daily) ?? num(Z.daily_fb) ?? undefined,
+    };
+  });
+  const vwcs = zones.map((z) => z.vwcAvg).filter((n) => n != null);
+  const ecs = zones.map((z) => z.poreEcAvg).filter((n) => n != null);
+  const min = (a) => (a.length ? Math.min(...a) : 0);
+  const max = (a) => (a.length ? Math.max(...a) : 0);
+  const avg = (a) => (a.length ? a.reduce((s, x) => s + x, 0) / a.length : 0);
+  return {
+    source: ROOM || "f2",
+    capturedAt: now,
+    runStart: now - 56 * 86400000,
+    runEnd: now,
+    daysTotal: 56,
+    steeringDial: dial,
+    substrate: {
+      vwcMin: +min(vwcs).toFixed(2),
+      vwcMax: +max(vwcs).toFixed(2),
+      vwcAvg: +avg(vwcs).toFixed(2),
+      poreEcMin: +min(ecs).toFixed(2),
+      poreEcMax: +max(ecs).toFixed(2),
+      poreEcAvg: +avg(ecs).toFixed(2),
+      drybackAvgPct: num(CONFIG.E.dryback_pct) ?? undefined,
+    },
+    irrigation: {
+      totalWaterLitres: +ZONES.reduce(
+        (s, z) => s + (num(CONFIG.ZONE(z).daily) ?? num(CONFIG.ZONE(z).daily_fb) ?? 0),
+        0
+      ).toFixed(1),
+      shotCount: ZONES.reduce((s, z) => s + (num(CONFIG.ZONE(z).shots) || 0), 0),
+    },
+    environment: {
+      tempAvg: num(CONFIG.E.air_temp) ?? undefined,
+      rhAvg: num(CONFIG.E.rh) ?? undefined,
+      vpdAvg: num(CONFIG.E.vpd) ?? undefined,
+      co2Avg: num(CONFIG.E.co2) ?? undefined,
+      ppfdAvg: num(CONFIG.E.ppfd) ?? undefined,
+      dliAvg: num(CONFIG.E.dli) ?? undefined,
+    },
+    perZone: zones,
+    notes: st(CONFIG.E.decision, "") || undefined,
+    raw: {
+      steeringMode: st(CONFIG.E.steering_mode),
+      growthStage: st(CONFIG.E.growth_stage),
+      irrigationPhase: st(CONFIG.E.irrigation_phase),
+      activity: st(CONFIG.E.activity),
+      safety: st(CONFIG.E.safety),
+      zones: ZONES,
+    },
+  };
+}
+function renderExport() {
+  document.getElementById("exportPre").textContent = JSON.stringify(buildSummary(), null, 2);
+}
+
+function renderAll() {
+  renderFacility();
+  renderSteer();
+  renderClimateNow();
+  renderIrrigation();
+  renderFertigation();
+  renderEnvMetrics();
+  renderLogic();
+  const active = document.querySelector(".panel.on")?.dataset.panel;
+  if (active) onTab(active);
+}
+
+/* ---- refresh ---- */
+async function refresh(showBanner = true) {
+  try {
+    if (DEMO) {
+      S = seedDemo();
+      setLive(true, "demo fixture · not live HA", "demo");
+      if (showBanner)
+        banner(
+          "DEMO MODE — synthetic fixture for offline layout checks. Remove <code>?demo</code> and open from HA <code>/local/aigrow-ops.html</code> for live data.",
+          "warn"
+        );
+    } else {
+      const tok = getToken();
+      if (!tok) {
+        setLive(false, "no HA token");
+        banner(
+          "Not authenticated. Open this page from Home Assistant while logged in (<code>/local/aigrow-ops.html</code>) so <code>hassTokens</code> is available. Do not use a long-lived token in the file.",
+          "err"
+        );
+        S = {};
+        ZONES = [1, 2, 3];
+        renderFacility();
+        return;
+      }
+      S = await fetchStates();
+      setLive(true, "live · " + new Date().toLocaleTimeString());
+      if (showBanner) banner("");
+    }
+    ZONES = discoverZones();
+    if (!ZONES.includes(selectedZone)) selectedZone = ZONES[0] || 1;
+    dial = dialFromLive();
+    renderAll();
+  } catch (e) {
+    setLive(false, "error · " + e.message);
+    banner("HA connection failed: " + esc(e.message), "err");
+  }
+}
+
+/* ---- boot ---- */
+function boot() {
+  initTabs();
+  if (ROOM) {
+    const p = document.getElementById("roomPill");
+    p.style.display = "";
+    p.textContent = "room: " + ROOM;
+  }
+  document.getElementById("btnRefresh").onclick = () => {
+    histCache = {};
+    refresh();
+  };
+  document.getElementById("btnSaveDirty").onclick = () => saveDirty();
+  document.getElementById("btnApplyDial").onclick = () => applyDial();
+  document.getElementById("btnManualShot").onclick = async () => {
+    try {
+      await evt("crop_steering_manual_irrigation", { zone: selectedZone, duration: 60 });
+      toast(`Manual shot · Z${selectedZone} 60s`);
+    } catch (e) {
+      toast("Shot failed: " + e.message);
+    }
+  };
+  document.getElementById("steerDial").oninput = (e) => {
+    dial = +e.target.value;
+    renderSteer();
+  };
+  document.getElementById("rangeSel").onchange = (e) => {
+    histHours = +e.target.value;
+    histCache = {};
+    const active = document.querySelector(".panel.on")?.dataset.panel;
+    if (active) onTab(active);
+  };
+  document.getElementById("btnCopyJson").onclick = async () => {
+    renderExport();
+    try {
+      await navigator.clipboard.writeText(document.getElementById("exportPre").textContent);
+      toast("Copied cropSteeringSummary");
+    } catch {
+      toast("Copy failed");
+    }
+  };
+  document.getElementById("btnDownloadJson").onclick = () => {
+    renderExport();
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(
+      new Blob([document.getElementById("exportPre").textContent], { type: "application/json" })
+    );
+    a.download = `cropSteeringSummary-z${selectedZone}-${Date.now()}.json`;
+    a.click();
+  };
+  document.getElementById("btnRebuildExport").onclick = () => {
+    renderExport();
+    toast("Rebuilt from live state");
+  };
+
+  refresh();
+  if (!DEMO) setInterval(() => refresh(false), CONFIG.REFRESH_MS);
+}
+boot();
+</script>
+</body>
+</html>

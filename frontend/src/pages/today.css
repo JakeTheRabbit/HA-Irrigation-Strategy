@@ -2,7 +2,11 @@
    needs a person: a flagged row gets a coloured edge and its reason in words, on the thing that has it. */
 .today {
   display: grid;
-  gap: 16px;
+  gap: 12px;
+}
+/* The grid owns section spacing; legacy panel margins would add a second gap. */
+.today > .panel {
+  margin-bottom: 0;
 }
 .today-empty-title {
   margin: 8px 0 16px;
@@ -60,23 +64,24 @@
   position: relative;
   padding-bottom: 22px;
 }
+/* Where the grow is: context, never louder than a problem. Thin and muted. */
 .today-run-track {
   position: relative;
   display: block;
-  height: 8px;
-  border-radius: 4px;
+  height: 5px;
+  border-radius: 3px;
   background: color-mix(in srgb, var(--muted-foreground) 20%, transparent);
 }
 .today-run-fill {
   position: absolute;
   inset: 0 auto 0 0;
-  border-radius: 4px;
-  background: var(--primary);
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--primary) 45%, var(--muted-foreground));
 }
 .today-run-now {
   position: absolute;
-  top: -5px;
-  bottom: -5px;
+  top: -4px;
+  bottom: -4px;
   width: 2px;
   margin-left: -1px;
   background: var(--foreground);
@@ -161,7 +166,7 @@
   gap: 9px;
   margin: 0;
   padding: 9px 13px;
-  border: 1px solid color-mix(in srgb, var(--warning) 28%, transparent);
+  border: 1px solid color-mix(in srgb, var(--warning-mark) 28%, transparent);
   border-radius: 7px;
   background: var(--warning-bg);
   color: var(--foreground);
@@ -214,9 +219,9 @@
 /* Today's shots: a track per zone, midnight to midnight. */
 .today-strip {
   display: grid;
-  gap: 10px;
+  gap: 8px;
   margin: 0;
-  padding: 14px 20px 12px;
+  padding: 10px 18px 8px;
 }
 .today-strip-head {
   display: flex;
@@ -254,9 +259,21 @@
   border: 1.5px dashed var(--primary);
   background: color-mix(in srgb, var(--primary) 14%, transparent);
 }
+.today-strip-legend [data-glyph="failed"]::before {
+  background: var(--destructive);
+}
+.today-strip-legend [data-glyph="warning"]::before {
+  background: var(--warning-mark);
+}
+.today-strip-window {
+  margin-left: 4px;
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
 .today-strip-legend [data-glyph="lights"]::before {
   width: 14px;
-  background: color-mix(in srgb, var(--warning) 25%, transparent);
+  background: color-mix(in srgb, var(--warning-mark) 25%, transparent);
 }
 .today-strip-open {
   margin-left: auto;
@@ -333,7 +350,7 @@
   box-shadow: var(--ha-native-shadow, 0 1px 2px rgb(0 0 0 / 4%));
 }
 .today-zone[data-attention="warning"] {
-  border-color: color-mix(in srgb, var(--warning) 70%, var(--border));
+  border-color: color-mix(in srgb, var(--warning-mark) 70%, var(--border));
 }
 .today-zone[data-attention="critical"] {
   border-color: color-mix(in srgb, var(--destructive) 65%, var(--border));
@@ -378,9 +395,19 @@
   font-weight: 600;
   line-height: 20px;
 }
+/* The one phase chip: fixed hue per phase, white text (as the menu, zone and history draw it). */
 .today-phase {
-  background: color-mix(in srgb, var(--primary) 18%, var(--surface));
-  color: var(--primary-strong);
+  background: var(--phase-p0);
+  color: #ffffff;
+}
+.today-phase[data-phase="P1"] {
+  background: var(--phase-p1);
+}
+.today-phase[data-phase="P2"] {
+  background: var(--phase-p2);
+}
+.today-phase[data-phase="P3"] {
+  background: var(--phase-p3);
 }
 .today-mode {
   border: 1px solid var(--border);
@@ -400,12 +427,15 @@
 }
 .today-zone-gauges {
   display: grid;
+  /* One set of columns for the zone's gauges: the bars line up, and a target never wraps. */
+  grid-template-columns: minmax(max-content, 1fr) minmax(48px, 1fr) auto;
   gap: 12px;
   min-width: 0;
 }
 .today-gauge {
   display: grid;
-  grid-template-columns: minmax(96px, 1fr) minmax(60px, 1fr) auto;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
   align-items: center;
   gap: 10px;
   font-variant-numeric: tabular-nums;
@@ -416,12 +446,14 @@
 }
 .today-gauge-label small {
   color: var(--muted-foreground);
-  font-size: var(--text-xs);
+  font-size: var(--text-label);
+  line-height: var(--leading-label);
 }
 .today-gauge-value {
   min-width: 52px;
   text-align: right;
-  font-size: var(--text-lg);
+  font-size: 18px;
+  line-height: var(--leading-reading);
   font-weight: 600;
   white-space: nowrap;
 }
@@ -429,7 +461,16 @@
   color: var(--warning);
 }
 .today-gauge[data-state="abnormal"] .mini-gauge-tick {
-  background: var(--warning);
+  background: var(--warning-mark);
+}
+.today-gauge[data-state="abnormal"] .today-gauge-label {
+  color: var(--warning);
+}
+/* A state that is not a warning (Ramping, Drying back, Not held · Timer): said, in muted ink. */
+.today-gauge .band-tag[data-tone="neutral"] {
+  border-color: var(--border);
+  color: var(--muted-foreground);
+  font-weight: 500;
 }
 .today-paused {
   display: flex;
@@ -496,11 +537,11 @@
   font-variant-numeric: tabular-nums;
 }
 .today-sensors li:not([data-health="ok"]):not([data-health="not-counted"]) {
-  border-color: var(--warning);
+  border-color: var(--warning-mark);
   background: var(--warning-bg);
 }
 .today-sensors li:not([data-health="ok"]):not([data-health="not-counted"]) i {
-  background: var(--warning);
+  background: var(--warning-mark);
 }
 .today-sensors li:not([data-health="ok"]):not([data-health="not-counted"]) .today-sensor-reading {
   color: var(--warning);
@@ -600,9 +641,38 @@
   .today-strip {
     padding: 12px 14px;
   }
+  /* The key on one line. */
+  .today-strip-legend {
+    gap: 4px 10px;
+    font-size: var(--text-xs);
+  }
   .today-strip-body {
     grid-template-columns: 52px minmax(0, 1fr);
     column-gap: 8px;
+  }
+  /* Rows a thumb can tell apart. */
+  .today-strip .shot-timeline[data-mode="strip"] {
+    --st-row: 32px;
+  }
+  .today-strip-labels li {
+    height: 33px;
+  }
+  /* Around now the shots have room: each mark is at least 8 px wide. */
+  .today-strip[data-windowed] .st-track .st-block {
+    width: max(var(--s), 8px);
+    border-radius: 3px;
+  }
+  .today-strip-phone {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px 12px;
+  }
+  .today-strip-counts {
+    color: var(--muted-foreground);
+    font-size: var(--text-sm);
+    font-weight: 500;
   }
   .today-strip-axis [data-odd] {
     display: none;
@@ -629,4 +699,193 @@
   [data-today-tank="readout"] {
     display: none;
   }
+}
+/* Watered by timer programs: no steering, so no green "automated" dot. */
+.today-mode[data-mode="timer"] i {
+  background: var(--muted-foreground);
+}
+
+/* Steering lanes: each zone's moisture today on the room's clock, the rail above them all, lined
+ * up with the curves. Name and VWC | curve | readings | sensors, one band per zone. */
+.today-rail {
+  margin: 0 calc(20px + 22px + 224px + 22px + 228px) 4px calc(20px + 184px + 22px);
+}
+.today-zone {
+  grid-template-columns: 184px minmax(0, 1fr) 224px 228px;
+  grid-template-areas:
+    "main lane gauges sensors"
+    "flags flags flags flags";
+}
+.today-zone-main {
+  grid-area: main;
+}
+.today-zone-lane {
+  grid-area: lane;
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+.today-gauge-track {
+  grid-column: 1 / -1;
+  display: block;
+  line-height: 0;
+}
+.today-zone-gauges {
+  grid-area: gauges;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 3px;
+}
+.today-zone-gauges .today-gauge {
+  row-gap: 2px;
+  column-gap: 8px;
+}
+.today-zone-gauges .today-gauge-label {
+  line-height: 1.15;
+}
+.today-zone-gauges .today-gauge-label small {
+  line-height: 1.15;
+}
+.today-zone-gauges .today-gauge-value {
+  font-size: 16px;
+  line-height: 1.15;
+  text-align: right;
+  white-space: nowrap;
+}
+.today-sensors {
+  grid-area: sensors;
+}
+.today-zone-flags {
+  grid-area: flags;
+}
+.today-zone-vwc {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin: 2px 0 0;
+}
+.today-zone-vwc-value {
+  font-size: 2.25rem;
+  line-height: 1;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.today-zone-vwc-unit,
+.today-zone-water {
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+}
+.today-zone-water {
+  margin: 0;
+}
+.today-zone-water strong {
+  color: var(--foreground);
+}
+@container (max-width: 960px) {
+  .today-rail {
+    margin: 0 20px 4px calc(20px + 184px + 22px);
+  }
+  .today-zone {
+    grid-template-columns: 184px minmax(0, 1fr);
+    grid-template-areas:
+      "main lane"
+      "gauges sensors"
+      "flags flags";
+  }
+}
+@container (max-width: 640px) {
+  .today-rail {
+    margin: 0 14px 4px;
+  }
+  .today-zone {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "main"
+      "lane"
+      "gauges"
+      "sensors"
+      "flags";
+  }
+  .today-zone-lane .vwc-lane {
+    height: 120px !important;
+  }
+}
+/* One band per zone: tight enough that every zone sits within a laptop's first screen and a half. */
+.today-zone {
+  padding: 8px 18px;
+  gap: 5px 18px;
+}
+.today-zone-main {
+  gap: 2px;
+}
+.today-zone-vwc-value {
+  font-size: 1.75rem;
+}
+.today-zone-gauges {
+  gap: 3px;
+  align-content: start;
+}
+.today-sensors {
+  gap: 4px;
+}
+.today-sensors ul {
+  gap: 4px;
+}
+.today-sensors li {
+  padding: 5px 10px;
+}
+.today-zone {
+  grid-template-columns: 198px minmax(0, 1fr) 228px 220px;
+}
+.today-rail {
+  margin-left: calc(18px + 198px + 18px);
+  margin-right: calc(18px + 18px + 228px + 18px + 220px);
+}
+@container (max-width: 960px) {
+  .today-zone {
+    grid-template-columns: 204px minmax(0, 1fr);
+  }
+  .today-rail {
+    margin-right: 18px;
+  }
+}
+@container (max-width: 640px) {
+  .today-zone {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .today-rail {
+    margin: 0 14px 4px;
+  }
+}
+@container (max-width: 640px) {
+  .today-zone {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-areas:
+      "main gauges"
+      "lane lane"
+      "sensors sensors"
+      "flags flags";
+    gap: 6px 12px;
+  }
+  .today-zone-lane .vwc-lane {
+    height: 76px !important;
+  }
+  .today-zone-lane .ec-lane {
+    height: 30px !important;
+  }
+  .today-zone-gauges .today-gauge-label small {
+    display: none;
+  }
+}
+@container (max-width: 640px) {
+  .today-zone-gauges {
+    grid-template-columns: minmax(0, 1fr) minmax(0, auto);
+  }
+  .today-zone-gauges .today-gauge-value {
+    min-width: 0;
+    white-space: normal;
+    text-align: right;
+  }
+}
+.today-zones {
+  gap: 8px;
 }

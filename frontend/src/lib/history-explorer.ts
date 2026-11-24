@@ -13,6 +13,7 @@ import type { SteCopy } from "./ste-copy";
 import type { ProjectionIntent } from "./strategy-review";
 import { clock, dayKey, dayLabel, startOfDay, wallHhmm } from "./time";
 import type { Controller, RoomView, States } from "./types";
+import { zoneColour } from "./zone-colours";
 
 const DAY = 86_400_000;
 const HOUR = 3_600_000;
@@ -907,7 +908,6 @@ export interface ExplorerSeries {
   kind: SensorKind;
 }
 /** Zones keep one colour on every chart; Feed, Tank and the room have their own. */
-const ZONE_COLORS = ["#1e88e5", "#d84f7a", "#5c8f3a", "#8e5cd9", "#e08a00", "#00897b"];
 const GROUP_COLORS: Record<string, string> = { feed: "#3a9aa5", tank: "#3f7fbf", room: "#c0763a" };
 const OTHER: Record<string, { group: "feed" | "tank" | "room"; chip: string }> = {
   "Feed EC": { group: "feed", chip: "EC" },
@@ -928,7 +928,7 @@ const GROUP_NAMES = { feed: "Feed", tank: "Tank", room: "Room" } as const;
 export function explorerSeries(room: RoomView, sensors: readonly ExplorerSensor[]): ExplorerSeries[] {
   const list: ExplorerSeries[] = [];
   room.zones.forEach((zone, index) => {
-    const color = ZONE_COLORS[index % ZONE_COLORS.length];
+    const color = zoneColour(index);
     for (const sensor of sensors.filter((s) => s.zone === zone.id)) {
       const fused = sensor.entityId === zone.vwc.entityId || sensor.entityId === zone.ec.entityId;
       const root = sensor.kind === "climate";

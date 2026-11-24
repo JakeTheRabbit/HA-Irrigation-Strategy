@@ -38,17 +38,17 @@
   font-size: var(--text-sm);
 }
 
-/* Mockup 04: the charts, the AI's suggestion under them; beside them today in numbers, why and
- * what comes next, and the shot log. The zone day's own parts sit in this grid. */
+/* The zone's day: charts and shot log on the left; numbers, why and the AI's suggestion beside
+ * them. Overlapping spans keep both columns packed. The zone day's own parts sit in this grid. */
 .zone-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(320px, 400px);
   grid-template-areas:
     "charts numbers"
     "charts why"
-    "suggest shots"
-    ". shots";
-  grid-template-rows: auto auto auto 1fr;
+    "shots why"
+    "shots suggest";
+  grid-template-rows: min-content min-content min-content 1fr;
   align-items: start;
   gap: 16px;
 }
@@ -111,24 +111,38 @@
   font-weight: 600;
 }
 
-/* Pore EC through the day: the stage's band green, the lights-off hours dark. */
+/* Pore EC through the day: unified green target band and series stroke matching EcLane & Explorer. */
 .zone-ec-plot {
   padding: 0 16px 12px;
 }
 .zone-ec-band {
-  fill: color-mix(in srgb, var(--success) 18%, transparent);
+  fill: var(--band-ec);
+}
+.zone-ec-band-edge {
+  stroke: var(--band-ec-edge);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
 }
 .zone-ec-dark {
-  fill: color-mix(in srgb, var(--foreground) 7%, transparent);
+  fill: color-mix(in srgb, var(--foreground) 6%, transparent);
 }
 .zone-ec-line {
   fill: none;
-  stroke: var(--foreground);
-  stroke-width: 2;
+  stroke: var(--series-ec);
+  stroke-width: 2.1;
   stroke-linejoin: round;
 }
+.zone-ec-live {
+  fill: var(--series-ec);
+  stroke: var(--surface);
+  stroke-width: 2;
+}
+.zone-ec-live[data-abnormal] {
+  fill: var(--warning-mark);
+}
 .zone-ec-now {
-  stroke: var(--muted-foreground);
+  stroke: var(--foreground);
+  stroke-opacity: 0.65;
   stroke-width: 1.5;
 }
 .zone-ec-axis {
@@ -143,8 +157,8 @@
   align-items: center;
   gap: 12px 14px;
   padding: 16px 18px;
-  border-color: color-mix(in srgb, var(--warning) 55%, var(--border));
-  background: color-mix(in srgb, var(--warning) 8%, var(--surface));
+  border-color: color-mix(in srgb, var(--warning-mark) 55%, var(--border));
+  background: color-mix(in srgb, var(--warning-mark) 8%, var(--surface));
 }
 .zone-suggestion-icon {
   color: var(--warning);
@@ -253,9 +267,9 @@
 }
 .zone-numbers dd.zone-sub {
   color: var(--muted-foreground);
-  font-size: var(--text-xs);
+  font-size: var(--text-label);
+  line-height: var(--leading-label);
   font-weight: 500;
-  line-height: 1.5;
 }
 .zone-numbers [data-status="above"] dd.zone-sub {
   color: var(--warning);
@@ -341,7 +355,8 @@
 .zone-why {
   display: block;
   color: var(--muted-foreground);
-  font-size: var(--text-xs);
+  font-size: var(--text-label);
+  line-height: var(--leading-label);
 }
 .zone-jev-list {
   margin: 0;
@@ -532,7 +547,8 @@
   }
   .zone-layout {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-areas: "charts" "numbers" "suggest" "why" "shots";
+    /* One column: the zone's condition and next action first, then the chart. */
+    grid-template-areas: "numbers" "charts" "suggest" "why" "shots";
     grid-template-rows: none;
   }
 }
@@ -543,6 +559,23 @@
   .zone-facts {
     flex-basis: 100%;
     margin-left: 0;
+  }
+  /* The comparison: a full-width selector, its choices sharing the row (wrapping if they must). */
+  .zone-day .zone-day-chart .timeline-heading-side {
+    width: 100%;
+  }
+  .zone-day-compare {
+    display: flex;
+    flex-wrap: wrap;
+    width: 100%;
+  }
+  .zone-day-compare .timeline-compare {
+    flex-basis: 100%;
+    padding: 4px 6px;
+  }
+  .zone-day-compare button {
+    flex: 1 1 auto;
+    min-height: 44px;
   }
   /* Phone (mockup 26): the charts side by side, one at a time, swiped. */
   .zone-day-slides {
@@ -601,12 +634,17 @@
   .zone-numbers-wrap {
     padding: 12px 14px;
   }
-  .zone-numbers {
-    gap: 10px 12px;
+  /* A phone: the day's tallies two by two under the gauges, not a column of four. */
+  .zone-layout .zone-numbers {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px 16px;
   }
   .zone-numbers > div + div {
     padding-left: 0;
     border-left: 0;
+  }
+  .zone-numbers dd {
+    white-space: normal;
   }
   .zone-page .panel-heading {
     padding: 12px 14px 6px;

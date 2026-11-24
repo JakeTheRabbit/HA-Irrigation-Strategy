@@ -1,12 +1,21 @@
-import { zoneAttention, type AttentionReason, type ZoneFacts } from "./attention";
-import { formatVolume } from "./display-units";
+import { irrigationMode } from "./facility";
+import { zoneAttention, type AttentionLevel, type AttentionReason, type ZoneFacts } from "./attention";
+import { formatEc, formatTemp, formatVolume } from "./display-units";
 import { readJev, jevIds, parseJevSetpoints, type JevStage } from "./jev";
 import { buildRoom, numeric, readable, roomStatus } from "./model";
 import { newestFirst, openAlerts } from "./open-alerts";
 import { reservoirView, type ReservoirView } from "./reservoir";
 import { routeHash } from "./routes";
 import { buildSetpointPreview } from "./setpoint-preview";
-import { stockTanks, stockState, type StockState, type StockTankReading } from "./dosing";
+import {
+  dosingStatusId,
+  readStatus,
+  stockTanks,
+  stockState,
+  type DosingStatus,
+  type StockState,
+  type StockTankReading,
+} from "./dosing";
 import { tankTelemetry } from "./tank-telemetry";
 import { eventTimes } from "./timeline";
 import type { CsEvent } from "./parity-types";
@@ -14,7 +23,7 @@ import type { Controller, EntityState, LogEvent, Metric, States, Zone } from "./
 import { dailyWater } from "./water-delivery";
 import { roomPlants } from "./water-view";
 import { climateReadings, rootZoneSensor, type ClimateReading } from "./zone-extras";
-import { zoneProbes, type Probe, type ProbeHealth } from "./probes";
+import { PROBE_TONE, zoneProbes, type Probe, type ProbeHealth } from "./probes";
 
 /** A physical substrate sensor: its moisture and EC probes paired by entity id (sensor.f1_z1_front_vwc
  * and sensor.f1_z1_front_ec are one sensor), with the worse of their two healths. */
@@ -67,13 +76,14 @@ export function zoneSensors(probes: readonly Probe[]): ZoneSensor[] {
 }
 
 /** Where a zone stands with the automation, the most limiting first. */
-export type ZoneMode = "room-off" | "offline" | "paused" | "watering-off" | "watering" | "automated";
+export type ZoneMode = "room-off" | "offline" | "paused" | "watering-off" | "watering" | "timer" | "automated";
 export const ZONE_MODE: Record<ZoneMode, string> = {
   "room-off": "Room off",
   offline: "Offline",
   paused: "Paused",
   "watering-off": "Watering off",
   watering: "Watering now",
+  timer: "Timer",
   automated: "Automated",
 };
 
@@ -126,6 +136,8 @@ export interface FacilityZone {
   /** Water delivered to the zone today, in litres. */
   waterL: number | null;
   mode: ZoneMode;
+  /** Watered by the room's timer programs (its irrigation mode), not steered: it has no phase. */
+  timer: boolean;
   sensors: ZoneSensor[];
   attention: AttentionReason[];
   /** Waiting for the pump: its place in line, 1 = next (`position` counts the zones ahead). From the
@@ -140,6 +152,8 @@ export interface FacilityZone {
   lastShotText: string | null;
   /** The zone's newest open alert, else why its reading is not usable. */
   problem: string | null;
+  /** `problem` is an open alert (an alarm), not the dashboard's own advisory. */
+  problemIsAlert: boolean;
 }
 export interface FacilityRoom {
   room: Controller["rooms"][number];
@@ -160,6 +174,25 @@ export interface FacilityRoom {
   growDay: { day: number; of: number | null; daysLeft: number | null; stage: string } | null;
   /** binary_sensor.crop_steering_<prefix>calibration_due: a feed probe is due. */
   feedCalibrationDue: boolean;
+  /** The room's open alerts, counted once each. */
+  alertCount: number;
+  /** The last batch's mix check when it did not pass (and no batch is running): what it was and
+   * when, else null. */
+  mixFailed: { title: string; at: string | null } | null;
+}
+
+/** The mix check's failure, as Feed & dosing names it; null when it passed or a batch runs. */
+function mixFailed(status: DosingStatus | null): FacilityRoom["mixFailed"] {
+  const mix = status?.mix;
+  if (!mix || status.batch.step !== "idle") return null;
+  const title = mix.gave_up_at
+    ? "Mix check not done"
+    : mix.verdict === "off target"
+      ? "Mix check failed"
+      : mix.verdict === "not read"
+        ? "Mix check could not read the tank"
+        : null;
+  return title ? { title, at: mix.checked_at ?? mix.gave_up_at } : null;
 }
 
 /** An entity's state, with "unknown" and "unavailable" read as absent. */
@@ -307,12 +340,16 @@ export function facilityView(
                   ? "watering-off"
                   : zone.valveOn === true
                     ? "watering"
-                    : "automated") as ZoneMode,
+                    : irrigationMode(states, room, zone.id) === "timer"
+                      ? "timer"
+                      : "automated") as ZoneMode,
+          timer: irrigationMode(states, room, zone.id) === "timer",
           sensors: zoneSensors(zoneProbes(zone, states, now)),
           attention: [] as AttentionReason[],
           queued: ahead === null || ahead < 0 ? null : { place: ahead + 1 },
           ...lastShot(states[`sensor.crop_steering_${prefix}zone_${zone.id}_flow_ratio`]),
           // Worded as the attention rule words a probe, so the card says it once.
+          problemIsAlert: alerts.some((alert) => alert.roomId === room.id && alert.zone === zone.id),
           problem:
             alerts.find((alert) => alert.roomId === room.id && alert.zone === zone.id)?.title ??
             (vwcIssue
@@ -371,6 +408,72 @@ export function facilityView(
       litresPerPlant: plantCount > 0 ? plantL / plantCount : null,
       growDay,
       feedCalibrationDue: states[`binary_sensor.crop_steering_${prefix}calibration_due`]?.state === "on",
+      alertCount: alerts.filter((alert) => alert.roomId === room.id).length,
+      mixFailed: mixFailed(readStatus(states[dosingStatusId(prefix)])),
     };
   });
+}
+
+/** The feed tank's live readings as the room cards print them: pH and EC to 2 decimals, as Feed &
+ * dosing reads the tank (EC's unit only when it is not mS/cm), the temperature to 1 decimal. Home
+ * Assistant's raw floats (3.06599998474121) never reach the page. */
+export function tankReadingText(tank: { ph: number | null; ec: number | null; temperature: number | null }) {
+  return {
+    ph: tank.ph === null ? null : tank.ph.toLocaleString(undefined, { maximumFractionDigits: 2 }),
+    ec: tank.ec === null ? null : formatEc(tank.ec, 2).replace(/ mS\/cm$/, ""),
+    temperature: tank.temperature === null ? null : formatTemp(tank.temperature, 1),
+  };
+}
+
+/** What in the room needs a look, for the line under its heading: each zone with a problem, a
+ * troubled sensor, a short last shot or an open alert, then the feed's failed mix check, a held
+ * tank and low stock. Each opens where it is fixed. */
+export function roomAttention(r: FacilityRoom): {
+  key: string;
+  /** "<place>: <problem>": the zone, tank or stock, then what is wrong there. */
+  text: string;
+  level: AttentionLevel;
+  /** An open alert (an alarm) rather than an advisory the dashboard reads from the room. */
+  alert: boolean;
+  zone?: number;
+  page: "zone" | "equipment/dosing" | "equipment/stock";
+}[] {
+  const zones = r.zones.flatMap((z) => {
+    const sensor = z.sensors.find((s) => s.health !== "ok" && s.health !== "not-counted");
+    const why =
+      z.problem ??
+      z.attention[0]?.text ??
+      (sensor ? `${sensor.name}: ${sensor.text}` : null) ??
+      (z.lastShotHollow ? "Last shot came up short" : null);
+    if (!why) return [];
+    const critical =
+      z.problem !== null ||
+      z.attention.some((a) => a.level === "critical") ||
+      (sensor !== undefined && PROBE_TONE[sensor.health] === "off");
+    return [
+      {
+        key: `zone-${z.zone.id}`,
+        text: `${z.zone.name}: ${why}`,
+        level: (critical ? "critical" : "warning") as AttentionLevel,
+        alert: z.problemIsAlert,
+        zone: z.zone.id,
+        page: "zone" as const,
+      },
+    ];
+  });
+  const low = r.stock.filter((tank) => tank.state !== "ok");
+  const items = [
+    ...zones,
+    ...(r.mixFailed
+      ? [{ key: "mix", text: `Feed tank: ${r.mixFailed.title}`, level: "critical" as const, alert: false, page: "equipment/dosing" as const }]
+      : []),
+    ...(r.reservoir.state === "held"
+      ? [{ key: "reservoir", text: `Feed tank: ${r.reservoir.label}`, level: "warning" as const, alert: false, page: "equipment/dosing" as const }]
+      : []),
+    ...(low.length
+      ? [{ key: "stock", text: `Stock: ${low.map((tank) => `${tank.name} low`).join(", ")}`, level: "warning" as const, alert: false, page: "equipment/stock" as const }]
+      : []),
+  ];
+  // The worst first; the order within a level stays.
+  return [...items.filter((i) => i.level === "critical"), ...items.filter((i) => i.level !== "critical")];
 }

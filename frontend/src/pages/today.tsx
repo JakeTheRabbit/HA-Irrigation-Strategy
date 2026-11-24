@@ -5,17 +5,18 @@ import { Button } from "@/components/ui/button";
 import { Empty, number, type Page } from "@/components/dashboard";
 import { RoomOffBanner } from "@/components/room-controls";
 import { BrainCard } from "@/components/brain";
+import { NeedsAttention } from "@/components/needs-attention";
 import { NeedsIntegration } from "@/components/needs-integration";
 import { PlanAndFeed } from "@/components/run-progress";
 import { PlantStressStrip } from "@/components/sensing";
 import { ShotTimeline } from "@/components/shot-timeline";
-import { DrinkBar } from "@/components/zone-gauges";
-import { ZoneSlab } from "@/components/zone-slab";
+import { AlertCodeText } from "@/components/alert-code-text";
+import { DayRail, EcLane, ecDomain, TargetTrack, VwcLane, vwcDomain, type SteeringTone } from "@/components/steering-lane";
 import { zoneAttention, type AttentionLevel, type AttentionReason, type ZoneFacts } from "@/lib/attention";
 import { growDay, type GrowDay } from "@/lib/day-timeline";
-import { formatTemp, formatVolume } from "@/lib/display-units";
+import { formatEc, formatTemp, formatVolume } from "@/lib/display-units";
 import { pickKey } from "@/lib/facility";
-import { drinkLine, excludedProbes, isRescue, readingIssue, ZONE_MODE, zoneHref } from "@/lib/facility-view";
+import { drinkLine, excludedProbes, isRescue, readingIssue, roomAttention, ZONE_MODE, zoneHref } from "@/lib/facility-view";
 import type { GaugeModel } from "@/lib/hmi";
 import { probeGaps } from "@/lib/hmi";
 import { jevIds, parseJevSetpoints, readJev } from "@/lib/jev";
@@ -37,7 +38,9 @@ import {
 } from "@/lib/today-room";
 import type { Controller, Notice, Zone } from "@/lib/types";
 import { offerUndo } from "@/lib/undo";
+import { useNarrow } from "@/lib/use-narrow";
 import { useRecentHistory } from "@/lib/use-recent-moisture";
+import { roomPhases, useSteeringDays, type RoomDay } from "@/lib/steering-day";
 import { dailyWater } from "@/lib/water-delivery";
 import { plantAmount, roomPlants } from "@/lib/water-view";
 import { formatDateTime } from "@/lib/clock";
@@ -89,6 +92,7 @@ export function Today({
     room.zones.map((zone) => zone.vwc.entityId).filter((id): id is string => !!id),
     Math.min(24, Math.ceil((now - from) / H) + 1),
   );
+  const steer = useSteeringDays(controller, [{ room: room.room, zones: room.zones }]).get(room.room.id);
   const view = roomView(controller, now);
   const stage = readJev(states, prefix).room?.stage ?? null;
   const plants = roomPlants(controller);
@@ -155,8 +159,21 @@ export function Today({
         </section>
       </>
     );
-  const drunk = view.rows.map((row) => row.drink?.ml ?? 0);
-  const maxMl = Math.max(1, ...drunk, ...view.rows.map((row) => row.drink?.median ?? 0)) * 1.15;
+  // One VWC scale and one pore EC scale for the room's curves, so its zones compare by eye.
+  const domain = vwcDomain(
+    view.rows.flatMap((row) => [
+      row.view.zone.vwc.value,
+      ...(row.view.timer ? [] : [row.view.rewater, row.view.target]),
+      ...(steer?.zones?.get(row.zone)?.vwc.map((point) => point.value) ?? []),
+    ]),
+  );
+  const ecDom = ecDomain([
+    ...(stage?.poreEc ?? []),
+    ...view.rows.flatMap((row) => [
+      row.view.zone.ec.value,
+      ...(steer?.zones?.get(row.zone)?.ec.map((point) => point.value) ?? []),
+    ]),
+  ]);
   return (
     <div className="today" data-today>
       <RoomHead controller={controller} view={view} day={day} now={now} navigate={navigate} />
@@ -166,6 +183,18 @@ export function Today({
       <TankLine controller={controller} navigate={navigate} />
       <PlantStressStrip controller={controller} />
       <section className="today-zones" aria-label="Zones">
+        {steer && (
+          <div className="today-rail">
+            <DayRail
+              span={steer.span}
+              lightsOn={steer.day.start}
+              lightsOff={steer.day.lightsOff}
+              phases={roomPhases(steer.zones, steer.day, now)}
+              now={now}
+              timeZone={controller.timeZone}
+            />
+          </div>
+        )}
         {view.rows.map((row) => (
           <ZoneRow
             key={row.zone}
@@ -175,7 +204,10 @@ export function Today({
             reasons={(attention.get(row.zone) ?? []).filter(
               (reason) => !row.paused || (reason.rule !== "water" && reason.rule !== "not-watered"),
             )}
-            maxMl={maxMl}
+            steer={steer}
+            domain={domain}
+            ecDom={ecDom}
+            poreEc={stage?.poreEc ?? null}
             now={now}
             open={() => navigate("zone", row.zone)}
             navigate={navigate}
@@ -258,6 +290,11 @@ function RoomHead({
           </p>
         )}
       </div>
+      <NeedsAttention
+        items={roomAttention(r)}
+        alerts={r.alertCount}
+        open={(item) => (item.page === "zone" ? navigate("zone", item.zone) : navigate(item.page))}
+      />
       {grow?.of != null && (
         <div className="today-run" data-today-run>
           <span className="today-run-track" aria-hidden="true">
@@ -392,7 +429,7 @@ function NoticeLine({
       className={plain ? "today-notice" : "today-notice today-critical"}
       role={plain ? undefined : "alert"}
     >
-      <strong>{notice.title}.</strong> {notice.detail}
+      <strong>{notice.title}.</strong> <AlertCodeText text={notice.detail} />
       {linked.map((zone) => (
         <button
           key={zone.id}
@@ -461,20 +498,46 @@ function TodayStrip({
         ),
       ]
     : [];
-  // The ticks, less any the "now" label would sit on.
-  const ticks = [...hourTicks(start, end, 6, timeZone), end].filter(
-    (time) => !(now >= start && now < end) || Math.abs(time - now) > (end - start) * 0.18,
+  // A phone draws 4 h before now to 2 h after it, so the shots spread out; "Full day" shows it all.
+  const narrow = useNarrow(720);
+  const [fullDay, setFullDay] = useState(false);
+  const nowIn = now >= start && now < end;
+  const windowed = narrow && nowIn && !fullDay;
+  const from = windowed ? Math.max(start, now - 4 * H) : start;
+  const to = windowed ? Math.min(end, now + 2 * H) : end;
+  // What the drawn tracks show that went wrong, counted.
+  const drawn = rows.filter((row) => row.zone !== null).flatMap((row) => row.blocks.filter((b) => b.start < to && b.end >= from));
+  const failed = drawn.filter((b) => b.glyph === "failed").length;
+  const warned = drawn.filter((b) => b.glyph === "warning").length;
+  // The window's start and end, the hours between, less any the "Now" label would sit on.
+  const ticks = [from, ...hourTicks(from, to, windowed ? 2 : 6, timeZone).filter((t) => t > from && t < to), to].filter(
+    (time) => !nowIn || Math.abs(time - now) > (to - from) * 0.12,
   );
-  const at = (time: number) => `${(((time - start) / (end - start)) * 100).toFixed(2)}%`;
+  // The window in words: a grow-day runs lights-on to the next lights-on, often into tomorrow.
+  const overnight = startOfDay(end - 1, timeZone) !== startOfDay(start, timeZone);
+  const at = (time: number) => `${(((time - from) / (to - from)) * 100).toFixed(2)}%`;
   return (
-    <section className="panel today-strip" aria-labelledby="today-strip-title" data-today-strip>
+    <section
+      className="panel today-strip"
+      aria-labelledby="today-strip-title"
+      data-today-strip
+      data-windowed={windowed || undefined}
+    >
       <div className="today-strip-head">
-        <h2 id="today-strip-title">Today</h2>
+        <h2 id="today-strip-title">
+          Today{" "}
+          <span className="today-strip-window">
+            {clock(start, timeZone)} → {overnight ? "tomorrow " : ""}
+            {clock(end, timeZone)}
+          </span>
+        </h2>
         {timeline.state !== "missing" && (
           <ul className="today-strip-legend" aria-label="Legend">
             <li data-glyph="done">Shot done</li>
             <li data-glyph="planned">Planned</li>
             <li data-glyph="lights">Lights on</li>
+            <li data-glyph="failed">Failed</li>
+            <li data-glyph="warning">Warning</li>
           </ul>
         )}
         <button
@@ -492,31 +555,54 @@ function TodayStrip({
           Today's shots did not load: {timeline.error}
         </p>
       ) : rows.length ? (
+        <>
+        {narrow && (
+          <div className="today-strip-phone">
+            {nowIn && (
+              <div className="history-toggle" role="group" aria-label="Strip window">
+                <button type="button" aria-pressed={!fullDay} onClick={() => setFullDay(false)}>
+                  Around now
+                </button>
+                <button type="button" aria-pressed={fullDay} onClick={() => setFullDay(true)}>
+                  Full day
+                </button>
+              </div>
+            )}
+            <p className="today-strip-counts" data-today-strip-counts>
+              {failed || warned
+                ? [failed ? `${failed} failed` : null, warned ? `${warned} ${warned === 1 ? "warning" : "warnings"}` : null]
+                    .filter(Boolean)
+                    .join(" · ")
+                : "No failed or warning shots"}
+            </p>
+          </div>
+        )}
         <div className="today-strip-body">
           <ul className="today-strip-labels" aria-hidden="true">
             {room.zones.map((zone) => (
               <li key={zone.id}>{zone.name}</li>
             ))}
           </ul>
-          <ShotTimeline rows={rows} span={{ start, end }} now={now} mode="strip" timeZone={timeZone} />
+          <ShotTimeline rows={rows} span={{ start: from, end: to }} now={now} mode="strip" timeZone={timeZone} />
           <div className="today-strip-axis" aria-hidden="true">
             {ticks.map((time, index) => (
               <span
                 key={time}
                 style={{ left: at(time) }}
-                data-end={time === end || undefined}
+                data-end={time === to || undefined}
                 data-odd={index % 2 === 1 || undefined}
               >
                 {time === end && !day ? "24:00" : clock(time, timeZone)}
               </span>
             ))}
-            {now >= start && now < end && (
+            {nowIn && (
               <span className="today-strip-now" style={{ left: at(now) }}>
-                now {clock(now, timeZone)}
+                Now {clock(now, timeZone)}
               </span>
             )}
           </div>
         </div>
+        </>
       ) : (
         <p className="today-strip-note">Loading today's shots…</p>
       )}
@@ -524,30 +610,86 @@ function TodayStrip({
   );
 }
 
-/** One gauge as its row reads it: the name and its target, a bar with the band and a tick, the value. */
-function RoomGauge({ model, value }: { model: GaugeModel; value: string }) {
-  const at = (v: number) =>
-    `${(Math.min(1, Math.max(0, (v - model.min) / (model.max - model.min || 1))) * 100).toFixed(1)}%`;
-  const target = targetText(model);
+/** One gauge as its row reads it: the name and its target, a shared target-band track, the value. */
+function RoomGauge({
+  model,
+  value,
+  phase,
+  timer = false,
+  tone = "neutral",
+}: {
+  model: GaugeModel;
+  value: string;
+  phase?: string;
+  /** A timer zone: watered by its programs, its moisture never held to the band. */
+  timer?: boolean;
+  tone?: SteeringTone;
+}) {
+  // VWC is held in its band only in P2: before then it is ramping to it, after it dries back from
+  // it, so outside P2 its target says so and a value outside it is not a warning.
+  const band = targetText(model);
+  const target =
+    phase === undefined || phase === "P2" || !band
+      ? band
+      : phase === "P1"
+        ? band.replace(/^target /, "ramping to ")
+        : band.replace(/^target /, "P2 band ");
+  const outside =
+    model.band !== null && model.value !== null && (model.value < model.band[0] || model.value > model.band[1]);
+  const low = outside && model.value! < model.band![0];
+  // Every value not plainly in range says why: out of band is a warning (Low/High); a timer zone's
+  // moisture is not held to the band; outside P2 moisture is ramping to it (P1) or drying back.
+  const note =
+    model.state === "abnormal" && outside
+      ? null
+      : phase !== undefined && timer && model.band
+        ? "Not held · Timer"
+        : phase === "P1" && outside
+          ? "Ramping"
+          : phase !== undefined && phase !== "P2" && outside
+            ? "Drying back"
+            : null;
   return (
     <div className="today-gauge" data-state={model.state}>
       <span className="today-gauge-label">
         {model.label}
         {target && <small>{target}</small>}
       </span>
-      <span className="mini-gauge-track" aria-hidden="true">
-        {model.band && (
-          <span
-            className="mini-gauge-band"
-            style={{ left: at(model.band[0]), width: `calc(${at(model.band[1])} - ${at(model.band[0])})` }}
-          />
-        )}
-        {model.value !== null && <span className="mini-gauge-tick" style={{ left: at(model.value) }} />}
-      </span>
       <span className="today-gauge-value">
         {value}
+        {/* Out of band: the tag says which way, so colour is never the only cue. */}
+        {model.state === "abnormal" &&
+          model.band &&
+          model.value !== null &&
+          outside && (
+            <span aria-hidden="true">
+              {" "}
+              <small className="band-tag">{low ? "Low" : "High"}</small>
+            </span>
+          )}
+        {note && (
+          <>
+            {" "}
+            <small className="band-tag" data-tone="neutral">
+              {note}
+            </small>
+          </>
+        )}
         {model.state === "abnormal" && <span className="sr-only">, {model.words}</span>}
       </span>
+      {(model.band || model.target !== null) && (
+        <span className="today-gauge-track">
+          <TargetTrack
+            value={model.value}
+            band={model.band}
+            target={model.target}
+            min={model.min}
+            max={model.max}
+            tone={tone}
+            abnormal={model.state === "abnormal"}
+          />
+        </span>
+      )}
     </div>
   );
 }
@@ -559,7 +701,10 @@ function ZoneRow({
   controller,
   row,
   reasons,
-  maxMl,
+  steer,
+  domain,
+  ecDom,
+  poreEc,
   now,
   open,
   navigate,
@@ -567,7 +712,10 @@ function ZoneRow({
   controller: Controller;
   row: RoomZoneRow;
   reasons: AttentionReason[];
-  maxMl: number;
+  steer: RoomDay | undefined;
+  domain: [number, number];
+  ecDom: [number, number];
+  poreEc: [number, number] | null;
   now: number;
   open: () => void;
   navigate: (page: Page) => void;
@@ -582,8 +730,12 @@ function ZoneRow({
     null,
   );
   const troubled = row.sensors.some((s) => s.health !== "ok" && s.health !== "not-counted");
-  const phase = /^P[0-3]$/.test(zone.phase) ? zone.phase : null;
+  // A timer zone is not steered: no phase, as the room list says.
+  const phase = !z.timer && /^P[0-3]$/.test(zone.phase) ? zone.phase : null;
   const shots = zone.shots.value === null ? null : Math.round(zone.shots.value);
+  const lane = steer?.zones?.get(zone.id);
+  const band: [number, number] | null =
+    !z.timer && z.rewater !== null && z.target !== null ? [z.rewater, z.target] : null;
   const name = /^zone\b/i.test(zone.name) ? zone.name.charAt(0).toLowerCase() + zone.name.slice(1) : zone.name;
   // Problems in place: a probe's trouble is on its sensor, pore EC on its gauge, the zone's open
   // alert once.
@@ -625,7 +777,8 @@ function ZoneRow({
     event.preventDefault();
     open();
   };
-  const ecText = (value: number | null) => (value === null ? "—" : number(value, 1));
+  const ecText = (value: number | null) =>
+    value === null ? "—" : formatEc(value, 1).replace(/ mS\/cm$/, "");
   return (
     <article
       className="today-zone"
@@ -634,17 +787,6 @@ function ZoneRow({
       data-mode={z.mode}
       aria-labelledby={`today-zone-${zone.id}`}
     >
-      <ZoneSlab
-        vwc={zone.vwc.value}
-        peak={z.peak}
-        rewater={z.rewater}
-        target={z.target}
-        ec={zone.ec.value}
-        ecBand={row.gauges[2].band}
-        level={level}
-        label=""
-        sensors={row.sensors.map((s) => ({ health: s.health, label: s.short }))}
-      />
       <div className="today-zone-main">
         <h2 id={`today-zone-${zone.id}`}>
           <a href={zoneHref(window.location.search, roomId, zone.id)} className="today-zone-link" onClick={follow}>
@@ -656,7 +798,7 @@ function ZoneRow({
         <p className="today-zone-chips">
           {phase && (
             <span className="today-phase" data-phase={phase}>
-              {phase} {PHASE_NAMES[phase]}
+              {phase} · {PHASE_NAMES[phase]}
             </span>
           )}
           <span className="today-mode" data-mode={z.mode}>
@@ -664,50 +806,86 @@ function ZoneRow({
             {ZONE_MODE[z.mode]}
           </span>
         </p>
-        <p className="today-water-label">Water per plant vs room median</p>
-        <DrinkBar
-          ml={row.drink?.ml ?? null}
-          median={row.drink?.median ?? null}
-          max={maxMl}
-          text={
-            <>
-              <strong>{z.mlPerPlant === null ? "—" : perPlant(z.mlPerPlant)}</strong>
-              {z.waterL !== null && <span> · {formatVolume(z.waterL, 1)}</span>}
-              {shots !== null && (
-                <span>
-                  {" · "}
-                  {zone.lastIrrigation.timestamp && shots > 0 ? (
-                    // The count carries the last shot's time, machine-readable and on hover.
-                    <time
-                      dateTime={zone.lastIrrigation.timestamp}
-                      data-last-irrigation={zone.id}
-                      title={`Last shot ${clock(Date.parse(zone.lastIrrigation.timestamp), timeZone)}`}
-                    >
-                      {shots} shot{shots === 1 ? "" : "s"}
-                    </time>
-                  ) : shots === 0 ? (
-                    "no shots"
-                  ) : (
-                    `${shots} shot${shots === 1 ? "" : "s"}`
-                  )}
-                </span>
+        <p className="today-zone-vwc">
+          <span className="today-zone-vwc-value">{zone.vwc.value === null ? "—" : number(zone.vwc.value, 0)}</span>
+          <span className="today-zone-vwc-unit">% VWC</span>
+        </p>
+        <p className="today-zone-water">
+          <strong>{z.mlPerPlant === null ? "—" : perPlant(z.mlPerPlant)}</strong> per plant
+          {z.waterL !== null && <span>, {formatVolume(z.waterL, 1)}</span>}
+          {shots !== null && (
+            <span>
+              {", "}
+              {zone.lastIrrigation.timestamp && shots > 0 ? (
+                // The count carries the last shot's time, machine-readable and on hover.
+                <time
+                  dateTime={zone.lastIrrigation.timestamp}
+                  data-last-irrigation={zone.id}
+                  title={`Last shot ${clock(Date.parse(zone.lastIrrigation.timestamp), timeZone)}`}
+                >
+                  {shots} shot{shots === 1 ? "" : "s"}
+                </time>
+              ) : shots === 0 ? (
+                "no shots"
+              ) : (
+                `${shots} shot${shots === 1 ? "" : "s"}`
               )}
-            </>
-          }
-        />
+            </span>
+          )}
+        </p>
         {row.drink && (
           <p className="today-drink-delta" data-today-delta>
             {drinkDelta(row.drink)}
           </p>
         )}
       </div>
+      <div className="today-zone-lane">
+        {steer ? (
+          <>
+            <VwcLane
+              span={steer.span}
+              readings={lane ? lane.vwc : steer.zones ? [] : null}
+              shots={lane?.shots ?? []}
+              band={band}
+              bandText={band ? `VWC ${number(band[0], 0)}–${number(band[1], 0)}%` : null}
+              domain={domain}
+              lightsOn={steer.day.start}
+              lightsOff={steer.day.lightsOff}
+              now={now}
+              abnormal={row.gauges[0]?.state === "abnormal"}
+              height={68}
+            />
+            <EcLane
+              span={steer.span}
+              readings={lane ? lane.ec : steer.zones ? [] : null}
+              band={poreEc}
+              bandText={poreEc ? `EC ${ecText(poreEc[0])}–${ecText(poreEc[1])}` : null}
+              domain={ecDom}
+              lightsOn={steer.day.start}
+              lightsOff={steer.day.lightsOff}
+              now={now}
+              abnormal={row.gauges[2]?.state === "abnormal"}
+              height={26}
+            />
+          </>
+        ) : (
+          <p className="muted">No photoperiod set: the curve needs the room's lights-on and lights-off hours.</p>
+        )}
+      </div>
       <div className="today-zone-gauges" role="group" aria-label={`${zone.name} readings`}>
-        <RoomGauge model={row.gauges[0]} value={zone.vwc.value === null ? "—" : `${number(zone.vwc.value, 1)}%`} />
+        <RoomGauge
+          model={row.gauges[0]}
+          value={zone.vwc.value === null ? "—" : `${number(zone.vwc.value, 1)}%`}
+          phase={zone.phase}
+          timer={z.timer}
+          tone="vwc"
+        />
         <RoomGauge
           model={row.gauges[1]}
           value={z.drybackPoints === null ? "—" : `${number(z.drybackPoints, 1)} pt`}
+          tone="vwc"
         />
-        <RoomGauge model={row.gauges[2]} value={ecText(zone.ec.value)} />
+        <RoomGauge model={row.gauges[2]} value={ecText(zone.ec.value)} tone="ec" />
         {row.paused && zone.enabledEntity && (
           <div className="today-paused" data-today-paused>
             <p>{pausedText(row.paused, timeZone, now)}</p>
@@ -773,7 +951,9 @@ function ZoneRow({
           {flags.map((flag) => (
             <p key={flag.key} className="today-flag" data-level={flag.level} data-today-problem>
               <TriangleAlert size={15} aria-hidden="true" />
-              <span>{flag.text}</span>
+              <span>
+                <AlertCodeText text={flag.text} />
+              </span>
             </p>
           ))}
         </div>

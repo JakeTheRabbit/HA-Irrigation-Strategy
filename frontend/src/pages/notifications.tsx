@@ -359,6 +359,19 @@ function DayStrip({ quiet, lights }: { quiet: Span[]; lights: Span[] }) {
  * applied with `notify_save` against the revision they were read at; a mute applies at once, with
  * Undo. The page itself never sends a push but a test one. */
 
+type NotifyGroup = "safety" | "irrigation" | "ops";
+const NOTIFY_GROUPS: readonly { id: NotifyGroup; label: string }[] = [
+  { id: "safety", label: "Critical & safety" },
+  { id: "irrigation", label: "Irrigation & sensors" },
+  { id: "ops", label: "Stock, dosing & AI" },
+];
+function kindGroup(kind: NotifyKind): NotifyGroup {
+  const key = `${kind.id} ${kind.name}`.toLowerCase();
+  if (/emerg|lock|hard|stop|safety/.test(key)) return "safety";
+  if (/sensor|drift|phase|vital|water|probe/.test(key)) return "irrigation";
+  return "ops";
+}
+
 export function Notifications({
   controller,
   onDirtyChange,
@@ -765,12 +778,6 @@ export function Notifications({
   return (
     <div className="notify-page">
       <Heading title="Notifications" action={shown.recipients.length > 0 && addButton} />
-      <NotificationPredictions controller={controller} />
-      <CanonicalControls
-        controller={controller}
-        owner="notifications"
-        onDirtyChange={setPolicyDirty}
-      />
       {loadError && (
         <p className="workspace-message error" role="alert">
           {loadError}
@@ -839,12 +846,24 @@ export function Notifications({
                   <th scope="col" className="notify-phone-head">
                     Phone
                   </th>
-                  {doc.kinds.map((kind) => (
-                    <th scope="col" key={kind.id} data-kind={kind.id}>
-                      <KindHeading kind={kind} />
-                    </th>
-                  ))}
-                  <th scope="col">Rooms</th>
+                  {doc.kinds.map((kind, index) => {
+                    const group = kindGroup(kind);
+                    const split = index > 0 && kindGroup(doc.kinds[index - 1]) !== group;
+                    return (
+                      <th
+                        scope="col"
+                        key={kind.id}
+                        data-kind={kind.id}
+                        data-group={group}
+                        data-group-start={split ? "" : undefined}
+                      >
+                        <KindHeading kind={kind} />
+                      </th>
+                    );
+                  })}
+                  <th scope="col" data-group-start="">
+                    Rooms
+                  </th>
                   <th scope="col" className="notify-urgent-head">
                     Emergencies loud
                   </th>
@@ -868,16 +887,22 @@ export function Notifications({
                       </div>
                       {testCell(view)}
                     </th>
-                    {doc.kinds.map((kind) => (
-                      <td
-                        key={kind.id}
-                        className="notify-check"
-                        data-changed={kindChanged(view, kind)}
-                      >
-                        {kindBox(view, kind)}
-                      </td>
-                    ))}
-                    <td>{roomChips(view)}</td>
+                    {doc.kinds.map((kind, index) => {
+                      const group = kindGroup(kind);
+                      const split = index > 0 && kindGroup(doc.kinds[index - 1]) !== group;
+                      return (
+                        <td
+                          key={kind.id}
+                          className="notify-check"
+                          data-group={group}
+                          data-group-start={split ? "" : undefined}
+                          data-changed={kindChanged(view, kind)}
+                        >
+                          {kindBox(view, kind)}
+                        </td>
+                      );
+                    })}
+                    <td data-group-start="">{roomChips(view)}</td>
                     <td className="notify-check" data-changed={loudChanged(view)}>
                       {loudSwitch(view)}
                     </td>
@@ -916,22 +941,41 @@ export function Notifications({
                   {testCell(view)}
                   {removeButton(view)}
                 </div>
-                {/* Chips, not a list of ticks: a phone's whole row fits a screen. */}
                 <ul className="notify-card-kinds" aria-label={`Alerts for ${view.label.name}`}>
-                  {doc.kinds.map((kind) => (
-                    <li key={kind.id}>
-                      <label className="notify-chip" data-changed={kindChanged(view, kind)}>
-                        {kindBox(view, kind)}
-                        <span>{kind.name}</span>
-                      </label>
-                    </li>
-                  ))}
-                  <li>
-                    <label className="notify-chip" data-changed={loudChanged(view)}>
-                      {loudSwitch(view)}
-                      <span>Emergencies loud</span>
-                    </label>
-                  </li>
+                  {NOTIFY_GROUPS.flatMap((group, groupIndex) => {
+                    const items = doc.kinds.filter((kind) => kindGroup(kind) === group.id);
+                    if (!items.length && group.id !== "safety") return [];
+                    const shortLabel =
+                      group.id === "safety" ? "Safety" : group.id === "irrigation" ? "Watering" : "Stock & AI";
+                    return [
+                      <li
+                        key={`group-${group.id}`}
+                        className="notify-card-group-tag"
+                        data-first={groupIndex === 0 ? "" : undefined}
+                        aria-hidden="true"
+                      >
+                        {shortLabel}
+                      </li>,
+                      ...items.map((kind) => (
+                        <li key={kind.id}>
+                          <label className="notify-chip" data-changed={kindChanged(view, kind)}>
+                            {kindBox(view, kind)}
+                            <span>{kind.name}</span>
+                          </label>
+                        </li>
+                      )),
+                      ...(group.id === "safety"
+                        ? [
+                            <li key="loud">
+                              <label className="notify-chip" data-changed={loudChanged(view)}>
+                                {loudSwitch(view)}
+                                <span>Emergencies loud</span>
+                              </label>
+                            </li>,
+                          ]
+                        : []),
+                    ];
+                  })}
                 </ul>
                 <div className="notify-card-rooms">
                   <span aria-hidden="true">Rooms</span>
@@ -1081,6 +1125,14 @@ export function Notifications({
             </ul>
           )}
         </section>
+      </div>
+      <div className="notify-vitals-section">
+        <NotificationPredictions controller={controller} />
+        <CanonicalControls
+          controller={controller}
+          owner="notifications"
+          onDirtyChange={setPolicyDirty}
+        />
       </div>
       <div className="notify-bar">
         <ReviewApply

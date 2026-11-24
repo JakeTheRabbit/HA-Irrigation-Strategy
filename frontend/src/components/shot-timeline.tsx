@@ -178,7 +178,11 @@ export function ShotTimeline({
     </span>
   );
   const step = hours <= 12 ? 1 : hours <= 24 ? 2 : 4;
-  const tickMarks = hourTicks(span.start, span.end, step, timeZone).map((t) => (
+  // A preview's track is narrow: a time under or beside the Now chip is left out, not half-covered.
+  const clear = mode === "preview" && nowShown ? (span.end - span.start) * 0.12 : 0;
+  const tickMarks = hourTicks(span.start, span.end, step, timeZone)
+    .filter((t) => Math.abs(t - now) >= clear)
+    .map((t) => (
     <span
       key={t}
       className="st-tick"
@@ -213,7 +217,17 @@ export function ShotTimeline({
       <span className="st-name">
         <span className="st-long">{row.label}</span>
         <span className="st-short">Z{row.zone}</span>
-        {row.sublabel && <small>{row.sublabel}</small>}
+        {/^P[0-3]$/.test(row.sublabel) ? (
+          <small className="phase-chip" data-phase={row.sublabel}>
+            {row.sublabel}
+          </small>
+        ) : row.sublabel === "Timer" ? (
+          <small className="phase-chip" data-mode="timer">
+            Timer
+          </small>
+        ) : (
+          row.sublabel && <small>{row.sublabel}</small>
+        )}
       </span>
     );
   const trackName = (row: TimelineRow) =>

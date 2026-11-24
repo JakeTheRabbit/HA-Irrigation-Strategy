@@ -70,7 +70,7 @@
 }
 .ar-legend i.is-line {
   height: 0;
-  border-top: 2px dashed var(--warning);
+  border-top: 2px dashed var(--warning-mark);
 }
 .ar-chart {
   display: grid;
@@ -161,7 +161,7 @@
   left: 0;
   right: 0;
   top: 7px;
-  border-top: 2px dashed var(--warning);
+  border-top: 2px dashed var(--warning-mark);
 }
 .ar-threshold:focus-visible::before {
   border-top-width: 3px;

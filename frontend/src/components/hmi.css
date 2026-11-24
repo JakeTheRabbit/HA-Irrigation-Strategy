@@ -31,7 +31,7 @@
   white-space: nowrap;
 }
 .hmi-chip[data-abnormal] {
-  border-color: color-mix(in srgb, var(--warning) 45%, transparent);
+  border-color: color-mix(in srgb, var(--warning-mark) 45%, transparent);
   background: var(--warning-bg);
   color: var(--warning);
 }
@@ -59,14 +59,14 @@
   gap: 6px;
 }
 .hmi-gauge-label {
-  font-size: var(--text-xs);
+  font-size: var(--text-label);
+  line-height: var(--leading-label);
   color: var(--muted-foreground);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  min-width: 0;
 }
 .hmi-gauge-value {
-  font-size: var(--text-lg);
+  font-size: var(--text-reading);
+  line-height: var(--leading-reading);
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   color: var(--foreground);
@@ -77,45 +77,6 @@
   margin-left: 1px;
   color: var(--muted-foreground);
 }
-.hmi-gauge-track {
-  position: relative;
-  height: 8px;
-  margin: 4px 0 3px;
-  border-radius: 4px;
-  background: var(--muted);
-  box-shadow: inset 0 0 0 1px var(--border);
-  overflow: hidden;
-}
-.hmi-gauge-fill {
-  position: absolute;
-  inset: 0 auto 0 0;
-  background: color-mix(in srgb, var(--muted-foreground) 55%, transparent);
-}
-.hmi-gauge-band {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  background: color-mix(in srgb, var(--foreground) 12%, transparent);
-  border-inline: 2px solid var(--foreground);
-}
-/* A reference, not a limit: hatched and quiet. */
-.hmi-gauge-reference {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  background: repeating-linear-gradient(
-    90deg,
-    color-mix(in srgb, var(--foreground) 30%, transparent) 0 2px,
-    transparent 2px 4px
-  );
-}
-.hmi-gauge-mark {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 1px;
-  background: var(--muted-foreground);
-}
 .hmi-gauge-marks {
   display: flex;
   flex-wrap: wrap;
@@ -124,14 +85,6 @@
   font-size: var(--text-xs);
   color: var(--muted-foreground);
   font-variant-numeric: tabular-nums;
-}
-.hmi-gauge-target {
-  position: absolute;
-  top: -1px;
-  bottom: -1px;
-  width: 2px;
-  margin-left: -1px;
-  background: var(--foreground);
 }
 .hmi-gauge-foot {
   display: flex;
@@ -143,25 +96,21 @@
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
+/* A long target line ("target 8% of peak · ref 16–23%") wraps inside its gauge, never into the next. */
+.hmi-gauge-foot > span:first-child {
+  min-width: 0;
+  white-space: normal;
+}
 .hmi-gauge-words {
   margin-left: auto;
 }
-.hmi-gauge[data-state="abnormal"] .hmi-gauge-fill {
-  background: var(--warning);
-}
+.hmi-gauge[data-state="abnormal"] .hmi-gauge-value,
 .hmi-gauge[data-state="abnormal"] .hmi-gauge-words {
   color: var(--warning);
   font-weight: 600;
 }
 .hmi-gauge[data-state="no-data"] .hmi-gauge-value {
   color: var(--muted-foreground);
-}
-.hmi-gauge[data-state="no-data"] .hmi-gauge-track {
-  background: repeating-linear-gradient(
-    -45deg,
-    transparent 0 4px,
-    color-mix(in srgb, var(--muted-foreground) 25%, transparent) 4px 6px
-  );
 }
 .hmi-gauge[data-state="no-data"] .hmi-gauge-words {
   font-style: italic;
@@ -173,7 +122,7 @@
   align-items: center;
   gap: 6px 10px;
   padding: 8px 12px;
-  border: 1px solid color-mix(in srgb, var(--warning) 40%, var(--border));
+  border: 1px solid color-mix(in srgb, var(--warning-mark) 40%, var(--border));
   border-radius: 8px;
   background: var(--warning-bg);
   font-size: var(--text-sm);

@@ -1,0 +1,288 @@
+/* The steering lanes: one clock per room (DayRail), each zone's moisture (VwcLane) and pore EC
+ * (EcLane) under it, plus the shared TargetTrack horizontal band indicator. */
+.day-rail {
+  position: relative;
+  height: 46px;
+}
+.day-rail-track {
+  position: relative;
+  height: 26px;
+}
+.day-rail-lights {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-radius: 4px;
+  background: color-mix(in srgb, #ffb300 12%, transparent);
+}
+.day-rail-phase {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  padding: 4px 8px;
+  border-left: 1px solid var(--border);
+  font-size: var(--text-xs);
+  color: var(--muted-foreground);
+  white-space: nowrap;
+  overflow: hidden;
+}
+.day-rail-phase b {
+  color: var(--foreground);
+  font-weight: 600;
+}
+.day-rail-ticks {
+  position: absolute;
+  top: 29px;
+  left: 0;
+  right: 0;
+  height: 16px;
+  font-size: var(--text-xs);
+  color: var(--muted-foreground);
+  font-variant-numeric: tabular-nums;
+}
+.day-rail-ticks span {
+  position: absolute;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+.day-rail-ticks span[data-edge="start"] {
+  transform: none;
+}
+.day-rail-ticks span[data-edge="end"] {
+  transform: translateX(-100%);
+}
+.day-rail-ticks .day-rail-now-label {
+  color: var(--foreground);
+  font-weight: 600;
+  background: var(--surface);
+  padding: 0 4px;
+}
+.day-rail > .lane-now {
+  bottom: 18px;
+}
+
+.lane-now {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 0;
+  border-left: 1.5px solid var(--foreground);
+  opacity: 0.75;
+  pointer-events: none;
+}
+
+.vwc-lane {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  height: 86px;
+  min-width: 0;
+}
+.vwc-lane-plot,
+.ec-lane-plot {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+.ec-lane {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border-top: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+  padding-top: 4px;
+}
+.vwc-lane-plot svg,
+.ec-lane-plot svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.lane-night {
+  fill: color-mix(in srgb, var(--foreground) 5%, transparent);
+}
+.lane-band {
+  fill: var(--band-vwc);
+}
+.lane-band-vwc {
+  fill: var(--band-vwc);
+}
+.lane-band-ec {
+  fill: var(--band-ec);
+}
+.lane-band-edge {
+  stroke: var(--band-vwc-edge);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
+.lane-band-edge-ec {
+  stroke: var(--band-ec-edge);
+}
+.lane-vwc {
+  fill: none;
+  stroke: var(--series-vwc, var(--primary));
+  stroke-width: 2.25;
+  stroke-linejoin: round;
+}
+.lane-ec {
+  fill: none;
+  stroke: var(--series-ec);
+  stroke-width: 1.85;
+  stroke-linejoin: round;
+}
+.lane-live-dot {
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  background: var(--series-vwc, var(--primary));
+  box-shadow: 0 0 0 2px var(--surface);
+  pointer-events: none;
+}
+.lane-live-dot[data-series="ec"] {
+  background: var(--series-ec);
+}
+.lane-live-dot[data-abnormal] {
+  background: var(--warning-mark);
+}
+.lane-band-label {
+  position: absolute;
+  right: 0;
+  transform: translateY(-50%);
+  padding: 0 5px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  color: var(--series-vwc, var(--primary));
+  font-size: var(--text-xs);
+  font-weight: 500;
+  white-space: nowrap;
+}
+.lane-band-label-ec {
+  color: var(--series-ec);
+}
+.lane-loading {
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+}
+.lane-flag {
+  position: absolute;
+  top: 2px;
+  max-width: 60%;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--warning-mark) 16%, var(--surface));
+  color: var(--foreground);
+  font-size: var(--text-xs);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lane-flag[data-level="critical"] {
+  background: color-mix(in srgb, var(--destructive) 16%, var(--surface));
+}
+.vwc-lane-shots {
+  position: relative;
+  height: 11px;
+  flex: none;
+}
+.lane-shot {
+  position: absolute;
+  top: 0;
+  width: 4px;
+  height: 11px;
+  margin-left: -2px;
+  border-radius: 1px;
+  background: var(--series-vwc, var(--primary));
+}
+.lane-shot[data-open] {
+  background: none;
+  border: 1.5px solid var(--series-vwc, var(--primary));
+}
+
+/* Shared inline position-vs-target track used on All rooms, Room, Zone and Current day. */
+.target-track {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 6px;
+  margin: 4px 0 2px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--foreground) 9%, transparent);
+}
+.target-track-band {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--muted-foreground) 28%, transparent);
+}
+.target-track[data-tone="vwc"] .target-track-band {
+  background: color-mix(in srgb, var(--series-vwc) 30%, transparent);
+}
+.target-track[data-tone="ec"] .target-track-band {
+  background: color-mix(in srgb, var(--series-ec) 30%, transparent);
+}
+.target-track-mark {
+  position: absolute;
+  top: -1px;
+  bottom: -1px;
+  width: 2px;
+  transform: translateX(-50%);
+  border-radius: 1px;
+  background: var(--muted-foreground);
+}
+.target-track-pip {
+  position: absolute;
+  top: 50%;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  background: var(--foreground);
+  box-shadow: 0 0 0 1.5px var(--surface);
+}
+.target-track[data-tone="vwc"] .target-track-pip {
+  background: var(--series-vwc);
+}
+.target-track[data-tone="ec"] .target-track-pip {
+  background: var(--series-ec);
+}
+.target-track[data-abnormal] .target-track-pip {
+  background: var(--warning-mark);
+}
+
+/* Clickable CS-xxx alert codes linking directly into Settings › Help. */
+.alert-code-link {
+  display: inline-block;
+  padding: 0 4px;
+  border-radius: 4px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.alert-code-link:hover {
+  background: color-mix(in srgb, var(--foreground) 10%, transparent);
+}
+
+@media (max-width: 720px) {
+  .day-rail-name {
+    display: none;
+  }
+  .day-rail-phase {
+    padding: 4px 5px;
+  }
+  .lane-flag {
+    left: auto !important;
+    right: 0;
+    max-width: 70%;
+  }
+}

@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { Heading } from "@/components/dashboard";
+import { FaultSummary, Heading } from "@/components/dashboard";
 import { NeedsIntegration } from "@/components/needs-integration";
 import { UpgradeReports } from "@/components/upgrade-report";
 import { HealthRing } from "@/components/primitives/ring";
@@ -148,6 +148,35 @@ export function SystemStatus({ controller }: PageProps) {
     const key = at ?? alert.roomId;
     list.set(key, [...(list.get(key) ?? []), alert]);
   }
+  // What needs attention, said first: each open alert on the device it is about, then each other
+  // device that is not online. Red only when the controller itself is down.
+  const offline = rows.filter((row) => !row.ok);
+  const fault = status.controller !== "running";
+  const attention = [
+    ...alerts.map((alert) => {
+      const row = rows.find((r) => r.entity_id === placeAlert(alert, rows.filter((x) => x.roomId === alert.roomId)));
+      return {
+        key: alert.eventId ?? `${alert.roomId}:${alert.code}:${alert.zone}`,
+        alert,
+        text: `${alert.code ? `${alert.code} · ` : ""}${row ? `${row.label}, ${seenText(row, controller.states[row.entity_id]?.state, controller.timeZone, now)}: ` : `${roomName(alert.roomId)}: `}${alert.title}`,
+      };
+    }),
+    ...offline
+      .filter((row) => !alerts.some((alert) => placeAlert(alert, rows.filter((x) => x.roomId === alert.roomId)) === row.entity_id))
+      .map((row) => ({
+        key: row.entity_id,
+        alert: null as OpenAlert | null,
+        text: `${row.label} offline, last seen ${seenText(row, controller.states[row.entity_id]?.state, controller.timeZone, now)}`,
+      })),
+  ];
+  const attentionTitle = [
+    fault ? "Controller not running" : "Needs attention",
+    alerts.length ? `${alerts.length} open ${alerts.length === 1 ? "alert" : "alerts"}` : null,
+    offline.length ? `${offline.length} ${offline.length === 1 ? "device" : "devices"} offline` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+  const ringTone = fault ? "bad" : attention.length ? "warn" : undefined;
   const cards = (key: string) =>
     (placed.get(key) ?? []).map((alert) => (
       <AlertCard key={alert.eventId ?? `${alert.roomId}:${alert.code}:${alert.zone}`} alert={alert} ack={alert.eventId ? acks[alert.eventId] : undefined} onAck={acknowledge} />
@@ -156,9 +185,38 @@ export function SystemStatus({ controller }: PageProps) {
   return (
     <>
       <Heading title="System status" action={<Capabilities />} />
+      {(fault || attention.length > 0) && (
+        <FaultSummary tone={fault ? "fault" : "warning"} title={attentionTitle}>
+          {attention.length > 0 && (
+            <ul className="system-attention">
+              {/* Each affected device with its own actions, right under the warning. */}
+              {attention.map((item) => (
+                <li key={item.key}>
+                  <span>{item.text}</span>
+                  {item.alert && (
+                    <span className="system-attention-actions">
+                      <a href={item.alert.code ? `#/help?code=${item.alert.code}` : "#/help"}>What to do →</a>
+                      {item.alert.eventId && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={acks[item.alert.eventId]?.busy}
+                          onClick={() => acknowledge(item.alert!)}
+                        >
+                          {acks[item.alert.eventId]?.busy ? "Acknowledging…" : "Acknowledge"}
+                        </Button>
+                      )}
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </FaultSummary>
+      )}
       <section className="panel system-health" aria-label="System health">
         <div className="system-health-line">
-          {status.pct_online !== null && <HealthRing pct={status.pct_online} label="System health" />}
+          {status.pct_online !== null && <HealthRing pct={status.pct_online} label="Devices online" tone={ringTone} />}
           <p>
             <strong>{healthSentence(status, alerts)}</strong>
             {checked !== null && (
@@ -189,7 +247,6 @@ export function SystemStatus({ controller }: PageProps) {
           {said}
         </p>
       </section>
-      <UpgradeReports controller={controller} />
 
       <div className="system-grid">
         <div className="system-side">
@@ -213,6 +270,9 @@ export function SystemStatus({ controller }: PageProps) {
               const online = group.rows.filter(({ row }) => row.ok).length;
               const known = group.rows.flatMap(({ row }) => (row.uptime_7d_pct === null ? [] : [row.uptime_7d_pct]));
               const mean = known.length ? known.reduce((sum, v) => sum + v, 0) / known.length : null;
+              // Exceptions first and open; healthy rows (online, no alert on them) fold away.
+              const exceptions = group.rows.filter(({ row, tone }) => tone !== "ok" || placed.has(row.entity_id));
+              const healthy = group.rows.filter((item) => !exceptions.includes(item));
               return (
                 <section key={group.label} className="system-group" aria-label={group.label} data-group={group.label}>
                   <h3>
@@ -224,19 +284,32 @@ export function SystemStatus({ controller }: PageProps) {
                   </h3>
                   {group.label === TANK_GROUP && cards(CARD.tank)}
                   <ul>
-                    {group.rows.map(({ row, tone }) => (
+                    {exceptions.map(({ row, tone }) => (
                       <li key={row.entity_id}>
                         <DeviceRow row={row} tone={tone} controller={controller} now={now} />
                         {cards(row.entity_id)}
                       </li>
                     ))}
                   </ul>
+                  {healthy.length > 0 && (
+                    <details className="system-healthy">
+                      <summary>{healthy.length} healthy</summary>
+                      <ul>
+                        {healthy.map(({ row, tone }) => (
+                          <li key={row.entity_id}>
+                            <DeviceRow row={row} tone={tone} controller={controller} now={now} />
+                          </li>
+                        ))}
+                      </ul>
+                    </details>
+                  )}
                 </section>
               );
             })}
           </div>
         </section>
       </div>
+      <UpgradeReports controller={controller} />
     </>
   );
 }
@@ -279,7 +352,9 @@ function DeviceRow({ row, tone, controller, now }: { row: Row; tone: "ok" | "war
       <span className="system-row-name">
         {row.label}
         <span className="sr-only">, {rowWords(row.kind, row.ok, tone)}</span>
-        <span className="system-row-entity">{row.entity_id}</span>
+        <span className="system-row-entity" title={row.entity_id}>
+          {row.entity_id}
+        </span>
       </span>
       <span className="system-row-seen">{seenText(row, controller.states[row.entity_id]?.state, controller.timeZone, now)}</span>
       <span className="system-bar" aria-hidden="true" data-low={pct !== null && pct < 95 ? "" : undefined}>

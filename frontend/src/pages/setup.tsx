@@ -39,6 +39,7 @@ import {
   useSizingUnits,
 } from "@/components/zone-sizing";
 import type { Controller } from "@/lib/types";
+import { formatState } from "@/lib/display-units";
 import { roomSlug } from "@/lib/model";
 import { SIZING_UNITS, reviewValue, sizingError } from "@/lib/units";
 import {
@@ -172,7 +173,7 @@ export function MappingPicker({
                   <small>{c.entity_id}</small>
                 </span>
                 <span className="mapping-reading">
-                  {c.state}
+                  {formatState(c.state)}
                   <small>{c.unit || c.domain}</small>
                 </span>
               </button>
@@ -585,15 +586,17 @@ export function Setup({
           </Button>
         }
       />
-      {connected && <SupplyEditor key={controller.roomId} controller={controller} onDirtyChange={setSupplyDirty} />}
       <div className="workspace-tabs" role="tablist" aria-label="Setup view">
         <button role="tab" aria-selected={tab === "rooms"} onClick={() => setTab("rooms")}>
-          Rooms & mappings
+          Rooms &amp; mappings
         </button>
         <button role="tab" aria-selected={tab === "install"} onClick={() => setTab("install")}>
           Installation
         </button>
       </div>
+      {tab === "rooms" && connected && (
+        <SupplyEditor key={controller.roomId} controller={controller} onDirtyChange={setSupplyDirty} />
+      )}
       {error && (
         <div className="workspace-message error" role="alert">
           {error}
