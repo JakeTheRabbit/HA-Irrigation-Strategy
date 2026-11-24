@@ -388,6 +388,19 @@ describe("H1 explorer: lanes, notes, CSV and the event read", () => {
       { at: at(6, 30), series: "tank", text: "Tank low" },
       { at: at(9, 30), series: "ec2", text: "Zone 2 over the band 09:30 to 11:00" },
     ]);
+    // Noise oscillating across a band edge within 45 min coalesces into one note instead of spamming dozens.
+    const noisy = [
+      { t: at(6, 0), v: 5.9 },
+      { t: at(6, 10), v: 6.1 },
+      { t: at(6, 12), v: 5.9 },
+      { t: at(6, 20), v: 6.2 },
+      { t: at(6, 22), v: 5.9 },
+      { t: at(6, 35), v: 6.1 },
+      { t: at(6, 37), v: 5.8 },
+    ];
+    expect(chartNotes([], ["ec2"], [{ ...readings[0], points: noisy }], "UTC")).toEqual([
+      { at: at(6, 10), series: "ec2", text: "Zone 2 over the band 06:10 to 06:37 (3×)" },
+    ]);
   });
 
   it("a refill is a rise that holds, and a probe dropout is a gap, not a refill", () => {

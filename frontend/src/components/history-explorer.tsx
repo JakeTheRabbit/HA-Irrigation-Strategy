@@ -1750,6 +1750,7 @@ function ExplorerChart({
   timeTicks: { t: number; label: string }[];
 }) {
   const { ref, width } = useWidth();
+  const [showAllNotes, setShowAllNotes] = useState(false);
   const height = 180;
   const inset = 14;
   // A VWC dropout (and the part-dropped samples beside it) is a gap, never a value: it breaks the
@@ -1934,17 +1935,25 @@ function ExplorerChart({
               {marker.phase} {clock(marker.from, timeZone)}
             </span>
           ))}
-        {/* In the plot, only a numbered mark at its time; the words sit under the plot. */}
-        {notes.map((note, i) => (
-          <span
-            key={`${note.series}-${note.at}`}
-            className="explorer-note-mark"
-            style={{ left: `clamp(10px, ${pctOf(axis, note.at)}%, calc(100% - 10px))`, top: `${6 + (i % 3) * 22}px` }}
-            aria-hidden="true"
-          >
-            {i + 1}
-          </span>
-        ))}
+        {/* In the plot, only non-colliding numbered marks; words sit cleanly under the plot. */}
+        {(() => {
+          const placed: number[] = [];
+          return notes.map((note, i) => {
+            const px = x(note.at);
+            if (width > 0 && placed.some((prev) => Math.abs(prev - px) < 20)) return null;
+            placed.push(px);
+            return (
+              <span
+                key={`${note.series}-${note.at}-${i}`}
+                className="explorer-note-mark"
+                style={{ left: `clamp(10px, ${pctOf(axis, note.at)}%, calc(100% - 10px))`, top: "6px" }}
+                aria-hidden="true"
+              >
+                {i + 1}
+              </span>
+            );
+          });
+        })()}
         {last && nowShown && (
           <span className="explorer-now-label" style={{ left: `${pctOf(axis, now)}%` }}>
             Now {clock(now, timeZone)}
@@ -1971,15 +1980,26 @@ function ExplorerChart({
         </div>
       )}
       {notes.length > 0 && (
-        <ol className="explorer-notes">
-          {notes.map((note, i) => (
-            <li key={`${note.series}-${note.at}`} className="explorer-note" data-chart-note>
-              <b aria-hidden="true">{i + 1}</b>
-              <CircleAlert size={13} aria-hidden="true" />
-              {note.text}
-            </li>
-          ))}
-        </ol>
+        <div className="explorer-notes-wrap">
+          <ol className="explorer-notes">
+            {(showAllNotes ? notes : notes.slice(0, 4)).map((note, i) => (
+              <li key={`${note.series}-${note.at}-${i}`} className="explorer-note" data-chart-note>
+                <b aria-hidden="true">{i + 1}</b>
+                <CircleAlert size={13} aria-hidden="true" />
+                {note.text}
+              </li>
+            ))}
+          </ol>
+          {notes.length > 4 && (
+            <button
+              type="button"
+              className="explorer-notes-more"
+              onClick={() => setShowAllNotes((open) => !open)}
+            >
+              {showAllNotes ? "Show fewer" : `Show ${notes.length - 4} more`}
+            </button>
+          )}
+        </div>
       )}
     </div>
   );

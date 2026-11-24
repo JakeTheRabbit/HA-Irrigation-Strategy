@@ -796,26 +796,51 @@ export function chartNotes(
     if (!series.includes(reading.key)) continue;
     const points = reading.points.filter((p) => Number.isFinite(p.v));
     const band = reading.band;
-    if (band)
+    if (band) {
+      const sideOf = (v: number) => (v > band[1] ? "over" : v < band[0] ? "under" : null);
+      type Excursion = { first: number; last: number; back: number | null; side: "over" | "under"; count: number };
+      const runs: Excursion[] = [];
       for (let i = 0; i < points.length; i++) {
-        const sideOf = (v: number) => (v > band[1] ? "over" : v < band[0] ? "under" : null);
         const side = sideOf(points[i].v);
         if (!side) continue;
         let j = i;
         while (j + 1 < points.length && sideOf(points[j + 1].v) === side) j++;
-        const back = points[j + 1];
-        // Out of the band from the first reading: it left before the range, so say only when it came back.
-        const when =
-          i === 0
-            ? back
-              ? `until ${time(back.t)}`
-              : "all through this range"
-            : back
-              ? `${time(points[i].t)} to ${time(back.t)}`
-              : `since ${time(points[i].t)}`;
-        notes.push({ at: points[i].t, series: reading.key, text: `${reading.label} ${side} the band ${when}` });
+        const back = j + 1 < points.length ? j + 1 : null;
+        const prev = runs[runs.length - 1];
+        // Coalesce repeated crossings on the same side separated by <= 45 min (sensor noise riding the band edge).
+        if (
+          prev &&
+          prev.side === side &&
+          prev.back !== null &&
+          points[i].t - points[prev.back].t <= 45 * MIN
+        ) {
+          prev.last = j;
+          prev.back = back;
+          prev.count += 1;
+        } else {
+          runs.push({ first: i, last: j, back, side, count: 1 });
+        }
         i = j;
       }
+      for (const run of runs) {
+        const backPoint = run.back !== null ? points[run.back] : undefined;
+        // Out of the band from the first reading: it left before the range, so say only when it came back.
+        const when =
+          run.first === 0
+            ? backPoint
+              ? `until ${time(backPoint.t)}`
+              : "all through this range"
+            : backPoint
+              ? `${time(points[run.first].t)} to ${time(backPoint.t)}`
+              : `since ${time(points[run.first].t)}`;
+        const repeats = run.count > 1 ? ` (${run.count}×)` : "";
+        notes.push({
+          at: points[run.first].t,
+          series: reading.key,
+          text: `${reading.label} ${run.side} the band ${when}${repeats}`,
+        });
+      }
+    }
     if (reading.kind === "level") {
       // A level of 0 or less is a probe dropout: a gap, so its recovery is not a refill.
       const points = reading.points.filter((p) => Number.isFinite(p.v) && p.v > 0);
