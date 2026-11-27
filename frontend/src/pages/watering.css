@@ -163,6 +163,28 @@
   font-size: var(--text-xs);
   padding: 0 4px;
 }
+.wt-problem-strip li[data-glyph] {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+}
+.wt-problem-strip li[data-glyph] > button:first-child {
+  flex: 1;
+}
+.wt-problem-strip li .wt-problem-dismiss {
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  padding: 0 8px;
+}
+.wt-problem-strip li.wt-problem-more button {
+  min-height: 32px;
+  padding: 4px 6px;
+  border: 0;
+  background: none;
+  color: var(--primary);
+  text-decoration: underline;
+}
 .wt-error {
   display: flex;
   flex-wrap: wrap;

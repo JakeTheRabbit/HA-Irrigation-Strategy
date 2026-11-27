@@ -76,7 +76,8 @@ export interface TimelineBlock {
 export interface TimelineRoom {
   room_id: string;
   lights: { on: string; off: string }[];
-  rows: { zone: number; blocks: TimelineBlock[] }[];
+  /** zone null: room-wide shots, not one zone's. */
+  rows: { zone: number | null; blocks: TimelineBlock[] }[];
   /** The room's irrigation pump (switch entity), else null. */
   pump: string | null;
   /** Every room on that pump; its `pump_load` is their total. */

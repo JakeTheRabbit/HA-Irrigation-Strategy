@@ -59,6 +59,9 @@ const markTree = (event: Event) => {
 const treePicked = (roomId: string) =>
   memory.room !== null && memory.room !== roomId && Date.now() - memory.treeAt < 2000;
 
+/** Failed or warning shots dismissed from the strip above the timeline (block ids, newest 500). */
+const DISMISSED_KEY = "crop-steering.watering-dismissed";
+
 const SOURCES: Record<string, string> = {
   engine: "Steering engine",
   timer: "Timer",
@@ -133,10 +136,17 @@ export function Watering({
   const span = spanOf(phone && q.span === 48 ? { ...q, span: 24 } : q, now, timeZone, today);
   const spanHours = (span.end - span.start) / 3_600_000;
 
-  // The rooms shown: a link's rooms, then the stages chosen.
+  // The rooms shown: a link's rooms, else the room picked in the room list (every room with "All
+  // rooms"), the picked room first; then the stages chosen.
   const stages = new Map(controller.rooms.map((room) => [room.id, stageOf(controller, room)]));
   const linked = q.rooms.flatMap((name) => resolveRequestedRoom(controller.rooms, name) ?? []);
-  const rooms = (linked.length ? linked : controller.rooms).filter(
+  const current = controller.rooms.find((room) => room.id === controller.roomId);
+  const rooms = (linked.length ? linked : !q.all && current ? [current] : controller.rooms)
+    .slice()
+    .sort((a, b) =>
+      a.id === controller.roomId ? -1 : b.id === controller.roomId ? 1 : a.name.localeCompare(b.name, undefined, { numeric: true }),
+    )
+    .filter(
     (room) => !q.stages.length || q.stages.includes(stages.get(room.id) ?? ""),
   );
   const ids = rooms.map((room) => room.id);
@@ -238,6 +248,13 @@ export function Watering({
   const markers = (data?.errors.markers ?? []).map((m) => String(m.block_id ?? "")).filter(Boolean);
   const failedCount = data?.errors.count ?? 0;
   const [focusIds, setFocusIds] = useState<string[]>([]);
+  const [dismissed, setDismissed] = useState<Set<string>>(() => {
+    try {
+      return new Set(JSON.parse(localStorage.getItem(DISMISSED_KEY) ?? "[]") as string[]);
+    } catch {
+      return new Set();
+    }
+  });
   const cycle = useRef(0);
   const nextFailed = () => {
     if (!markers.length) return;
@@ -271,7 +288,7 @@ export function Watering({
   const [note, setNote] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const shown = open ? (rows.flatMap((r) => r.blocks).find((b) => b.id === open.block.id) ?? open.block) : null;
-  const where = (b: TimelineBlock) => `${names.get(b.roomId) ?? b.roomId} Zone ${b.zone}`;
+  const where = (b: TimelineBlock) => `${names.get(b.roomId) ?? b.roomId} ${b.zone === 0 ? "room" : `Zone ${b.zone}`}`;
   const goZone = (b: TimelineBlock, page: Page) => {
     setOpen(null);
     if (b.roomId !== controller.roomId) controller.changeRoom(b.roomId);
@@ -371,6 +388,17 @@ export function Watering({
   problemBlocks.sort((a, b) =>
     a.block.glyph === b.block.glyph ? b.block.start - a.block.start : a.block.glyph === "failed" ? -1 : 1,
   );
+  // A shot dismissed from the strip stays on the timeline; only the strip forgets it.
+  const stripShown = problemBlocks.filter((p) => !dismissed.has(p.block.id));
+  const dismiss = (blockIds: string[]) => {
+    const next = [...dismissed, ...blockIds].slice(-500);
+    setDismissed(new Set(next));
+    try {
+      localStorage.setItem(DISMISSED_KEY, JSON.stringify(next));
+    } catch {
+      /* private mode: dismissed for this visit only */
+    }
+  };
   const jumpToBlock = (b: TimelineBlock) => {
     if (collapsed.has(b.roomId)) toggleRoom(b.roomId);
     setFocusIds([b.id]);
@@ -411,8 +439,8 @@ export function Watering({
           icon={Layers}
           tone="neutral"
           label="Rooms shown"
-          value={controller.rooms.length}
-          detail={controller.rooms.map((r) => r.name).join(" · ")}
+          value={rooms.length}
+          detail={rooms.map((r) => r.name).join(" · ")}
         />
       </KpiGrid>
       <section className="panel watering" aria-label="Watering timeline" data-watering>
@@ -472,6 +500,11 @@ export function Watering({
         )}
 
         <div className="wt-filters">
+          {!linked.length && controller.rooms.length > 1 && (
+            <button type="button" className="wt-chip" aria-pressed={!!q.all} onClick={() => change({ all: !q.all })} data-watering-all>
+              All rooms
+            </button>
+          )}
           {!phone &&
             stagesShown.map((stage) => {
               const on = !q.stages.length || q.stages.includes(stage);
@@ -522,24 +555,35 @@ export function Watering({
           </div>
         )}
         {data?.truncated && <p className="wt-note">Showing the newest shots only</p>}
-        {problemBlocks.length > 0 && (
+        {stripShown.length > 0 && (
           <ul className="wt-problem-strip" aria-label="Shots with problems">
-            {problemBlocks.slice(0, 4).map(({ block, roomName }) => (
+            {stripShown.slice(0, 4).map(({ block, roomName }) => (
               <li key={block.id} data-glyph={block.glyph}>
                 <button type="button" onClick={() => jumpToBlock(block)}>
                   <strong>
-                    {roomName} Zone {block.zone}
+                    {roomName} {block.zone === 0 ? "Room" : `Zone ${block.zone}`}
                   </strong>{" "}
                   <span>
                     {clock(block.start, timeZone)} · {block.glyph === "failed" ? "failed" : "warning"}
                     {block.reason ? ` — ${block.reason}` : ""}
                   </span>
                 </button>
+                <button
+                  type="button"
+                  className="wt-problem-dismiss"
+                  aria-label={`Dismiss ${roomName} ${clock(block.start, timeZone)}`}
+                  onClick={() => dismiss([block.id])}
+                >
+                  <X size={14} aria-hidden="true" />
+                </button>
               </li>
             ))}
-            {problemBlocks.length > 4 && (
-              <li className="wt-problem-more">+{problemBlocks.length - 4} more</li>
-            )}
+            <li className="wt-problem-more">
+              {stripShown.length > 4 && <span>+{stripShown.length - 4} more · </span>}
+              <button type="button" onClick={() => dismiss(stripShown.map((p) => p.block.id))} data-watering-dismiss-all>
+                Dismiss all
+              </button>
+            </li>
           </ul>
         )}
 

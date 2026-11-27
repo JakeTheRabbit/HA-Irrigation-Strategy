@@ -166,6 +166,16 @@ describe("placement and keys", () => {
     });
   });
 
+  test("a room-wide shot (zone null) is a Whole room row, not a second room header", () => {
+    const rows = toTimelineRows(
+      data([], { rows: [{ zone: 3, blocks: [api({})] }, { zone: null, blocks: [api({ id: "room-shot" })] }] }),
+      {},
+      ROOMS,
+    );
+    expect(rows.filter((row) => row.zone === null)).toHaveLength(1);
+    expect(rows.at(-1)).toMatchObject({ zone: 0, label: "Whole room" });
+  });
+
   test("place answers 0/0 for an empty span", () => {
     expect(place(block({}), { start: T0, end: T0 })).toEqual({ offsetPct: 0, sizePct: 0 });
     expect(place(block({}), { start: T0, end: T0 - min })).toEqual({ offsetPct: 0, sizePct: 0 });
