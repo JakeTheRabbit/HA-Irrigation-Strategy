@@ -1,3 +1,4 @@
+import { AlertCodeText, CodeLink } from "@/components/alert-code-text";
 import { CanonicalControls } from "@/components/canonical-controls";
 import { useEffect, useId, useRef, useState } from "react";
 import {
@@ -659,8 +660,10 @@ export function GuardMark({
           <Pill dot tone={guard.tone}>
             {guard.label}
           </Pill>
-          {guard.code && <a href={`#/help?code=${guard.code}`}>{guard.code}</a>}
-          <p>{guard.detail}</p>
+          {guard.code && <CodeLink code={guard.code} />}
+          <p>
+            <AlertCodeText text={guard.detail} />
+          </p>
           {guard.state === "unmapped" && (
             <Button variant="ghost" size="sm" onClick={onConfigure}>
               <Settings2 size={16} /> Map the tank level

@@ -171,6 +171,13 @@
 .wt-problem-strip li[data-glyph] > button:first-child {
   flex: 1;
 }
+.wt-problem-strip li .wt-problem-code {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 8px;
+  font-size: var(--text-xs);
+  white-space: nowrap;
+}
 .wt-problem-strip li .wt-problem-dismiss {
   align-items: center;
   justify-content: center;

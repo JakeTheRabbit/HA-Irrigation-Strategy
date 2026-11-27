@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Activity, AlertTriangle, Cpu, Layers } from "lucide-react";
+import { AlertCodeText, CodeLink } from "@/components/alert-code-text";
 import { FaultSummary, Heading } from "@/components/dashboard";
 import { KpiCard, KpiGrid } from "@/components/ha-primitives";
 import { NeedsIntegration } from "@/components/needs-integration";
@@ -225,7 +226,9 @@ export function SystemStatus({ controller }: PageProps) {
               {/* Each affected device with its own actions, right under the warning. */}
               {attention.map((item) => (
                 <li key={item.key}>
-                  <span>{item.text}</span>
+                  <span>
+                    <AlertCodeText text={item.text} />
+                  </span>
                   {item.alert && (
                     <span className="system-attention-actions">
                       <a href={item.alert.code ? `#/help?code=${item.alert.code}` : "#/help"}>What to do →</a>
@@ -358,8 +361,14 @@ function Capabilities() {
 function AlertCard({ alert, ack, onAck }: { alert: OpenAlert; ack: Ack | undefined; onAck: (alert: OpenAlert) => void }) {
   return (
     <div className="system-alert" role="group" aria-label={`${alert.code ?? "Alert"}: ${alert.title}`} data-alert={alert.code ?? ""}>
-      {alert.code && <strong>{alert.code}</strong>}
-      <span className="system-alert-title">{alert.title}</span>
+      {alert.code && (
+        <strong>
+          <CodeLink code={alert.code} />
+        </strong>
+      )}
+      <span className="system-alert-title">
+        <AlertCodeText text={alert.title} />
+      </span>
       <span className="system-alert-actions">
         <a href={alert.code ? `#/help?code=${alert.code}` : "#/help"}>What to do →</a>
         {alert.eventId && (

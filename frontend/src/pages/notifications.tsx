@@ -1,3 +1,4 @@
+import { CodeLink } from "@/components/alert-code-text";
 import { NotificationPredictions } from "@/components/notification-predictions";
 import { CanonicalControls } from "@/components/canonical-controls";
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
@@ -128,7 +129,7 @@ function KindCoverage({ kind }: { kind: NotifyKind }) {
         <ul className="notify-kind-codes">
           {codes.map(({ code, title }) => (
             <li key={code}>
-              {title ? <a href={`#/help?code=${code}`}>{code}</a> : <code>{code}</code>}
+              {title ? <CodeLink code={code} /> : <code>{code}</code>}
               <span>{title ?? "Not in Help's list yet"}</span>
             </li>
           ))}

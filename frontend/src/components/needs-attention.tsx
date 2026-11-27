@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { ChevronDown, CircleAlert, TriangleAlert } from "lucide-react";
-import { extractAlertCodes } from "@/components/alert-code-text";
+import { CodeLink, extractAlertCodes } from "@/components/alert-code-text";
 import type { roomAttention } from "@/lib/facility-view";
 import "./needs-attention.css";
 
@@ -79,14 +79,7 @@ export function NeedsAttention({
                   {item.text}
                 </button>
                 {codes.map((code) => (
-                  <a
-                    key={code}
-                    href={`#/settings/help?code=${encodeURIComponent(code)}`}
-                    className="needs-attention-tag alert-code-link"
-                    title={`Look up ${code} in Help`}
-                  >
-                    {code}
-                  </a>
+                  <CodeLink key={code} code={code} className="needs-attention-tag" />
                 ))}
                 {item.alert && <span className="needs-attention-tag">Open alert</span>}
               </li>

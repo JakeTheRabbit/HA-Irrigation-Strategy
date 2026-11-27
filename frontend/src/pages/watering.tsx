@@ -2,6 +2,7 @@ import { AlertTriangle, ChevronLeft, ChevronRight, Droplets, Layers, TriangleAle
 import { Popover } from "radix-ui";
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import { toast } from "sonner";
+import { AlertCodeText, CodeLink, extractAlertCodes } from "@/components/alert-code-text";
 import { Heading } from "@/components/dashboard";
 import { KpiCard, KpiGrid } from "@/components/ha-primitives";
 import { NeedsIntegration } from "@/components/needs-integration";
@@ -565,9 +566,12 @@ export function Watering({
                   </strong>{" "}
                   <span>
                     {clock(block.start, timeZone)} · {block.glyph === "failed" ? "failed" : "warning"}
-                    {block.reason ? ` — ${block.reason}` : ""}
+                    {block.reason ? ` — ${block.reason.replace(/\s*\(CS-\d{3}\)/g, "")}` : ""}
                   </span>
                 </button>
+                {extractAlertCodes(`${block.reason ?? ""} ${block.code ?? ""}`).map((code) => (
+                  <CodeLink key={code} code={code} className="wt-problem-code" />
+                ))}
                 <button
                   type="button"
                   className="wt-problem-dismiss"
@@ -732,7 +736,11 @@ function BlockDetails({
       <p className="wt-pop-status" data-glyph={block.glyph} data-running={block.running || undefined}>
         {statusLine(block)}
       </p>
-      {block.reason && <p className="wt-pop-reason">{block.reason}</p>}
+      {block.reason && (
+        <p className="wt-pop-reason">
+          <AlertCodeText text={block.reason} />
+        </p>
+      )}
       <dl className="wt-pop-rows">
         {water.length > 0 && (
           <div>
@@ -751,7 +759,7 @@ function BlockDetails({
             <dt>Source</dt>
             <dd>
               <span className="wt-source">{source}</span>
-              {block.code && <code>{block.code}</code>}
+              {block.code && <CodeLink code={block.code} />}
             </dd>
           </div>
         )}
