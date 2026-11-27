@@ -52,7 +52,7 @@ await runParity({
       assert.match(headA, desktop ? /^Day 37 of 56\s*· 19 days left$/ : /^Day 37\/56$/, `${label}: Room A stage-arc day`);
       assert.equal(await roomB.locator(".facility-room-day").count(), 0, `${label}: Room B has no grow day on 3.17`);
     }
-    assert.match(await roomA.innerText(), /Drunk today\s+[\d.]+ L per plant · [\d.]+ L room/, `${label}: drink line`);
+    assert.match(await roomA.innerText(), /Delivered today(?: · estimated)?\s+[\d.]+ L per plant · [\d.]+ L room/, `${label}: drink line`);
     region("header");
 
     // Zone cards: each links to its zone page.

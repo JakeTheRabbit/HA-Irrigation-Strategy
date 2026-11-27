@@ -186,9 +186,8 @@ export function discoverRooms(states: States): Room[] {
             : "Default room"),
     });
   }
-  return rooms.sort((a, b) =>
-    a.prefix === "" ? -1 : b.prefix === "" ? 1 : a.name.localeCompare(b.name),
-  );
+  // By name (F1 before F2, Room 2 before Room 10); the un-prefixed older room has no special place.
+  return rooms.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
 }
 
 export function resolveRequestedRoom(rooms: Room[], requested: string | null): Room | undefined {

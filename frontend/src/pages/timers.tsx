@@ -1,7 +1,8 @@
-import { Check } from "lucide-react";
+import { AlertTriangle, Check, Clock, Droplets } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { Heading } from "@/components/dashboard";
+import { KpiCard, KpiGrid } from "@/components/ha-primitives";
 import { NeedsIntegration } from "@/components/needs-integration";
 import { CapacityBar } from "@/components/primitives/capacity-bar";
 import { Sentence } from "@/components/primitives/sentence";
@@ -699,9 +700,33 @@ export function Timers({ controller, onDirtyChange }: PageProps) {
     });
   }
 
+  const activePrograms = list.programs.filter((p) => p.active).length;
   return (
     <>
       <Heading title="Timer programs" />
+      <KpiGrid>
+        <KpiCard
+          icon={Clock}
+          tone={activePrograms > 0 ? "primary" : "neutral"}
+          label="Active programs"
+          value={`${activePrograms} / ${list.programs.length}`}
+          detail={room.room.name}
+        />
+        <KpiCard
+          icon={Droplets}
+          tone={timerZones.length > 0 ? "success" : "neutral"}
+          label="Timer-mode zones"
+          value={`${timerZones.length} of ${room.zones.length}`}
+          detail={timerZones.length ? timerZones.map((z) => z.name).join(", ") : "All zones on steering"}
+        />
+        <KpiCard
+          icon={AlertTriangle}
+          tone={freeZones.length > 0 ? "warning" : "success"}
+          label="Uncovered timer zones"
+          value={freeZones.length}
+          detail={freeZones.length > 0 ? "Assign a program to water them" : "All timer zones covered"}
+        />
+      </KpiGrid>
       <div className="timers" data-timers>
         <div className="tm-side">
           {programs}

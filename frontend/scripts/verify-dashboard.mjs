@@ -503,7 +503,7 @@ try {
     // The header, today's strip and every zone row within 1.35 windows; the plan line and the AI
     // assistant's card follow.
     const bottom = await rows.last().evaluate((el) => el.getBoundingClientRect().bottom + scrollY);
-    assert.ok(bottom <= 900 * 1.35, `the zone rows end ${bottom}px down a 900px window`);
+    assert.ok(bottom <= 900 * 1.37, `the zone rows end ${bottom}px down a 900px window`);
     // The whole page: measured 1357px at 1440 x 900 with the demo, plus 10%.
     const whole = await page.evaluate(() => document.documentElement.scrollHeight);
     assert.ok(whole <= 1357 * 1.1, `Today is ${whole}px tall in a 900px window`);
@@ -525,8 +525,8 @@ try {
     for (const index of [0, 1, 2]) {
       const row = rows.nth(index);
       assert.equal(await row.locator(".today-gauge").count(), 3);
-      assert.match(await row.locator(".today-gauge").nth(0).innerText(), /^VWC\s+target [\d.]+–[\d.]+%\s+[\d.]+%(\s*, [\d.]+ points (under|over))?$/);
-      assert.match(await row.locator(".today-gauge").nth(2).innerText(), /^Pore EC\s+target 3\.5–6(\.0)?\s+[\d.]+(\s*, [\d.]+ mS\/cm (under|over))?$/);
+      assert.match(await row.locator(".today-gauge").nth(0).innerText(), /^VWC\s+(target|ramping to|P2 band) [\d.]+–[\d.]+%\s+[\d.]+%( (Low|High|Ramping|Drying back|Not held · Timer))?(\s*, [\d.]+ points (under|over))?$/);
+      assert.match(await row.locator(".today-gauge").nth(2).innerText(), /^Pore EC\s+target 3\.5–6(\.0)?\s+[\d.]+( (Low|High))?(\s*, [\d.]+ mS\/cm (under|over))?$/);
       assert.match(await row.locator("[data-today-delta]").innerText(), /^[+−±]\d+ mL vs median \d+ mL$/);
       assert.equal(await row.locator(".today-sensors li").count(), 2, "front and back sensors");
     }
@@ -565,9 +565,10 @@ try {
     await page.locator("[data-plan-feed]").waitFor();
     const height = await page.evaluate(() => document.documentElement.scrollHeight);
     // The bottom section bar is fixed chrome; the page pads itself clear of it. Each zone row
-    // carries its sensors in place, so the page is 2.85 phone screens at most (measured 2317px).
+    // carries its sensors in place, and the room's "Needs attention" line and 14 px labels sit
+    // over them, so the page is 2.95 phone screens at most (measured 2426px).
     const bar = await page.evaluate(() => document.querySelector(".bottom-nav")?.getBoundingClientRect().height ?? 0);
-    assert.ok(height - bar <= 2.85 * 844, `Today is ${height}px tall on a 844px phone`);
+    assert.ok(height - bar <= 2.95 * 844, `Today is ${height}px tall on a 844px phone`);
     // Each zone row fits a screen, one column wide.
     const rows = await page.locator("article.today-zone").evaluateAll((all) =>
       all.map((row) => row.getBoundingClientRect()),
@@ -588,13 +589,14 @@ try {
     };
     await page.setViewportSize({ width: 1440, height: 900 });
     await open();
-    // The tank readout joins the room's line; the zone rows still end within 1.35 windows.
+    // The tank readout joins the room's line; the zone rows still end within 1.37 windows (the
+    // room's "Needs attention" line sits under its name).
     await expectVisible(page.locator("[data-today-tank]"));
     const bottom = await page
       .locator("article.today-zone")
       .last()
       .evaluate((el) => el.getBoundingClientRect().bottom + scrollY);
-    assert.ok(bottom <= 900 * 1.35, `with every option on the zone rows end ${bottom}px down`);
+    assert.ok(bottom <= 900 * 1.37, `with every option on the zone rows end ${bottom}px down`);
     await page.setViewportSize({ width: 390, height: 844 });
     await open();
     const phone = await page.evaluate(() => document.documentElement.scrollHeight);
@@ -700,7 +702,9 @@ try {
         "P3",
       ]);
       const key = day.getByRole("list", { name: "Chart key" });
-      assert.ok((await key.locator("li").count()) <= 8, "the key stays small");
+      // Every layer drawn has its key entry in view; with every layer on there is no "More layers".
+      assert.equal(await key.locator(".grow-legend-more").count(), 0, "every layer is on, so none waits behind More layers");
+      assert.equal(await key.locator('[data-layer-toggle][aria-pressed="false"]').count(), 0);
       // Pointing at a shot says what it was, under the chart rather than over it, and a bar up the
       // plot marks where the reading is taken.
       const svg = day.locator(".grow-svg");
@@ -733,7 +737,9 @@ try {
       await day.locator(".grow-tip").waitFor({ state: "hidden" });
       await readings.selectOption("below");
       // Every entry in the key switches its layer, off the chart and out of the readings.
-      const ecKey = key.getByRole("button", { name: "Pore EC" });
+      // An off layer moves into the closed More layers disclosure. Read its state by the stable
+      // layer identity; role queries intentionally exclude that hidden button.
+      const ecKey = key.locator('[data-layer-toggle="ec"]');
       assert.equal(await ecKey.getAttribute("aria-pressed"), "true");
       await expectVisible(layer("ec"));
       await ecKey.click();
@@ -743,7 +749,8 @@ try {
       await page.mouse.move(plot.x + plot.width / 2, box.y + box.height / 2);
       assert.doesNotMatch(await readout.innerText(), /pore EC/);
       await page.mouse.move(0, 0);
-      assert.equal(await key.getByRole("button").count(), await key.locator("li").count());
+      assert.equal(await key.locator("[data-layer-toggle]").count(), await key.locator("li:not(.grow-legend-more)").count());
+      await expectVisible(key.getByText("More layers (1 off)", { exact: true }));
       // Compare with Off, Yesterday, the last run's day of the same number (mockup 04) or Typical.
       const compare = day.getByRole("group", { name: "Compare with" });
       const choice = (name) => compare.getByRole("button", { name, exact: true });
@@ -764,6 +771,7 @@ try {
       assert.equal(await choice("Off").getAttribute("aria-pressed"), "true");
       assert.equal(await ecKey.getAttribute("aria-pressed"), "false");
       assert.equal(await layer("ec").count(), 0);
+      await key.getByText("More layers (1 off)", { exact: true }).click();
       await ecKey.click();
       await expectVisible(layer("ec"));
       await choice("Yesterday").click();
@@ -2642,9 +2650,9 @@ try {
     // The previous run at the same grow days: days 8 to 15 of this run (it began 14 days ago at
     // lights-on), so the same days of the previous run, which began 112 days ago.
     await explorer.locator("[data-compare-toggle]").check();
-    const legend = explorer.locator("[data-previous-legend]");
+    const legend = explorer.locator("[data-chart-key] li").filter({ hasText: /^\s*Run / }).first();
     await expectVisible(legend);
-    assert.match(await legend.innerText(), /^Run Demo • previous run — Room A, days 8–15$/);
+    assert.match((await legend.innerText()).trim(), /^Run Demo • previous run — Room A, days 8–15\b/);
     assert.equal(await explorer.getAttribute("data-compare-days"), "8-15");
     // Seven elapsed days can cross DST: in NZ this range starts at 15:00 standard time,
     // although its end is 16:00 daylight time. Compare the selected start's grow-day offset.
@@ -2673,11 +2681,11 @@ try {
     assert.equal(await explorer.locator("[data-compare-note]").count(), 0);
     // The choice is in the address: a reload, light and dark, keeps it.
     await inBothThemes("zone history explorer", async () => {
-      await expectVisible(page.locator("[data-previous-legend]"));
+      await expectVisible(page.locator("[data-history-explorer] [data-chart-key] li").filter({ hasText: /^\s*Run / }).first());
     });
     await page.evaluate(() => localStorage.setItem("irrigation-theme", "dark"));
     await page.reload({ waitUntil: "networkidle" });
-    await expectVisible(page.locator("[data-previous-legend]"));
+    await expectVisible(page.locator("[data-history-explorer] [data-chart-key] li").filter({ hasText: /^\s*Run / }).first());
     await page.locator("[data-history-explorer]").scrollIntoViewIfNeeded();
     await page
       .locator("[data-history-explorer]")
@@ -2685,7 +2693,7 @@ try {
     // A phone: the controls in a sheet, the chart scrolls sideways inside its panel.
     await page.setViewportSize({ width: 390, height: 844 });
     await page.reload({ waitUntil: "networkidle" });
-    await expectVisible(page.locator("[data-previous-legend]"));
+    await expectVisible(page.locator("[data-history-explorer] [data-chart-key] li").filter({ hasText: /^\s*Run / }).first());
     await noOverflow();
     await page.getByRole("button", { name: "Range and sensors" }).click();
     const sheet = page.getByRole("dialog", { name: "Range and sensors" });
@@ -2710,8 +2718,8 @@ try {
     assert.ok(await page.locator(".topbar-title").isVisible(), "phone header names the page");
     assert.equal(await page.getByRole("button", { name: /^Jump to…/ }).isVisible(), false);
     assert.deepEqual(await page.locator(".safety-switch-text").allInnerTexts(), [
-      "Watering on",
-      "Stop all",
+      "Watering on: Room A",
+      "Stop Room A",
     ]);
     // The five sections along the bottom of the phone.
     assert.deepEqual(

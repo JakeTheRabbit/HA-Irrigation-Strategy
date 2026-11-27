@@ -73,7 +73,9 @@ export function toTimelineRows(
   return data.rooms.flatMap((room) => {
     const meta = rooms.find((r) => r.id === room.room_id);
     const lights = room.lights.map((l) => ({ on: Date.parse(l.on), off: Date.parse(l.off) }));
-    const zones = room.rows.map(({ zone, blocks: raw }): TimelineRow => {
+    // A room-wide shot comes as zone null; row zone null means the room's own header, so it is zone 0 here.
+    const zones = room.rows.map(({ zone: given, blocks: raw }): TimelineRow => {
+      const zone = given ?? 0;
       const plants = plantsByZone[pickKey(room.room_id, zone)];
       const blocks = raw
         .map((b): TimelineBlock => {
@@ -110,7 +112,7 @@ export function toTimelineRows(
         key: pickKey(room.room_id, zone),
         roomId: room.room_id,
         zone,
-        label: `Zone ${zone}`,
+        label: zone === 0 ? "Whole room" : `Zone ${zone}`,
         sublabel: phase ?? "",
         blocks,
         lights,

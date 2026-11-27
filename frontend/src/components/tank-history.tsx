@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/sheet";
 import { Empty } from "@/components/dashboard";
 import { UiTip } from "@/components/info-tip";
+import { ChartKey, NOW_KEY } from "@/components/chart-key";
 import { whileVisible } from "@/lib/live";
 import { historySpan, latestOnly } from "@/lib/sensor-context";
 import {
@@ -214,6 +215,8 @@ export function TankSparkline({
       aria-label={`${name} over the last 24 h: ${trim(line.lowest.value)} to ${trim(line.highest.value)}${unit}`}
     >
       <path d={path} />
+      {/* The line ends now: the right edge. */}
+      <line x1={SPARK.width - 0.5} x2={SPARK.width - 0.5} y1={0} y2={SPARK.height} className="tank-spark-now" />
     </svg>
   );
 }
@@ -415,20 +418,24 @@ function TankChart({
         />
       ) : (
         <>
-          <div className="tank-history-key" aria-hidden="true">
-            {drawn.map((key) => (
-              <span key={key}>
-                <i className={`tank-key-${key}`} />
-                {NAMES[key].name} · {NAMES[key].axis}
-              </span>
-            ))}
-            {gateLines.length > 0 && (
-              <span>
-                <i className="tank-key-gate" />
-                Source-water gate
-              </span>
-            )}
-          </div>
+          <ChartKey
+            className="tank-history-key"
+            items={[
+              ...drawn.map((key) => ({
+                mark: "line" as const,
+                color: `var(--tank-${key})`,
+                label: `Tank ${NAMES[key].name}`,
+                detail: NAMES[key].axis,
+              })),
+              ...KEYS.filter((key) => gateLines.some((line) => line.key === key)).map((key) => ({
+                mark: "dash" as const,
+                color: `var(--tank-${key})`,
+                label: `${NAMES[key].name} source-water gate`,
+                detail: "min / max limit",
+              })),
+              ...(connected ? [NOW_KEY] : []),
+            ]}
+          />
           <div className="tank-history-chart" role="img" aria-label={summary} data-tank-chart>
             <ResponsiveContainer width="100%" height="100%">
               {/* The chart is one image with a text alternative and a table: no keyboard stop in it. */}
@@ -500,6 +507,15 @@ function TankChart({
                     }}
                   />
                 ))}
+                {connected && (
+                  <ReferenceLine
+                    yAxisId={drawn[0]}
+                    x={end}
+                    stroke="var(--primary)"
+                    strokeWidth={2}
+                    label={{ value: "Now", position: "insideTopRight", className: "tank-now-label" }}
+                  />
+                )}
                 {drawn.map((key) => (
                   <Line
                     key={key}

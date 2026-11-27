@@ -2,14 +2,29 @@ import type { ReactNode } from "react";
 import { ArrowRight, Clock, Pause, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Empty, number, time as clock } from "@/components/dashboard";
-import { FeedTankDrawing, ZoneSlab } from "@/components/zone-slab";
-import { DrinkBar, MiniGauge, ShotDots } from "@/components/zone-gauges";
+import { FeedTankDrawing } from "@/components/zone-slab";
+import { AlertCodeText } from "@/components/alert-code-text";
+import {
+  DayRail,
+  EcLane,
+  ecDomain,
+  laneKeyItems,
+  laneMarks,
+  TargetTrack,
+  VwcLane,
+  vwcDomain,
+  type SteeringTone,
+} from "@/components/steering-lane";
+import { ChartKey } from "@/components/chart-key";
 import { StockBottle } from "@/components/stock-bottle";
+import { NeedsAttention } from "@/components/needs-attention";
 import { STOCK_STATES } from "@/lib/dosing";
 import { formatEc, formatTemp, formatVolume } from "@/lib/display-units";
 import {
   drinkLine,
   facilityView,
+  roomAttention,
+  tankReadingText,
   zoneHref,
   ZONE_MODE,
   type FacilityRoom,
@@ -21,20 +36,20 @@ import type { AttentionLevel } from "@/lib/attention";
 import type { Controller } from "@/lib/types";
 import type { Page } from "@/lib/routes";
 import { useNarrow } from "@/lib/use-narrow";
+import { roomPhases, useSteeringDays, type RoomDay } from "@/lib/steering-day";
 import "./all-zones.css";
+import "./facility-steer.css";
 import "@/components/zone-slab.css";
 
 const perPlant = (ml: number) => {
   const { value, unit, digits } = plantAmount(ml);
   return `${number(value, digits)} ${unit}`;
 };
-const capital = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 /** The grow plan's stage, else the stage arc's name. */
+const capital = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 const stageName = (r: FacilityRoom) => r.growDay?.stage || r.stage?.name || "";
-/** The digits a reading came with: a display never shows more. */
-const digitsOf = (value: number) => (String(value).split(".")[1] ?? "").length;
-/** EC after its label: the unit only when it is not mS/cm ("EC 2.4", "EC 1200 ppm"). */
-const ec = (ms: number) => formatEc(ms, digitsOf(ms)).replace(/ mS\/cm$/, "");
+/** EC to one decimal ("EC 3.0" beside "EC 2.7"): the unit only when it is not mS/cm. */
+const ec = (ms: number) => formatEc(ms, 1).replace(/ mS\/cm$/, "");
 const ordinal = (n: number) => {
   const tail = n % 100 >= 11 && n % 100 <= 13 ? "th" : (["th", "st", "nd", "rd"][n % 10] ?? "th");
   return `${n}${tail}`;
@@ -45,8 +60,21 @@ const ROOT_BAND: [number, number] = [19, 23];
 
 type Open = (room: string, page: Page, zone?: number) => void;
 
-/** The facility as rooms, each room's zones, each zone's sensors. A problem shows where it is: on
- * the room, the zone, the sensor or the tank, never in a separate list. */
+/** Water the controller gave the room today: an estimate (shot time × the drippers' flow) unless a
+ * zone has a meter, which reports how much of each shot arrived. */
+const deliveredLabel = (r: FacilityRoom) =>
+  r.zones.some((z) => z.flowRatio !== null) ? "Delivered today" : "Delivered today · estimated";
+
+const mixText = (mix: NonNullable<FacilityRoom["mixFailed"]>) =>
+  `${mix.title}${mix.at ? ` ${clock(mix.at)}` : ""}`;
+
+/** "Low" / "High" when a value is outside its band, else null. */
+const outside = (value: number | null, band: [number, number] | null | undefined) =>
+  value !== null && band ? (value < band[0] ? "Low" : value > band[1] ? "High" : null) : null;
+
+/** The facility as rooms on their own clocks: each room's photoperiod and phases as a rail, each
+ * zone's moisture today under it on the same axis, its numbers beside it. A problem shows where it
+ * is: on the zone's curve, the room or the tank, never in a separate list. */
 export function AllZones({ controller, open }: { controller: Controller; open: Open }) {
   const fmt = (value: string | number) =>
     new Date(value).toLocaleTimeString([], {
@@ -61,6 +89,10 @@ export function AllZones({ controller, open }: { controller: Controller; open: O
   });
   const offline = controller.connection === "offline";
   const phone = useNarrow(720);
+  const days = useSteeringDays(
+    controller,
+    rooms.map((r) => ({ room: r.room, zones: r.zones.map((z) => z.zone) })),
+  );
   return (
     <div className="facility">
       {/* The menu already marks All rooms: the heading is for screen readers only. */}
@@ -81,13 +113,17 @@ export function AllZones({ controller, open }: { controller: Controller; open: O
           />
         </section>
       )}
-      {rooms.map((r) =>
-        phone ? (
-          <PhoneRoom key={r.room.id} r={r} offline={offline} open={open} />
-        ) : (
-          <RoomCard key={r.room.id} r={r} offline={offline} open={open} />
-        ),
-      )}
+      {rooms.map((r) => (
+        <RoomCard
+          key={r.room.id}
+          r={r}
+          offline={offline}
+          open={open}
+          day={days.get(r.room.id)}
+          phone={phone}
+          timeZone={controller.timeZone}
+        />
+      ))}
       <p className="muted facility-note">
         Water is the controller's estimate unless a meter is fitted; per plant is the zone's water
         over its plant count, not measured uptake. Safety controls in the header apply only to the
@@ -97,7 +133,21 @@ export function AllZones({ controller, open }: { controller: Controller; open: O
   );
 }
 
-function RoomCard({ r, offline, open }: { r: FacilityRoom; offline: boolean; open: Open }) {
+function RoomCard({
+  r,
+  offline,
+  open,
+  day,
+  phone,
+  timeZone,
+}: {
+  r: FacilityRoom;
+  offline: boolean;
+  open: Open;
+  day: RoomDay | undefined;
+  phone: boolean;
+  timeZone: string;
+}) {
   const { room, view, status, climate, growDay } = r;
   const stale = status.tone === "stale" || offline;
   const air = climate.find((c) => c.key === "temperature");
@@ -105,12 +155,23 @@ function RoomCard({ r, offline, open }: { r: FacilityRoom; offline: boolean; ope
   const vpd = climate.find((c) => c.key === "vpd");
   const problem = status.tone === "stopped" || status.tone === "off" || stale;
   const drink = drinkLine(r.waterL, r.litresPerPlant);
-  const drunk = r.zones
-    .map((z) => z.mlPerPlant)
-    .filter((ml): ml is number => ml !== null)
-    .sort((x, y) => x - y);
-  const median = drunk.length ? drunk[Math.floor(drunk.length / 2)] : null;
-  const maxMl = Math.max(1, ...drunk) * 1.15;
+  const now = Date.now();
+  // One VWC scale and one pore EC scale for the room's lanes, so its zones compare by eye.
+  const domain = vwcDomain(
+    r.zones.flatMap((z) => [
+      z.zone.vwc.value,
+      ...(z.timer ? [] : [z.rewater, z.target]),
+      ...(day?.zones?.get(z.zone.id)?.vwc.map((point) => point.value) ?? []),
+    ]),
+  );
+  const ecDom = ecDomain([
+    ...(r.stage?.poreEc ?? []),
+    ...r.zones.flatMap((z) => [
+      z.zone.ec.value,
+      ...(day?.zones?.get(z.zone.id)?.ec.map((point) => point.value) ?? []),
+    ]),
+  ]);
+  const phases = day ? roomPhases(day.zones, day.day, now) : [];
   return (
     <section
       className="facility-room panel"
@@ -118,105 +179,129 @@ function RoomCard({ r, offline, open }: { r: FacilityRoom; offline: boolean; ope
       data-problem={problem || undefined}
       aria-labelledby={`facility-${room.id}`}
     >
-      <div className="facility-room-top">
-        <div className="facility-room-main">
-          <div className="facility-room-head">
-            <button
-              type="button"
-              className="facility-room-name"
-              onClick={() => open(room.id, "today")}
-            >
-              <span className="facility-room-dot" data-tone={status.tone} aria-hidden="true" />
-              <h2 id={`facility-${room.id}`}>{room.name}</h2>
-              <ArrowRight size={15} aria-hidden="true" />
-            </button>
-            <span className="facility-room-state">
-              {stale ? "Last reported" : !view.roomActive ? "Room not in use" : status.text}
-              {stageName(r) ? ` · ${capital(stageName(r))}` : ""}
+      <header className="steer-room-head">
+        <div className="facility-room-head">
+          <button type="button" className="facility-room-name" onClick={() => open(room.id, "today")}>
+            <span className="facility-room-dot" data-tone={status.tone} aria-hidden="true" />
+            <h2 id={`facility-${room.id}`}>{room.name}</h2>
+            <ArrowRight size={15} aria-hidden="true" />
+          </button>
+          <span className="facility-room-state">
+            {stale ? "Last reported" : !view.roomActive ? "Room not in use" : status.text}
+            {stageName(r) ? ` · ${capital(stageName(r))}` : ""}
+          </span>
+          {growDay && (
+            <span className="facility-room-day">
+              Day <strong>{growDay.day}</strong>
+              {growDay.of !== null && (phone ? `/${growDay.of}` : ` of ${growDay.of}`)}
+              {!phone && growDay.daysLeft !== null && (
+                <span className="muted"> · {growDay.daysLeft} days left</span>
+              )}
             </span>
-            {growDay && (
-              <span className="facility-room-day">
-                Day <strong>{growDay.day}</strong>
-                {growDay.of !== null && ` of ${growDay.of}`}
-                {growDay.daysLeft !== null && (
-                  <span className="muted"> · {growDay.daysLeft} days left</span>
-                )}
-              </span>
-            )}
-          </div>
-          {problem && !stale && (
-            <p className="facility-flag" data-level="critical" role="status">
-              <TriangleAlert size={15} aria-hidden="true" /> {status.text}: {status.detail}
-            </p>
           )}
-          <RunBar r={r} />
-          <dl className="facility-room-facts">
-            {drink && (
-              <div className="facility-fact-lead">
-                <dt>Drunk today</dt>
-                <dd>
-                  <DrinkText drink={drink} />
-                </dd>
-              </div>
-            )}
-            {air?.value != null && (
-              <div>
-                <dt>Air</dt>
-                <dd>
-                  {number(air.value, 1)} {air.unit}
-                </dd>
-              </div>
-            )}
-            {rh?.value != null && (
-              <div>
-                <dt>RH</dt>
-                <dd>{number(rh.value, 0)}%</dd>
-              </div>
-            )}
-            {vpd?.value != null && (
-              <div>
-                <dt>VPD</dt>
-                <dd>{number(vpd.value, 2)} kPa</dd>
-              </div>
-            )}
-          </dl>
         </div>
-      </div>
-      <div className="facility-supply">
-        <TankCard r={r} open={open} />
-        {r.stock.length > 0 && <StockRow r={r} open={open} />}
-      </div>
-      <div className="facility-zones">
+        <dl className="steer-room-facts">
+          {drink && (
+            <div>
+              <dt>{deliveredLabel(r)}</dt>
+              <dd>
+                <DrinkText drink={drink} />
+              </dd>
+            </div>
+          )}
+          {air?.value != null && (
+            <div>
+              <dt>Air</dt>
+              <dd>
+                {number(air.value, 1)} {air.unit}
+              </dd>
+            </div>
+          )}
+          {rh?.value != null && (
+            <div>
+              <dt>RH</dt>
+              <dd>{number(rh.value, 0)}%</dd>
+            </div>
+          )}
+          {vpd?.value != null && (
+            <div>
+              <dt>VPD</dt>
+              <dd>{number(vpd.value, 2)} kPa</dd>
+            </div>
+          )}
+        </dl>
+        <NeedsAttention
+          items={roomAttention(r)}
+          alerts={r.alertCount}
+          open={(item) => open(room.id, item.page, item.zone)}
+        />
+        {problem && !stale && (
+          <p className="facility-flag" data-level="critical" role="status">
+            <TriangleAlert size={15} aria-hidden="true" /> {status.text}:{" "}
+            <AlertCodeText text={status.detail} />
+          </p>
+        )}
+      </header>
+      <div className="steer-grid">
+        {day && (
+          <div className="steer-lane steer-rail">
+            <ChartKey
+              className="steer-key"
+              label={`${room.name} lanes key`}
+              items={laneKeyItems({
+                span: day.span,
+                now,
+                lightsOn: day.day.start,
+                lightsOff: day.day.lightsOff,
+                phases: phases.length > 0,
+                lanes: r.zones.map((z) => {
+                  const lane = day.zones?.get(z.zone.id);
+                  const loading = day.zones ? [] : null;
+                  return laneMarks(
+                    day.span,
+                    lane ? lane.vwc : loading,
+                    lane ? lane.ec : loading,
+                    lane?.shots ?? [],
+                    !z.timer && z.rewater !== null && z.target !== null,
+                    !!r.stage?.poreEc,
+                    z.problem ? (z.problemIsAlert ? "critical" : "warning") : null,
+                  );
+                }),
+              })}
+            />
+            <DayRail
+              span={day.span}
+              lightsOn={day.day.start}
+              lightsOff={day.day.lightsOff}
+              phases={phases}
+              now={now}
+              timeZone={timeZone}
+            />
+          </div>
+        )}
         {r.zones.map((z) => (
-          <ZoneCard
+          <ZoneRow
             key={z.zone.id}
             r={r}
             z={z}
             stale={stale}
             open={open}
-            median={median}
-            maxMl={maxMl}
+            day={day}
+            domain={domain}
+            ecDom={ecDom}
+            now={now}
           />
         ))}
       </div>
+      {phone ? (
+        <PhoneFeed r={r} open={open} />
+      ) : (
+        <div className="steer-supply">
+          <TankCard r={r} open={open} />
+          {r.stock.length > 0 && <StockRow r={r} open={open} />}
+        </div>
+      )}
     </section>
-  );
-}
-
-/** The grow's run: done so far, a tick at today. */
-function RunBar({ r }: { r: FacilityRoom }) {
-  const { growDay } = r;
-  if (!growDay || growDay.of === null || growDay.of <= 0) return null;
-  const at = `${Math.max(0, Math.min(100, (growDay.day / growDay.of) * 100))}%`;
-  return (
-    <div
-      className="facility-run"
-      role="img"
-      aria-label={`Day ${growDay.day} of ${growDay.of}${growDay.stage ? `, ${growDay.stage}` : ""}`}
-    >
-      <span className="facility-run-done" style={{ width: at }} />
-      <span className="facility-run-today" style={{ left: at }} />
-    </div>
   );
 }
 
@@ -237,18 +322,15 @@ function ZoneLink({
   r,
   zone,
   open,
-  className,
   children,
 }: {
   r: FacilityRoom;
   zone: number;
   open: Open;
-  className?: string;
   children: ReactNode;
 }) {
   return (
     <a
-      className={className}
       href={zoneHref(window.location.search, r.room.id, zone)}
       onClick={(event) => {
         if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)
@@ -262,7 +344,7 @@ function ZoneLink({
   );
 }
 
-/** A sensor's own name inside its zone's card: "Zone 1 front" reads "Front". */
+/** A sensor's own name inside its zone's row: "Zone 1 front" reads "Front". */
 function sensorName(sensor: ZoneSensor, context: string[]) {
   let name = sensor.name;
   for (const word of context)
@@ -270,21 +352,26 @@ function sensorName(sensor: ZoneSensor, context: string[]) {
   return name ? name.charAt(0).toUpperCase() + name.slice(1) : "Sensor";
 }
 
-function ZoneCard({
+/** One zone on the room's clock: who it is and its VWC, today's moisture under the room's rail,
+ * and its dryback, pore EC, water and root beside it. Its trouble sits on its curve. */
+function ZoneRow({
   r,
   z,
   stale,
   open,
-  median,
-  maxMl,
+  day,
+  domain,
+  ecDom,
+  now,
 }: {
   r: FacilityRoom;
   z: FacilityZone;
   stale: boolean;
   open: Open;
-  /** The room's median water per plant today, and the bar's end, for the zone's drink bar. */
-  median: number | null;
-  maxMl: number;
+  day: RoomDay | undefined;
+  domain: [number, number];
+  ecDom: [number, number];
+  now: number;
 }) {
   const { zone } = z;
   const mode = stale && z.mode !== "room-off" ? "offline" : z.mode;
@@ -292,16 +379,20 @@ function ZoneCard({
     (worst, reason) => (worst === "critical" || reason.level === "critical" ? "critical" : "warning"),
     null,
   );
-  // Moisture is held between the re-water point and the peak only in P2; overnight (P3) it is
-  // meant to dry back and is out of band only under the rescue floor; P0 and P1 are moving to it.
+  // A timer zone is not steered: no phase and no band.
+  const phase = !z.timer && /^P[0-3]$/.test(zone.phase) ? zone.phase : null;
   const band: [number, number] | null =
-    zone.phase === "P2" && z.rewater !== null && z.target !== null
-      ? [z.rewater, z.target]
-      : zone.phase === "P3" && z.rescue !== null
-        ? [z.rescue, Number.POSITIVE_INFINITY]
+    !z.timer && z.rewater !== null && z.target !== null ? [z.rewater, z.target] : null;
+  const vwc = zone.vwc.value;
+  // A reading says its state only when it is not plainly in range: held to the band in P2 only.
+  const state = z.timer
+    ? "Not held, timer"
+    : phase === "P1" && band && vwc !== null && vwc < band[0]
+      ? "Ramping"
+      : phase === "P2"
+        ? outside(vwc, band)
         : null;
   const poreEc = r.stage?.poreEc ?? null;
-  const phase = /^P[0-3]$/.test(zone.phase) ? zone.phase : null;
   const context = [r.room.name, zone.name];
   // A sensor the zone's open alert already names ("Back sensor silent 3 h…") is said once, there.
   const troubled = z.sensors.filter(
@@ -310,127 +401,208 @@ function ZoneCard({
       s.health !== "not-counted" &&
       !z.problem?.toLowerCase().startsWith(`${sensorName(s, context).toLowerCase()} sensor`),
   );
+  // Pore EC out of band shows on its number, a probe's trouble on its sensor line, the problem on
+  // the curve.
+  const others = z.attention.filter(
+    (reason) => reason.rule !== "pore-ec" && reason.rule !== "probe" && reason.text !== z.problem,
+  );
+  const lane = day?.zones?.get(zone.id);
+  const drybackBand = r.stage?.drybackPoints ?? null;
   return (
-    <article
-      className="facility-zone"
+    <div
+      className="steer-zone"
       data-facility-zone={`${r.room.id}/${zone.id}`}
       data-mode={mode}
       data-level={level ?? undefined}
       data-last-shot={z.lastShotHollow ? "hollow" : undefined}
     >
-      <div className="facility-zone-top">
-        <ZoneSlab
-          vwc={zone.vwc.value}
-          peak={z.peak}
-          rewater={z.rewater}
-          target={z.target}
-          ec={zone.ec.value}
-          ecBand={poreEc}
-          level={level}
-          label=""
-          sensors={z.sensors.map((s) => ({
-            health: s.health,
-            label: `${sensorName(s, context)}: ${
-              s.vwc?.value == null ? "—" : `${number(s.vwc.value)}%`
-            }${s.ec?.value == null ? "" : `, EC ${number(s.ec.value)}`}${
-              s.health === "ok" ? "" : ` (${s.text})`
-            }`,
-          }))}
-        />
-        <div className="facility-zone-head">
-          <h3>
-            <ZoneLink r={r} zone={zone.id} open={open}>
-              {zone.name}
-              <ArrowRight size={14} aria-hidden="true" />
-            </ZoneLink>
-          </h3>
-          <span className="facility-zone-chips">
-            <span className="facility-phase" data-phase={phase ?? undefined}>
-              {phase ?? "–"}
+      <div className="steer-who facility-zone-head">
+        <h3>
+          <ZoneLink r={r} zone={zone.id} open={open}>
+            {zone.name}
+          </ZoneLink>
+        </h3>
+        {zone.cultivar && <span className="steer-cultivar">{zone.cultivar}</span>}
+        <p className="steer-reading">
+          <span className="steer-value">{vwc === null ? "—" : number(vwc, 0)}</span>
+          <span className="steer-unit">% VWC</span>
+        </p>
+        <p className="steer-chips">
+          {state && (
+            <span
+              className="steer-state"
+              data-state={state === "Ramping" ? "ramp" : state.startsWith("Not") ? "free" : "off"}
+            >
+              {state}
             </span>
-            <span className="facility-mode" data-mode={mode}>
-              {mode === "paused" && <Pause size={12} aria-hidden="true" />}
-              {ZONE_MODE[mode]}
-            </span>
+          )}
+          <span className="facility-mode" data-mode={mode}>
+            {mode === "paused" && <Pause size={12} aria-hidden="true" />}
+            {mode === "paused"
+              ? "Scheduling paused"
+              : phase && mode !== "watering"
+                ? `${phase}, ${ZONE_MODE[mode].toLowerCase()}`
+                : ZONE_MODE[mode]}
           </span>
-          <ShotDots shots={zone.shots.value === null ? null : Math.round(zone.shots.value)} />
-        </div>
+        </p>
       </div>
-      <DrinkBar
-        ml={z.mlPerPlant}
-        median={median}
-        max={maxMl}
-        text={
-          z.mlPerPlant !== null ? (
-            <>
-              <strong>{perPlant(z.mlPerPlant)}</strong> per plant
-              {z.waterL !== null && <span className="muted"> · {number(z.waterL, 1)} L today</span>}
-            </>
-          ) : (
-            <span className="muted">Per plant unknown</span>
+      <div className="steer-lane">
+        {day ? (
+          <>
+            <VwcLane
+              span={day.span}
+              readings={lane ? lane.vwc : day.zones ? [] : null}
+              shots={lane?.shots ?? []}
+              band={band}
+              bandText={band ? `VWC ${number(band[0], 0)}–${number(band[1], 0)}%` : null}
+              domain={domain}
+              lightsOn={day.day.start}
+              lightsOff={day.day.lightsOff}
+              now={now}
+              abnormal={state === "Low" || state === "High"}
+              flag={
+                z.problem
+                  ? {
+                      level: z.problemIsAlert ? "critical" : "warning",
+                      text: (
+                        <span data-facility-problem>
+                          <AlertCodeText text={z.problem} />
+                        </span>
+                      ),
+                    }
+                  : null
+              }
+            />
+            <EcLane
+              span={day.span}
+              readings={lane ? lane.ec : day.zones ? [] : null}
+              band={poreEc}
+              bandText={poreEc ? `EC ${ec(poreEc[0])}–${ec(poreEc[1])}` : null}
+              domain={ecDom}
+              lightsOn={day.day.start}
+              lightsOff={day.day.lightsOff}
+              now={now}
+              abnormal={outside(zone.ec.value, poreEc) !== null}
+            />
+          </>
+        ) : (
+          z.problem && (
+            <p className="facility-flag" data-level={level ?? "warning"} data-facility-problem>
+              <TriangleAlert size={14} aria-hidden="true" /> <AlertCodeText text={z.problem} />
+            </p>
           )
-        }
-      />
-      <div className="facility-gauges">
-        <MiniGauge label="VWC" value={zone.vwc.value} unit="%" band={band} scale={[20, 80]} />
-        <MiniGauge
-          label="Dryback"
-          value={z.drybackPoints}
-          unit=" pt"
-          band={r.stage?.drybackPoints ?? null}
-          scale={[0, 20]}
-        />
-        <MiniGauge
-          label="Pore EC"
-          value={zone.ec.value}
-          band={poreEc}
-          scale={poreEc ? [0, poreEc[1] * 1.6] : [0, 10]}
-        />
-        <MiniGauge label="Root" value={z.rootTemp} unit="°" band={ROOT_BAND} scale={[14, 30]} />
+        )}
+        {(z.queued || z.lastShotText || others.length > 0 || troubled.length > 0) && (
+          <ul className="steer-notes">
+            {z.queued && (
+              <li data-facility-queued>
+                <Clock size={13} aria-hidden="true" /> {queuedText(z.queued.place)}
+              </li>
+            )}
+            {z.lastShotText && <li data-facility-flow>{z.lastShotText}</li>}
+            {others.map((reason) => (
+              <li key={reason.rule} data-level={reason.level}>
+                <TriangleAlert size={13} aria-hidden="true" /> <AlertCodeText text={reason.text} />
+              </li>
+            ))}
+            {troubled.map((s) => (
+              <li
+                key={s.key}
+                data-level={
+                  s.health === "no-reading" || s.health === "out-of-range" ? "critical" : "warning"
+                }
+              >
+                <TriangleAlert size={13} aria-hidden="true" /> {sensorName(s, context)} sensor:{" "}
+                <AlertCodeText text={s.text} />
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
-      {z.queued && (
-        <p className="facility-line" data-facility-queued>
-          <Clock size={14} aria-hidden="true" /> {queuedText(z.queued.place)}
-        </p>
+      <dl className="steer-metrics">
+        <Metric
+          label="Dryback"
+          value={z.drybackPoints === null ? "—" : number(z.drybackPoints, 0)}
+          unit="pt"
+          state={outside(z.drybackPoints, drybackBand)}
+          target={drybackBand ? `target ${number(drybackBand[0], 0)}–${number(drybackBand[1], 0)}` : null}
+          valueNum={z.drybackPoints}
+          band={drybackBand}
+          tone="vwc"
+        />
+        <Metric
+          label="Pore EC"
+          value={zone.ec.value === null ? "—" : ec(zone.ec.value)}
+          unit=""
+          state={outside(zone.ec.value, poreEc)}
+          target={poreEc ? `target ${ec(poreEc[0])}–${ec(poreEc[1])}` : null}
+          valueNum={zone.ec.value}
+          band={poreEc}
+          tone="ec"
+        />
+        <Metric
+          label="Water today"
+          value={z.mlPerPlant === null ? "—" : perPlant(z.mlPerPlant)}
+          unit="/plant"
+          target={`${zone.shots.value === null ? "—" : Math.round(zone.shots.value)} shots${
+            z.waterL !== null ? `, ${formatVolume(z.waterL, 1)}` : ""
+          }`}
+        />
+        <Metric
+          label="Root"
+          value={z.rootTemp === null ? "—" : formatTemp(z.rootTemp, 1)}
+          unit=""
+          state={outside(z.rootTemp, ROOT_BAND)}
+          valueNum={z.rootTemp}
+          band={ROOT_BAND}
+          tone="neutral"
+        />
+      </dl>
+    </div>
+  );
+}
+
+function Metric({
+  label,
+  value,
+  unit,
+  state,
+  target,
+  valueNum,
+  band,
+  tone = "neutral",
+}: {
+  label: string;
+  value: string;
+  unit: string;
+  state?: string | null;
+  target?: string | null;
+  valueNum?: number | null;
+  band?: readonly [number, number] | null;
+  tone?: SteeringTone;
+}) {
+  return (
+    <div className="steer-metric" data-off={state ? "" : undefined}>
+      <dt>{label}</dt>
+      <dd>
+        <span className="steer-metric-value">{value}</span>
+        {unit && <small>{unit}</small>}
+        {state && <span className="steer-metric-state"> {state}</span>}
+      </dd>
+      {band && (
+        <dd className="steer-metric-track">
+          <TargetTrack value={valueNum ?? null} band={band} tone={tone} abnormal={!!state} />
+        </dd>
       )}
-      {z.lastShotText && (
-        <p className="facility-line" data-facility-flow>
-          {z.lastShotText}
-        </p>
-      )}
-      {z.problem && (
-        <p className="facility-flag" data-level={level ?? "warning"} data-facility-problem>
-          <TriangleAlert size={14} aria-hidden="true" /> {z.problem}
-        </p>
-      )}
-      {z.attention
-        // Pore EC out of band shows on its gauge, a probe's trouble on its sensor, and the zone's
-        // problem above.
-        .filter(
-          (reason) =>
-            reason.rule !== "pore-ec" && reason.rule !== "probe" && reason.text !== z.problem,
-        )
-        .map((reason) => (
-          <p key={reason.rule} className="facility-flag" data-level={reason.level}>
-            <TriangleAlert size={14} aria-hidden="true" /> {reason.text}
-          </p>
-        ))}
-      {troubled.map((s) => (
-        <p
-          key={s.key}
-          className="facility-flag"
-          data-level={s.health === "no-reading" || s.health === "out-of-range" ? "critical" : "warning"}
-        >
-          <TriangleAlert size={14} aria-hidden="true" /> {sensorName(s, context)} sensor: {s.text}
-        </p>
-      ))}
-    </article>
+      {target && <dd className="steer-metric-target">{target}</dd>}
+    </div>
   );
 }
 
 function TankCard({ r, open }: { r: FacilityRoom; open: Open }) {
   const { tank, reservoir } = r;
   const level = tank.level.value;
+  const readings = tankReadingText({ ph: tank.ph.value, ec: tank.ec.value, temperature: tank.temperature.value });
   const held = reservoir.state === "held";
   return (
     <button
@@ -460,7 +632,7 @@ function TankCard({ r, open }: { r: FacilityRoom; open: Open }) {
         </span>
         <span className="facility-tank-readings">
           {/* Spaces between the parts: the line may wrap before any reading, never inside one. */}
-          <span>pH {tank.ph.value === null ? "—" : number(tank.ph.value, 2)}</span>
+          <span>pH {readings.ph ?? "—"}</span>
           {r.feedCalibrationDue && (
             <>
               {" "}
@@ -470,14 +642,13 @@ function TankCard({ r, open }: { r: FacilityRoom; open: Open }) {
             </>
           )}{" "}
           <span>
-            <span aria-hidden="true">·</span> EC {tank.ec.value === null ? "—" : ec(tank.ec.value)}
+            <span aria-hidden="true">·</span> EC {readings.ec ?? "—"}
           </span>
           {tank.temperature.value !== null && (
             <>
               {" "}
               <span>
-                <span aria-hidden="true">·</span>{" "}
-                {formatTemp(tank.temperature.value, digitsOf(tank.temperature.value))}
+                <span aria-hidden="true">·</span> {readings.temperature}
               </span>
             </>
           )}
@@ -486,6 +657,11 @@ function TankCard({ r, open }: { r: FacilityRoom; open: Open }) {
           Pump {tank.pump.on === null ? "unknown" : tank.pump.on ? "on" : "off"}
           {tank.lastFill.timestamp ? ` · filled ${clock(tank.lastFill.timestamp)}` : ""}
         </span>
+        {r.mixFailed && (
+          <span className="facility-flag" data-level="critical" data-facility-mix>
+            <TriangleAlert size={13} aria-hidden="true" /> {mixText(r.mixFailed)}
+          </span>
+        )}
         {held && (
           <span className="facility-flag" data-level="critical">
             <Pause size={13} aria-hidden="true" /> {reservoir.label}
@@ -526,148 +702,60 @@ function StockRow({ r, open }: { r: FacilityRoom; open: Open }) {
   );
 }
 
-/** The phone's room (mockup P1): the zones as three tiles, then one feed line with what is low. */
-function PhoneRoom({ r, offline, open }: { r: FacilityRoom; offline: boolean; open: Open }) {
-  const { room, view, status, growDay, tank } = r;
-  const stale = status.tone === "stale" || offline;
-  const drink = drinkLine(r.waterL, r.litresPerPlant);
+/** The phone's feed line: the tank's readings, the due flag and what stock is low, in one button. */
+function PhoneFeed({ r, open }: { r: FacilityRoom; open: Open }) {
+  const { room, tank } = r;
   const level = tank.level.value;
+  const readings = tankReadingText({ ph: tank.ph.value, ec: tank.ec.value, temperature: tank.temperature.value });
   const low = r.stock.filter((t) => t.state !== "ok");
   return (
-    <section
-      className="facility-room facility-phone panel"
-      data-facility-room={room.id}
-      aria-labelledby={`facility-${room.id}`}
+    <button
+      type="button"
+      className="facility-phone-feed"
+      onClick={() => open(room.id, "equipment/dosing")}
     >
-      <div className="facility-phone-head">
-        <button type="button" className="facility-room-name" onClick={() => open(room.id, "today")}>
-          <span className="facility-room-dot" data-tone={status.tone} aria-hidden="true" />
-          <h2 id={`facility-${room.id}`}>{room.name}</h2>
-        </button>
-        <span className="facility-room-state">
-          {stale ? "Last reported" : !view.roomActive ? "Room not in use" : status.text}
-          {stageName(r) ? ` · ${capital(stageName(r))}` : ""}
-        </span>
-        {growDay && (
-          <span className="facility-room-day">
-            Day <strong>{growDay.day}</strong>
-            {growDay.of !== null && `/${growDay.of}`}
+      {/* The button's name is its text: the readings, the due flag and what is low. */}
+      <span className="sr-only">Open {room.name} tank and feed: </span>
+      <span aria-hidden="true">
+        <FeedTankDrawing
+          level={level}
+          minimum={r.reservoir.minimum}
+          full={tank.fill.on}
+          low={r.reservoir.state === "held"}
+          label={level === null ? "Tank level unavailable" : `Tank ${number(level, 0)} % full`}
+        />
+      </span>
+      <span className="facility-phone-feed-text">
+        <strong>Feed {level === null ? "—" : `${number(level, 0)}%`}</strong>
+        {r.reservoir.aboveMinimumL !== null && ` · ${formatVolume(r.reservoir.aboveMinimumL, 0)}`}
+        {tank.ph.value !== null && (
+          <>
+            {" · "}
+            <span className="facility-nowrap">pH {readings.ph}</span>
+          </>
+        )}
+        {r.feedCalibrationDue && (
+          <span className="facility-due" data-facility-due>
+            Calibration due
           </span>
         )}
-      </div>
-      <RunBar r={r} />
-      {drink && (
-        <p className="facility-phone-drink">
-          Drunk today <DrinkText drink={drink} />
-        </p>
+        {tank.ec.value !== null && (
+          <>
+            {" · "}
+            <span className="facility-nowrap">EC {readings.ec}</span>
+          </>
+        )}
+      </span>
+      {r.mixFailed && (
+        <span className="facility-flag" data-level="critical" data-facility-mix>
+          <TriangleAlert size={13} aria-hidden="true" /> {mixText(r.mixFailed)}
+        </span>
       )}
-      <div className="facility-tiles">
-        {r.zones.map((z) => {
-          const mode = stale && z.mode !== "room-off" ? "offline" : z.mode;
-          const phase = /^P[0-3]$/.test(z.zone.phase) ? z.zone.phase : null;
-          // The phone has no sensor rows: a sensor's trouble is the tile's problem when it has no other.
-          const sensor = z.sensors.find((s) => s.health !== "ok" && s.health !== "not-counted");
-          const problem =
-            z.problem ??
-            (sensor ? `${sensorName(sensor, [room.name, z.zone.name])} sensor: ${sensor.text}` : null);
-          const flagged = problem !== null || z.lastShotHollow;
-          return (
-            <ZoneLink key={z.zone.id} r={r} zone={z.zone.id} open={open} className="facility-tile">
-              <span
-                className="facility-tile-body"
-                data-facility-zone={`${room.id}/${z.zone.id}`}
-                data-mode={mode}
-                data-level={flagged ? "warning" : undefined}
-              >
-                <span className="facility-tile-head">
-                  <strong>{z.zone.name}</strong>
-                  <span className="facility-phase" data-phase={phase ?? undefined}>
-                    {phase ?? "–"}
-                  </span>
-                </span>
-                <ZoneSlab
-                  vwc={z.zone.vwc.value}
-                  peak={z.peak}
-                  rewater={z.rewater}
-                  target={z.target}
-                  ec={z.zone.ec.value}
-                  ecBand={r.stage?.poreEc ?? null}
-                  level={flagged ? "warning" : null}
-                  label=""
-                  sensors={z.sensors.map((s) => ({ health: s.health, label: s.name }))}
-                />
-                <span className="facility-tile-reading">
-                  <strong>{z.zone.vwc.value === null ? "—" : `${number(z.zone.vwc.value)}%`}</strong>
-                  <span className="muted">
-                    EC {z.zone.ec.value === null ? "—" : ec(z.zone.ec.value)}
-                  </span>
-                </span>
-                <span className="facility-mode" data-mode={mode}>
-                  {mode === "watering" ? "Watering" : ZONE_MODE[mode]}
-                </span>
-                {z.queued && (
-                  <span className="facility-tile-line" data-facility-queued>
-                    {queuedText(z.queued.place)}
-                  </span>
-                )}
-                {z.lastShotText && (
-                  <span className="facility-tile-problem" data-facility-flow>
-                    {z.lastShotText}
-                  </span>
-                )}
-                {problem && (
-                  <span className="facility-tile-problem" data-facility-problem>
-                    {problem}
-                  </span>
-                )}
-              </span>
-            </ZoneLink>
-          );
-        })}
-      </div>
-      <button
-        type="button"
-        className="facility-phone-feed"
-        onClick={() => open(room.id, "equipment/dosing")}
-      >
-        {/* The button's name is its text: the readings, the due flag and what is low. */}
-        <span className="sr-only">Open {room.name} tank and feed: </span>
-        <span aria-hidden="true">
-          <FeedTankDrawing
-            level={level}
-            minimum={r.reservoir.minimum}
-            full={tank.fill.on}
-            low={r.reservoir.state === "held"}
-            label={level === null ? "Tank level unavailable" : `Tank ${number(level, 0)} % full`}
-          />
+      {low.length > 0 && (
+        <span className="facility-phone-low">
+          {low.map((t) => `${t.name} ${STOCK_STATES[t.state].toLowerCase()}`).join(" · ")}
         </span>
-        <span className="facility-phone-feed-text">
-          <strong>Feed {level === null ? "—" : `${number(level, 0)}%`}</strong>
-          {r.reservoir.aboveMinimumL !== null && ` · ${formatVolume(r.reservoir.aboveMinimumL, 0)}`}
-          {tank.ph.value !== null && (
-            <>
-              {" · "}
-              <span className="facility-nowrap">pH {number(tank.ph.value, 2)}</span>
-            </>
-          )}
-          {r.feedCalibrationDue && (
-            <span className="facility-due" data-facility-due>
-              Calibration due
-            </span>
-          )}
-          {tank.ec.value !== null && (
-            <>
-              {" · "}
-              <span className="facility-nowrap">EC {ec(tank.ec.value)}</span>
-            </>
-          )}
-        </span>
-        {low.length > 0 && (
-          <span className="facility-phone-low">
-            {low.map((t) => `${t.name} ${STOCK_STATES[t.state].toLowerCase()}`).join(" · ")}
-          </span>
-        )}
-      </button>
-    </section>
+      )}
+    </button>
   );
 }

@@ -78,41 +78,74 @@ export function CanonicalControls({
   );
   return (
     <>
-      {features.map((f) => (
-        <section
-          key={f.feature.id}
-          id={`config-${f.feature.id}`}
-          className="panel workspace-card"
-          tabIndex={-1}
-        >
-          <div className="panel-heading">
-            <h2>
-              {f.feature.label}
-              {f.feature.id === "sizing" ? " · room defaults" : ""}
-            </h2>
-            <p>{f.feature.help}</p>
+      {features.map((f) => {
+        const masterCells = f.master ? [f.master.room, ...f.master.zones].filter(Boolean) : [];
+        const hasFeatureDirty = f.controls.some((r) =>
+          [r.room, ...r.zones].some((c) => c && staged[c.entityId] !== undefined),
+        );
+        const masterOff =
+          masterCells.length > 0 &&
+          masterCells.every((c) => c && (staged[c.entityId] ?? c.value) === false);
+        const collapsible = masterOff && f.controls.length > 1;
+        const title = `${f.feature.label}${f.feature.id === "sizing" ? " · room defaults" : ""}`;
+        const body = (
+          <div className="canonical-controls-grid">
+            {f.controls.map((r) => (
+              <ControlEditor
+                key={r.control.key}
+                row={r}
+                staged={staged}
+                zoneName={name}
+                readOnly={
+                  locked || (room.strategy.engaged && ["number", "select"].includes(r.control.domain))
+                }
+                onChange={(cell, value) =>
+                  setStaged((current) => {
+                    const next = { ...current };
+                    if (cell.value === value) delete next[cell.entityId];
+                    else next[cell.entityId] = value;
+                    return next;
+                  })
+                }
+              />
+            ))}
           </div>
-          {f.controls.map((r) => (
-            <ControlEditor
-              key={r.control.key}
-              row={r}
-              staged={staged}
-              zoneName={name}
-              readOnly={
-                locked || (room.strategy.engaged && ["number", "select"].includes(r.control.domain))
-              }
-              onChange={(cell, value) =>
-                setStaged((current) => {
-                  const next = { ...current };
-                  if (cell.value === value) delete next[cell.entityId];
-                  else next[cell.entityId] = value;
-                  return next;
-                })
-              }
-            />
-          ))}
-        </section>
-      ))}
+        );
+        if (collapsible) {
+          return (
+            <details
+              key={f.feature.id}
+              id={`config-${f.feature.id}`}
+              className="panel workspace-card canonical-card canonical-collapsible"
+              open={hasFeatureDirty || undefined}
+              tabIndex={-1}
+            >
+              <summary className="canonical-summary">
+                <div className="canonical-summary-text">
+                  <h2>{title}</h2>
+                  <p>{f.feature.help}</p>
+                </div>
+                <span className="canonical-summary-badge">Off</span>
+              </summary>
+              <div className="canonical-collapsible-body">{body}</div>
+            </details>
+          );
+        }
+        return (
+          <section
+            key={f.feature.id}
+            id={`config-${f.feature.id}`}
+            className="panel workspace-card canonical-card"
+            tabIndex={-1}
+          >
+            <div className="panel-heading">
+              <h2>{title}</h2>
+              <p>{f.feature.help}</p>
+            </div>
+            {body}
+          </section>
+        );
+      })}
       {dirty && (
         <div className="features-apply">
           <span>

@@ -47,30 +47,24 @@
   gap: 4px 16px;
   margin-bottom: 10px;
 }
-.ar-legend {
-  margin-left: auto;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--muted-foreground);
+.ar-now {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-left: 2px solid var(--primary);
+  pointer-events: none;
+}
+.ar-now span {
+  position: absolute;
+  top: 2px;
+  right: 4px;
+  color: var(--primary);
   font-size: var(--text-xs);
+  font-weight: 600;
+  white-space: nowrap;
 }
-.ar-legend i {
-  display: inline-block;
-  width: 14px;
-  height: 10px;
-  margin-left: 8px;
-  border-radius: 2px;
-}
-.ar-legend i.is-fire {
-  background: color-mix(in srgb, var(--destructive) 35%, transparent);
-}
-.ar-legend i.is-short {
-  background: color-mix(in srgb, var(--muted-foreground) 35%, transparent);
-}
-.ar-legend i.is-line {
-  height: 0;
-  border-top: 2px dashed var(--warning);
+.ar-replay .chart-key {
+  margin-top: 8px;
 }
 .ar-chart {
   display: grid;
@@ -161,7 +155,7 @@
   left: 0;
   right: 0;
   top: 7px;
-  border-top: 2px dashed var(--warning);
+  border-top: 2px dashed var(--warning-mark);
 }
 .ar-threshold:focus-visible::before {
   border-top-width: 3px;

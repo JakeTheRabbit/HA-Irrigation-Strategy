@@ -57,20 +57,6 @@
   border-radius: 6px;
   padding: 0.35rem 0.5rem;
 }
-.grows-legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem 1rem;
-  font-size: var(--text-sm);
-}
-.grows-legend i {
-  display: inline-block;
-  width: 14px;
-  height: 4px;
-  border-radius: 2px;
-  margin-right: 0.35rem;
-  vertical-align: middle;
-}
 .grows-charts {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 22rem), 1fr));

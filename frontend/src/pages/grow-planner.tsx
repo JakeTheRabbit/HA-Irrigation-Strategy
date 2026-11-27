@@ -542,6 +542,7 @@ export function GrowPlanner({
                 parameters={interpolate(profile, currentBlock.bias, limits)}
                 onChange={disabled ? undefined : curveEdit}
                 showEc
+                live={day === today}
               />
             </section>
           ) : (

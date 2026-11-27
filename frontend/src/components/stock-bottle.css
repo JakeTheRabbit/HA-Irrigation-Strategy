@@ -14,7 +14,7 @@
   fill: color-mix(in srgb, var(--pump-hue, var(--primary)) 62%, var(--surface));
 }
 .stock-bottle[data-state="low"] .sb-liquid {
-  fill: color-mix(in srgb, var(--warning) 70%, var(--surface));
+  fill: color-mix(in srgb, var(--warning-mark) 70%, var(--surface));
 }
 .stock-bottle[data-state="very-low"] .sb-liquid {
   fill: color-mix(in srgb, var(--destructive) 70%, var(--surface));

@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Empty, number, time as clock } from "@/components/dashboard";
 import { inPairs } from "@/components/day-timeline";
 import { UiTip } from "@/components/info-tip";
+import { ChartKey, NOW_KEY, type KeyItem } from "@/components/chart-key";
 import { appendLive, duration, joinRows, type Level, type TimelineRows } from "@/lib/day-timeline";
 import { numeric } from "@/lib/model";
 import { rangeTicks, tickLabel } from "@/lib/tank-history";
@@ -316,42 +317,33 @@ function LevelRecord({
         texts={texts}
       />
       <div className="grow-foot">
-        <ul className="grow-legend" aria-label="Chart key">
-          <li title="Tank level. The values of the mapped level sensor. Each value stays on the chart until the next reading.">
-            <i className="key-level" aria-hidden="true" />
-            Tank level
-          </li>
-          {ids.valves.length > 0 && (
-            <li title="Shot. A zone valve opened. The mark is on the level line at the time that the valve opened.">
-              <i className="key-shot" aria-hidden="true" />
-              Shot
-            </li>
-          )}
-          {ids.pump && (
-            <li title="Pump on. The pump switch reports that it is on. The chart does not show measured flow.">
-              <i className="key-pump" aria-hidden="true" />
-              Pump on
-            </li>
-          )}
-          {ids.filling && (
-            <li title="Tank fill. The mapped fill status of the tank for this room.">
-              <i className="key-filling" aria-hidden="true" />
-              Filling
-            </li>
-          )}
-          {ids.fill && (
-            <li title="Recorded fill. The last-fill record of the tank shows a newer time.">
-              <i className="key-fill" aria-hidden="true" />
-              Recorded fill
-            </li>
-          )}
-          {lines.map((line) => (
-            <li key={line.key} title={line.title}>
-              <i className={`key-${line.key}`} aria-hidden="true" />
-              {line.label}
-            </li>
-          ))}
-        </ul>
+        <ChartKey
+          className="grow-legend"
+          items={[
+            { mark: "line", color: "var(--primary)", label: "Tank level", detail: "mapped sensor, held until its next reading" },
+            ...(ids.valves.length > 0
+              ? [{ mark: "point", color: "var(--gd-ink)", label: "Shot", detail: "a zone valve opened, on the level line" } satisfies KeyItem]
+              : []),
+            ...(ids.pump
+              ? [{ mark: "bar", color: "var(--primary)", label: "Pump on", detail: "Pump strip; switch state, not measured flow" } satisfies KeyItem]
+              : []),
+            ...(ids.filling
+              ? [{ mark: "bar", color: "var(--gd-veg)", label: "Filling", detail: "Fill strip; the tank's fill status" } satisfies KeyItem]
+              : []),
+            ...(ids.fill
+              ? [{ mark: "tick", color: "var(--gd-veg)", label: "Recorded fill", detail: "dashed line with a diamond on the Fill strip" } satisfies KeyItem]
+              : []),
+            ...lines.map(
+              (line): KeyItem => ({
+                mark: "dash",
+                color: line.key === "minimum" ? "var(--destructive)" : "var(--warning-mark)",
+                label: line.label,
+                detail: line.title,
+              }),
+            ),
+            NOW_KEY,
+          ]}
+        />
         <details className="timeline-events">
           <summary>{counts.join(" · ")}</summary>
           {events.length ? (
@@ -675,6 +667,12 @@ ${line.title}`,
                 className="shot-dot"
               />
             ))}
+          </g>
+          <g data-layer="now">
+            <line x1={x(end)} x2={x(end)} y1={0} y2={bottom} className="now-line" />
+            <text x={x(end) - 4} y={TOP - 3} className="now-label" textAnchor="end">
+              Now
+            </text>
           </g>
           {ticks.map(
             (time, index) =>

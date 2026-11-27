@@ -46,7 +46,8 @@ describe("RoomTree", () => {
         },
       },
     );
-    expect(out).toMatch(/data-mode="timer"[^>]*>T</);
+    // The mode is an outline tag beside the name; the phase slot never carries it.
+    expect(out).toMatch(/data-mode="timer"[^>]*>Timer</);
     expect(out.match(/data-mode="timer"/g)).toHaveLength(1);
   });
 

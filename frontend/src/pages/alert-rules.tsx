@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
+import { Bell, BellOff, ShieldAlert } from "lucide-react";
 import { toast } from "sonner";
+import { ChartKey, NOW_KEY } from "@/components/chart-key";
 import { Heading } from "@/components/dashboard";
+import { KpiCard, KpiGrid } from "@/components/ha-primitives";
 import { NeedsIntegration } from "@/components/needs-integration";
 import { Sentence } from "@/components/primitives/sentence";
 import { Button } from "@/components/ui/button";
@@ -320,6 +323,9 @@ export function AlertRules({ controller, onDirtyChange }: PageProps) {
   const isNew = !editing;
   const title = phone && param !== null ? (isNew ? "New alert rule" : "Edit alert rule") : "Alert rules";
 
+  const activeRules = list.rules.filter((r) => r.active).length;
+  const pausedRules = list.rules.length - activeRules;
+
   return (
     <div className="alert-rules">
       <Heading
@@ -332,6 +338,31 @@ export function AlertRules({ controller, onDirtyChange }: PageProps) {
           ) : undefined
         }
       />
+      {showList && list.state === "ready" && (
+        <KpiGrid>
+          <KpiCard
+            icon={Bell}
+            tone={activeRules > 0 ? "success" : "neutral"}
+            label="Active rules"
+            value={activeRules}
+            detail={`of ${list.rules.length} configured`}
+          />
+          <KpiCard
+            icon={BellOff}
+            tone="neutral"
+            label="Paused rules"
+            value={pausedRules}
+            detail={pausedRules > 0 ? "Temporarily silenced" : "None paused"}
+          />
+          <KpiCard
+            icon={ShieldAlert}
+            tone="primary"
+            label="Active room"
+            value={room.room.name}
+            detail="Custom threshold alerts"
+          />
+        </KpiGrid>
+      )}
       {showBuilder &&
         (list.state === "missing" ? (
           <section className="panel ar-builder" aria-labelledby="ar-builder-title">
@@ -552,6 +583,8 @@ export function RuleReplay({
   const fires = (preview?.fires ?? []).map((f) => ({ start: Date.parse(f.start), at: Date.parse(f.fired_at), end: f.end ? Date.parse(f.end) : end }));
   const short = (preview?.ignored ?? []).filter((s) => s.reason === "shorter than min_duration");
   const ticks = hourTicks(start, end + 1, phone ? 6 : 3, tz);
+  // Now sits at the right-hand end: the replay runs up to the latest reading.
+  const nowX = now >= start && now <= end + 15 * 60_000 ? Math.min(100, x(now)) : null;
 
   // The threshold line: drag, or ArrowUp/ArrowDown by a step (Shift: ten).
   const plot = useRef<HTMLDivElement>(null);
@@ -578,11 +611,6 @@ export function RuleReplay({
       <figcaption className="ar-replay-head">
         <strong id="ar-replay-title">Yesterday, as this rule would have seen it</strong>
         {!phone && <span className="ar-muted">{label}{lightsText}</span>}
-        {!phone && (
-          <span className="ar-legend" aria-hidden="true">
-            <i className="is-fire" /> would alert <i className="is-short" /> too short to alert <i className="is-line" /> your threshold
-          </span>
-        )}
       </figcaption>
       <div className="ar-chart">
         <div className="ar-yaxis" aria-hidden="true">
@@ -612,6 +640,11 @@ export function RuleReplay({
             const v = valueAt(f.at);
             return v === null ? null : <i key={`d${f.at}`} className="ar-dot" style={{ left: `${x(f.at)}%`, top: `${y(v)}%` }} aria-hidden="true" />;
           })}
+          {nowX !== null && (
+            <div className="ar-now" style={{ left: `${nowX}%` }} aria-hidden="true">
+              <span>Now</span>
+            </div>
+          )}
           <div
             className="ar-threshold"
             role="slider"
@@ -643,6 +676,17 @@ export function RuleReplay({
           ))}
         </div>
       </div>
+      <ChartKey
+        label="Replay key"
+        items={[
+          { mark: "line", color: "var(--primary)", label: label || "Reading" },
+          { mark: "dash", color: "var(--warning-mark)", label: "Your threshold", detail: "drag to move" },
+          ...(fires.length ? [{ mark: "band", color: "var(--destructive)", label: "Would alert" } as const, { mark: "point", color: "var(--destructive)", label: "Alert sent" } as const] : []),
+          ...(short.length ? [{ mark: "band", color: "var(--muted-foreground)", label: "Too short to alert" } as const] : []),
+          ...(nights.length ? [{ mark: "band", color: "var(--foreground)", label: "Lights off" } as const] : []),
+          ...(nowX !== null ? [NOW_KEY] : []),
+        ]}
+      />
       <p className="ar-result" aria-live="polite" aria-atomic="true" data-replay-sentence data-count={preview?.count ?? undefined}>
         {error && preview ? error : (preview?.sentence ?? "")}
       </p>

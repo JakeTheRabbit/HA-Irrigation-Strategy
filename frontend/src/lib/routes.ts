@@ -1,6 +1,5 @@
-/** The dashboard's pages, the five menu entries they sit under, and the addresses that open them,
- * the old eleven-page menu's included: a bookmark or a notification link from before keeps working
- * and lands where that page's content lives now. */
+/** The dashboard's pages, the eight focused workspaces they live under, and the addresses that
+ * open them (every legacy URL and HA notification/Repairs link keeps working without breaking). */
 
 export interface Route {
   page: Page;
@@ -44,18 +43,58 @@ export type Page = (typeof RENDERED_PAGES)[number];
 
 export const PAGES: readonly Page[] = RENDERED_PAGES;
 
-export type Section = "today" | "plan" | "history" | "equipment" | "settings";
+export type Section =
+  | "overview"
+  | "watering"
+  | "dosing"
+  | "hardware"
+  | "history"
+  | "ai"
+  | "alerts"
+  | "system";
 
-/** The menu entry a page belongs to: a zone and the AI assistant are reached from Today, Help sits with
- * Settings. */
+/** Which of the eight focused workspaces owns a given page. */
 export function sectionOf(page: Page): Section {
-  if (page === "all-zones" || page === "today" || page === "zone" || page === "today/ai")
-    return "today";
-  if (page === "settings" || page === "help") return "settings";
-  return page.split("/")[0] as Section;
+  switch (page) {
+    case "all-zones":
+    case "today":
+    case "zone":
+      return "overview";
+    case "plan/watering":
+    case "plan/targets":
+    case "plan/timers":
+    case "plan/schedule":
+      return "watering";
+    case "equipment/dosing":
+    case "equipment/stock":
+    case "equipment/pump-calibration":
+    case "equipment/feed-calibration":
+      return "dosing";
+    case "equipment/probes":
+    case "equipment/setup":
+      return "hardware";
+    case "history/explorer":
+    case "history/water":
+    case "history/compare":
+    case "history/grows":
+    case "history/changes":
+    case "history/drivers":
+      return "history";
+    case "today/ai":
+    case "settings/ai":
+      return "ai";
+    case "settings/notifications":
+    case "settings/alerts":
+      return "alerts";
+    case "settings/system":
+    case "settings":
+    case "settings/features":
+    case "help":
+      return "system";
+  }
 }
 
-/** Each old page's new home. */
+/** Each old page's home. */
 export const LEGACY_PAGES: Readonly<Record<string, Page>> = {
   overview: "today",
   zones: "all-zones",
@@ -99,10 +138,19 @@ export const LEGACY_VIEWS: Readonly<Record<string, Page>> = {
   help: "help",
 };
 
-/** A menu entry opened on its own opens its first page; the phone's bottom bar opens these too. */
+/** A workspace or legacy section opened on its own lands on its default view.
+ * Note: "overview" intentionally stays in LEGACY_PAGES ("today") so legacy #/overview & f2.html
+ * links still open the room view, while the Overview sidebar workspace opens its first tab (all-zones). */
 export const SECTION_PAGES: Readonly<Record<string, Page>> = {
-  plan: "plan/watering",
+  watering: "plan/watering",
+  dosing: "equipment/dosing",
+  hardware: "equipment/probes",
   history: "history/explorer",
+  ai: "today/ai",
+  alerts: "settings/notifications",
+  system: "settings/system",
+  // Legacy 5-section shorthands kept working:
+  plan: "plan/watering",
   equipment: "equipment/probes",
   settings: "settings/alerts",
 };
@@ -114,9 +162,7 @@ export function routeHash(route: Route): string {
   if (route.page === "zone" && route.zone) return `#/zone/${route.zone}`;
   return (
     `#/${route.page}` +
-    (route.zone && ZONE_FOCUS_PAGES.includes(route.page)
-      ? `?zone=${route.zone}`
-      : "")
+    (route.zone && ZONE_FOCUS_PAGES.includes(route.page) ? `?zone=${route.zone}` : "")
   );
 }
 
@@ -148,9 +194,7 @@ export function parseRoute(hash: string, search = ""): { route: Route; canonical
   if ((PAGES as readonly string[]).includes(path)) {
     const zone = Number(new URLSearchParams(hash.split("?")[1] ?? "").get("zone"));
     const focused =
-      ZONE_FOCUS_PAGES.includes(path as Page) &&
-      Number.isSafeInteger(zone) &&
-      zone > 0;
+      ZONE_FOCUS_PAGES.includes(path as Page) && Number.isSafeInteger(zone) && zone > 0;
     return {
       route: focused ? { page: path as Page, zone } : { page: path as Page },
       canonical: true,
@@ -160,17 +204,19 @@ export function parseRoute(hash: string, search = ""): { route: Route; canonical
   return { route: { page }, canonical: false };
 }
 
-/** The hash an address should read, or null when it already does: `#/sensors?x=1` becomes
- * `#/equipment/probes?x=1`. */
+/** The canonical `#/...` when `hash` is an old or short address, else null. Query parameters stay. */
 export function canonicalHash(hash: string, search = ""): string | null {
-  const { route, canonical } = parseRoute(hash, search);
-  if (canonical) return null;
+  const parsed = parseRoute(hash, search);
+  if (parsed.canonical) return null;
   const query = hash.includes("?") ? hash.slice(hash.indexOf("?")) : "";
-  return routeHash(route) + query;
+  return `${routeHash(parsed.route)}${query}`;
 }
 
-/** The zone a zone page shows: the addressed one, the room's first for a bare `#/zone`, and none
- * when the address names a zone the room does not have (a stale bookmark or notification). */
-export function zoneOnPage<T extends { id: number }>(zones: T[], zoneId: number | null): T | undefined {
-  return zoneId === null ? zones[0] : zones.find((zone) => zone.id === zoneId);
+/** The zone the zone page shows: the named one when the room has it, the first when none was asked
+ * for, or undefined when the named zone does not exist in this room. */
+export function zoneOnPage<T extends { id: number }>(
+  zones: readonly T[],
+  requested: number | null,
+): T | undefined {
+  return requested === null ? zones[0] : zones.find((zone) => zone.id === requested);
 }

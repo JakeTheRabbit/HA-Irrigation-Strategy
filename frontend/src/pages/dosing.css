@@ -231,7 +231,8 @@
 }
 .dosing-step-text span {
   color: var(--muted-foreground);
-  font-size: var(--text-xs);
+  font-size: var(--text-label);
+  line-height: var(--leading-label);
   overflow-wrap: anywhere;
 }
 .dosing-step-state {
@@ -623,10 +624,17 @@
 .plumb-tank > .panel {
   margin-bottom: 0;
 }
-/* The tank card sits under the pumps: a tighter inset, still one on every side, keeps it on a
-   laptop's first screen with room to spare (verify-tank-status). */
+/* The tank card sits under the pumps: a tighter inset, still one on every side (the heading's
+   included), keeps it on a laptop's first screen (verify-tank-status). */
+.plumb-tank .panel-heading {
+  padding: 12px 12px 0;
+}
 .plumb-tank .tank-layout {
   padding: 12px;
+  row-gap: 12px;
+}
+.plumb-tank .tank-equipment {
+  padding-top: 12px;
 }
 .plumb-guard {
   display: grid;
@@ -642,7 +650,7 @@
   align-items: center;
   gap: 6px 10px;
   padding: 10px 12px;
-  border-left: 3px solid var(--warning);
+  border-left: 3px solid var(--warning-mark);
   border-radius: 8px;
   background: var(--warning-bg);
   font-size: var(--text-sm);
@@ -887,6 +895,11 @@
   .plumb-main {
     grid-template-columns: minmax(0, 1fr);
   }
+  /* Hoist any active mix-check fault card above the fill valve & tank on narrow phone screens so
+     operators see the fault and its Top up and re-check hold button immediately. */
+  .plumb-main > [data-mix-check] {
+    order: -1;
+  }
   .plumb-tank {
     grid-row: auto;
   }
@@ -933,4 +946,14 @@
   .dosing-setup-line > .mapping-picker {
     grid-column: 2 / -1;
   }
+}
+/* An entity id in a line of words: small monospace, cut with an ellipsis, the full id on hover. */
+.dosing-mono[title] {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  font-size: var(--text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
 }

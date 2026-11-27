@@ -6,6 +6,8 @@ import {
   getDisplayUnits,
   parseEc,
   readDisplayUnits,
+  readingDigits,
+  formatState,
   setDisplayUnits,
 } from "./display-units";
 
@@ -88,5 +90,16 @@ describe("display units", () => {
     expect(readDisplayUnits({}, "not json")).toEqual({ ec: "mS/cm", temp: "C", volume: "auto", clock: "24" });
     // A room attribute wins over the browser's choice.
     expect(readDisplayUnits({ ec_unit: "mS/cm" }, stored).ec).toBe("mS/cm");
+  });
+});
+
+describe("raw Home Assistant floats", () => {
+  test("a live reading's float noise never reaches the page", () => {
+    expect(readingDigits(19.8333996337891, 1)).toBe(1);
+    expect(readingDigits(3.06599998474121, 2)).toBe(2);
+    expect(readingDigits(2.4, 2)).toBe(1);
+    expect(formatState("6.15000009536743")).toBe("6.15");
+    expect(formatState("19.8333996337891", 1)).toBe("19.8");
+    expect(formatState("unavailable")).toBe("unavailable");
   });
 });

@@ -40,6 +40,13 @@ describe("wateringQuery", () => {
     expect(wateringQuery(hash)).toEqual(q);
   });
 
+  test("All rooms round-trips as all=1", () => {
+    const hash = "#/plan/watering?span=24&all=1";
+    expect(wateringQuery(hash).all).toBe(true);
+    expect(wateringHash(wateringQuery(hash))).toBe(hash);
+    expect(wateringQuery("#/plan/watering?span=24").all).toBeUndefined();
+  });
+
   test("an address without a query reads the defaults", () => {
     expect(wateringQuery("#/plan/watering")).toEqual({
       date: "",

@@ -26,7 +26,7 @@
   background: var(--foreground);
 }
 .meter-fill[data-tone="high"] {
-  background: var(--warning);
+  background: var(--warning-mark);
 }
 .meter-fill[data-tone="over"] {
   background: var(--destructive);
@@ -44,6 +44,11 @@
   stroke-width: 1.5;
   stroke-linejoin: round;
   stroke-linecap: round;
+}
+.sparkline-now {
+  stroke: var(--primary);
+  stroke-width: 1;
+  opacity: 0.6;
 }
 /* Rounded state pills: green when a valve is open, red when it is shut, a phase in its timeline
    colour. The phase colours are the day timeline's light palette in both themes, dark enough
@@ -84,7 +89,7 @@
 }
 /* P2's timeline violet: a phase change. */
 .pill[data-tone="phase"] {
-  --pill-tone: #6450b0;
+  --pill-tone: var(--phase-p2);
 }
 .pill[data-tone="on"],
 .pill[data-tone="off"],
@@ -105,14 +110,14 @@
   color: #ffffff;
 }
 .pill[data-phase="P0"] {
-  background: #6b7580;
+  background: var(--phase-p0);
 }
 .pill[data-phase="P1"] {
-  background: #2f6fb5;
+  background: var(--phase-p1);
 }
 .pill[data-phase="P2"] {
-  background: #6450b0;
+  background: var(--phase-p2);
 }
 .pill[data-phase="P3"] {
-  background: #34405a;
+  background: var(--phase-p3);
 }

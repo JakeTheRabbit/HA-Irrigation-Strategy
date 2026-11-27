@@ -16,12 +16,15 @@ export function PlannerDayCurve({
   parameters,
   onChange,
   showEc = false,
+  live = false,
 }: {
   controller: Controller;
   zoneId: number;
   parameters: Record<string, number>;
   onChange?: (key: string, value: number) => void;
   showEc?: boolean;
+  /** The preview day is today: the curve marks Now. */
+  live?: boolean;
 }) {
   const prefix = controller.room.room.prefix;
   const on = numeric(controller.states[`number.crop_steering_${prefix}lights_on_hour`]);
@@ -36,6 +39,7 @@ export function PlannerDayCurve({
         showEditors={false}
         initialShowEc={showEc}
         onChange={onChange}
+        recorded={live ? { vwc: [], ec: [], now: Date.now(), timeZone: controller.timeZone } : undefined}
         description={
           onChange
             ? "Schedule planning reference. Dragging a target changes both endpoints of the selected profile; review and save before arming."

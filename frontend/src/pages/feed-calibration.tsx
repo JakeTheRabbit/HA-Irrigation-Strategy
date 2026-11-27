@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChevronLeft, X } from "lucide-react";
 import { Empty } from "@/components/dashboard";
+import { ChartKey, NOW_KEY } from "@/components/chart-key";
 import { NeedsIntegration } from "@/components/needs-integration";
 import { ProbeCalibration } from "@/components/probe-calibration";
 import { StabilityRing } from "@/components/primitives/ring";
@@ -439,19 +440,6 @@ export function FeedCalibration({ controller, navigate }: PageProps) {
     </div>
   ) : (
     <div className="feed-cal-title">
-      <button
-        type="button"
-        className="feed-cal-crumb"
-        onClick={() => {
-          abandon(session);
-          navigate("equipment/dosing");
-        }}
-      >
-        Feed &amp; dosing · {room}
-      </button>
-      <span className="feed-cal-sep" aria-hidden="true">
-        ›
-      </span>
       <h1>{title}</h1>
     </div>
   );
@@ -497,7 +485,7 @@ export function FeedCalibration({ controller, navigate }: PageProps) {
   const captured = point !== null && points[point] !== null;
   const ringState: "settling" | "steady" | "offline" = cap.reason ? "offline" : steady ? "steady" : "settling";
   const temp = session?.temperature_entity_id ? controller.states[session.temperature_entity_id] : undefined;
-  const tempText = temp && temp.state !== "" && Number.isFinite(Number(temp.state)) ? formatTemp(Number(temp.state), digitsOf(temp.state)) : null;
+  const tempText = temp && temp.state !== "" && Number.isFinite(Number(temp.state)) ? formatTemp(Number(temp.state), 1) : null;
   const liveText = Number.isFinite(rawValue) ? feedValue(rawValue, kind, digitsOf(raw?.state)) : "—";
   const stabWord = cap.reason
     ? "Offline"
@@ -856,15 +844,28 @@ function Trace({ series, kind, now }: { series: Reading[]; kind: FeedKind; now: 
   // A probe holds its value until it reports again: steps, not slopes.
   const points = series.flatMap((r, i) => (i ? [`${x(r.at)},${y(series[i - 1].value)}`, `${x(r.at)},${y(r.value)}`] : [`${x(r.at)},${y(r.value)}`]));
   return (
-    <svg
-      className="feed-cal-trace"
-      viewBox="0 0 260 90"
-      role="img"
-      aria-label={`Reading over the last minute: ${feedValue(values[0], kind, 2)} to ${feedValue(values[values.length - 1], kind, 2)}`}
-    >
-      <line x1="0" x2="260" y1={y(values[values.length - 1])} y2={y(values[values.length - 1])} className="feed-cal-trace-now" />
-      <polyline points={points.join(" ")} />
-    </svg>
+    <figure className="feed-cal-trace-wrap">
+      <svg
+        className="feed-cal-trace"
+        viewBox="0 0 260 90"
+        role="img"
+        aria-label={`Reading over the last minute, ending now: ${feedValue(values[0], kind, 2)} to ${feedValue(values[values.length - 1], kind, 2)}`}
+      >
+        <line x1="0" x2="260" y1={y(values[values.length - 1])} y2={y(values[values.length - 1])} className="feed-cal-trace-now" />
+        <polyline points={points.join(" ")} />
+        <line x1="259" x2="259" y1="0" y2="90" className="feed-cal-trace-nowline" />
+        <text x="255" y="11" textAnchor="end" className="feed-cal-trace-nowlabel">
+          Now
+        </text>
+      </svg>
+      <ChartKey
+        items={[
+          { mark: "line", color: "var(--primary)", label: "Reading", detail: "last minute" },
+          { mark: "dash", color: "var(--muted-foreground)", label: "Latest reading" },
+          NOW_KEY,
+        ]}
+      />
+    </figure>
   );
 }
 

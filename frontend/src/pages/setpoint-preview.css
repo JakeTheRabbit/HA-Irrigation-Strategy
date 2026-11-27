@@ -36,8 +36,8 @@
 
 .setpoint-preview-note {
   color: var(--muted-foreground);
-  font-size: var(--text-xs);
-  line-height: 1.5;
+  font-size: var(--text-label);
+  line-height: var(--leading-label);
   margin: 12px 0;
 }
 .setpoint-preview-zone {
@@ -86,4 +86,15 @@
   .setpoint-preview-context strong {
     font-size: var(--text-xs);
   }
+}
+/* Calm drag handles on the setpoint preview until hovered, focused or edited. */
+.planning-handle {
+  opacity: 0.72;
+  transition: opacity 0.14s ease, stroke-width 0.14s ease;
+}
+.planning-handle:hover,
+.planning-handle:focus-visible {
+  opacity: 1;
+  stroke: var(--primary);
+  stroke-width: 2.75;
 }

@@ -8,6 +8,7 @@ import { useBrain } from "@/lib/brain";
 import { CameraCard, ClimatePanel, HardwarePanel, RootZonePanel } from "@/components/zone-extras";
 import { UiTip } from "@/components/info-tip";
 import { ZoneDay, type ZoneCompare } from "@/components/day-timeline";
+import { ChartKey, NOW_KEY, type KeyItem } from "@/components/chart-key";
 import { NeedsIntegration } from "@/components/needs-integration";
 import { OverlayRows, useOverlays } from "@/components/overlay-row";
 import { Pill } from "@/components/mini-visuals";
@@ -16,7 +17,7 @@ import { addDays, midnight } from "@/lib/comparison";
 import type { RunsDocument } from "@/lib/comparison-types";
 import { rangeText, steeringOf } from "@/lib/day-chart";
 import { growDay, type DayTrace, type GrowDay } from "@/lib/day-timeline";
-import { formatEc, formatVolume, getDisplayUnits } from "@/lib/display-units";
+import { formatEc, formatState, formatVolume, getDisplayUnits, readingDigits } from "@/lib/display-units";
 import { ZONE_MODE } from "@/lib/facility-view";
 import type { GaugeModel } from "@/lib/hmi";
 import {
@@ -415,12 +416,36 @@ function PoreEcChart({
   const x = (time: number) => (day ? L + ((time - day.start) / (day.end - day.start)) * plot : L);
   const y = (value: number) => T + H - ((value - low) / (high - low || 1)) * H;
   const ticks = day ? [0, 6, 12, 18, 24].map((hour) => day.start + hour * 3_600_000) : [];
-  const target = band ? `${number(band[0], 1)}–${number(band[1], 1)}` : null;
+  const ecNum = (value: number, digits = 1) => formatEc(value, digits).replace(/ (?:mS\/cm|ppm)$/, "");
+  const ecUnit = formatEc(1, 0).replace(/^[\d.,]+\s*/, "");
+  const target = band ? `${ecNum(band[0], 1)}–${ecNum(band[1], 1)} ${ecUnit}` : null;
+  const latest = today.at(-1) ?? null;
+  const abnormal = !!(band && latest && (latest.v < band[0] || latest.v > band[1]));
+  const nowIn = !!day && now >= day.start && now <= day.end;
+  const keyItems: KeyItem[] = [
+    { mark: "line", color: "var(--series-ec)", label: "Pore EC" },
+    ...(band ? [{ mark: "band", color: "var(--band-ec-edge)", label: "Target band", detail: target ?? undefined } as KeyItem] : []),
+    ...(day && day.lightsOff < day.end
+      ? [{ mark: "band", color: "color-mix(in srgb, var(--foreground) 24%, transparent)", label: "Lights off" } as KeyItem]
+      : []),
+    ...(latest
+      ? [
+          abnormal
+            ? ({ mark: "point", color: "var(--warning-mark)", label: "Latest reading, out of target" } as KeyItem)
+            : ({ mark: "point", color: "var(--series-ec)", label: "Latest reading" } as KeyItem),
+        ]
+      : []),
+    ...(nowIn ? [NOW_KEY] : []),
+  ];
   return (
     <section className="panel zone-ec-chart" aria-labelledby="zone-ec-title" data-zone-ec-chart>
       <div className="panel-heading">
         <h2 id="zone-ec-title">Today · Pore EC</h2>
-        {target && <span className="muted small">target {target}</span>}
+        <span className="muted small">
+          {latest ? `${formatEc(latest.v, 2)}` : ""}
+          {latest && target ? " · " : ""}
+          {target ? `target ${target}` : ""}
+        </span>
       </div>
       <div className="zone-ec-plot" ref={box}>
         {!day ? (
@@ -437,7 +462,7 @@ function PoreEcChart({
               width={width}
               height={T + H + 22}
               role="img"
-              aria-label={`Pore EC since lights-on, from ${number(today[0].v, 2)} to ${number(today.at(-1)!.v, 2)}${target ? `, target ${target}` : ""}`}
+              aria-label={`Pore EC since lights-on, from ${formatEc(today[0].v, 2)} to ${formatEc(today.at(-1)!.v, 2)}${target ? `, target ${target}` : ""}`}
             >
               <rect
                 className="zone-ec-dark"
@@ -447,17 +472,21 @@ function PoreEcChart({
                 height={H}
               />
               {band && (
-                <rect
-                  className="zone-ec-band"
-                  x={L}
-                  width={plot}
-                  y={y(band[1])}
-                  height={Math.max(0, y(band[0]) - y(band[1]))}
-                />
+                <>
+                  <rect
+                    className="zone-ec-band"
+                    x={L}
+                    width={plot}
+                    y={y(band[1])}
+                    height={Math.max(0, y(band[0]) - y(band[1]))}
+                  />
+                  <line className="zone-ec-band-edge" x1={L} x2={L + plot} y1={y(band[1])} y2={y(band[1])} />
+                  <line className="zone-ec-band-edge" x1={L} x2={L + plot} y1={y(band[0])} y2={y(band[0])} />
+                </>
               )}
               {[low, (low + high) / 2, high].map((value) => (
                 <text key={value} className="zone-ec-axis" x={L - 6} y={y(value) + 4} textAnchor="end">
-                  {number(value, 1)}
+                  {ecNum(value, 1)}
                 </text>
               ))}
               {ticks.map((time, index) => (
@@ -478,17 +507,36 @@ function PoreEcChart({
                   .map((point, index) => `${index ? "L" : "M"}${x(point.t).toFixed(1)} ${y(point.v).toFixed(1)}`)
                   .join("")}
               />
-              <line className="zone-ec-now" x1={x(now)} x2={x(now)} y1={T} y2={T + H} />
+              {nowIn && (
+                <>
+                  <line className="zone-ec-now" x1={x(now)} x2={x(now)} y1={T} y2={T + H} />
+                  <text
+                    className="zone-ec-now-label"
+                    x={x(now) > L + plot - 34 ? x(now) - 4 : x(now) + 4}
+                    y={T + 12}
+                    textAnchor={x(now) > L + plot - 34 ? "end" : "start"}
+                  >
+                    Now
+                  </text>
+                </>
+              )}
+              {latest && (
+                <circle
+                  className="zone-ec-live"
+                  data-abnormal={abnormal ? "" : undefined}
+                  cx={x(latest.t)}
+                  cy={y(latest.v)}
+                  r="4"
+                />
+              )}
             </svg>
           )
         )}
+        {day && !loading && today.length >= 2 && width > 0 && <ChartKey label="Pore EC chart key" items={keyItems} />}
       </div>
     </section>
   );
 }
-
-/** Settings shown with as many decimals as they were written with. */
-const digitsOf = (value: number) => (String(value).split(".")[1] ?? "").length;
 
 /** The AI assistant's change to a pore EC setting, on the pore EC chart: the problem it answers,
  * what it set against the grower's own, Apply (keep it as the grower's) with Undo, or Dismiss. */
@@ -511,7 +559,7 @@ function EcSuggestion({
   latest.current = controller;
   const tz = controller.timeZone;
   const label = overlayLabel(overlay);
-  const ec = (value: number) => formatEc(value, digitsOf(value));
+  const ec = (value: number) => formatEc(value, readingDigits(value, 2));
   const over =
     gauge?.band && gauge.value !== null && (gauge.deviation ?? 0) > 0
       ? `Pore EC ${number(gauge.value, gauge.digits)} is over the ${number(gauge.band[0], 1)}–${number(gauge.band[1], 1)} band.`
@@ -1109,7 +1157,7 @@ function ZoneProbes({
                       <code>{probe.id}</code>
                     </span>
                     <span className="numeric">
-                      {probe.value === null ? "—" : `${probe.value} ${probe.unit}`.trim()}
+                      {probe.value === null ? "—" : `${formatState(String(probe.value))} ${probe.unit}`.trim()}
                     </span>
                     <Pill dot tone={PROBE_TONE[probe.health]} data-probe-health={probe.health}>
                       {probe.health !== "ok"

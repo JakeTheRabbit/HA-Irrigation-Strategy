@@ -35,7 +35,9 @@ describe("Equipment › Feed & dosing owns the tank", () => {
 describe("Equipment › Feed & dosing: the mix check in place", () => {
   test("a failed mix check sits inside the plumbing, with its hold and the probe's calibration", () => {
     const html = render();
-    expect(html).toContain("protections armed 5 of 5");
+    // A failed check leads the page; the armed count does not read as all-clear above it.
+    expect(html).not.toContain("protections armed");
+    expect(html.indexOf("Mix check failed")).toBeLessThan(html.indexOf("data-plumbing"));
     const plumbing = html.slice(html.indexOf("data-plumbing"), html.indexOf("data-feed-recipes"));
     expect(plumbing).toContain('data-mix-check="off target"');
     expect(plumbing).toContain("Mix check failed");

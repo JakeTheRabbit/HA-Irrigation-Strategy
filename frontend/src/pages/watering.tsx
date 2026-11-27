@@ -1,14 +1,16 @@
-import { ChevronLeft, ChevronRight, X } from "lucide-react";
+import { AlertTriangle, ChevronLeft, ChevronRight, Droplets, Layers, TriangleAlert, X } from "lucide-react";
 import { Popover } from "radix-ui";
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import { toast } from "sonner";
+import { AlertCodeText, CodeLink, extractAlertCodes } from "@/components/alert-code-text";
 import { Heading } from "@/components/dashboard";
+import { KpiCard, KpiGrid } from "@/components/ha-primitives";
 import { NeedsIntegration } from "@/components/needs-integration";
 import { ShotTimeline } from "@/components/shot-timeline";
 import { Button } from "@/components/ui/button";
 import { formatVolume } from "@/lib/display-units";
 import { useCsEvents } from "@/lib/events";
-import { pickKey } from "@/lib/facility";
+import { irrigationMode, pickKey } from "@/lib/facility";
 import { zoneHref } from "@/lib/facility-view";
 import { buildRoom, resolveRequestedRoom } from "@/lib/model";
 import { useParity } from "@/lib/parity-api";
@@ -57,6 +59,9 @@ const markTree = (event: Event) => {
 /** Whether the page mounted from a room-tree pick of another room (pure: a render may run twice). */
 const treePicked = (roomId: string) =>
   memory.room !== null && memory.room !== roomId && Date.now() - memory.treeAt < 2000;
+
+/** Failed or warning shots dismissed from the strip above the timeline (block ids, newest 500). */
+const DISMISSED_KEY = "crop-steering.watering-dismissed";
 
 const SOURCES: Record<string, string> = {
   engine: "Steering engine",
@@ -132,10 +137,17 @@ export function Watering({
   const span = spanOf(phone && q.span === 48 ? { ...q, span: 24 } : q, now, timeZone, today);
   const spanHours = (span.end - span.start) / 3_600_000;
 
-  // The rooms shown: a link's rooms, then the stages chosen.
+  // The rooms shown: a link's rooms, else the room picked in the room list (every room with "All
+  // rooms"), the picked room first; then the stages chosen.
   const stages = new Map(controller.rooms.map((room) => [room.id, stageOf(controller, room)]));
   const linked = q.rooms.flatMap((name) => resolveRequestedRoom(controller.rooms, name) ?? []);
-  const rooms = (linked.length ? linked : controller.rooms).filter(
+  const current = controller.rooms.find((room) => room.id === controller.roomId);
+  const rooms = (linked.length ? linked : !q.all && current ? [current] : controller.rooms)
+    .slice()
+    .sort((a, b) =>
+      a.id === controller.roomId ? -1 : b.id === controller.roomId ? 1 : a.name.localeCompare(b.name, undefined, { numeric: true }),
+    )
+    .filter(
     (room) => !q.stages.length || q.stages.includes(stages.get(room.id) ?? ""),
   );
   const ids = rooms.map((room) => room.id);
@@ -189,10 +201,18 @@ export function Watering({
     const scoped = { ...controller, room: buildRoom(controller.states, room), roomId: room.id };
     for (const [zone, count] of Object.entries(roomPlants(scoped))) plants[pickKey(room.id, Number(zone))] = count ?? 0;
   }
-  const all = useMemo(
-    () => (data ? toTimelineRows(data, plants, rooms.map((room) => roomMeta(controller, room))) : []),
-    [data, controller.states],
-  );
+  const all = useMemo(() => {
+    if (!data) return [];
+    // Each zone's chip is its phase or mode now, as the room list shows it, whatever day is drawn.
+    const built = new Map(rooms.map((room) => [room.id, { room, zones: buildRoom(controller.states, room).zones }]));
+    return toTimelineRows(data, plants, rooms.map((room) => roomMeta(controller, room))).map((row) => {
+      const at = built.get(row.roomId);
+      if (row.zone === null || !at) return row;
+      if (irrigationMode(controller.states, at.room, row.zone) === "timer") return { ...row, sublabel: "Timer" };
+      const phase = at.zones.find((zone) => zone.id === row.zone)?.phase ?? "";
+      return { ...row, sublabel: /^P[0-3]$/.test(phase) ? phase : "" };
+    });
+  }, [data, controller.states]);
   const rows = matchQuery(q.problemsOnly ? keepProblems(all) : all, q.q);
   const names = new Map(rooms.map((room) => [room.id, room.name]));
 
@@ -229,6 +249,13 @@ export function Watering({
   const markers = (data?.errors.markers ?? []).map((m) => String(m.block_id ?? "")).filter(Boolean);
   const failedCount = data?.errors.count ?? 0;
   const [focusIds, setFocusIds] = useState<string[]>([]);
+  const [dismissed, setDismissed] = useState<Set<string>>(() => {
+    try {
+      return new Set(JSON.parse(localStorage.getItem(DISMISSED_KEY) ?? "[]") as string[]);
+    } catch {
+      return new Set();
+    }
+  });
   const cycle = useRef(0);
   const nextFailed = () => {
     if (!markers.length) return;
@@ -262,7 +289,7 @@ export function Watering({
   const [note, setNote] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const shown = open ? (rows.flatMap((r) => r.blocks).find((b) => b.id === open.block.id) ?? open.block) : null;
-  const where = (b: TimelineBlock) => `${names.get(b.roomId) ?? b.roomId} Zone ${b.zone}`;
+  const where = (b: TimelineBlock) => `${names.get(b.roomId) ?? b.roomId} ${b.zone === 0 ? "room" : `Zone ${b.zone}`}`;
   const goZone = (b: TimelineBlock, page: Page) => {
     setOpen(null);
     if (b.roomId !== controller.roomId) controller.changeRoom(b.roomId);
@@ -348,9 +375,75 @@ export function Watering({
     );
 
   const shows = timeline.state === "ready" ? bodyState(rows, all, q.problemsOnly, q.q) : "timeline";
+  // Surface failed/warning shots inline above the timeline so operators immediately see which zone
+  // failed and when, without hunting for a narrow bar (plain array: safe after the early return).
+  const problemBlocks: { block: TimelineBlock; roomName: string }[] = [];
+  for (const row of rows) {
+    if (row.zone === null) continue;
+    for (const b of row.blocks) {
+      if (b.glyph === "failed" || b.glyph === "warning") {
+        problemBlocks.push({ block: b, roomName: names.get(b.roomId) ?? b.roomId });
+      }
+    }
+  }
+  problemBlocks.sort((a, b) =>
+    a.block.glyph === b.block.glyph ? b.block.start - a.block.start : a.block.glyph === "failed" ? -1 : 1,
+  );
+  // A shot dismissed from the strip stays on the timeline; only the strip forgets it.
+  const stripShown = problemBlocks.filter((p) => !dismissed.has(p.block.id));
+  const dismiss = (blockIds: string[]) => {
+    const next = [...dismissed, ...blockIds].slice(-500);
+    setDismissed(new Set(next));
+    try {
+      localStorage.setItem(DISMISSED_KEY, JSON.stringify(next));
+    } catch {
+      /* private mode: dismissed for this visit only */
+    }
+  };
+  const jumpToBlock = (b: TimelineBlock) => {
+    if (collapsed.has(b.roomId)) toggleRoom(b.roomId);
+    setFocusIds([b.id]);
+    requestAnimationFrame(() =>
+      body.current?.querySelector<HTMLButtonElement>(`.st-block[data-id="${CSS.escape(b.id)}"]`)?.focus(),
+    );
+  };
+  const totalShots = rows.reduce((sum, r) => (r.zone === null ? sum : sum + r.blocks.length), 0);
+  const failedInView = problemBlocks.filter((p) => p.block.glyph === "failed").length;
+  const warnInView = problemBlocks.filter((p) => p.block.glyph === "warning").length;
   return (
     <>
       <Heading title="Timeline" description={phone ? "All rooms · swipe for more" : undefined} action={phone ? spanToggle : undefined} />
+      <KpiGrid>
+        <KpiCard
+          icon={Droplets}
+          tone="primary"
+          label="Shots in window"
+          value={totalShots}
+          detail={`${spanHours} h window · ${dayWords(date)}`}
+        />
+        <KpiCard
+          icon={AlertTriangle}
+          tone={failedInView > 0 ? "error" : "success"}
+          label="Failed shots"
+          value={failedInView}
+          detail={failedInView > 0 ? "Click to focus failed" : "None failed"}
+          onClick={failedInView > 0 ? tapFailed : undefined}
+        />
+        <KpiCard
+          icon={TriangleAlert}
+          tone={warnInView > 0 ? "warning" : "neutral"}
+          label="Warnings"
+          value={warnInView}
+          detail={warnInView > 0 ? "Review highlighted shots" : "No warnings"}
+        />
+        <KpiCard
+          icon={Layers}
+          tone="neutral"
+          label="Rooms shown"
+          value={rooms.length}
+          detail={rooms.map((r) => r.name).join(" · ")}
+        />
+      </KpiGrid>
       <section className="panel watering" aria-label="Watering timeline" data-watering>
         {phone ? (
           <div className="wt-dayline" data-watering-day>
@@ -408,6 +501,11 @@ export function Watering({
         )}
 
         <div className="wt-filters">
+          {!linked.length && controller.rooms.length > 1 && (
+            <button type="button" className="wt-chip" aria-pressed={!!q.all} onClick={() => change({ all: !q.all })} data-watering-all>
+              All rooms
+            </button>
+          )}
           {!phone &&
             stagesShown.map((stage) => {
               const on = !q.stages.length || q.stages.includes(stage);
@@ -458,6 +556,40 @@ export function Watering({
           </div>
         )}
         {data?.truncated && <p className="wt-note">Showing the newest shots only</p>}
+        {stripShown.length > 0 && (
+          <ul className="wt-problem-strip" aria-label="Shots with problems">
+            {stripShown.slice(0, 4).map(({ block, roomName }) => (
+              <li key={block.id} data-glyph={block.glyph}>
+                <button type="button" onClick={() => jumpToBlock(block)}>
+                  <strong>
+                    {roomName} {block.zone === 0 ? "Room" : `Zone ${block.zone}`}
+                  </strong>{" "}
+                  <span>
+                    {clock(block.start, timeZone)} · {block.glyph === "failed" ? "failed" : "warning"}
+                    {block.reason ? ` — ${block.reason.replace(/\s*\(CS-\d{3}\)/g, "")}` : ""}
+                  </span>
+                </button>
+                {extractAlertCodes(`${block.reason ?? ""} ${block.code ?? ""}`).map((code) => (
+                  <CodeLink key={code} code={code} className="wt-problem-code" />
+                ))}
+                <button
+                  type="button"
+                  className="wt-problem-dismiss"
+                  aria-label={`Dismiss ${roomName} ${clock(block.start, timeZone)}`}
+                  onClick={() => dismiss([block.id])}
+                >
+                  <X size={14} aria-hidden="true" />
+                </button>
+              </li>
+            ))}
+            <li className="wt-problem-more">
+              {stripShown.length > 4 && <span>+{stripShown.length - 4} more · </span>}
+              <button type="button" onClick={() => dismiss(stripShown.map((p) => p.block.id))} data-watering-dismiss-all>
+                Dismiss all
+              </button>
+            </li>
+          </ul>
+        )}
 
         <div className="wt-body" ref={body}>
           {!data && timeline.state !== "error" ? (
@@ -604,7 +736,11 @@ function BlockDetails({
       <p className="wt-pop-status" data-glyph={block.glyph} data-running={block.running || undefined}>
         {statusLine(block)}
       </p>
-      {block.reason && <p className="wt-pop-reason">{block.reason}</p>}
+      {block.reason && (
+        <p className="wt-pop-reason">
+          <AlertCodeText text={block.reason} />
+        </p>
+      )}
       <dl className="wt-pop-rows">
         {water.length > 0 && (
           <div>
@@ -623,7 +759,7 @@ function BlockDetails({
             <dt>Source</dt>
             <dd>
               <span className="wt-source">{source}</span>
-              {block.code && <code>{block.code}</code>}
+              {block.code && <CodeLink code={block.code} />}
             </dd>
           </div>
         )}

@@ -6,6 +6,7 @@ import {
   LabelList,
   Line,
   LineChart,
+  ReferenceLine,
   ResponsiveContainer,
   Scatter,
   ScatterChart,
@@ -13,13 +14,15 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { Empty, number } from "@/components/dashboard";
+import { ChartKey, NOW_KEY, type KeyItem } from "@/components/chart-key";
+import { Empty, number, type Page } from "@/components/dashboard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Pill } from "@/components/mini-visuals";
 import { dateInZone } from "@/lib/comparison";
 import type { RunRecord, RunsDocument } from "@/lib/comparison-types";
 import {
+  dayOfRun,
   growPoints,
   growStats,
   TREND_MIN_GROWS,
@@ -52,6 +55,8 @@ interface Metric {
     key:
       "vwcPeak" | "vwcTrough" | "p0Dryback" | "nightRate" | "ecMean" | "litresPerPlant" | "shots";
     dashed?: boolean;
+    /** The line's name in the key, when a chart draws two lines a grow. */
+    name?: string;
   }[];
   unit: string;
   digits: number;
@@ -61,7 +66,7 @@ const METRICS: Metric[] = [
     id: "vwc",
     title: "Moisture",
     detail: "Each grow day’s peak (solid) and trough (dashed), %.",
-    keys: [{ key: "vwcPeak" }, { key: "vwcTrough", dashed: true }],
+    keys: [{ key: "vwcPeak", name: "peak" }, { key: "vwcTrough", dashed: true, name: "trough" }],
     unit: " %",
     digits: 1,
   },
@@ -111,9 +116,11 @@ const METRICS: Metric[] = [
  * grow's statistics and its yield. Read-only: nothing here changes watering. */
 export function Grows({
   controller,
+  navigate,
   onDirtyChange,
 }: {
   controller: Controller;
+  navigate?: (page: Page) => void;
   onDirtyChange?: (dirty: boolean) => void;
 }) {
   const [recordsDirty, setRecordsDirty] = useState(false);
@@ -169,7 +176,14 @@ export function Grows({
     [chosen.map((r) => r.id).join(), rows, scope],
   );
   const maxDay = Math.max(0, ...series.flatMap((s) => s.points.map((p) => p.day)));
-  const chartRows = Array.from({ length: maxDay }, (_, i) => {
+  // An ongoing grow's day today, marked Today on every chart; the axis reaches it.
+  const ongoing = series.findIndex((s) => !s.run.end_date);
+  const todayDay =
+    ongoing < 0
+      ? null
+      : dayOfRun(series[ongoing].run, dateInZone(Date.now(), series[ongoing].run.time_zone));
+  const showToday = todayDay !== null && todayDay >= 1 && maxDay > 0;
+  const chartRows = Array.from({ length: showToday ? Math.max(maxDay, todayDay) : maxDay }, (_, i) => {
     const row: Record<string, number | null> = { day: i + 1 };
     series.forEach((s, g) => {
       const point = s.points.find((p) => p.day === i + 1);
@@ -206,9 +220,7 @@ export function Grows({
         <div>
           <h1>Grows</h1>
           <p className="muted small">
-            Grows side by side by grow day, from the summary the controller records at each
-            lights-on. Summary recording and run records are managed here; they do not change
-            watering.
+            Side-by-side grow summaries and run records.
           </p>
         </div>
       </header>
@@ -218,11 +230,6 @@ export function Grows({
         </p>
       )}
       <RunRecords controller={controller} onDirtyChange={setRecordsDirty} />
-      <CanonicalControls
-        controller={controller}
-        owner="history"
-        onDirtyChange={setRecordingDirty}
-      />
       <section className="panel grows-pick">
         <fieldset>
           <legend>Grows (2 to {MAX_GROWS})</legend>
@@ -275,14 +282,6 @@ export function Grows({
         />
       ) : (
         <>
-          <div className="grows-legend" aria-label="Grows">
-            {series.map((s, g) => (
-              <span key={s.run.id}>
-                <i style={{ background: colour(g) }} aria-hidden="true" />
-                {s.run.name}
-              </span>
-            ))}
-          </div>
           <div className="grows-charts">
             {METRICS.map((metric) => (
               <figure className="panel grows-chart" key={metric.id} data-grow-chart={metric.id}>
@@ -313,6 +312,14 @@ export function Grows({
                           : `${number(Number(value), metric.digits)}${metric.unit}`,
                       ]}
                     />
+                    {showToday && (
+                      <ReferenceLine
+                        x={todayDay}
+                        stroke="var(--primary)"
+                        strokeWidth={2}
+                        label={{ value: "Today", position: "insideTopRight", fill: "var(--primary)", fontSize: 11 }}
+                      />
+                    )}
                     {series.flatMap((s, g) =>
                       metric.keys.map(({ key, dashed }) => (
                         <Line
@@ -330,6 +337,23 @@ export function Grows({
                     )}
                   </LineChart>
                 </ResponsiveContainer>
+                <ChartKey
+                  label={`${metric.title} chart key`}
+                  items={[
+                    ...series.flatMap((s, g) =>
+                      metric.keys
+                        .filter(({ key }) => s.points.some((p) => p[key] !== null && p[key] !== undefined))
+                        .map(({ key, dashed, name }): KeyItem => ({
+                          mark: dashed ? "dash" : "line",
+                          color: colour(g),
+                          label: name ? `${s.run.name} · ${name}` : s.run.name,
+                        })),
+                    ),
+                    ...(showToday
+                      ? [{ ...NOW_KEY, label: "Today", detail: `${series[ongoing].run.name} · day ${todayDay}` }]
+                      : []),
+                  ]}
+                />
               </figure>
             ))}
           </div>
@@ -537,6 +561,11 @@ export function Grows({
           }}
         />
       )}
+      <CanonicalControls
+        controller={controller}
+        owner="history"
+        onDirtyChange={setRecordingDirty}
+      />
     </div>
   );
 }
@@ -557,47 +586,53 @@ function YieldScatter({
     <figure className="grows-scatter">
       <figcaption className="small">{title}</figcaption>
       {data.length ? (
-        <ResponsiveContainer width="100%" height={180}>
-          <ScatterChart
-            margin={{ top: 10, right: 16, bottom: 4, left: 0 }}
-            accessibilityLayer={false}
-          >
-            <CartesianGrid strokeDasharray="3 5" stroke="var(--border)" />
-            <XAxis
-              type="number"
-              dataKey="x"
-              name={xUnit}
-              {...axis}
-              domain={["auto", "auto"]}
-              unit={` ${xUnit}`}
-            />
-            <YAxis
-              type="number"
-              dataKey="y"
-              name={yUnit}
-              {...axis}
-              width={44}
-              domain={["auto", "auto"]}
-            />
-            <Tooltip contentStyle={tooltipStyle} cursor={{ stroke: "var(--border)" }} />
-            {data.map((p) => (
-              <Scatter
-                key={p.g}
-                name={p.name}
-                data={[p]}
-                fill={colour(p.g)}
-                isAnimationActive={false}
-              >
-                <LabelList
-                  dataKey="name"
-                  position="top"
-                  fill="var(--muted-foreground)"
-                  fontSize={12}
-                />
-              </Scatter>
-            ))}
-          </ScatterChart>
-        </ResponsiveContainer>
+        <>
+          <ResponsiveContainer width="100%" height={180}>
+            <ScatterChart
+              margin={{ top: 10, right: 16, bottom: 4, left: 0 }}
+              accessibilityLayer={false}
+            >
+              <CartesianGrid strokeDasharray="3 5" stroke="var(--border)" />
+              <XAxis
+                type="number"
+                dataKey="x"
+                name={xUnit}
+                {...axis}
+                domain={["auto", "auto"]}
+                unit={` ${xUnit}`}
+              />
+              <YAxis
+                type="number"
+                dataKey="y"
+                name={yUnit}
+                {...axis}
+                width={44}
+                domain={["auto", "auto"]}
+              />
+              <Tooltip contentStyle={tooltipStyle} cursor={{ stroke: "var(--border)" }} />
+              {data.map((p) => (
+                <Scatter
+                  key={p.g}
+                  name={p.name}
+                  data={[p]}
+                  fill={colour(p.g)}
+                  isAnimationActive={false}
+                >
+                  <LabelList
+                    dataKey="name"
+                    position="top"
+                    fill="var(--muted-foreground)"
+                    fontSize={12}
+                  />
+                </Scatter>
+              ))}
+            </ScatterChart>
+          </ResponsiveContainer>
+          <ChartKey
+            label={`${title} key`}
+            items={data.map((p): KeyItem => ({ mark: "point", color: colour(p.g), label: p.name, detail: "one harvest" }))}
+          />
+        </>
       ) : (
         <p className="small muted">Enter a harvest to plot it.</p>
       )}

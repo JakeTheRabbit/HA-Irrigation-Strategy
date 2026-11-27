@@ -6,6 +6,7 @@ import {
   BarChart,
   CartesianGrid,
   Cell,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -14,6 +15,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Empty, number } from "@/components/dashboard";
 import { UiTip } from "@/components/info-tip";
+import { ChartKey, NOW_KEY } from "@/components/chart-key";
 import { waterLitres } from "@/lib/model";
 import type { StrategyDocument } from "@/lib/operator-types";
 import type { Controller, Zone } from "@/lib/types";
@@ -30,9 +32,10 @@ import {
   type ZoneWaterUse,
 } from "@/lib/water-use";
 import "./water-use.css";
+import { ZONE_COLOURS } from "@/lib/zone-colours";
 
 /** The zone colours of the history chart. */
-const palette = ["#03a9f4", "#e5a43b", "#a57bf3", "#e97d98", "#43bdab"];
+const palette = ZONE_COLOURS;
 const DAY = 86_400_000;
 /** How far back to look for the start of a grow that no grow plan dates. */
 const LOOKBACK_DAYS = 120;
@@ -186,7 +189,7 @@ export function WaterUsePanel({
         <div>
           <h2 id="water-use-title">{title}</h2>
           <p>
-            Litres per zone, all plants
+            The controller’s recorded litres, not the meter: per zone, all plants
             {lightsOn !== undefined && lightsOn !== null
               ? `. A grow-day runs from lights-on (${clock(lightsOn)}) to the next lights-on.`
               : "."}
@@ -232,7 +235,7 @@ export function WaterUsePanel({
       ) : (
         <WaterUseBody
           rows={shown}
-          colours={new Map(room.zones.map((zone, index) => [zone.id, palette[index % 5]]))}
+          colours={new Map(room.zones.map((zone, index) => [zone.id, palette[index % palette.length]]))}
           today={today}
           lightsOn={lightsOn!}
           source={loaded!.record.source}
@@ -298,6 +301,8 @@ function WaterUseBody({
       ),
     };
   });
+  // The week still running: the Now line sits on it.
+  const current = chart.filter((week) => week.partial).at(-1);
   return (
     <>
       <div className="table-scroll" tabIndex={0} role="region" aria-label="Water use by zone">
@@ -310,7 +315,7 @@ function WaterUseBody({
                   <UiTip copyKey="zone" />
                 </span>
               </th>
-              <th scope="col">Today · zone total</th>
+              <th scope="col">Today · zone total (estimate)</th>
               <th scope="col">Today · average per plant</th>
               <th scope="col">
                 <span className="wu-th">
@@ -435,14 +440,28 @@ function WaterUseBody({
         <div className="wu-chart">
           <div className="wu-chart-head">
             <h3>Litres per grow week</h3>
-            <div className="chart-legend wu-legend">
-              {rows.map((row) => (
-                <span key={row.zone.id}>
-                  <i style={{ background: colours.get(row.zone.id) }} />
-                  {row.zone.name}
-                </span>
-              ))}
-            </div>
+            <ChartKey
+              className="wu-legend"
+              items={[
+                ...rows.map((row) => ({
+                  mark: "bar" as const,
+                  color: colours.get(row.zone.id),
+                  label: row.zone.name,
+                  detail: "litres in a grow week",
+                })),
+                ...(current
+                  ? [
+                      {
+                        mark: "bar" as const,
+                        color: "color-mix(in srgb, var(--muted-foreground) 40%, transparent)",
+                        label: "Current week so far",
+                        detail: "pale bar, dashed outline",
+                      },
+                      NOW_KEY,
+                    ]
+                  : []),
+              ]}
+            />
           </div>
           <div
             className="chart-wrap wu-bars"
@@ -507,6 +526,14 @@ function WaterUseBody({
                     })}
                   </Bar>
                 ))}
+                {current && (
+                  <ReferenceLine
+                    x={current.label}
+                    stroke="var(--primary)"
+                    strokeWidth={2}
+                    label={{ value: "Now", position: "insideTopRight", className: "wu-now-label" }}
+                  />
+                )}
               </BarChart>
             </ResponsiveContainer>
           </div>

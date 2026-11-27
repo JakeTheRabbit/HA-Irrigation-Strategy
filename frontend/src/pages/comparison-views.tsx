@@ -1,7 +1,9 @@
 import type { ComparisonTarget } from "@/lib/comparison-target";
+import { formatState } from "@/lib/display-units";
 import { Empty } from "@/components/dashboard";
 import { UiTip } from "@/components/info-tip";
 import { Meter } from "@/components/mini-visuals";
+import { ChartKey, NOW_KEY, type KeyItem } from "@/components/chart-key";
 import type { HistoryPoint, HistoryWindow, RunRecord, RunZone } from "@/lib/comparison-types";
 import { addDays, ageAt, dateInZone, daysBetween, mergeDaily } from "@/lib/comparison";
 export type Loaded = {
@@ -133,6 +135,32 @@ export function ComparisonChart({
       )
       .slice(0, 1600);
   const hasPoints = lines.some((line) => line.points.some((p) => p.value !== null));
+  // The window is clipped at the moment it was loaded, so a live window ends at Now.
+  const live = loaded.loadedAt - loaded.end < 10 * 60_000;
+  const planColor = { vwc: "#007b83", ec: "#ba4783", floor: "#b87012" } as const;
+  const planName = { vwc: "VWC plan", ec: "EC plan", floor: "Emergency floor (plan)" } as const;
+  const keyItems: KeyItem[] = [
+    ...lines
+      .filter((line) => line.points.some((p) => p.value !== null))
+      .map((line): KeyItem => ({ mark: line.previous ? "dash" : "line", color: line.color, label: line.name })),
+    ...lines
+      .filter((line) => sparse(line).length)
+      .map((line): KeyItem => ({ mark: "point", color: line.color, label: `${line.name}, isolated reading` })),
+    ...(dailyTarget
+      ? (["vwc", "ec", "floor"] as const)
+          .filter((metric) => dailyTarget[metric].some((p) => p.value !== null && Number.isFinite(p.value)))
+          .map((metric): KeyItem => ({ mark: "dot", color: planColor[metric], label: `${label} ${planName[metric]}` }))
+      : []),
+    ...(["vwc", "ec"] as const)
+      .filter((metric) => targets[metric] !== null)
+      .map((metric): KeyItem => ({
+        mark: "dot",
+        color: metric === "vwc" ? "#03a9f4" : "#e86aa5",
+        label: `${metric.toUpperCase()} reference`,
+        detail: `${targets[metric]} ${metric === "vwc" ? "%" : "mS/cm"}`,
+      })),
+    ...(live ? [NOW_KEY] : []),
+  ];
   return (
     <section className="panel comparison-chart">
       <div className="panel-heading">
@@ -217,7 +245,7 @@ export function ComparisonChart({
                   fill={line.color}
                 >
                   <title>
-                    {line.name}: isolated retained reading {point.value}
+                    {line.name}: isolated retained reading {formatState(String(point.value))}
                   </title>
                 </circle>
               ) : null;
@@ -259,18 +287,17 @@ export function ComparisonChart({
                 </line>
               ),
           )}
+          {live && (
+            <g className="comparison-now" data-comparison-series="now">
+              <line x1={x(last)} x2={x(last)} y1="40" y2="260" />
+              <text x={x(last) - 4} y="52" textAnchor="end">
+                Now
+              </text>
+            </g>
+          )}
         </svg>
       )}
-      <div className="comparison-legend">
-        {lines.map((line) => (
-          <span key={line.name}>
-            <i style={{ background: line.color }} />
-            {line.name}
-            {line.previous ? " · dashed" : " · solid"}
-          </span>
-        ))}
-        <span>Fine dotted lines: reference targets; amber dotted: emergency floor</span>
-      </div>
+      <ChartKey className="comparison-key" label="VWC and EC chart key" items={keyItems} />
       <p className="small">
         Target lines are a selected reference, not a record of targets used during either run.
         Unavailable readings and gaps over 30 minutes break the lines. Long continuous spans retain

@@ -193,14 +193,16 @@ export function RoomTree({
                   attrs: { "data-flag": flag ?? undefined },
                 },
                 <>
-                  <span
-                    className="room-tree-phase"
-                    data-phase={timer ? undefined : zone.phase}
-                    data-mode={timer ? "timer" : undefined}
-                  >
-                    {timer ? "T" : /^P[0-3]$/.test(zone.phase) ? zone.phase : "–"}
+                  <span className="room-tree-phase" data-phase={timer ? undefined : zone.phase}>
+                    {!timer && /^P[0-3]$/.test(zone.phase) ? zone.phase : "–"}
                   </span>
                   <span className="room-tree-name">{zone.name}</span>
+                  {/* The mode is its own outline tag, never in the phase slot. */}
+                  {timer && (
+                    <span className="room-tree-mode" data-mode="timer">
+                      Timer
+                    </span>
+                  )}
                   <span className="room-tree-value">
                     {zone.vwc.value === null
                       ? timer

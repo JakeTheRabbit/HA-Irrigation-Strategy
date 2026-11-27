@@ -67,9 +67,22 @@
   padding: 16px 18px;
   min-width: 0;
 }
+/* Side by side, the cards share their rows: a chip that wraps under one zone's title moves every
+   zone's gauge and chart down with it, so they stay level. A phone folds them instead. */
+@media (min-width: 721px) {
+  .wf-zones > .wf-zone {
+    display: grid;
+    grid-row: span 5;
+    grid-template-rows: subgrid;
+    row-gap: 12px;
+  }
+  .wf-zones > .wf-zone > .wf-zone-head {
+    align-self: start;
+  }
+}
 .wf-zone[data-flow-verdict="low"] {
-  border-color: var(--warning);
-  box-shadow: 0 0 0 1px var(--warning);
+  border-color: var(--warning-mark);
+  box-shadow: 0 0 0 1px var(--warning-mark);
 }
 .wf-zone-head,
 .wf-card-head {
@@ -131,23 +144,10 @@
   color: var(--muted-foreground);
   font-size: var(--text-sm);
 }
-.wf-legend {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-.wf-legend i,
-.wf-plant-key i {
-  display: inline-block;
-  width: 10px;
-  height: 10px;
-  margin-left: 6px;
-}
-.wf-legend i[data-key="asked"] {
-  border: 1px solid var(--foreground);
-}
-.wf-legend i[data-key="metered"] {
-  background: var(--primary);
+/* Asked is drawn hollow: its key swatch too. */
+.wf-bars-key li:first-child .chart-key-swatch {
+  background: none;
+  border: 1px solid var(--key-color);
 }
 .wf-bars svg {
   display: block;
@@ -163,7 +163,7 @@
   fill: var(--primary);
 }
 .wf-bar-metered[data-short] {
-  fill: var(--warning);
+  fill: var(--warning-mark);
 }
 .wf-bars-top {
   stroke: var(--border);
@@ -187,9 +187,35 @@
   color: var(--foreground);
   font-weight: 600;
 }
+.wf-week .chart-key {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+.wf-weekline-wrap {
+  position: relative;
+  display: block;
+  padding-top: 14px;
+}
+.wf-weekline-wrap .wf-now-tag {
+  position: absolute;
+  top: 0;
+  right: 0;
+}
 .wf-weekline {
+  display: block;
   width: 100%;
   height: 32px;
+}
+.wf-weekline-now {
+  stroke: var(--primary);
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+.wf-now-tag {
+  color: var(--primary);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  line-height: 1;
 }
 .wf-weekline-band {
   fill: color-mix(in srgb, var(--success) 14%, transparent);
@@ -204,17 +230,17 @@
   fill: var(--primary);
 }
 .wf-zone[data-flow-verdict="low"] .wf-weekline polyline {
-  stroke: var(--warning);
+  stroke: var(--warning-mark);
 }
 .wf-zone[data-flow-verdict="low"] .wf-weekline circle {
-  fill: var(--warning);
+  fill: var(--warning-mark);
 }
 .wf-blocked,
 .wf-high,
 .wf-plant-note {
   margin: 0;
   padding: 12px 14px;
-  border: 1px solid color-mix(in srgb, var(--warning) 28%, transparent);
+  border: 1px solid color-mix(in srgb, var(--warning-mark) 28%, transparent);
   border-radius: 10px;
   background: var(--warning-bg);
   font-size: var(--text-sm);
@@ -263,7 +289,7 @@
   border-radius: 2px;
   background: var(--primary);
 }
-.wf-lane[data-lane="meter"] span:not(.wf-lane-future) {
+.wf-lane[data-lane="meter"] span:not(.wf-lane-future, .wf-lane-now) {
   background: var(--success);
 }
 .wf-lane .wf-lane-future {
@@ -272,6 +298,17 @@
   bottom: 0;
   border-radius: 0;
   background: repeating-linear-gradient(135deg, transparent 0 5px, color-mix(in srgb, var(--foreground) 10%, transparent) 5px 8px);
+}
+.wf-lane .wf-lane-now {
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  margin-left: -1px;
+  border-radius: 0;
+  background: var(--primary);
+}
+.wf-lanes > .chart-key {
+  margin: 0;
 }
 .wf-shut {
   margin: 0;
@@ -288,7 +325,7 @@
 }
 .wf-ticks {
   position: relative;
-  height: 18px;
+  height: 32px;
   color: var(--muted-foreground);
   font-size: var(--text-xs);
 }
@@ -297,11 +334,16 @@
   transform: translateX(-50%);
   white-space: nowrap;
 }
-.wf-ticks span:first-child {
+.wf-ticks span:first-of-type {
   transform: none;
 }
-.wf-ticks span:last-child {
+.wf-ticks span:last-of-type {
   transform: translateX(-100%);
+}
+.wf-ticks .wf-now-tag {
+  position: absolute;
+  top: 16px;
+  transform: translateX(-50%);
 }
 .wf-days {
   display: flex;
@@ -336,8 +378,8 @@
   background: color-mix(in srgb, var(--muted-foreground) 14%, var(--surface));
 }
 .wf-days li[data-hit] i {
-  background: color-mix(in srgb, var(--warning) 45%, var(--surface));
-  outline: 1px solid var(--warning);
+  background: color-mix(in srgb, var(--warning-mark) 45%, var(--surface));
+  outline: 1px solid var(--warning-mark);
 }
 .wf-days p {
   flex: 1 1 220px;
@@ -378,7 +420,7 @@
   background: var(--primary);
 }
 .wf-plant-fill[data-tone="warn"] {
-  background: var(--warning);
+  background: var(--warning-mark);
 }
 .wf-plant-asked,
 .wf-plant-median {
@@ -392,24 +434,6 @@
 .wf-plant-median {
   background: none;
   border-left: 2px dashed var(--foreground);
-}
-.wf-plant-key {
-  margin: 0;
-  color: var(--muted-foreground);
-  font-size: var(--text-sm);
-}
-.wf-plant-key i[data-key="median"] {
-  width: 12px;
-  height: 0;
-  border-top: 2px dashed var(--foreground);
-  vertical-align: middle;
-}
-.wf-plant-key i[data-key="asked"] {
-  width: 2px;
-  height: 12px;
-  margin-left: 12px;
-  background: var(--foreground);
-  vertical-align: middle;
 }
 @media (max-width: 1100px) {
   .wf-lower {
@@ -431,4 +455,72 @@
 .wf-gauge-row .arc-gauge {
   width: 140px;
   height: auto;
+}
+/* The zones whose water did not arrive as asked, first, each with a jump to its card. */
+.wf-faults {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 16px;
+  padding: 12px 16px;
+  border: 1px solid color-mix(in srgb, var(--warning-mark) 55%, var(--border));
+  border-radius: var(--radius);
+  background: var(--warning-bg);
+  list-style: none;
+  font-size: var(--text-label);
+  line-height: var(--leading-label);
+}
+.wf-faults li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px 12px;
+}
+.wf-faults span {
+  font-weight: 600;
+}
+.wf-faults .wf-link {
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+}
+/* A phone: a zone on target is one line until opened. */
+.wf-zone-fold {
+  min-width: 0;
+  border: 1px solid color-mix(in srgb, var(--border) 75%, transparent);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.wf-zone-fold > summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  min-height: 48px;
+  padding: 12px 16px;
+  color: var(--muted-foreground);
+  font-size: var(--text-label);
+  line-height: var(--leading-label);
+  cursor: pointer;
+}
+.wf-zone-fold > summary b {
+  color: var(--foreground);
+  font-size: var(--text-reading);
+}
+.wf-zone-fold[open] > summary {
+  border-bottom: 1px solid var(--border);
+}
+.wf-zone-fold > .panel {
+  border: 0;
+  box-shadow: none;
+}
+.wf-zone-fold > summary::after {
+  content: "Show";
+  margin-left: auto;
+  color: var(--primary-strong);
+  font-weight: 600;
+}
+.wf-zone-fold[open] > summary::after {
+  content: "Hide";
 }

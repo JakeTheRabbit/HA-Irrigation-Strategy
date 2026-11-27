@@ -5,11 +5,13 @@ import {
   CartesianGrid,
   Line,
   LineChart,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from "recharts";
+import { ChartKey as Key, NOW_KEY, type KeyItem } from "@/components/chart-key";
 import { number } from "@/components/dashboard";
 import {
   chartRows,
@@ -151,6 +153,36 @@ function Chart({ spec, runs, rows }: { spec: Spec; runs: ChartRun[]; rows: Chart
   );
   const name = (run: number, key: ChartKey) =>
     spec.keys.length > 1 ? `${runs[run].name} · ${LINE[key]}` : runs[run].name;
+  const drawn = (run: number, key: ChartKey) => rows.some((row) => row[`r${run}_${key}`] !== null);
+  // The week that is still running, when one is: its line is marked Today.
+  const todayRun = runs.findIndex((run) => run.weeks.some((week) => week.current));
+  const todayWeek = todayRun < 0 ? null : runs[todayRun].weeks.find((week) => week.current)!.week;
+  const today =
+    todayWeek === null ? null : (
+      <ReferenceLine
+        x={`W${todayWeek}`}
+        stroke="var(--primary)"
+        strokeWidth={2}
+        label={{ value: "Today", position: "insideTopRight", fill: "var(--primary)", fontSize: 11 }}
+      />
+    );
+  const keyItems: KeyItem[] = [
+    ...runs.flatMap((_, run) =>
+      spec.keys
+        .filter((key) => drawn(run, key))
+        .map(
+          (key, index): KeyItem => ({
+            mark: spec.bars ? "bar" : spec.keys.indexOf(key) ? "dot" : "line",
+            color: colour(run),
+            label: name(run, key),
+            detail: !spec.bars && run === 0 && index === 0 ? "a dot per grow week" : undefined,
+          }),
+        ),
+    ),
+    ...(todayWeek === null
+      ? []
+      : [{ ...NOW_KEY, label: "Today", detail: `${runs[todayRun].name} · week ${todayWeek}` }]),
+  ];
   // A long run scrolls sideways at phone width instead of crushing its weeks together.
   const minWidth = `max(100%, ${rows.length * (spec.bars ? runs.length * 0.9 + 0.8 : 1.9)}rem)`;
   let chart: ReactNode;
@@ -165,6 +197,7 @@ function Chart({ spec, runs, rows }: { spec: Spec; runs: ChartRun[]; rows: Chart
         {x}
         {y}
         {tooltip}
+        {today}
         {runs.map((_, run) => (
           <Bar
             key={run}
@@ -189,6 +222,7 @@ function Chart({ spec, runs, rows }: { spec: Spec; runs: ChartRun[]; rows: Chart
         {x}
         {y}
         {tooltip}
+        {today}
         {runs.flatMap((_, run) =>
           spec.keys.map((key, index) => (
             <Line
@@ -215,18 +249,21 @@ function Chart({ spec, runs, rows }: { spec: Spec; runs: ChartRun[]; rows: Chart
         <p>{spec.detail}</p>
       </figcaption>
       {recorded ? (
-        <div
-          className="rw-chart-scroll"
-          tabIndex={0}
-          role="region"
-          aria-label={`${spec.title} chart`}
-        >
-          <div className="rw-chart-plot" role="img" aria-label={summary} style={{ minWidth }}>
-            <ResponsiveContainer width="100%" height="100%">
-              {chart}
-            </ResponsiveContainer>
+        <>
+          <div
+            className="rw-chart-scroll"
+            tabIndex={0}
+            role="region"
+            aria-label={`${spec.title} chart`}
+          >
+            <div className="rw-chart-plot" role="img" aria-label={summary} style={{ minWidth }}>
+              <ResponsiveContainer width="100%" height="100%">
+                {chart}
+              </ResponsiveContainer>
+            </div>
           </div>
-        </div>
+          <Key label={`${spec.title} chart key`} items={keyItems} />
+        </>
       ) : (
         <p className="rw-chart-empty" role="note">
           No record of this for {runs.length > 1 ? "either run" : "this run"}. Nothing is drawn in
@@ -244,14 +281,6 @@ export function RunWeekCharts({ runs }: { runs: ChartRun[] }) {
   if (!rows.length) return null;
   return (
     <section className="rw-charts" aria-label="Charts by grow week">
-      <div className="rw-chart-key" aria-hidden="true">
-        {runs.map((run, index) => (
-          <span key={index}>
-            <i style={{ background: colour(index) }} />
-            {run.name}
-          </span>
-        ))}
-      </div>
       <div className="rw-chart-grid">
         {SPECS.map((spec) => (
           <Chart key={spec.id} spec={spec} runs={runs} rows={rows} />

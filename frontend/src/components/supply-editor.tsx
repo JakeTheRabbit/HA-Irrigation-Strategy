@@ -64,6 +64,8 @@ export function SupplyEditor({ controller, onDirtyChange }: { controller: Contro
   // Why a dripper flow was not written, by zone; editing that zone's field clears it.
   const [dripperReason, setDripperReason] = useState<Record<string, string>>({});
   const [last, setLast] = useState<SupplyUndo | null>(null);
+  // A phone shows each zone as one line until it is opened to edit.
+  const [opened, setOpened] = useState<number[]>([]);
 
   const readSetup = useCallback(async () => {
     try {
@@ -455,19 +457,44 @@ export function SupplyEditor({ controller, onDirtyChange }: { controller: Contro
                       const shown = base === null ? "" : flowValue(base, dripperDigits(base));
                       const reason = dripperReason[String(z.id)];
                       const errorId = `supply-dripper-error-${z.id}`;
+                      const drippers = z.plant_count * (z.drippers_per_plant ?? 1);
+                      // An edited or refused row stays open: its change and its reason must show.
+                      const open = opened.includes(z.id) || changed || invalid || !!reason;
                       return (
-                        <tr key={z.id} data-zone={z.id}>
+                        <tr key={z.id} data-zone={z.id} data-open={open || undefined}>
                           <th scope="row">
                             <span className="supply-dot" data-tone={tone(z.id)} aria-hidden />
                             {z.name}
+                            <span className="supply-zone-summary">
+                              {[
+                                `${drippers} drippers`,
+                                shown ? `${shown} ${unit} each` : null,
+                                flow === undefined ? null : lphText(flow),
+                                share === null ? null : `${pct(share)} pump`,
+                              ]
+                                .filter(Boolean)
+                                .join(" · ")}
+                            </span>
+                            <button
+                              type="button"
+                              className="supply-zone-toggle"
+                              aria-expanded={open}
+                              aria-label={`${open ? "Close" : "Edit"} ${z.name}`}
+                              disabled={open && !opened.includes(z.id)}
+                              onClick={() =>
+                                setOpened((list) => (list.includes(z.id) ? list.filter((id) => id !== z.id) : [...list, z.id]))
+                              }
+                            >
+                              {open ? "Close" : "Edit"}
+                            </button>
                           </th>
-                          <td>
-                            {z.plant_count * (z.drippers_per_plant ?? 1)}
+                          <td data-label="Drippers">
+                            {drippers}
                             <small className="muted">
                               {z.plant_count} plants × {z.drippers_per_plant ?? 1}
                             </small>
                           </td>
-                          <td>
+                          <td data-label="Dripper flow">
                             <span className="supply-input is-small">
                               <input
                                 inputMode="decimal"
@@ -491,8 +518,8 @@ export function SupplyEditor({ controller, onDirtyChange }: { controller: Contro
                               </small>
                             )}
                           </td>
-                          <td className="supply-num">{flow === undefined ? <span className="muted">not set</span> : lphText(flow)}</td>
-                          <td>
+                          <td className="supply-num" data-label="Zone flow">{flow === undefined ? <span className="muted">not set</span> : lphText(flow)}</td>
+                          <td data-label="Share of pump">
                             {share === null ? (
                               <span className="muted">{flow === undefined ? "Set dripper flow" : "Set max flow"}</span>
                             ) : (
@@ -505,7 +532,7 @@ export function SupplyEditor({ controller, onDirtyChange }: { controller: Contro
                               </span>
                             )}
                           </td>
-                          <td>
+                          <td data-label="Exclusive group">
                             <div className="supply-seg" role="group" aria-label={`${z.name} exclusive group`}>
                               {[...new Set([...GROUPS, groupOf(z.id)])].map((g) => (
                                 <button
@@ -529,17 +556,32 @@ export function SupplyEditor({ controller, onDirtyChange }: { controller: Contro
               </div>
             )}
             <p className="small muted">
-              Zones in the same exclusive group never water at the same time, e.g. two zones on one submain. Line at 2/3 of
-              each bar = 100% of the pump.
+              Zones in the same exclusive group never water at the same time, e.g. two zones on one submain.{" "}
+              <span className="supply-share-key">
+                <i aria-hidden /> 100% pump
+              </span>
             </p>
           </section>
 
           {together.length > 0 && maxLph ? (
             <section className="panel supply-card" aria-labelledby="supply-together">
               <h3 id="supply-together">What can run together</h3>
+              {/* The limit first: a set it blocks is muted, so its bar does not read as allowed. */}
+              <p className="supply-together-lead">
+                {together.some((r) => r.zones.length > conc) && (
+                  <b>
+                    Max {conc} zone{conc === 1 ? "" : "s"} at a time.{" "}
+                  </b>
+                )}
+                <span className="muted">Bars: combined pump demand.</span>
+              </p>
               <ul className="supply-together">
                 {together.map((r) => (
-                  <li key={r.zones.join("+")} data-muted={r.sameGroup || undefined} data-over={(!r.sameGroup && r.pct > 100) || undefined}>
+                  <li
+                    key={r.zones.join("+")}
+                    data-muted={r.sameGroup || r.zones.length > conc || undefined}
+                    data-over={(!r.sameGroup && r.pct > 100) || undefined}
+                  >
                     <b>{zonesText(r.zones)}</b>
                     <CapacityBar segments={segments(r.zones)} capacityLph={maxLph} caption={`${zonesText(r.zones)}: ${pct(r.pct)} of the pump`} />
                     <span className="supply-verdict">
@@ -552,6 +594,25 @@ export function SupplyEditor({ controller, onDirtyChange }: { controller: Contro
           ) : null}
         </div>
 
+        {/* A phone with changes keeps them in reach above the bottom bar. */}
+        {rows.length > 0 && (
+          <div className="supply-pending-bar" role="status">
+            <span>
+              {rows.length} unsaved {rows.length === 1 ? "change" : "changes"}
+            </span>
+            <button
+              type="button"
+              className="inline-action"
+              onClick={() =>
+                document
+                  .querySelector('[data-supply-editor] [aria-label="Review and apply"]')
+                  ?.scrollIntoView({ behavior: "smooth", block: "start" })
+              }
+            >
+              Review &amp; apply
+            </button>
+          </div>
+        )}
         <ReviewApply
           layout="panel"
           rows={rows}

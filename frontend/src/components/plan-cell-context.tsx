@@ -1,3 +1,4 @@
+import { ChartKey } from "@/components/chart-key";
 import { number, PlantAmount } from "@/components/dashboard";
 import { dailyWater } from "@/lib/water-delivery";
 import { useWaterView } from "@/lib/water-view";
@@ -93,6 +94,7 @@ export function PlanCellContext({
           }),
         };
   const today = growDay(zone.start_date, localDate());
+  const todayShown = today >= 1 && today <= days;
   return (
     <section className="plan-cell" aria-labelledby="plan-cell-title">
       <div className="plan-cell-head">
@@ -214,12 +216,34 @@ export function PlanCellContext({
                   y2={100 - now}
                 />
               )}
+              {todayShown && (
+                <line
+                  data-plan-today
+                  x1={today - 0.5}
+                  x2={today - 0.5}
+                  y1={0}
+                  y2={100}
+                  stroke="var(--primary)"
+                  strokeWidth={2}
+                  vectorEffect="non-scaling-stroke"
+                />
+              )}
             </svg>
             <div className="plan-cell-axis">
               <span>{granularity === "week" ? "Week 1" : "Day 1"}</span>
               <span>bar height = % generative</span>
               <span>{unit(columns - 1)}</span>
             </div>
+            <ChartKey
+              label="Whole grow chart key"
+              items={[
+                { mark: "bar", color: "color-mix(in srgb, var(--primary) 55%, var(--card))", label: "Planned balance per day", detail: "height = % generative" },
+                { mark: "bar", color: "var(--primary-strong)", label: `${unit(column)}, the cell selected` },
+                { mark: "band", color: "var(--primary)", label: "Days of the selected cell" },
+                ...(now !== null ? [{ mark: "dash" as const, color: "var(--foreground)", label: `Saved balance, ${now}%` }] : []),
+                ...(todayShown ? [{ mark: "now" as const, label: "Today", detail: `grow day ${today}` }] : []),
+              ]}
+            />
           </figure>
           <div>
             <h4>

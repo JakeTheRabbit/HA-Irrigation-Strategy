@@ -125,6 +125,73 @@
   color: var(--muted-foreground);
   font-size: var(--text-sm);
 }
+/* Inline fault/warning summary strip above the timeline so operators see what failed at a glance. */
+.wt-problem-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.wt-problem-strip li button {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px;
+  min-height: 32px;
+  padding: 4px 10px;
+  border: 1px solid color-mix(in srgb, var(--warning-mark) 45%, var(--border));
+  border-radius: 8px;
+  background: var(--warning-bg);
+  color: var(--foreground);
+  font: inherit;
+  font-size: var(--text-xs);
+  text-align: left;
+  cursor: pointer;
+}
+.wt-problem-strip li[data-glyph="failed"] button {
+  border-color: color-mix(in srgb, var(--destructive) 55%, var(--border));
+  background: color-mix(in srgb, var(--destructive) 12%, var(--surface));
+}
+.wt-problem-strip li button:hover {
+  filter: brightness(1.06);
+}
+.wt-problem-more {
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+  padding: 0 4px;
+}
+.wt-problem-strip li[data-glyph] {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+}
+.wt-problem-strip li[data-glyph] > button:first-child {
+  flex: 1;
+}
+.wt-problem-strip li .wt-problem-code {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 8px;
+  font-size: var(--text-xs);
+  white-space: nowrap;
+}
+.wt-problem-strip li .wt-problem-dismiss {
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  padding: 0 8px;
+}
+.wt-problem-strip li.wt-problem-more button {
+  min-height: 32px;
+  padding: 4px 6px;
+  border: 0;
+  background: none;
+  color: var(--primary);
+  text-decoration: underline;
+}
 .wt-error {
   display: flex;
   flex-wrap: wrap;
@@ -254,7 +321,7 @@
 }
 .wt-pop-status[data-glyph="warning"],
 .wt-pop-status[data-glyph="queued"] {
-  border-color: var(--warning);
+  border-color: var(--warning-mark);
   color: var(--foreground);
 }
 .wt-pop-status[data-glyph="done"]:not([data-running]) {

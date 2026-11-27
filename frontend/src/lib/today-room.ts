@@ -212,7 +212,7 @@ export function roomView(controller: Controller, now: number): RoomView | null {
           value: zone.vwc.value,
           unit: "%",
           band: view.rewater !== null && view.target !== null ? [view.rewater, view.target] : null,
-          tolerance: zone.phase === "P2" ? 2 : Number.POSITIVE_INFINITY,
+          tolerance: zone.phase === "P2" && !view.timer ? 2 : Number.POSITIVE_INFINITY,
           quality: zone.vwc.value === null ? "no reading" : undefined,
         }),
         gauge({

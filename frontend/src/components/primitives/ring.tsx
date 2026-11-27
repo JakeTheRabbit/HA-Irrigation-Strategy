@@ -26,8 +26,18 @@ function RingArc({ size, stroke, share }: { size: number; stroke: number; share:
 }
 
 /** A small ring with the percentage inside and the label beside it. */
-export function HealthRing({ pct, label }: { pct: number; label: string }) {
-  const tone = pct >= 90 ? "ok" : pct >= 70 ? "warn" : "bad";
+export function HealthRing({
+  pct,
+  label,
+  tone: worst,
+}: {
+  pct: number;
+  label: string;
+  /** The worst open problem: the ring is never green while one is open. */
+  tone?: "warn" | "bad";
+}) {
+  const share = pct >= 90 ? "ok" : pct >= 70 ? "warn" : "bad";
+  const tone = worst === "bad" || share === "bad" ? "bad" : worst ?? share;
   return (
     <span className="health-ring" data-tone={tone}>
       <svg viewBox="0 0 56 56" width={56} height={56} role="img" aria-label={`${label} ${number(pct)}%`}>

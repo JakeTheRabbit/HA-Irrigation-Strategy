@@ -48,7 +48,7 @@ await runParity({
       const facts = (await header.locator(".topbar-facts").innerText()).replace(/\s+/g, " ").trim();
       assert.match(facts, /^Updated \d+ (s|min) ago · AI \S/, `${label}: ${facts}`);
       assert.equal(await header.getByRole("button", { name: /^Jump to…/ }).isVisible(), false);
-      assert.deepEqual(await header.locator(".safety-switch-text").allInnerTexts(), ["Watering on", "Stop all"]);
+      assert.deepEqual(await header.locator(".safety-switch-text").allInnerTexts(), ["Watering on: Room A", "Stop Room A"]);
       await auditHeader(page, label);
       return;
     }
@@ -74,7 +74,7 @@ await runParity({
         jump,
         header.locator(".header-safety-scope"),
         header.getByRole("button", { name: /^Watering on/ }),
-        header.getByRole("button", { name: /^Stop all/ }),
+        header.getByRole("button", { name: /^Stop Room / }),
       ].map(async (l) => (await l.boundingBox()).x),
     );
     assert.deepEqual([...xs].sort((a, b) => a - b), xs, `${label}: header order ${xs}`);
@@ -130,7 +130,7 @@ await runParity({
 
     // Over the Stop all review the shortcuts do nothing.
     region("palette: not over another modal");
-    await header.getByRole("button", { name: /^Stop all/ }).click();
+    await header.getByRole("button", { name: /^Stop Room / }).click();
     const stop = page.getByRole("dialog", { name: /^Stop all water in / });
     await stop.waitFor();
     await page.keyboard.press("Control+k");

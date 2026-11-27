@@ -17,6 +17,8 @@ export interface WateringQuery {
   /** "flower", "veg"; empty for every stage. */
   stages: string[];
   problemsOnly: boolean;
+  /** Every room; off shows only the room picked in the room list. */
+  all?: boolean;
   /** Narrows the rows to a room or zone ("z3", "f2"). */
   q: string;
 }
@@ -36,6 +38,7 @@ export function wateringQuery(hash: string): WateringQuery {
     rooms: list(query.get("rooms")),
     stages: list(query.get("stages")),
     problemsOnly: query.get("problems") === "1",
+    ...(query.get("all") === "1" ? { all: true } : {}),
     q: query.get("q") ?? "",
   };
 }
@@ -47,6 +50,7 @@ export function wateringHash(q: WateringQuery): string {
     q.rooms.length && `rooms=${q.rooms.map(encodeURIComponent).join(",")}`,
     q.stages.length && `stages=${q.stages.map(encodeURIComponent).join(",")}`,
     q.problemsOnly && "problems=1",
+    q.all && "all=1",
     q.q && `q=${encodeURIComponent(q.q)}`,
   ].filter(Boolean);
   return `#/plan/watering?${parts.join("&")}`;

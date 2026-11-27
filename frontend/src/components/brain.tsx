@@ -1,9 +1,11 @@
 import { CanonicalControls } from "@/components/canonical-controls";
 import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Clock, Coins, SlidersHorizontal, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { ChartKey } from "@/components/chart-key";
 import { Heading, time as clock, type Page } from "@/components/dashboard";
+import { KpiCard, KpiGrid, type HaTone } from "@/components/ha-primitives";
 import { UiTip } from "@/components/info-tip";
 import { Meter } from "@/components/mini-visuals";
 import {
@@ -233,6 +235,8 @@ function DemoSwitcher({ demo }: { demo: BrainDemoState }) {
   );
 }
 
+/** Shared view switcher unifying Status › AI assistant (#/today/ai) and Settings › AI assistant
+ * (#/settings/ai) into one workspace without breaking either route. */
 /** The AI assistant page: its state, budget, last decision, what it may do and its latest decisions. */
 export function BrainPage({
   controller,
@@ -247,9 +251,48 @@ export function BrainPage({
   const log = readJev(states, room.room.prefix).log;
   const last = panel?.lastDecision ?? null;
   const budget = panel && budgetLine(panel);
+  const stateTone: HaTone =
+    view.tone === "positive"
+      ? "success"
+      : view.tone === "info"
+        ? "primary"
+        : view.tone === "warning"
+          ? "warning"
+          : "neutral";
   return (
     <div className="brain-page" data-brain-page={panel?.state ?? "none"}>
       <Heading title="AI assistant" />
+      <KpiGrid>
+        <KpiCard
+          icon={Sparkles}
+          tone={stateTone}
+          label="Assistant state"
+          value={view.chip}
+          detail={`${providerWords(panel)}${panel?.model ? ` · ${panel.model}` : ""}`}
+        />
+        <KpiCard
+          icon={SlidersHorizontal}
+          tone="primary"
+          label="Operating mode"
+          value={modeWords(panel)}
+          detail={panel?.mode === "dry_run" ? "Observing only" : "Inside safety bounds"}
+          onClick={() => navigate("settings/ai")}
+        />
+        <KpiCard
+          icon={Coins}
+          tone={panel?.budgetLeftUsd === 0 ? "warning" : "primary"}
+          label="Budget today"
+          value={panel?.budgetUsd != null ? money(panel.spentUsd ?? 0) : "—"}
+          detail={panel?.budgetUsd != null ? `of ${money(panel.budgetUsd)} daily limit` : "No budget reported"}
+        />
+        <KpiCard
+          icon={Clock}
+          tone="neutral"
+          label="Last decision"
+          value={last?.time != null ? clock(last.time) : "None yet"}
+          detail={last ? `${judgeTitle(last.judge)}` : "No recent judge call"}
+        />
+      </KpiGrid>
       {controller.demo && <DemoSwitcher demo={demo} />}
       <section className="panel" aria-labelledby="brain-status-title">
         <div className="panel-heading">
@@ -851,6 +894,15 @@ function OutcomesCard({ controller }: { controller: Controller }) {
           ))}
         </ol>
       )}
+      {shown.some((row) => row.band && row.value !== null) && (
+        <ChartKey
+          label="Band key"
+          items={[
+            { mark: "band", color: "var(--success)", label: "Target band", detail: "as the controller set it" },
+            { mark: "tick", color: "var(--foreground)", label: "Where the value landed" },
+          ]}
+        />
+      )}
       {shown.some((row) => row.verdict === "not checked") && (
         <p className="brain-line" id={notCheckedId}>
           Not checked: the controller does not check this kind of decision later.
@@ -879,9 +931,11 @@ function BandTick({ band, value }: { band: [number, number]; value: number }) {
  * in controller options. */
 export function AiSettings({
   controller,
+  navigate,
   onDirtyChange,
 }: {
   controller: Controller;
+  navigate?: Navigate;
   onDirtyChange?: (dirty: boolean) => void;
 }) {
   const [instructionsDirty, setInstructionsDirty] = useState(false);

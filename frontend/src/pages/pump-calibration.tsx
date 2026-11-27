@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { Check, X } from "lucide-react";
-import { Empty } from "@/components/dashboard";
+import { ChartKey } from "@/components/chart-key";
+import { Empty, Heading } from "@/components/dashboard";
 import { NeedsIntegration } from "@/components/needs-integration";
 import { PeristalticPump } from "@/components/peristaltic-pump";
 import { HoldButton } from "@/components/primitives/hold-button";
@@ -323,17 +324,7 @@ export function PumpCalibration({ controller, navigate, onDirtyChange }: PagePro
   };
 
   const room = controller.room.room.name;
-  const header = (
-    <div className="pump-cal-title">
-      <button type="button" className="pump-cal-crumb" onClick={() => navigate("equipment/dosing")}>
-        Feed &amp; dosing · {room}
-      </button>
-      <span className="pump-cal-sep" aria-hidden="true">
-        ›
-      </span>
-      <h1>Prime &amp; calibrate a pump</h1>
-    </div>
-  );
+  const header = <Heading title={`Pump calibration · ${room}`} />;
   if (load.state === "missing")
     return (
       <div className="pump-cal">
@@ -606,7 +597,21 @@ export function PumpCalibration({ controller, navigate, onDirtyChange }: PagePro
               {saved && (
                 <div className="pump-cal-result">
                   <p className="pump-cal-rate">{rateSentence(saved.result.ml_min, nominal)}</p>
-                  {history.length > 1 && <WearSpark history={history} name={pump.name} />}
+                  {history.length > 1 && (
+                    <>
+                      <WearSpark history={history} name={pump.name} />
+                      <ChartKey
+                        items={[
+                          {
+                            mark: "line",
+                            color: "var(--primary)",
+                            label: "Calibrated flow, mL/min",
+                            detail: `last ${history.length} calibrations, oldest to newest`,
+                          },
+                        ]}
+                      />
+                    </>
+                  )}
                   {wear && <p className="pump-cal-wear">{wear}</p>}
                   <Button variant="outline" onClick={restart}>
                     Calibrate another pump

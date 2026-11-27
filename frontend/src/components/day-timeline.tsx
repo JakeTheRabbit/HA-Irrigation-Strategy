@@ -10,6 +10,7 @@ import {
 import { LoaderCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { UiTip } from "@/components/info-tip";
+import { ChartKey, NOW_KEY, type KeyItem } from "@/components/chart-key";
 import { gauge, probeGaps, vwcGauge, type ProbeGap } from "@/lib/hmi";
 import { GaugeRow, QualityChip, StatusLine } from "@/components/hmi";
 import { dailyLimit, Empty, number, time as clock } from "@/components/dashboard";
@@ -891,7 +892,10 @@ function ZoneNumbers({
         target: targets.dryback_target ?? null,
         reference: referenceDryback(stage?.drybackPoints, dryback?.value.peak),
         unit: "%",
-        points: "%",
+        // A difference of two percentages is in points ("4.5 pt over"), as dryback is elsewhere.
+        points: "pt",
+        // Dryback is a share of the peak ((peak − VWC) / peak), said once.
+        basis: "of peak",
         tolerance: 3,
         underIsNormal: dryback?.night === "tonight",
       }),
@@ -929,6 +933,12 @@ function ZoneNumbers({
         )}
       </StatusLine>
       <GaugeRow gauges={gauges} label={`${zone.name} key values`} />
+      {/* The next action right under the condition, before the day's tallies. */}
+      {next && (
+        <p className="zone-next" title={next.detail} data-tone={next.tone}>
+          <strong>Next:</strong> {next.text}
+        </p>
+      )}
       <dl className="zone-numbers" aria-label={`${zone.name} today in numbers`}>
         <div data-status={share !== null && share >= 80 ? "above" : undefined}>
           <dt>Water today</dt>
@@ -1015,11 +1025,6 @@ function ZoneNumbers({
           )}
         </div>
       </dl>
-      {next && (
-        <p className="zone-next" title={next.detail} data-tone={next.tone}>
-          <strong>Next:</strong> {next.text}
-        </p>
-      )}
     </div>
   );
 }
@@ -1073,6 +1078,58 @@ function DayChart({
     ...lane.roomChanges.map((change) => ({ time: change.time, text: changeText(change) })),
   ].sort((a, b) => a.time - b.time);
   const typicalDays = lane.past.length;
+  // The marks the key's switches do not cover, each only when the chart draws it.
+  const projected = !hidden.has("vwc") ? lane.projection : null;
+  const marks: KeyItem[] = [
+    { mark: "bar", color: "var(--gd-day)", label: "Lights on" },
+    ...(day.lightsOff < day.end ? [{ mark: "bar", color: "var(--gd-night)", label: "Lights off" } as KeyItem] : []),
+    ...(lane.columns.length
+      ? [
+          {
+            mark: "point",
+            color: "var(--gd-ink)",
+            label: "Phase P0–P3",
+            detail: lane.columns.some((column) => column.future) ? "outlined: still to come" : undefined,
+          } as KeyItem,
+        ]
+      : []),
+    ...(lane.columns.length > 1 ? [{ mark: "dash", color: "var(--muted-foreground)", label: "Phase change" } as KeyItem] : []),
+    ...(projected && projected.points.length > 1
+      ? [{ mark: "dot", color: "var(--primary)", label: "Projected VWC", detail: "an estimate" } as KeyItem]
+      : []),
+    ...(projected?.shots.some((shot) => !shot.emergency)
+      ? [{ mark: "point", color: "var(--muted-foreground)", label: "Expected shot" } as KeyItem]
+      : []),
+    ...(projected?.shots.some((shot) => shot.emergency)
+      ? [{ mark: "point", color: "var(--gd-red)", label: "Expected rescue shot" } as KeyItem]
+      : []),
+    ...(!hidden.has("ec") && lane.ecBand && lane.ec.length > 0
+      ? [
+          {
+            mark: "band",
+            color:
+              lane.steering === "generative"
+                ? "var(--gd-gen)"
+                : lane.steering === "vegetative"
+                  ? "var(--gd-veg)"
+                  : "var(--muted-foreground)",
+            label: "Pore EC target",
+            detail: "on the right axis",
+          } as KeyItem,
+        ]
+      : []),
+    ...(now < day.end
+      ? [
+          {
+            mark: "band",
+            color: "color-mix(in srgb, var(--foreground) 15%, transparent)",
+            label: "After now",
+            detail: "expected, not recorded",
+          } as KeyItem,
+        ]
+      : []),
+    ...(now >= day.start && now <= day.end ? [NOW_KEY] : []),
+  ];
   return (
     <div className="timeline-body">
       <div className="grow-chart" ref={box}>
@@ -1112,6 +1169,7 @@ function DayChart({
         <Legend
           steering={lane.steering}
           jev={lane.jevOn}
+          typical={compare === "typical"}
           compare={
             compare === "yesterday"
               ? (lane.versus?.name ?? "Yesterday")
@@ -1124,6 +1182,7 @@ function DayChart({
           hidden={hidden}
           onToggle={toggle}
         />
+        <ChartKey className="grow-key" label="Chart marks" items={marks} />
         <span className="label-with-tip">
           <label className="grow-readout-choice">
             Readings
@@ -1155,19 +1214,22 @@ function DayChart({
 function Legend({
   steering,
   jev,
+  typical,
   compare,
   hidden,
   onToggle,
 }: {
   steering: Steering | null;
   jev: boolean;
+  /** The comparison is the typical day: a band, not a line. */
+  typical: boolean;
   compare: string | null;
   hidden: ReadonlySet<ChartLayer>;
   onToggle: (layer: ChartLayer) => void;
 }) {
   const kind: Steering = steering ?? "vegetative";
   const entry = (layer: ChartLayer, title: string | undefined, children: ReactNode) => (
-    <li>
+    <li key={layer}>
       <button
         type="button"
         title={title}
@@ -1179,25 +1241,43 @@ function Legend({
       </button>
     </li>
   );
-  return (
-    <ul className="grow-legend" aria-label="Chart key">
-      {entry(
+  const entries: [ChartLayer, ReactNode][] = [
+    [
+      "vwc",
+      entry(
         "vwc",
-        "Solid: recorded today. Dashed: what is expected for the rest of the day, an estimate.",
+        "Solid: recorded today. Dotted: projected for the rest of the day, an estimate.",
         <>
           <i className="key-vwc" aria-hidden="true" />
           VWC
         </>,
-      )}
-      {entry(
+      ),
+    ],
+    [
+      "band",
+      entry(
+        "band",
+        "From the re-water point up to the peak target, in the ramp and maintenance hours. Below the re-water point, P2 gives a maintenance shot.",
+        <>
+          <i className="key-band" aria-hidden="true" />
+          Maintenance band
+        </>,
+      ),
+    ],
+    [
+      "ec",
+      entry(
         "ec",
         "Right-hand axis, mS/cm. Green while steering vegetative, purple while generative.",
         <>
           <i className="key-ec" data-steering={kind} aria-hidden="true" />
           Pore EC
         </>,
-      )}
-      {entry(
+      ),
+    ],
+    [
+      "shots",
+      entry(
         "shots",
         undefined,
         <>
@@ -1206,8 +1286,11 @@ function Legend({
           <i className="key-held" aria-hidden="true" />
           held
         </>,
-      )}
-      {entry(
+      ),
+    ],
+    [
+      "fc",
+      entry(
         "fc",
         "Field capacity, with a thin runoff band: just above it for vegetative steering, just under it for generative.",
         <>
@@ -1215,41 +1298,64 @@ function Legend({
           <i className="key-runoff" data-steering={kind} aria-hidden="true" />
           FC · runoff
         </>,
-      )}
-      {entry(
-        "band",
-        "From the re-water point up to the peak target, in the ramp and maintenance hours. Below the re-water point, P2 gives a maintenance shot.",
-        <>
-          <i className="key-band" aria-hidden="true" />
-          Maintenance band
-        </>,
-      )}
-      {entry(
+      ),
+    ],
+    [
+      "rescue",
+      entry(
         "rescue",
         "Overnight, the controller waters only below this level.",
         <>
           <i className="key-rescue" aria-hidden="true" />
           Rescue floor
         </>,
+      ),
+    ],
+    ...(jev
+      ? ([
+          [
+            "jev",
+            entry(
+              "jev",
+              "Filled: code acted on it. Outline: advice, no action, or refused.",
+              <>
+                <i className="key-jev" aria-hidden="true" />
+                AI assistant decision
+              </>,
+            ),
+          ],
+        ] as [ChartLayer, ReactNode][])
+      : []),
+    ...(compare
+      ? ([
+          [
+            "compare",
+            entry(
+              "compare",
+              "Drawn on today’s scale: an earlier day beyond it runs off the edge.",
+              <>
+                <i className="key-compare" data-typical={typical || undefined} aria-hidden="true" />
+                {compare}
+              </>,
+            ),
+          ],
+        ] as [ChartLayer, ReactNode][])
+      : []),
+  ];
+  // Every layer drawn has its entry in the key; only the layers switched off wait behind "More
+  // layers", each still a switch to turn it back on.
+  const off = entries.filter(([layer]) => hidden.has(layer));
+  return (
+    <ul className="grow-legend" aria-label="Chart key">
+      {entries.filter(([layer]) => !hidden.has(layer)).map(([, item]) => item)}
+      {off.length > 0 && (
+        <li className="grow-legend-more">
+          <details>
+            <summary>More layers ({off.length} off)</summary>
+            <ul>{off.map(([, item]) => item)}</ul>
+          </details>
+        </li>
       )}
-      {jev &&
-        entry(
-          "jev",
-          "Filled: code acted on it. Outline: advice, no action, or refused.",
-          <>
-            <i className="key-jev" aria-hidden="true" />
-            AI assistant decision
-          </>,
-        )}
-      {compare &&
-        entry(
-          "compare",
-          "Drawn on today’s scale: an earlier day beyond it runs off the edge.",
-          <>
-            <i className="key-compare" aria-hidden="true" />
-            {compare}
-          </>,
-        )}
     </ul>
   );
 }
@@ -1566,6 +1672,10 @@ function Chart({
         </clipPath>
       </defs>
       <rect x={L} y={0} width={plotW} height={8} rx={4} fill={`url(#${id}-light)`} />
+      {/* After now the chart is what is expected, not what was recorded: a faint wash says so. */}
+      {nowX < L + plotW && (
+        <rect x={nowX} y={TOP} width={L + plotW - nowX} height={H} className="future-wash" />
+      )}
       <text x={L - 6} y={10} className="axis-title" textAnchor="end">
         VWC
       </text>
@@ -1579,8 +1689,12 @@ function Chart({
       ))}
       {show("ec") && ecAxis && lane.ec.length > 0 && (
         <g className="ec-axis" data-steering={lane.steering ?? undefined}>
+          {/* The right axis's title, its unit under it: "EC · mS/cm" would not fit the margin. */}
           <text x={L + plotW + 7} y={10} className="axis-title">
             EC
+            <tspan x={L + plotW + R} dy={12} textAnchor="end" className="axis-unit">
+              mS/cm
+            </tspan>
           </text>
           {lane.ecBand && (
             <rect
@@ -1685,6 +1799,18 @@ function Chart({
         )}
         {show("vwc") && <path d={linePath(points, x, y)} className="vwc-line" data-layer="vwc" />}
       </g>
+      {/* The estimate named where it starts, over its first crest so it clears the measured line. */}
+      {show("vwc") &&
+        projection &&
+        projection.points.length > 1 &&
+        (() => {
+          const crest = projection.points.reduce((top, point) => (point.value > top.value ? point : top));
+          return (
+            <text x={x(crest.time)} y={y(crest.value) - 8} className="ref-label projection-label">
+              Projected
+            </text>
+          );
+        })()}
       {show("fc") && fcNow !== null && vwcAxis && (
         <text
           x={L + plotW - 4}
@@ -1714,7 +1840,7 @@ function Chart({
           y={onAxis(rescueNow.value) ? y(rescueNow.value) - 4 : bottom - 4}
           className="ref-label rescue"
         >
-          Rescue {number(rescueNow.value)}%{onAxis(rescueNow.value) ? "" : " ↓"}
+          Rescue {number(rescueNow.value)}%{onAxis(rescueNow.value) ? "" : " · below range ↓"}
         </text>
       )}
       {!points.length && (
@@ -1780,6 +1906,11 @@ function Chart({
       )}
       <line x1={nowX} x2={nowX} y1={0} y2={bottom} className="now-line" />
       <path d={`M${nowX - 4} 9L${nowX + 4} 9L${nowX} 14Z`} className="now-mark" />
+      {nowX < L + plotW - 30 && (
+        <text x={nowX + 5} y={TOP + 12} className="now-label">
+          Now
+        </text>
+      )}
       {badges.map(({ column, cx, word }, index) => (
         <g key={index} className="phase-badge" data-future={column.future || undefined}>
           <circle cx={cx} cy={bottom + 12} r={BADGE / 2} />
@@ -1824,8 +1955,8 @@ function columnText(column: Column, lane: Lane, day: GrowDay, now: number): stri
 }
 
 /** A clock hour short enough for an axis: "4 PM", "16". */
-const hourLabel = (time: number) =>
-  formatDateTime(time, { hour: "numeric", minute: "2-digit" }).replace(/:00(?=\D|$)/, "");
+// Always a clock time ("10:00"), never a bare hour that could read as a value.
+const hourLabel = (time: number) => formatDateTime(time, { hour: "numeric", minute: "2-digit" });
 const diamond = (cx: number, cy: number) =>
   `M${cx} ${cy - 5}L${cx + 5} ${cy}L${cx} ${cy + 5}L${cx - 5} ${cy}Z`;
 /** The recorded VWC as one path, broken where readings stop for more than 20 minutes. */

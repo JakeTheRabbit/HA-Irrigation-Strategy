@@ -21,6 +21,8 @@ export interface TimelineRequest {
   attributeIds: string[];
   start: number;
   end: number;
+  /** All rooms reads every discovered room's own entities, not only the selected room's. */
+  allRooms?: boolean;
 }
 export interface Span {
   start: number;

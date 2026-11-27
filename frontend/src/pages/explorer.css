@@ -240,16 +240,16 @@
   font-size: var(--text-xs);
   font-weight: 650;
   white-space: nowrap;
-  background: #6b7580;
+  background: var(--phase-p0);
 }
 .explorer-phase[data-phase="P1"] {
-  background: #2f6fb5;
+  background: var(--phase-p1);
 }
 .explorer-phase[data-phase="P2"] {
-  background: #6450b0;
+  background: var(--phase-p2);
 }
 .explorer-phase[data-phase="P3"] {
-  background: #34405a;
+  background: var(--phase-p3);
 }
 .explorer-phase[data-planned] {
   background: color-mix(in srgb, var(--muted-foreground) 18%, var(--surface));
@@ -354,22 +354,34 @@
   display: block;
 }
 .explorer-band {
-  fill: color-mix(in srgb, var(--success) 9%, transparent);
+  fill: var(--band-ec);
+}
+.explorer-band[data-band-kind="vwc"] {
+  fill: var(--band-vwc);
 }
 .explorer-band-edge {
-  stroke: var(--border);
+  stroke: var(--band-ec-edge);
   stroke-dasharray: 4 4;
 }
+.explorer-band-edge[data-band-kind="vwc"] {
+  stroke: var(--band-vwc-edge);
+}
+/* What is still ahead: a sparse, quiet hatch and the plain word. */
 .explorer-ahead {
   position: absolute;
   top: 0;
   right: 0;
   bottom: 0;
+  padding: 4px 6px;
+  overflow: hidden;
   background: repeating-linear-gradient(
     -45deg,
-    color-mix(in srgb, var(--muted-foreground) 14%, transparent) 0 2px,
-    transparent 2px 9px
+    color-mix(in srgb, var(--muted-foreground) 9%, transparent) 0 1px,
+    transparent 1px 14px
   );
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+  text-align: right;
   pointer-events: none;
 }
 .explorer-marker {
@@ -389,17 +401,35 @@
   stroke-opacity: 0.6;
 }
 .explorer-now {
-  stroke: var(--foreground);
-  stroke-width: 1.5;
-}
-.explorer-cross {
   stroke: var(--primary);
+  stroke-width: 2;
+}
+/* The pointer crosshair stays off the Now line's colour, so the two never read alike. */
+.explorer-cross {
+  stroke: var(--foreground);
   stroke-width: 1.2;
+  stroke-opacity: 0.7;
+}
+/* The lanes over the charts share their time axis: they start past the scale's gutter. */
+.explorer-lane > :last-child {
+  margin-left: 48px;
+}
+/* The scale's own gutter beside the plot. */
+.explorer-plot-box {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  min-width: 0;
+}
+.explorer-y-axis {
+  position: relative;
+  height: 180px;
 }
 .explorer-y {
   position: absolute;
-  left: 8px;
+  right: 6px;
   z-index: 1;
+  text-align: right;
+  white-space: nowrap;
   color: var(--muted-foreground);
   font-size: var(--text-xs);
   pointer-events: none;
@@ -411,7 +441,7 @@
   bottom: 4px;
 }
 .explorer-marker-label,
-.explorer-note,
+.explorer-note-mark,
 .explorer-now-label,
 .explorer-pill {
   position: absolute;
@@ -428,23 +458,86 @@
   background: var(--surface);
   color: var(--foreground);
 }
-.explorer-note {
-  top: 30px;
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  max-width: 16rem;
-  padding: 2px 8px;
-  overflow: hidden;
+/* A note's numbered mark in the plot, its words in the list under it. */
+.explorer-note-mark {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  margin-left: -9px;
+  border: 1.5px solid var(--warning-mark);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--foreground);
+  font-size: var(--text-xs);
+  font-weight: 700;
+}
+.explorer-chart-key {
+  grid-column: 2;
+}
+.explorer-notes-wrap {
+  grid-column: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 6px 0 0;
+}
+.explorer-notes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.explorer-notes-more {
+  padding: 2px 10px;
+  border: 1px solid var(--border);
   border-radius: 999px;
-  background: color-mix(in srgb, var(--warning) 16%, var(--surface));
+  background: transparent;
+  color: var(--muted-foreground);
+  font-size: var(--text-xs, 0.75rem);
+  cursor: pointer;
+}
+.explorer-notes-more:hover {
+  color: var(--foreground);
+  border-color: var(--foreground);
+}
+.explorer-note {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   color: color-mix(in srgb, var(--warning) 60%, var(--foreground));
-  text-overflow: ellipsis;
+  font-size: var(--text-label);
+  line-height: var(--leading-label);
+  font-weight: 600;
+}
+.explorer-note > b {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 18px;
+  height: 18px;
+  border: 1.5px solid var(--warning-mark);
+  border-radius: 50%;
+  color: var(--foreground);
+  font-size: var(--text-xs);
+}
+.explorer-note > svg {
+  flex: none;
+  color: var(--warning-mark);
+}
+/* The levels between the ends: light rules under the lines. */
+.explorer-grid {
+  stroke: color-mix(in srgb, var(--foreground) 8%, transparent);
+  stroke-width: 1;
 }
 .explorer-now-label {
   bottom: 6px;
   margin-left: 6px;
-  color: var(--foreground);
+  color: var(--primary);
+  font-weight: 600;
 }
 .explorer-pill {
   bottom: 6px;
@@ -457,7 +550,11 @@
 .explorer-ticks {
   position: relative;
   height: 20px;
-  margin: 0 18px 0 0;
+  margin: 0 18px 0 48px;
+}
+/* Under each chart, a phone's few times (the wide layout has one axis under them all). */
+.explorer-chart-ticks {
+  display: none;
 }
 .explorer-ticks span {
   position: absolute;
@@ -500,8 +597,23 @@
   .explorer-lane-note > span:first-child {
     display: none;
   }
-  .explorer-plot {
-    height: 150px;
+  .explorer-chart-key,
+  .explorer-notes-wrap {
+    grid-column: 1;
+  }
+  .explorer-chart-ticks {
+    position: relative;
+    display: block;
+    height: 18px;
+    margin: 2px 0 0 48px;
+  }
+  .explorer-chart-ticks span {
+    position: absolute;
+    top: 0;
+    color: var(--muted-foreground);
+    font-size: var(--text-xs);
+    transform: translateX(-50%);
+    white-space: nowrap;
   }
   .explorer-legend ul {
     grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
@@ -576,4 +688,57 @@
     grid-column: 1 / -1;
     grid-row: 2;
   }
+}
+
+/* A phase segment names itself only when it has room (48 px); narrower, just its P0–P3. */
+.explorer-phase {
+  container-type: inline-size;
+}
+.explorer-phase-short {
+  display: none;
+}
+/* The query reads the content box: "P2 maintain" needs ~78 px; narrower switches cleanly to P0–P3. */
+@container (max-width: 78px) {
+  .explorer-phase-long {
+    display: none;
+  }
+  .explorer-phase-short {
+    display: inline;
+  }
+}
+/* A phone: the series toggles fold under one line. */
+.explorer-series > summary {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-weight: 600;
+  cursor: pointer;
+  list-style: none;
+}
+.explorer-series > summary::-webkit-details-marker {
+  display: none;
+}
+.explorer-series > summary::after {
+  content: "▸";
+  margin-left: auto;
+  color: var(--muted-foreground);
+}
+.explorer-series[open] > summary::after {
+  content: "▾";
+}
+.explorer-series[open] > .explorer-chips {
+  margin-top: 8px;
+}
+/* Too narrow even for its P0–P3: the colour and the legend carry it. */
+@container (max-width: 13px) {
+  .explorer-phase-short {
+    display: none;
+  }
+}
+.explorer-clipped {
+  stroke: var(--surface);
+  stroke-width: 1;
 }

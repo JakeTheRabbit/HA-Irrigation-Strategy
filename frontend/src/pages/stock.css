@@ -140,7 +140,7 @@
   text-align: center;
 }
 .stock-card[data-stock-next] {
-  border-color: var(--warning);
+  border-color: var(--warning-mark);
 }
 .stock-card h2 {
   margin: 8px 0 0;
@@ -231,16 +231,13 @@
   margin: 0;
   font-size: var(--text-lg);
 }
-.stock-legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 14px;
+.stock-weekly .chart-key {
   margin: 0;
-  padding: 0;
-  list-style: none;
-  font-size: var(--text-sm);
 }
-.stock-legend li,
+.stock-weekly-chart .stock-now-label {
+  fill: var(--primary);
+  font-weight: 600;
+}
 .stock-refill-tank {
   display: inline-flex;
   align-items: center;

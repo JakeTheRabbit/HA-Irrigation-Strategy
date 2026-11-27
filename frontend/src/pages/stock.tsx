@@ -5,14 +5,16 @@ import {
   BarChart,
   CartesianGrid,
   Cell,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from "recharts";
 import { toast } from "sonner";
-import { FlaskConical, Pencil, Plus, Trash2, TriangleAlert } from "lucide-react";
+import { Clock, FlaskConical, Pencil, Plus, Trash2, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ChartKey, NOW_KEY, type KeyItem } from "@/components/chart-key";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -24,6 +26,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Empty, Heading, number, type Page } from "@/components/dashboard";
+import { KpiCard, KpiGrid } from "@/components/ha-primitives";
 import { UiTip } from "@/components/info-tip";
 import {
   MIN_BOTTLE,
@@ -293,14 +296,29 @@ function UsedPerWeek({ doc, tz }: { doc: StockDocument; tz: string }) {
     <section className="panel stock-weekly" data-stock-weekly aria-labelledby="stock-weekly-title">
       <div className="stock-panel-head">
         <h2 id="stock-weekly-title">Used per week</h2>
-        <ul className="stock-legend" aria-label="Tanks">
-          {doc.tanks.map((tank, index) => (
-            <li key={tank.id} data-stock-hue={index % 8}>
-              <span className="stock-swatch" aria-hidden="true" />
-              {tank.name}
-            </li>
-          ))}
-        </ul>
+        <ChartKey
+          items={[
+            ...doc.tanks.map(
+              (tank, index): KeyItem => ({
+                mark: "bar",
+                color: `var(--stock-hue-${index % 8})`,
+                label: tank.name,
+                detail: "used that week",
+              }),
+            ),
+            ...(weeks.at(-1)?.partial
+              ? [
+                  {
+                    mark: "bar",
+                    color: "color-mix(in srgb, var(--muted-foreground) 45%, transparent)",
+                    label: "This week so far",
+                    detail: "faded bar",
+                  } satisfies KeyItem,
+                  NOW_KEY,
+                ]
+              : []),
+          ]}
+        />
       </div>
       {rows.length ? (
         <>
@@ -346,6 +364,14 @@ function UsedPerWeek({ doc, tz }: { doc: StockDocument; tz: string }) {
                     ))}
                   </Bar>
                 ))}
+                {weeks.at(-1)?.partial && (
+                  <ReferenceLine
+                    x="This week"
+                    stroke="var(--primary)"
+                    strokeWidth={2}
+                    label={{ value: "Now", position: "insideTopRight", className: "stock-now-label" }}
+                  />
+                )}
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -736,6 +762,39 @@ export function StockTanks({
       )}
       {doc && !!doc.tanks.length && (
         <>
+          <KpiGrid>
+            <KpiCard
+              icon={TriangleAlert}
+              tone={
+                next && stockState(next.tank) === "very-low"
+                  ? "error"
+                  : next && stockState(next.tank) === "low"
+                    ? "warning"
+                    : "primary"
+              }
+              label="Next to run out"
+              value={next ? next.tank.name : "All full"}
+              detail={
+                next
+                  ? (outlookWords(next.tank, doses[next.tank.id] ?? next.tank.dose_ml, links.get(next.tank.id) ?? null, every) ?? `${volume(next.tank.level_l)} left`)
+                  : "No low concentrates"
+              }
+            />
+            <KpiCard
+              icon={FlaskConical}
+              tone={doc.tanks.some((t) => stockState(t) !== "ok") ? "warning" : "success"}
+              label="Low concentrates"
+              value={doc.tanks.filter((t) => stockState(t) !== "ok").length}
+              detail={`of ${doc.tanks.length} configured tanks`}
+            />
+            <KpiCard
+              icon={Clock}
+              tone="neutral"
+              label="Batch rhythm"
+              value={every ? `Every ${number(every, 1)} d` : "—"}
+              detail={links.size ? `${links.size} linked to dosing pumps` : "Tracked by batch count"}
+            />
+          </KpiGrid>
           <p className="stock-rhythm" data-stock-rhythm>
             {doc.tanks.some((tank) => Math.cbrt(tank.capacity_l / largest) < MIN_BOTTLE)
               ? "Drawn to scale, the smallest tanks a little larger"

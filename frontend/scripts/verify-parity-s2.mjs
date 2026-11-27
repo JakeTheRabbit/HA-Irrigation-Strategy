@@ -81,7 +81,7 @@ await runParity({
     const zone = (n) => page.locator(`article.today-zone[data-zone="${n}"]`);
     for (const n of [1, 2, 3]) {
       assert.equal(await zone(n).locator(".today-gauge").count(), 3, `${label}: zone ${n} gauges`);
-      assert.equal(await zone(n).getByText(/^target /).count(), v318 ? 3 : 1, `${label}: zone ${n} targets`);
+      assert.equal(await zone(n).getByText(/^(target|ramping to|P2 band) /).count(), v318 ? 3 : 1, `${label}: zone ${n} targets`);
       const href = await zone(n).locator(`a[href$="#/zone/${n}"]`).getAttribute("href");
       assert.equal(new URL(href, "http://x/").searchParams.get("room"), "room:room_b_", `${label}: zone ${n} link room`);
     }

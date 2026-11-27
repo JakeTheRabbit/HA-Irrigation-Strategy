@@ -41,42 +41,26 @@
   stroke: var(--destructive);
 }
 .tank-level .level-mark-remind {
-  stroke: var(--warning);
+  stroke: var(--warning-mark);
 }
 .tank-level .level-mark-label {
   paint-order: stroke;
   stroke: var(--surface);
   stroke-width: 3px;
 }
-.tank-level .key-minimum,
-.tank-level .key-remind {
-  height: 0 !important;
-  border-top: 2px dashed var(--destructive);
+/* Now: the right edge of the range, in the key's Now colour. */
+.tank-level .now-line {
+  stroke: var(--primary);
+  stroke-width: 2;
+  opacity: 1;
 }
-.tank-level .key-remind {
-  border-top-color: var(--warning);
-}
-.tank-level .key-level {
-  border-top: 2px solid var(--primary);
-}
-.tank-level .key-pump,
-.tank-level .key-filling {
-  height: 8px !important;
-  border-radius: 2px;
-  background: var(--primary);
-}
-.tank-level .key-filling {
-  background: var(--gd-veg);
-}
-.tank-level .key-fill {
-  width: 0 !important;
-  height: 12px !important;
-  border-left: 2px dashed var(--gd-veg);
+.tank-level .now-label {
+  fill: var(--primary);
 }
 .tank-level .tank-level-note {
   margin: 10px 0 0;
-  font-size: var(--text-xs);
-  line-height: 1.5;
+  font-size: var(--text-label);
+  line-height: var(--leading-label);
   color: var(--muted-foreground);
 }
 .tank-level .tank-history-note,

@@ -50,8 +50,8 @@
 .sensor-context-note {
   margin: 0 16px 16px;
   color: var(--muted-foreground);
-  font-size: var(--text-xs);
-  line-height: 1.5;
+  font-size: var(--text-label);
+  line-height: var(--leading-label);
 }
 .sensor-context-loading {
   min-height: 170px;
@@ -64,29 +64,6 @@
   .sensor-context-body .sensor-chart {
     transition: opacity 0.15s ease;
   }
-}
-.sensor-key {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px 16px;
-  padding: 0 16px 4px;
-  color: var(--muted-foreground);
-  font-size: var(--text-xs);
-}
-.sensor-key span {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-.sensor-key i {
-  width: 20px;
-  border-top: 2px solid var(--sc-setpoint);
-}
-.sensor-key i.sensor-key-saved {
-  border-top: 2px dashed var(--muted-foreground);
-}
-.sensor-key i.sensor-key-learned {
-  border-top: 2px dotted var(--foreground);
 }
 .sensor-chart {
   padding: 10px 16px 4px;
@@ -228,6 +205,15 @@
   stroke-width: 3px;
   stroke-linejoin: round;
 }
+.sensor-now {
+  stroke: var(--primary);
+  stroke-width: 2;
+}
+.sensor-now-label {
+  fill: var(--primary);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
 .sensor-crosshair line {
   stroke: var(--muted-foreground);
   stroke-width: 1;
@@ -278,8 +264,8 @@
 .sensor-context-caption {
   margin: 10px 16px 16px;
   color: var(--muted-foreground);
-  font-size: var(--text-xs);
-  line-height: 1.5;
+  font-size: var(--text-label);
+  line-height: var(--leading-label);
 }
 /* A suggested value under a field, beside the button that copies it into the local draft. */
 .setting-suggestion {

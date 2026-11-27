@@ -90,6 +90,19 @@ export function useDisplayUnits(controller: Controller): DisplayUnits {
 /** Never more digits than the source has. */
 const fixed = (value: number, digits: number) => value.toFixed(Math.max(0, digits));
 
+/** The digits a reading came with, float noise removed and never more than `max`: Home Assistant
+ * can hand over 19.8333996337891 for a 19.8 probe. */
+export const readingDigits = (value: number, max: number) =>
+  Math.min(max, (String(Number(value.toPrecision(12))).split(".")[1] ?? "").length);
+
+/** An entity's raw state for display: a number at most `digits` decimals, any other state as is. */
+export function formatState(state: string, digits = 2): string {
+  const value = Number(state);
+  return state.trim() !== "" && Number.isFinite(value)
+    ? value.toLocaleString(undefined, { maximumFractionDigits: digits })
+    : state;
+}
+
 export function formatEc(ms: number, sourceDigits: number): string {
   const { ec } = getDisplayUnits();
   if (ec === "mS/cm") return `${fixed(ms, sourceDigits)} mS/cm`;

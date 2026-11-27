@@ -23,8 +23,8 @@ export function NotificationPredictions({ controller }: { controller: Controller
   return (
     <section className="panel settings-section">
       <div className="settings-label">
-        <h2>Notifications</h2>
-        <p>The controller&rsquo;s vitals report, for {controller.room.room.name}.</p>
+        <h2>Vitals report</h2>
+        <p>The controller&rsquo;s daily vitals summary, for {controller.room.room.name}.</p>
       </div>
       <div id="config-notify_predictions">
         <div className="label-with-tip">

@@ -13,6 +13,7 @@ import type { SteCopy } from "./ste-copy";
 import type { ProjectionIntent } from "./strategy-review";
 import { clock, dayKey, dayLabel, startOfDay, wallHhmm } from "./time";
 import type { Controller, RoomView, States } from "./types";
+import { zoneColour } from "./zone-colours";
 
 const DAY = 86_400_000;
 const HOUR = 3_600_000;
@@ -795,26 +796,51 @@ export function chartNotes(
     if (!series.includes(reading.key)) continue;
     const points = reading.points.filter((p) => Number.isFinite(p.v));
     const band = reading.band;
-    if (band)
+    if (band) {
+      const sideOf = (v: number) => (v > band[1] ? "over" : v < band[0] ? "under" : null);
+      type Excursion = { first: number; last: number; back: number | null; side: "over" | "under"; count: number };
+      const runs: Excursion[] = [];
       for (let i = 0; i < points.length; i++) {
-        const sideOf = (v: number) => (v > band[1] ? "over" : v < band[0] ? "under" : null);
         const side = sideOf(points[i].v);
         if (!side) continue;
         let j = i;
         while (j + 1 < points.length && sideOf(points[j + 1].v) === side) j++;
-        const back = points[j + 1];
-        // Out of the band from the first reading: it left before the range, so say only when it came back.
-        const when =
-          i === 0
-            ? back
-              ? `until ${time(back.t)}`
-              : "all through this range"
-            : back
-              ? `${time(points[i].t)} to ${time(back.t)}`
-              : `since ${time(points[i].t)}`;
-        notes.push({ at: points[i].t, series: reading.key, text: `${reading.label} ${side} the band ${when}` });
+        const back = j + 1 < points.length ? j + 1 : null;
+        const prev = runs[runs.length - 1];
+        // Coalesce repeated crossings on the same side separated by <= 45 min (sensor noise riding the band edge).
+        if (
+          prev &&
+          prev.side === side &&
+          prev.back !== null &&
+          points[i].t - points[prev.back].t <= 45 * MIN
+        ) {
+          prev.last = j;
+          prev.back = back;
+          prev.count += 1;
+        } else {
+          runs.push({ first: i, last: j, back, side, count: 1 });
+        }
         i = j;
       }
+      for (const run of runs) {
+        const backPoint = run.back !== null ? points[run.back] : undefined;
+        // Out of the band from the first reading: it left before the range, so say only when it came back.
+        const when =
+          run.first === 0
+            ? backPoint
+              ? `until ${time(backPoint.t)}`
+              : "all through this range"
+            : backPoint
+              ? `${time(points[run.first].t)} to ${time(backPoint.t)}`
+              : `since ${time(points[run.first].t)}`;
+        const repeats = run.count > 1 ? ` (${run.count}×)` : "";
+        notes.push({
+          at: points[run.first].t,
+          series: reading.key,
+          text: `${reading.label} ${run.side} the band ${when}${repeats}`,
+        });
+      }
+    }
     if (reading.kind === "level") {
       // A level of 0 or less is a probe dropout: a gap, so its recovery is not a refill.
       const points = reading.points.filter((p) => Number.isFinite(p.v) && p.v > 0);
@@ -907,7 +933,6 @@ export interface ExplorerSeries {
   kind: SensorKind;
 }
 /** Zones keep one colour on every chart; Feed, Tank and the room have their own. */
-const ZONE_COLORS = ["#1e88e5", "#d84f7a", "#5c8f3a", "#8e5cd9", "#e08a00", "#00897b"];
 const GROUP_COLORS: Record<string, string> = { feed: "#3a9aa5", tank: "#3f7fbf", room: "#c0763a" };
 const OTHER: Record<string, { group: "feed" | "tank" | "room"; chip: string }> = {
   "Feed EC": { group: "feed", chip: "EC" },
@@ -928,7 +953,7 @@ const GROUP_NAMES = { feed: "Feed", tank: "Tank", room: "Room" } as const;
 export function explorerSeries(room: RoomView, sensors: readonly ExplorerSensor[]): ExplorerSeries[] {
   const list: ExplorerSeries[] = [];
   room.zones.forEach((zone, index) => {
-    const color = ZONE_COLORS[index % ZONE_COLORS.length];
+    const color = zoneColour(index);
     for (const sensor of sensors.filter((s) => s.zone === zone.id)) {
       const fused = sensor.entityId === zone.vwc.entityId || sensor.entityId === zone.ec.entityId;
       const root = sensor.kind === "climate";

@@ -1,16 +1,19 @@
 import { CanonicalControls } from "@/components/canonical-controls";
 import { Fragment, useEffect, useRef, useState } from "react";
-import { ArrowRight, Search, TriangleAlert } from "lucide-react";
+import { Activity, ArrowRight, Cpu, Search, Sparkles, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Empty, Heading, Status, time, type Page } from "@/components/dashboard";
+import { AlertCodeText } from "@/components/alert-code-text";
+import { ChartKey, NOW_KEY } from "@/components/chart-key";
+import { KpiCard, KpiGrid } from "@/components/ha-primitives";
 import { UiTip } from "@/components/info-tip";
 import { JevTrouble, jevUsage } from "@/components/jev-status";
 import { Pill, Sparkline } from "@/components/mini-visuals";
 import { NeedsIntegration } from "@/components/needs-integration";
 import { ReviewApply, type ReviewRow } from "@/components/review-apply";
 import { ageText, readHeartbeat } from "@/lib/controller-health";
-import { formatEc, formatTemp } from "@/lib/display-units";
+import { formatEc, formatState, formatTemp } from "@/lib/display-units";
 import { recentReadings } from "@/lib/dryback";
 import { brainWords, readJev } from "@/lib/jev";
 import { descriptor, numeric } from "@/lib/model";
@@ -188,12 +191,20 @@ export function Probes({
         description={`${counts.total} ${counts.total === 1 ? "probe" : "probes"} · ${counts.used} in zone values · raw readings always kept`}
         action={<UiTip copyKey="probes" />}
       />
-      <CanonicalControls controller={controller} owner="probes" onDirtyChange={onDirtyChange} />
-      <section className="panel probes-status" aria-label="Controller and AI assistant">
-        <div>
-          <span className="eyebrow">Controller</span>
-          <strong>
-            {heartbeat.health === "fresh"
+      <KpiGrid className="probes-status" >
+        <KpiCard
+          icon={Cpu}
+          tone={counts.healthy === counts.total ? "success" : "warning"}
+          label="Probe health"
+          value={`${counts.healthy} / ${counts.total}`}
+          detail={`${counts.used} in zone values`}
+        />
+        <KpiCard
+          icon={Activity}
+          tone={heartbeat.health === "fresh" ? "success" : heartbeat.health === "stale" || heartbeat.health === "stopped" ? "error" : "warning"}
+          label="Controller"
+          value={
+            heartbeat.health === "fresh"
               ? "Reporting"
               : heartbeat.health === "stale"
                 ? "Not reporting"
@@ -201,23 +212,23 @@ export function Probes({
                   ? "No heartbeat"
                   : heartbeat.health === "stopped"
                     ? "Stopped"
-                    : "Heartbeat unreadable"}
-          </strong>
-          <span className="muted small">
-            {heartbeat.at === null
-              ? "No time on its last report"
-              : `Last report ${ageText(now - heartbeat.at)} ago`}
-            {status ? ` · ${status.replaceAll("_", " ")}` : ""}
-          </span>
-        </div>
-        <div>
-          <span className="eyebrow">AI assistant</span>
-          <strong>{brainWords(jev).tile}</strong>
-          <span className="muted small">
-            {jev?.on ? jevUsage(jev, true) || "No calls today" : brainWords(jev).detail}
-          </span>
-        </div>
-      </section>
+                    : "Unreadable"
+          }
+          detail={
+            heartbeat.at === null
+              ? "No report time"
+              : `${ageText(now - heartbeat.at)} ago${status ? ` · ${status.replaceAll("_", " ")}` : ""}`
+          }
+        />
+        <KpiCard
+          icon={Sparkles}
+          tone={jev?.on ? "primary" : "neutral"}
+          label="AI assistant"
+          value={brainWords(jev).tile}
+          detail={jev?.on ? jevUsage(jev, true) || "No calls today" : brainWords(jev).detail}
+          onClick={() => navigate("today/ai")}
+        />
+      </KpiGrid>
       {jev && <JevTrouble jev={jev} />}
       {room.alerts.length > 0 && (
         <div className="attention-list">
@@ -225,7 +236,7 @@ export function Probes({
             <div className={`attention attention-${notice.severity}`} key={notice.id}>
               <div>
                 <strong>{notice.title}</strong>
-                <p>{notice.detail}</p>
+                <p><AlertCodeText text={notice.detail} /></p>
               </div>
             </div>
           ))}
@@ -280,6 +291,16 @@ export function Probes({
               </table>
             </div>
           )}
+          {!!rows.length && (
+            <ChartKey
+              label="Probe table key"
+              items={[
+                { mark: "bar", color: "var(--success)", label: "Probe spread", detail: "lowest to highest probe, on a scale of ±10 points" },
+                { mark: "tick", color: "var(--foreground)", label: "Zone value" },
+                ...(history ? [{ mark: "line", color: "var(--primary)", label: `Moisture, last ${PROBE_H} h` } as const, NOW_KEY] : []),
+              ]}
+            />
+          )}
         </section>
         <aside className="probes-aside">
           <SubstrateCurve room={room} probes={probes} missing={offsets.missing} offsets={offsets.rooms[room.room.id] ?? null} />
@@ -321,34 +342,42 @@ export function Probes({
               <h2 id="probes-room-title">Pump, main line and feed</h2>
               <p>As Home Assistant reports them. “Off” does not prove a valve closed or no flow.</p>
             </div>
+            <p className="probes-feed-cal">
+              <a href="#/equipment/feed-calibration">Calibrate feed pH &amp; EC →</a>
+            </p>
           </div>
           <ul className="probes-hardware">
             {hardware.map(([label, id]) => {
               const entity = states[id];
               return (
                 <li key={id}>
-                  <span>
+                  <div className="probes-hw-head">
                     <strong>{label}</strong>
+                    <span className="numeric probes-hw-val">
+                      {entity
+                        ? `${formatState(entity.state)} ${String(entity.attributes.unit_of_measurement ?? "")}`.trim()
+                        : "Not in HA"}
+                    </span>
+                  </div>
+                  <div className="probes-hw-meta">
                     <code>{id}</code>
-                  </span>
-                  <span className="numeric">
-                    {entity
-                      ? `${entity.state} ${String(entity.attributes.unit_of_measurement ?? "")}`.trim()
-                      : "Not in Home Assistant"}
-                  </span>
-                  <span className="muted small">
-                    {entity?.last_updated ? time(entity.last_updated) : ""}
-                  </span>
+                    <span className="muted small">
+                      {entity?.last_updated ? time(entity.last_updated) : ""}
+                    </span>
+                  </div>
                 </li>
               );
             })}
           </ul>
         </section>
       )}
-      <p className="probes-feed-cal">
-        <a href="#/equipment/feed-calibration">Feed pH and EC probes: Calibrate →</a>
-      </p>
+      {hardware.length === 0 && (
+        <p className="probes-feed-cal">
+          <a href="#/equipment/feed-calibration">Feed pH and EC probes: Calibrate →</a>
+        </p>
+      )}
       <RoomMap controller={controller} navigate={navigate} />
+      <CanonicalControls controller={controller} owner="probes" onDirtyChange={onDirtyChange} />
       <ControllerInternals controller={controller} />
       <p className="footnote">
         A probe the zone’s reading leaves out does not steer watering while another one reports.
@@ -509,12 +538,13 @@ function RoomRows({
                     <Sparkline
                       points={recentReadings(points(row.vwc.id)!, PROBE_H, row.vwc.value, now)}
                       width={80}
+                      now={now}
                       label={`${zone.name} ${row.side} moisture over the last ${PROBE_H} hours`}
                     />
                   )}
                 </td>
                 <td className="numeric probes-vwc" data-label="VWC" data-tone={row.vwc.health === "out-of-range" ? "bad" : undefined}>
-                  {row.vwc.value === null ? "—" : `${row.vwc.value}${row.vwc.unit === "%" ? "%" : ` ${row.vwc.unit}`}`}
+                  {row.vwc.value === null ? "—" : `${formatState(String(row.vwc.value), 1)}${row.vwc.unit === "%" ? "%" : ` ${row.vwc.unit}`}`}
                 </td>
                 <td className="numeric" data-label={temp ? "EC · Temp" : "EC"} data-probe-ec={row.ec?.id}>
                   {row.ec ? <EcCell probe={row.ec} now={now} /> : "—"}
@@ -967,7 +997,7 @@ function RoomMap({
         {entityId && <code>{entityId}</code>}
         <small>
           {entity
-            ? `Last reported: ${entity.state} ${entity.attributes.unit_of_measurement || ""} · ${time(entity.last_updated)}`
+            ? `Last reported: ${formatState(entity.state)} ${entity.attributes.unit_of_measurement || ""} · ${time(entity.last_updated)}`
             : "Unavailable"}
         </small>
       </div>
@@ -1163,7 +1193,7 @@ function ControllerInternals({ controller }: { controller: Controller }) {
                           </td>
                           <td className="numeric">
                             {isAvailable(sensor)
-                              ? `${sensor.state} ${sensor.attributes.unit_of_measurement || ""}`
+                              ? `${formatState(sensor.state)} ${sensor.attributes.unit_of_measurement || ""}`
                               : "Unavailable"}
                           </td>
                           <td data-sensor-trend={sensor.entity_id}>
@@ -1176,6 +1206,7 @@ function ControllerInternals({ controller }: { controller: Controller }) {
                                   now,
                                 )}
                                 width={96}
+                                now={now}
                                 label={`${name} over the last ${RECENT_H} hours`}
                               />
                             )}
@@ -1209,6 +1240,12 @@ function ControllerInternals({ controller }: { controller: Controller }) {
                   </tbody>
                 </table>
               </div>
+            )}
+            {!!visible.length && history && (
+              <ChartKey
+                label={`Last ${RECENT_H} hours key`}
+                items={[{ mark: "line", color: "var(--primary)", label: `Reading, last ${RECENT_H} hours` }, NOW_KEY]}
+              />
             )}
           </section>
         </>
