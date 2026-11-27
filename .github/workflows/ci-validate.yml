@@ -116,7 +116,7 @@ jobs:
           PYTHONPATH=crop-steering-engine/src python -m pytest crop-steering-engine/tests -q
 
       - name: Hassfest
-        uses: home-assistant/actions/hassfest@86d4564712fa02543c808e3a693dd04f9d3f8361 # master, 2026-10-17 (no releases)
+        uses: home-assistant/actions/hassfest@9e9565e68f5a70d874202871f4c4064d23814235 # master, 2026-10-17 (no releases)
 
       - name: HACS Validation (integration)
         uses: hacs/action@d556e736723344f83838d08488c983a15381059a # 22.5.0
@@ -296,7 +296,7 @@ jobs:
         # the review visible in PR logs, but do not fail the whole validation suite
         # when GitHub reports repository-level support is unavailable.
         continue-on-error: true
-        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        uses: actions/dependency-review-action@bbc44d14a204704ccc493733616cd1e93a0321ec # v5.0.1
         with:
           fail-on-severity: high
 
