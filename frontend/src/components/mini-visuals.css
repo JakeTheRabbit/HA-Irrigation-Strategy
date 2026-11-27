@@ -45,6 +45,11 @@
   stroke-linejoin: round;
   stroke-linecap: round;
 }
+.sparkline-now {
+  stroke: var(--primary);
+  stroke-width: 1;
+  opacity: 0.6;
+}
 /* Rounded state pills: green when a valve is open, red when it is shut, a phase in its timeline
    colour. The phase colours are the day timeline's light palette in both themes, dark enough
    for white text. */

@@ -137,6 +137,12 @@
   line-height: 1.05;
   font-variant-numeric: tabular-nums;
 }
+.feed-cal-trace-wrap {
+  flex: 1;
+  min-width: 180px;
+  max-width: 360px;
+  margin: 0;
+}
 .feed-cal-trace {
   flex: 1;
   min-width: 180px;
@@ -154,6 +160,20 @@
 .feed-cal-trace-now {
   stroke: var(--muted-foreground);
   stroke-dasharray: 4 4;
+}
+.feed-cal-trace-wrap .feed-cal-trace {
+  display: block;
+  width: 100%;
+  max-width: none;
+}
+.feed-cal-trace-nowline {
+  stroke: var(--primary);
+  stroke-width: 2;
+}
+.feed-cal-trace-nowlabel {
+  fill: var(--primary);
+  font-size: var(--text-xs);
+  font-weight: 600;
 }
 .feed-cal-stab {
   display: grid;

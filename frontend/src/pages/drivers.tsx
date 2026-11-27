@@ -9,6 +9,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { ChartKey } from "@/components/chart-key";
 import { Empty, Heading } from "@/components/dashboard";
 import { useGrids } from "@/components/history-explorer";
 import { UiTip } from "@/components/info-tip";
@@ -161,14 +162,17 @@ export function DrybackDrivers({ controller }: { controller: Controller }) {
               </ResponsiveContainer>
             </div>
           )}
-          <ul className="dryback-drivers-legend" aria-label="Zones">
-            {zones.map((zone, index) => (
-              <li key={zone.id}>
-                <i style={{ background: SERIES_COLORS[index % SERIES_COLORS.length] }} />
-                {zone.name}
-              </li>
-            ))}
-          </ul>
+          {!recorded.busy && !recorded.error && !!points.length && (
+            <ChartKey
+              className="dryback-drivers-legend"
+              label="Zones"
+              items={zones.flatMap((zone, index) =>
+                points.some((point) => point.zone === zone.id)
+                  ? [{ mark: "point" as const, color: SERIES_COLORS[index % SERIES_COLORS.length], label: zone.name, detail: "one night" }]
+                  : [],
+              )}
+            />
+          )}
         </section>
       )}
     </>

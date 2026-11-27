@@ -3,6 +3,7 @@ import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } f
 import { ArrowRight, Clock, Coins, SlidersHorizontal, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { ChartKey } from "@/components/chart-key";
 import { Heading, time as clock, type Page } from "@/components/dashboard";
 import { KpiCard, KpiGrid, type HaTone } from "@/components/ha-primitives";
 import { UiTip } from "@/components/info-tip";
@@ -892,6 +893,15 @@ function OutcomesCard({ controller }: { controller: Controller }) {
             </li>
           ))}
         </ol>
+      )}
+      {shown.some((row) => row.band && row.value !== null) && (
+        <ChartKey
+          label="Band key"
+          items={[
+            { mark: "band", color: "var(--success)", label: "Target band", detail: "as the controller set it" },
+            { mark: "tick", color: "var(--foreground)", label: "Where the value landed" },
+          ]}
+        />
       )}
       {shown.some((row) => row.verdict === "not checked") && (
         <p className="brain-line" id={notCheckedId}>

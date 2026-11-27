@@ -9,9 +9,20 @@ import { NeedsAttention } from "@/components/needs-attention";
 import { NeedsIntegration } from "@/components/needs-integration";
 import { PlanAndFeed } from "@/components/run-progress";
 import { PlantStressStrip } from "@/components/sensing";
-import { ShotTimeline } from "@/components/shot-timeline";
+import { ShotTimeline, shotKeyItems } from "@/components/shot-timeline";
 import { AlertCodeText } from "@/components/alert-code-text";
-import { DayRail, EcLane, ecDomain, TargetTrack, VwcLane, vwcDomain, type SteeringTone } from "@/components/steering-lane";
+import {
+  DayRail,
+  EcLane,
+  ecDomain,
+  laneKeyItems,
+  laneMarks,
+  TargetTrack,
+  VwcLane,
+  vwcDomain,
+  type SteeringTone,
+} from "@/components/steering-lane";
+import { ChartKey } from "@/components/chart-key";
 import { zoneAttention, type AttentionLevel, type AttentionReason, type ZoneFacts } from "@/lib/attention";
 import { growDay, type GrowDay } from "@/lib/day-timeline";
 import { formatEc, formatTemp, formatVolume } from "@/lib/display-units";
@@ -185,6 +196,28 @@ export function Today({
       <section className="today-zones" aria-label="Zones">
         {steer && (
           <div className="today-rail">
+            <ChartKey
+              label="Zone lanes key"
+              items={laneKeyItems({
+                span: steer.span,
+                now,
+                lightsOn: steer.day.start,
+                lightsOff: steer.day.lightsOff,
+                phases: roomPhases(steer.zones, steer.day, now).length > 0,
+                lanes: view.rows.map((row) => {
+                  const lane = steer.zones?.get(row.zone);
+                  const loading = steer.zones ? [] : null;
+                  return laneMarks(
+                    steer.span,
+                    lane ? lane.vwc : loading,
+                    lane ? lane.ec : loading,
+                    lane?.shots ?? [],
+                    !row.view.timer && row.view.rewater !== null && row.view.target !== null,
+                    !!stage?.poreEc,
+                  );
+                }),
+              })}
+            />
             <DayRail
               span={steer.span}
               lightsOn={steer.day.start}
@@ -532,13 +565,18 @@ function TodayStrip({
           </span>
         </h2>
         {timeline.state !== "missing" && (
-          <ul className="today-strip-legend" aria-label="Legend">
-            <li data-glyph="done">Shot done</li>
-            <li data-glyph="planned">Planned</li>
-            <li data-glyph="lights">Lights on</li>
-            <li data-glyph="failed">Failed</li>
-            <li data-glyph="warning">Warning</li>
-          </ul>
+          <ChartKey
+            className="today-strip-legend"
+            label="Today's shots key"
+            items={shotKeyItems(
+              rows.flatMap((row) => row.blocks.filter((b) => b.start < to && b.end >= from)),
+              {
+                lights: rows.some((row) => row.lights.some((l) => l.on < to && l.off > from)),
+                now,
+                nowShown: now >= from && now <= to,
+              },
+            )}
+          />
         )}
         <button
           type="button"

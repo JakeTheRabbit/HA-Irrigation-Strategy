@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { ChartKey, NOW_KEY, type KeyItem } from "@/components/chart-key";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ReviewApply, type ApplyReceipt, type ReviewRow } from "@/components/review-apply";
@@ -104,12 +105,6 @@ export function RunChart({
     <header>
       <h2>{spec.title}</h2>
       <span>{unit}</span>
-      {!!bands.length && (
-        <span className="rc-band-key">
-          <i aria-hidden="true" />
-          Guide range
-        </span>
-      )}
     </header>
   );
   if (!values.length)
@@ -164,6 +159,18 @@ export function RunChart({
       : [];
   });
   const summary = `${spec.title} by day of run: ${means.join("; ")}.${callout ? " " + callout.text : ""}`;
+  const keyItems: KeyItem[] = [
+    ...runs
+      .filter((run) => (run.days[spec.metric] ?? []).length)
+      .map((run): KeyItem => ({
+        mark: "line",
+        color: colours.get(run.id),
+        label: run.name,
+        detail: run.current ? "this run, thicker line" : undefined,
+      })),
+    ...(bands.length ? [{ mark: "band", color: "rgb(129, 201, 149)", label: "Guide range", detail: "by stage" } as const] : []),
+    ...(box ? [{ mark: "band", color: "var(--foreground)", label: "Callout box", detail: "where the difference was measured" } as const] : []),
+  ];
   return (
     <section className="rc-chart" aria-label={spec.title} data-compare-chart={spec.metric}>
       {header}
@@ -188,7 +195,11 @@ export function RunChart({
             }}
           />
         ))}
-        {today !== null && <span className="rc-today" style={{ left: percent(x(today)) }} />}
+        {today !== null && (
+          <span className="rc-today" style={{ left: percent(x(today)) }}>
+            <span>Today</span>
+          </span>
+        )}
         <svg viewBox="0 0 1000 100" preserveAspectRatio="none" aria-hidden="true">
           {[...runs].reverse().map((run) => (
             <path
@@ -224,6 +235,7 @@ export function RunChart({
           ))}
         </div>
       </div>
+      <ChartKey className="rc-key" label={`${spec.title} chart key`} items={keyItems} />
     </section>
   );
 }
@@ -481,19 +493,19 @@ export function RunCompare({
         ))}
       </div>
       <div className="rc-legend">
-        {stages.map((s, i) => (
-          <span key={s.name}>
-            <i aria-hidden="true" style={{ background: stageColour(i) }} />
-            {capital(stageWord(s.name))} · days {s.first}–{s.last}
-          </span>
-        ))}
+        <ChartKey
+          label="Key for all four charts"
+          items={[
+            ...stages.map((s, i): KeyItem => ({
+              mark: "bar",
+              color: stageColour(i),
+              label: `${capital(stageWord(s.name))} strip`,
+              detail: `days ${s.first}–${s.last}`,
+            })),
+            ...(todayDrawn !== null ? [{ ...NOW_KEY, label: `Today, day ${todayDrawn} of this run` }] : []),
+          ]}
+        />
         <span className="rc-hedge">Stages and guide ranges assume run day 1 was flower day 1: no flip dates are recorded.</span>
-        {todayDrawn !== null && (
-          <span>
-            <i aria-hidden="true" className="rc-today-key" />
-            Today, day {todayDrawn} of this run
-          </span>
-        )}
       </div>
     </section>
   );

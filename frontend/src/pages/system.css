@@ -154,6 +154,7 @@
   color: var(--destructive);
 }
 .system-strip {
+  position: relative;
   display: flex;
   align-items: flex-end;
   gap: 2px;
@@ -169,6 +170,13 @@
 .system-strip span[data-missed] {
   height: 35%;
   background: var(--warning-mark);
+}
+.system-strip-now {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  right: -4px;
+  border-left: 2px solid var(--primary);
 }
 .system-beat-note {
   margin: 0;

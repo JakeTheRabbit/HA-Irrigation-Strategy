@@ -1676,15 +1676,6 @@ select option:disabled {
   width: 18px;
   border-top: 2px solid var(--foreground);
 }
-.planning-legend .key-recorded {
-  border-top: 2.5px solid var(--series-vwc);
-}
-.planning-legend .key-target {
-  border-top: 2px dashed var(--series-vwc);
-}
-.planning-legend .key-draft {
-  border-top: 2px dashed var(--primary);
-}
 .planning-legend .key-earlier {
   border-top-color: var(--muted-foreground);
   opacity: 0.6;

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChevronLeft, X } from "lucide-react";
 import { Empty } from "@/components/dashboard";
+import { ChartKey, NOW_KEY } from "@/components/chart-key";
 import { NeedsIntegration } from "@/components/needs-integration";
 import { ProbeCalibration } from "@/components/probe-calibration";
 import { StabilityRing } from "@/components/primitives/ring";
@@ -843,15 +844,28 @@ function Trace({ series, kind, now }: { series: Reading[]; kind: FeedKind; now: 
   // A probe holds its value until it reports again: steps, not slopes.
   const points = series.flatMap((r, i) => (i ? [`${x(r.at)},${y(series[i - 1].value)}`, `${x(r.at)},${y(r.value)}`] : [`${x(r.at)},${y(r.value)}`]));
   return (
-    <svg
-      className="feed-cal-trace"
-      viewBox="0 0 260 90"
-      role="img"
-      aria-label={`Reading over the last minute: ${feedValue(values[0], kind, 2)} to ${feedValue(values[values.length - 1], kind, 2)}`}
-    >
-      <line x1="0" x2="260" y1={y(values[values.length - 1])} y2={y(values[values.length - 1])} className="feed-cal-trace-now" />
-      <polyline points={points.join(" ")} />
-    </svg>
+    <figure className="feed-cal-trace-wrap">
+      <svg
+        className="feed-cal-trace"
+        viewBox="0 0 260 90"
+        role="img"
+        aria-label={`Reading over the last minute, ending now: ${feedValue(values[0], kind, 2)} to ${feedValue(values[values.length - 1], kind, 2)}`}
+      >
+        <line x1="0" x2="260" y1={y(values[values.length - 1])} y2={y(values[values.length - 1])} className="feed-cal-trace-now" />
+        <polyline points={points.join(" ")} />
+        <line x1="259" x2="259" y1="0" y2="90" className="feed-cal-trace-nowline" />
+        <text x="255" y="11" textAnchor="end" className="feed-cal-trace-nowlabel">
+          Now
+        </text>
+      </svg>
+      <ChartKey
+        items={[
+          { mark: "line", color: "var(--primary)", label: "Reading", detail: "last minute" },
+          { mark: "dash", color: "var(--muted-foreground)", label: "Latest reading" },
+          NOW_KEY,
+        ]}
+      />
+    </figure>
   );
 }
 

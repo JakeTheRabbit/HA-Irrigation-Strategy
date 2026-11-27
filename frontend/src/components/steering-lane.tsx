@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import type { PhaseBand, Reading, Shot, Span } from "@/lib/day-timeline";
 import { clock, hourTicks } from "@/lib/time";
+import { NOW_KEY, type KeyItem } from "./chart-key";
 import "./steering-lane.css";
 
 const PHASE_NAME: Record<string, string> = { P0: "Hold", P1: "Ramp", P2: "Maintenance", P3: "Dryback" };
@@ -306,6 +307,68 @@ export function EcLane({
       </div>
     </div>
   );
+}
+
+/** What one zone's lanes draw, for the room's key. */
+export interface LaneMarks {
+  vwc: boolean;
+  vwcBand: boolean;
+  ec: boolean;
+  ecBand: boolean;
+  shots: boolean;
+  flag?: "warning" | "critical" | null;
+}
+
+/** What a zone's VwcLane and EcLane draw from the same props (readings null while loading). */
+export function laneMarks(
+  span: Span,
+  vwc: Reading[] | null,
+  ec: Reading[] | null,
+  shots: Shot[],
+  vwcBand: boolean,
+  ecBand: boolean,
+  flag: LaneMarks["flag"] = null,
+): LaneMarks {
+  const inSpan = (readings: Reading[]) => readings.some((r) => r.time >= span.start && r.time <= span.end);
+  // EcLane is left out when it has no readings in the span; while loading it shows its band alone.
+  const ecShown = ec === null || inSpan(ec);
+  return { vwc: !!vwc && inSpan(vwc), vwcBand, ec: !!ec && inSpan(ec), ecBand: ecBand && ecShown, shots: shots.length > 0, flag };
+}
+
+/** The key for a DayRail and the VwcLane/EcLane rows under it: only what they draw. */
+export function laneKeyItems({
+  span,
+  now,
+  lightsOn,
+  lightsOff,
+  phases,
+  lanes,
+}: {
+  span: Span;
+  now: number;
+  lightsOn: number;
+  lightsOff: number;
+  phases: boolean;
+  lanes: LaneMarks[];
+}): KeyItem[] {
+  const any = (mark: keyof LaneMarks) => lanes.some((lane) => !!lane[mark]);
+  const items: KeyItem[] = [];
+  if (lightsOff > lightsOn) items.push({ mark: "band", color: "#ffb300", label: "Lights on" });
+  if (lanes.length && (lightsOn > span.start || lightsOff < span.end))
+    items.push({ mark: "band", color: "color-mix(in srgb, var(--foreground) 20%, transparent)", label: "Lights off" });
+  if (phases)
+    items.push({ mark: "tick", color: "var(--border)", label: "Phase start", detail: "P0 hold · P1 ramp · P2 maintenance · P3 dryback" });
+  if (any("vwc")) items.push({ mark: "line", color: "var(--series-vwc, var(--primary))", label: "VWC", detail: "breaks where readings stop" });
+  if (any("vwcBand")) items.push({ mark: "band", color: "var(--band-vwc-edge)", label: "VWC target band" });
+  if (any("ec")) items.push({ mark: "line", color: "var(--series-ec)", label: "Pore EC" });
+  if (any("ecBand")) items.push({ mark: "band", color: "var(--band-ec-edge)", label: "Pore EC target band" });
+  if (any("vwc") || any("ec"))
+    items.push({ mark: "point", color: "var(--series-vwc, var(--primary))", label: "Latest reading", detail: "amber when out of target" });
+  if (any("shots")) items.push({ mark: "tick", color: "var(--series-vwc, var(--primary))", label: "Shot", detail: "outlined while running" });
+  if (lanes.some((lane) => lane.flag === "warning")) items.push({ mark: "band", color: "var(--warning-mark)", label: "Problem" });
+  if (lanes.some((lane) => lane.flag === "critical")) items.push({ mark: "band", color: "var(--destructive)", label: "Open alert" });
+  if (now > span.start && now < span.end) items.push(NOW_KEY);
+  return items;
 }
 
 /** One VWC scale for every lane of a room, so the zones compare by eye: the readings and bands,

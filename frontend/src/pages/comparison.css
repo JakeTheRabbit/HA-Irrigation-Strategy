@@ -184,24 +184,16 @@
   stroke: var(--border);
   stroke-width: 0.8;
 }
-.comparison-legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.7rem;
-  align-items: center;
+.comparison-now line {
+  stroke: var(--primary);
+  stroke-width: 2;
 }
-.comparison-legend {
-  font-size: 0.75rem;
+.comparison-chart svg .comparison-now text {
+  fill: var(--primary);
+  font-weight: 600;
+}
+.comparison-chart .comparison-key {
   margin: 0.7rem 0;
-}
-.comparison-legend span {
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
-}
-.comparison-legend i {
-  width: 1rem;
-  height: 0.2rem;
 }
 .comparison-table {
   overflow-x: auto;
@@ -261,23 +253,6 @@
   display: grid;
   gap: 0.6rem;
   margin-bottom: 1rem;
-}
-.rw-chart-key {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem 1rem;
-  font-size: var(--text-xs);
-  color: var(--muted-foreground);
-}
-.rw-chart-key span {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-}
-.rw-chart-key i {
-  width: 0.9rem;
-  height: 0.55rem;
-  border-radius: 2px;
 }
 .rw-chart-grid {
   display: grid;
@@ -403,8 +378,7 @@
   width: 1.1rem;
   height: 1.1rem;
 }
-.rc-tick-run i,
-.rc-legend i {
+.rc-tick-run i {
   width: 1rem;
   height: 0.2rem;
   border-radius: 2px;
@@ -468,18 +442,6 @@
   font-size: var(--text-xs);
   color: var(--muted-foreground);
 }
-.rc-band-key {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  margin-left: auto;
-}
-.rc-band-key i {
-  width: 0.9rem;
-  height: 0.65rem;
-  border: 1px dashed rgba(129, 201, 149, 0.7);
-  background: rgba(129, 201, 149, 0.22);
-}
 .rc-callout {
   align-self: center;
   max-width: 34rem;
@@ -528,7 +490,15 @@
   position: absolute;
   top: -0.4rem;
   bottom: 0;
-  border-left: 1px dashed var(--muted-foreground);
+  border-left: 2px solid var(--primary);
+}
+.rc-today span {
+  position: absolute;
+  top: 0;
+  right: 0.25rem;
+  color: var(--primary);
+  font-weight: 600;
+  white-space: nowrap;
 }
 .rc-box {
   position: absolute;
@@ -568,19 +538,15 @@
   font-size: var(--text-xs);
   color: var(--muted-foreground);
 }
-.rc-legend span {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-}
 .rc-legend .rc-hedge {
   flex-basis: 100%;
 }
-.rc-legend .rc-today-key {
-  width: 0;
-  height: 0.75rem;
-  border-left: 1px dashed var(--muted-foreground);
-  border-radius: 0;
+.rc-legend .chart-key {
+  margin: 0;
+}
+/* Below the day axis, which hangs under the plot. */
+.rc-chart .rc-key {
+  margin-top: 1.75rem;
 }
 @media (max-width: 760px) {
   .rc-grid {

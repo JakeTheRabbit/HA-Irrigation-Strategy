@@ -6,6 +6,7 @@ import {
   BarChart,
   CartesianGrid,
   Cell,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -14,6 +15,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Empty, number } from "@/components/dashboard";
 import { UiTip } from "@/components/info-tip";
+import { ChartKey, NOW_KEY } from "@/components/chart-key";
 import { waterLitres } from "@/lib/model";
 import type { StrategyDocument } from "@/lib/operator-types";
 import type { Controller, Zone } from "@/lib/types";
@@ -299,6 +301,8 @@ function WaterUseBody({
       ),
     };
   });
+  // The week still running: the Now line sits on it.
+  const current = chart.filter((week) => week.partial).at(-1);
   return (
     <>
       <div className="table-scroll" tabIndex={0} role="region" aria-label="Water use by zone">
@@ -436,14 +440,28 @@ function WaterUseBody({
         <div className="wu-chart">
           <div className="wu-chart-head">
             <h3>Litres per grow week</h3>
-            <div className="chart-legend wu-legend">
-              {rows.map((row) => (
-                <span key={row.zone.id}>
-                  <i style={{ background: colours.get(row.zone.id) }} />
-                  {row.zone.name}
-                </span>
-              ))}
-            </div>
+            <ChartKey
+              className="wu-legend"
+              items={[
+                ...rows.map((row) => ({
+                  mark: "bar" as const,
+                  color: colours.get(row.zone.id),
+                  label: row.zone.name,
+                  detail: "litres in a grow week",
+                })),
+                ...(current
+                  ? [
+                      {
+                        mark: "bar" as const,
+                        color: "color-mix(in srgb, var(--muted-foreground) 40%, transparent)",
+                        label: "Current week so far",
+                        detail: "pale bar, dashed outline",
+                      },
+                      NOW_KEY,
+                    ]
+                  : []),
+              ]}
+            />
           </div>
           <div
             className="chart-wrap wu-bars"
@@ -508,6 +526,14 @@ function WaterUseBody({
                     })}
                   </Bar>
                 ))}
+                {current && (
+                  <ReferenceLine
+                    x={current.label}
+                    stroke="var(--primary)"
+                    strokeWidth={2}
+                    label={{ value: "Now", position: "insideTopRight", className: "wu-now-label" }}
+                  />
+                )}
               </BarChart>
             </ResponsiveContainer>
           </div>

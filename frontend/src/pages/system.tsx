@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Activity, AlertTriangle, Cpu, Layers } from "lucide-react";
 import { AlertCodeText, CodeLink } from "@/components/alert-code-text";
+import { ChartKey, NOW_KEY } from "@/components/chart-key";
 import { FaultSummary, Heading } from "@/components/dashboard";
 import { KpiCard, KpiGrid } from "@/components/ha-primitives";
 import { NeedsIntegration } from "@/components/needs-integration";
@@ -505,7 +506,18 @@ function Heartbeats({ rooms, entityOnly, now }: { rooms: { name: string; beat: R
                   {strip.map((b) => (
                     <span key={b.at} data-missed={b.missed ? "" : undefined} style={{ flexGrow: b.weight }} />
                   ))}
+                  {!!strip.length && <i className="system-strip-now" aria-hidden="true" />}
                 </div>
+                {!!strip.length && (
+                  <ChartKey
+                    label={`${name} heartbeat key`}
+                    items={[
+                      ...(received ? [{ mark: "bar", color: "var(--success)", label: "Beat received" } as const] : []),
+                      ...(missed ? [{ mark: "bar", color: "var(--warning-mark)", label: "Missed beat", detail: "short bar" } as const] : []),
+                      { ...NOW_KEY, detail: `right-hand end; strip covers ${span}` },
+                    ]}
+                  />
+                )}
                 <p className="system-beat-note">
                   Every {beat.interval_s} s ·{" "}
                   {recorded ? `${missed} missed in ${span}` : "no beats recorded since Home Assistant started"}

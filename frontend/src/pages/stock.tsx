@@ -5,6 +5,7 @@ import {
   BarChart,
   CartesianGrid,
   Cell,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -13,6 +14,7 @@ import {
 import { toast } from "sonner";
 import { Clock, FlaskConical, Pencil, Plus, Trash2, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ChartKey, NOW_KEY, type KeyItem } from "@/components/chart-key";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -294,14 +296,29 @@ function UsedPerWeek({ doc, tz }: { doc: StockDocument; tz: string }) {
     <section className="panel stock-weekly" data-stock-weekly aria-labelledby="stock-weekly-title">
       <div className="stock-panel-head">
         <h2 id="stock-weekly-title">Used per week</h2>
-        <ul className="stock-legend" aria-label="Tanks">
-          {doc.tanks.map((tank, index) => (
-            <li key={tank.id} data-stock-hue={index % 8}>
-              <span className="stock-swatch" aria-hidden="true" />
-              {tank.name}
-            </li>
-          ))}
-        </ul>
+        <ChartKey
+          items={[
+            ...doc.tanks.map(
+              (tank, index): KeyItem => ({
+                mark: "bar",
+                color: `var(--stock-hue-${index % 8})`,
+                label: tank.name,
+                detail: "used that week",
+              }),
+            ),
+            ...(weeks.at(-1)?.partial
+              ? [
+                  {
+                    mark: "bar",
+                    color: "color-mix(in srgb, var(--muted-foreground) 45%, transparent)",
+                    label: "This week so far",
+                    detail: "faded bar",
+                  } satisfies KeyItem,
+                  NOW_KEY,
+                ]
+              : []),
+          ]}
+        />
       </div>
       {rows.length ? (
         <>
@@ -347,6 +364,14 @@ function UsedPerWeek({ doc, tz }: { doc: StockDocument; tz: string }) {
                     ))}
                   </Bar>
                 ))}
+                {weeks.at(-1)?.partial && (
+                  <ReferenceLine
+                    x="This week"
+                    stroke="var(--primary)"
+                    strokeWidth={2}
+                    label={{ value: "Now", position: "insideTopRight", className: "stock-now-label" }}
+                  />
+                )}
               </BarChart>
             </ResponsiveContainer>
           </div>

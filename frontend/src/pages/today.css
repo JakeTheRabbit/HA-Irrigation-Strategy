@@ -242,38 +242,11 @@
   color: var(--muted-foreground);
   font-size: var(--text-sm);
 }
-.today-strip-legend li {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.today-strip-legend li::before {
-  content: "";
-  box-sizing: border-box;
-  width: 4px;
-  height: 14px;
-  border-radius: 1px;
-  background: color-mix(in srgb, var(--muted-foreground) 75%, var(--surface));
-}
-.today-strip-legend [data-glyph="planned"]::before {
-  border: 1.5px dashed var(--primary);
-  background: color-mix(in srgb, var(--primary) 14%, transparent);
-}
-.today-strip-legend [data-glyph="failed"]::before {
-  background: var(--destructive);
-}
-.today-strip-legend [data-glyph="warning"]::before {
-  background: var(--warning-mark);
-}
 .today-strip-window {
   margin-left: 4px;
   color: var(--muted-foreground);
   font-size: var(--text-sm);
   font-weight: 500;
-}
-.today-strip-legend [data-glyph="lights"]::before {
-  width: 14px;
-  background: color-mix(in srgb, var(--warning-mark) 25%, transparent);
 }
 .today-strip-open {
   margin-left: auto;

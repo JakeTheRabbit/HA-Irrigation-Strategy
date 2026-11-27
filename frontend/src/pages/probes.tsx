@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Empty, Heading, Status, time, type Page } from "@/components/dashboard";
 import { AlertCodeText } from "@/components/alert-code-text";
+import { ChartKey, NOW_KEY } from "@/components/chart-key";
 import { KpiCard, KpiGrid } from "@/components/ha-primitives";
 import { UiTip } from "@/components/info-tip";
 import { JevTrouble, jevUsage } from "@/components/jev-status";
@@ -290,6 +291,16 @@ export function Probes({
               </table>
             </div>
           )}
+          {!!rows.length && (
+            <ChartKey
+              label="Probe table key"
+              items={[
+                { mark: "bar", color: "var(--success)", label: "Probe spread", detail: "lowest to highest probe, on a scale of ±10 points" },
+                { mark: "tick", color: "var(--foreground)", label: "Zone value" },
+                ...(history ? [{ mark: "line", color: "var(--primary)", label: `Moisture, last ${PROBE_H} h` } as const, NOW_KEY] : []),
+              ]}
+            />
+          )}
         </section>
         <aside className="probes-aside">
           <SubstrateCurve room={room} probes={probes} missing={offsets.missing} offsets={offsets.rooms[room.room.id] ?? null} />
@@ -527,6 +538,7 @@ function RoomRows({
                     <Sparkline
                       points={recentReadings(points(row.vwc.id)!, PROBE_H, row.vwc.value, now)}
                       width={80}
+                      now={now}
                       label={`${zone.name} ${row.side} moisture over the last ${PROBE_H} hours`}
                     />
                   )}
@@ -1194,6 +1206,7 @@ function ControllerInternals({ controller }: { controller: Controller }) {
                                   now,
                                 )}
                                 width={96}
+                                now={now}
                                 label={`${name} over the last ${RECENT_H} hours`}
                               />
                             )}
@@ -1227,6 +1240,12 @@ function ControllerInternals({ controller }: { controller: Controller }) {
                   </tbody>
                 </table>
               </div>
+            )}
+            {!!visible.length && history && (
+              <ChartKey
+                label={`Last ${RECENT_H} hours key`}
+                items={[{ mark: "line", color: "var(--primary)", label: `Reading, last ${RECENT_H} hours` }, NOW_KEY]}
+              />
             )}
           </section>
         </>

@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Empty } from "@/components/dashboard";
 import { UiTip } from "@/components/info-tip";
 import { Pill } from "./mini-visuals";
+import { ChartKey, NOW_KEY } from "./chart-key";
 import { errorText } from "@/lib/utils";
 import type { Controller, Series, Zone } from "@/lib/types";
 import {
@@ -326,6 +327,7 @@ function SensorChart({
   ].filter((marker, index, all) => index === 0 || marker.reading.time !== all[0].reading.time);
   // The Now tile above already carries the value; at phone width the plot has no room for it.
   const showNowLabel = !compact && markers.every((marker) => marker.reading.time !== current.time);
+  const drawnTone = (tone: string) => labels.some((label) => label.tone === tone && !label.pinned);
   const anchor = (px: number) => (px > left + (plotRight - left) * 0.62 ? "end" : "start");
 
   const focus = hover === null ? -1 : nearestReading(readings, hover);
@@ -405,6 +407,33 @@ function SensorChart({
           detail={`median of ${stats.days} ${stats.days === 1 ? "day" : "days"}`}
         />
       </dl>
+      <ChartKey
+        label={`${title} chart key`}
+        items={[
+          { mark: "line", color: "var(--sc-series)", label: `Recorded ${title}` },
+          ...(isolated.length
+            ? [{ mark: "point" as const, color: "var(--sc-series)", label: "Reading between gaps" }]
+            : []),
+          ...(drawnTone("draft")
+            ? [{ mark: "line" as const, color: "var(--sc-setpoint)", label: "Setpoint as typed" }]
+            : []),
+          ...(drawnTone("saved")
+            ? [{ mark: "dash" as const, color: "var(--muted-foreground)", label: "Saved on controller" }]
+            : []),
+          ...(drawnTone("learned")
+            ? [{ mark: "dot" as const, color: "var(--foreground)", label: "Learned peak (auto)" }]
+            : []),
+          {
+            mark: "point",
+            color: "var(--sc-series)",
+            label: markers.map((marker, i) => (i ? marker.label.toLowerCase() : marker.label)).join(" and "),
+          },
+          stats.current
+            ? { mark: "point", color: "var(--sc-series)", label: "Latest reading" }
+            : { mark: "point", color: "var(--muted-foreground)", label: "Last reading", detail: "stale, hollow" },
+          NOW_KEY,
+        ]}
+      />
       <div
         ref={wrap}
         className="sensor-chart-plot"
@@ -463,6 +492,11 @@ function SensorChart({
                   />
                 ),
             )}
+          {/* The window ends now: its right edge is the Now line. */}
+          <line x1={x(end)} x2={x(end)} y1={top} y2={bottom} className="sensor-now" data-sensor-now-line />
+          <text x={x(end)} y={top - 4} textAnchor="middle" className="sensor-now-label">
+            Now
+          </text>
           <path d={path} className="sensor-series" data-sensor-series={metric} />
           {isolated.map((point) => (
             <circle
@@ -570,8 +604,6 @@ export function SensorContextCard({
   const { hours, vwc, ec } = context;
   const start = context.now - hours * 3_600_000;
   const hasData = context.loadedAt !== null;
-  const ghost = lines.some((line) => line.saved !== null);
-  const learned = lines.some((line) => line.kind === "learned");
   const value = (stats: SensorStats | null, metric: SensorMetric, pick: keyof SensorStats) => {
     const item = stats?.[pick];
     return item === null || item === undefined
@@ -637,24 +669,6 @@ export function SensorContextCard({
         </div>
       ) : (
         <div className="sensor-context-body" data-refreshing={context.refreshing || undefined}>
-          <div className="sensor-key" aria-hidden="true">
-            <span>
-              <i className="sensor-key-draft" />
-              Setpoint as typed
-            </span>
-            {ghost && (
-              <span>
-                <i className="sensor-key-saved" />
-                Saved on controller
-              </span>
-            )}
-            {learned && (
-              <span>
-                <i className="sensor-key-learned" />
-                Learned peak (auto)
-              </span>
-            )}
-          </div>
           {(["vwc", "ec"] as const).map((metric) => (
             <SensorChart
               key={metric}

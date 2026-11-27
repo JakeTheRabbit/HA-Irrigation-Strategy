@@ -37,34 +37,16 @@
   font-size: var(--text-xs);
 }
 .tank-history-key {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px 16px;
-  color: var(--muted-foreground);
-  font-size: var(--text-xs);
-}
-.tank-history-key span {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-}
-.tank-history-key i {
-  width: 20px;
-  border-top: 2px solid var(--muted-foreground);
-}
-.tank-history-key i.tank-key-ec {
-  border-color: var(--tank-ec);
-}
-.tank-history-key i.tank-key-ph {
-  border-color: var(--tank-ph);
-}
-.tank-history-key i.tank-key-gate {
-  border-top-style: dashed;
+  margin: 0;
 }
 .tank-history-chart {
   height: 280px;
   margin: 0 -4px;
   font-size: var(--text-xs);
+}
+.tank-history-chart .tank-now-label {
+  fill: var(--primary);
+  font-weight: 600;
 }
 /* On the panel's own background, so a line passing behind a gate label leaves it readable. */
 .tank-history-chart .tank-gate-label {

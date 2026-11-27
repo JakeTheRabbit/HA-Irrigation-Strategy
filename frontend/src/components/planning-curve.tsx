@@ -3,6 +3,7 @@ import { SlidersHorizontal } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { UiTip } from "@/components/info-tip";
+import { ChartKey, NOW_KEY, type KeyItem } from "@/components/chart-key";
 import { CheckChip, GaugeRow, QualityChip, StatusLine } from "@/components/hmi";
 import { gauge, probeGaps, valueAt, PROBE_GAP_VWC } from "@/lib/hmi";
 import { referenceDryback } from "@/lib/day-chart";
@@ -144,8 +145,10 @@ export function PlanningCurve({
     right = showEc ? 42 : 14,
     plotWidth = width - left - right;
   const x = (hour: number) => left + (Math.min(24, Math.max(0, hour)) / 24) * plotWidth;
+  // With no readings yet the clock still says where now is: the day is drawn either way.
+  const nowMs = recorded ? recorded.now || Date.now() : NaN;
   const fold = (readings: readonly RecordedReading[] = []) =>
-    foldRecorded(readings, lightsOn, recorded?.now ?? NaN, recorded?.timeZone);
+    foldRecorded(readings, lightsOn, nowMs, recorded?.timeZone);
   // A probe dropout reads 0 %: it is a gap in the data, not a dry zone, so it is left out of the
   // lines and of the peak, and the card says so.
   const vwcFolded = fold(recorded?.vwc);
@@ -165,7 +168,7 @@ export function PlanningCurve({
   const ecToday = probeGaps(ecRecorded.today, 0).clean;
   const hasRecorded = vwcRecorded.today.length + vwcRecorded.previous.length > 0;
   const nowHour = recorded
-    ? (fold([{ time: recorded.now, value: 1 }]).today[0]?.hour ?? null)
+    ? (fold([{ time: nowMs, value: 1 }]).today[0]?.hour ?? null)
     : null;
   // The day drawn the way the engine runs it, timed by this zone's own measured dryback.
   const rates = dryRates([vwcRecorded.today, ...vwcRecorded.previous], plan.photoperiod);
@@ -439,6 +442,86 @@ export function PlanningCurve({
         : null;
   const canApply = (key: string) => !!onChange && !!limits[key];
 
+  // The key names every mark the chart below draws, on the same conditions that draw it.
+  const drawsPlan = plan.photoperiod > 0;
+  const keyItems: KeyItem[] = [
+    {
+      mark: "band",
+      color: "var(--muted-foreground)",
+      label: "Phases P0–P3",
+      detail: selectedPhase ? `${selectedPhase} selected, darker` : undefined,
+    },
+    ...(gaps.length > 0
+      ? [{ mark: "band" as const, color: "var(--muted-foreground)", label: "Probe gap, no usable reading" }]
+      : []),
+    ...(drawsPlan && vwcRecorded.today.length > 1
+      ? [{ mark: "line" as const, color: "var(--series-vwc)", label: "Recorded VWC, this grow-day" }]
+      : []),
+    ...(drawsPlan && nowVwc
+      ? [{ mark: "point" as const, color: "var(--series-vwc)", label: "Latest VWC reading" }]
+      : []),
+    ...(drawsPlan && targetPath
+      ? [
+          {
+            mark: "dash" as const,
+            color: "var(--series-vwc)",
+            label: dirty ? "Draft target VWC" : "Target VWC",
+            detail: projection ? "projected day" : undefined,
+          },
+        ]
+      : []),
+    ...(dirty && saved && saved.photoperiod > 0
+      ? [{ mark: "dash" as const, color: "var(--muted-foreground)", label: "Saved on controller" }]
+      : []),
+    ...(drawsPlan && plan.p2Envelope && !projection
+      ? [{ mark: "band" as const, color: "var(--band-vwc)", label: "P2 shot envelope", detail: "nominal, full retention" }]
+      : []),
+    ...(drawsPlan && projection && Number.isFinite(parameters.p2_vwc_threshold) && p2.end > p2.start
+      ? [{ mark: "dot" as const, color: "var(--muted-foreground)", label: "P2 re-water point" }]
+      : []),
+    ...(drawsPlan && drybackVwc !== null
+      ? [{ mark: "dot" as const, color: "var(--muted-foreground)", label: "Dryback target" }]
+      : []),
+    ...(drawsPlan && referenceBand
+      ? [{ mark: "band" as const, color: "var(--muted-foreground)", label: "Reference dryback for the stage" }]
+      : []),
+    ...(drawsPlan && plan.emergencyFloor !== null
+      ? [
+          {
+            mark: "dot" as const,
+            color: plan.emergencyReferenceActive ? "var(--warning-mark)" : "var(--muted-foreground)",
+            label: "Rescue floor",
+          },
+        ]
+      : []),
+    ...(drawsPlan && shots.some((shot) => !shot.emergency)
+      ? [{ mark: "tick" as const, color: "var(--muted-foreground)", label: "Shot", detail: "under the clock" }]
+      : []),
+    ...(drawsPlan && shots.some((shot) => shot.emergency)
+      ? [{ mark: "tick" as const, color: "var(--warning-mark)", label: "Rescue shot" }]
+      : []),
+    ...(drawsPlan && showEc && poreBand
+      ? [{ mark: "band" as const, color: "var(--band-ec-edge)", label: "Pore EC band" }]
+      : []),
+    ...(drawsPlan && showEc && ecToday.length > 1
+      ? [{ mark: "line" as const, color: "var(--series-ec)", label: "Recorded pore EC" }]
+      : []),
+    ...(drawsPlan && showEc && plan.ec.length > 0
+      ? [{ mark: "dot" as const, color: "var(--series-ec)", label: "EC phase targets", detail: "schematic" }]
+      : []),
+    ...(drawsPlan && handles.some((handle) => handle.axis !== "ec" || showEc)
+      ? [
+          {
+            mark: "point" as const,
+            color: dirty ? "var(--primary)" : "var(--muted-foreground)",
+            label: onChange ? "Setpoint, drag to change" : "Setpoint",
+          },
+        ]
+      : []),
+    ...(drawsPlan ? [{ mark: "tick" as const, color: "var(--muted-foreground)", label: "Lights off" }] : []),
+    ...(nowHour !== null ? [NOW_KEY] : []),
+  ];
+
   const phaseEnd = (id: PlanningPhaseId) =>
     projection?.points.filter((point) => point.phase === id).at(-1)?.value ?? null;
   const rows = plan.photoperiod
@@ -519,20 +602,7 @@ export function PlanningCurve({
         )}
       </div>
       <div className="planning-legend" role="group" aria-label="Chart key">
-        <span>
-          <i className="key-recorded" aria-hidden="true" />
-          Recorded
-        </span>
-        <span>
-          <i className="key-target" aria-hidden="true" />
-          {dirty ? "Saved target" : "Target"}
-        </span>
-        {dirty && (
-          <span>
-            <i className="key-draft" aria-hidden="true" />
-            Draft
-          </span>
-        )}
+        <ChartKey items={keyItems} label="Daily plan chart key" />
         <span className="planning-legend-toggles">
           {previousDay.length > 1 && (
             <button
@@ -1015,6 +1085,28 @@ export function PlanningCurve({
                 />
               )}
             </>
+          )}
+          {nowHour !== null && (
+            <g data-planning-now="line">
+              <line
+                x1={x(nowHour)}
+                x2={x(nowHour)}
+                y1={TOP}
+                y2={TOP + HEIGHT}
+                stroke="var(--primary)"
+                strokeWidth="2"
+              />
+              <text
+                x={x(nowHour) + (nowHour > 20 ? -4 : 4)}
+                y={TOP + 12}
+                textAnchor={nowHour > 20 ? "end" : "start"}
+                fill="var(--primary)"
+                fontSize="12"
+                fontWeight="600"
+              >
+                Now
+              </text>
+            </g>
           )}
         </svg>
       </div>

@@ -41,17 +41,19 @@ export function Meter({
   );
 }
 
-/** A line of recent readings, scaled to their own range. */
+/** A line of recent readings, scaled to their own range. With `now`, a live line marks Now. */
 export function Sparkline({
   points,
   label,
   width = 72,
   height = 22,
+  now,
 }: {
   points: Reading[];
   label: string;
   width?: number;
   height?: number;
+  now?: number;
 }) {
   if (points.length < 2) return null;
   const t0 = points[0].time,
@@ -61,12 +63,11 @@ export function Sparkline({
     hi = Math.max(...values);
   const y = (value: number) =>
     hi === lo ? height / 2 : height - 1.5 - ((value - lo) / (hi - lo)) * (height - 3);
+  const x = (time: number) => (1 + ((time - t0) / span) * (width - 2)).toFixed(1);
   const path = points
-    .map(
-      (point, i) =>
-        `${i ? "L" : "M"}${(1 + ((point.time - t0) / span) * (width - 2)).toFixed(1)} ${y(point.value).toFixed(1)}`,
-    )
+    .map((point, i) => `${i ? "L" : "M"}${x(point.time)} ${y(point.value).toFixed(1)}`)
     .join(" ");
+  const nowX = now !== undefined && now >= t0 && now <= t0 + span ? x(now) : null;
   return (
     <svg
       className="sparkline"
@@ -77,6 +78,7 @@ export function Sparkline({
       aria-label={label}
     >
       <path d={path} />
+      {nowX !== null && <line className="sparkline-now" x1={nowX} x2={nowX} y1={0} y2={height} />}
     </svg>
   );
 }

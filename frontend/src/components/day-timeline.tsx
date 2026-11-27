@@ -10,6 +10,7 @@ import {
 import { LoaderCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { UiTip } from "@/components/info-tip";
+import { ChartKey, NOW_KEY, type KeyItem } from "@/components/chart-key";
 import { gauge, probeGaps, vwcGauge, type ProbeGap } from "@/lib/hmi";
 import { GaugeRow, QualityChip, StatusLine } from "@/components/hmi";
 import { dailyLimit, Empty, number, time as clock } from "@/components/dashboard";
@@ -1077,6 +1078,58 @@ function DayChart({
     ...lane.roomChanges.map((change) => ({ time: change.time, text: changeText(change) })),
   ].sort((a, b) => a.time - b.time);
   const typicalDays = lane.past.length;
+  // The marks the key's switches do not cover, each only when the chart draws it.
+  const projected = !hidden.has("vwc") ? lane.projection : null;
+  const marks: KeyItem[] = [
+    { mark: "bar", color: "var(--gd-day)", label: "Lights on" },
+    ...(day.lightsOff < day.end ? [{ mark: "bar", color: "var(--gd-night)", label: "Lights off" } as KeyItem] : []),
+    ...(lane.columns.length
+      ? [
+          {
+            mark: "point",
+            color: "var(--gd-ink)",
+            label: "Phase P0–P3",
+            detail: lane.columns.some((column) => column.future) ? "outlined: still to come" : undefined,
+          } as KeyItem,
+        ]
+      : []),
+    ...(lane.columns.length > 1 ? [{ mark: "dash", color: "var(--muted-foreground)", label: "Phase change" } as KeyItem] : []),
+    ...(projected && projected.points.length > 1
+      ? [{ mark: "dot", color: "var(--primary)", label: "Projected VWC", detail: "an estimate" } as KeyItem]
+      : []),
+    ...(projected?.shots.some((shot) => !shot.emergency)
+      ? [{ mark: "point", color: "var(--muted-foreground)", label: "Expected shot" } as KeyItem]
+      : []),
+    ...(projected?.shots.some((shot) => shot.emergency)
+      ? [{ mark: "point", color: "var(--gd-red)", label: "Expected rescue shot" } as KeyItem]
+      : []),
+    ...(!hidden.has("ec") && lane.ecBand && lane.ec.length > 0
+      ? [
+          {
+            mark: "band",
+            color:
+              lane.steering === "generative"
+                ? "var(--gd-gen)"
+                : lane.steering === "vegetative"
+                  ? "var(--gd-veg)"
+                  : "var(--muted-foreground)",
+            label: "Pore EC target",
+            detail: "on the right axis",
+          } as KeyItem,
+        ]
+      : []),
+    ...(now < day.end
+      ? [
+          {
+            mark: "band",
+            color: "color-mix(in srgb, var(--foreground) 15%, transparent)",
+            label: "After now",
+            detail: "expected, not recorded",
+          } as KeyItem,
+        ]
+      : []),
+    ...(now >= day.start && now <= day.end ? [NOW_KEY] : []),
+  ];
   return (
     <div className="timeline-body">
       <div className="grow-chart" ref={box}>
@@ -1116,6 +1169,7 @@ function DayChart({
         <Legend
           steering={lane.steering}
           jev={lane.jevOn}
+          typical={compare === "typical"}
           compare={
             compare === "yesterday"
               ? (lane.versus?.name ?? "Yesterday")
@@ -1128,6 +1182,7 @@ function DayChart({
           hidden={hidden}
           onToggle={toggle}
         />
+        <ChartKey className="grow-key" label="Chart marks" items={marks} />
         <span className="label-with-tip">
           <label className="grow-readout-choice">
             Readings
@@ -1159,12 +1214,15 @@ function DayChart({
 function Legend({
   steering,
   jev,
+  typical,
   compare,
   hidden,
   onToggle,
 }: {
   steering: Steering | null;
   jev: boolean;
+  /** The comparison is the typical day: a band, not a line. */
+  typical: boolean;
   compare: string | null;
   hidden: ReadonlySet<ChartLayer>;
   onToggle: (layer: ChartLayer) => void;
@@ -1276,7 +1334,7 @@ function Legend({
               "compare",
               "Drawn on today’s scale: an earlier day beyond it runs off the edge.",
               <>
-                <i className="key-compare" aria-hidden="true" />
+                <i className="key-compare" data-typical={typical || undefined} aria-hidden="true" />
                 {compare}
               </>,
             ),

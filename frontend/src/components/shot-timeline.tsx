@@ -8,6 +8,7 @@ import {
   type TimelineRow,
 } from "@/lib/shot-timeline";
 import { clock, dayLabel, hourTicks } from "@/lib/time";
+import { ChartKey, NOW_KEY, type KeyItem } from "./chart-key";
 import "./shot-timeline.css";
 
 type Key = "ArrowLeft" | "ArrowRight" | "ArrowUp" | "ArrowDown" | "Home";
@@ -38,6 +39,31 @@ function visibleRows(
       .flatMap((r) => r.blocks.filter(inSpan));
     return [{ ...row, blocks: blocks.sort((a, b) => a.start - b.start) }];
   });
+}
+
+/** The key for a shot timeline: one entry per kind of block it draws, the lights and Now. */
+export function shotKeyItems(
+  blocks: TimelineBlock[],
+  { lights, now, nowShown, stale = false }: { lights: boolean; now: number; nowShown: boolean; stale?: boolean },
+): KeyItem[] {
+  const has = (test: (b: TimelineBlock) => boolean) => blocks.some(test);
+  const glyph = (g: TimelineBlock["glyph"]) => has((b) => b.glyph === g && !b.skipped);
+  const items: KeyItem[] = [];
+  if (glyph("done"))
+    items.push({ mark: "bar", color: "color-mix(in srgb, var(--muted-foreground) 75%, var(--surface))", label: "Shot done" });
+  if (has((b) => b.running)) items.push({ mark: "bar", color: "var(--primary)", label: "Watering now", detail: "pulses" });
+  if (glyph("planned")) items.push({ mark: "dash", color: "var(--primary)", label: "Planned" });
+  if (glyph("expected")) items.push({ mark: "dot", color: "var(--primary)", label: "Expected" });
+  if (glyph("failed")) items.push({ mark: "bar", color: "var(--destructive)", label: "Failed" });
+  if (glyph("warning")) items.push({ mark: "bar", color: "var(--warning-mark)", label: "Warning" });
+  if (glyph("queued")) items.push({ mark: "band", color: "var(--warning-mark)", label: "Waiting for pump", detail: "hatched" });
+  if (has((b) => b.skipped))
+    items.push({ mark: "bar", color: "color-mix(in srgb, var(--muted-foreground) 45%, transparent)", label: "Skipped", detail: "faded, struck through" });
+  if (stale && has((b) => b.start > now))
+    items.push({ mark: "band", color: "var(--muted-foreground)", label: "Planned, controller data stale", detail: "grey hatching" });
+  if (lights) items.push({ mark: "band", color: "color-mix(in srgb, var(--warning-mark) 40%, transparent)", label: "Lights on" });
+  if (nowShown) items.push(NOW_KEY);
+  return items;
 }
 
 /** Each zone's shots, holds, alerts and planned shots over a span, on one shared time axis.
@@ -335,14 +361,19 @@ export function ShotTimeline({
       )}
       {body}
       {mode === "full" && (
-        <div className="st-legend" aria-label="Legend">
-          <span data-glyph="done">Done</span>
-          <span data-glyph="planned">Planned</span>
-          <span data-glyph="expected">Expected</span>
-          <span data-glyph="failed">Failed</span>
-          <span data-glyph="warning">Warning</span>
-          <span data-glyph="queued">Waiting for pump</span>
-          <span data-glyph="lights">Lights on</span>
+        <div className="st-legend">
+          <ChartKey
+            label="Shot timeline key"
+            items={shotKeyItems(
+              visible.flatMap((r) => r.blocks),
+              {
+                lights: visible.some((r) => r.lights.some((l) => l.on < span.end && l.off > span.start)),
+                now,
+                nowShown,
+                stale,
+              },
+            )}
+          />
           <span className="st-scale">
             {vertical ? "Width = water" : "Bar height = water per plant"}
           </span>

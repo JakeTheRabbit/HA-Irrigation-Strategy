@@ -483,28 +483,12 @@
   font-size: var(--text-xs);
   font-variant-numeric: tabular-nums;
 }
-.notify-strip-legend {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px 8px;
-  color: var(--muted-foreground);
-  font-size: var(--text-xs);
-}
-.notify-key-quiet,
-.notify-key-lights {
-  display: inline-block;
-  width: 14px;
-  border-radius: 2px;
-}
-.notify-key-quiet {
-  height: 10px;
-  background: color-mix(in srgb, var(--quiet) 75%, transparent);
-}
-.notify-key-lights {
-  height: 3px;
-  margin-left: 6px;
-  background: var(--lights);
+.notify-strip-now {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  margin-left: -1px;
+  border-left: 2px solid var(--primary);
 }
 .notify-mutes {
   display: grid;

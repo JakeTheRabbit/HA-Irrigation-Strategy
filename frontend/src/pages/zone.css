@@ -677,3 +677,8 @@
   color: var(--muted-foreground);
   font-size: var(--text-sm);
 }
+.zone-ec-now-label {
+  fill: var(--foreground);
+  font-size: 12px;
+  font-weight: 600;
+}

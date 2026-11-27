@@ -480,6 +480,18 @@
 .day-timeline .key-compare {
   border-top: 1px solid color-mix(in srgb, var(--muted-foreground) 50%, transparent);
 }
+/* The typical day is drawn as a band (its middle half), so its key is one. */
+.day-timeline .key-compare[data-typical] {
+  height: 10px !important;
+  border-top: 0;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--muted-foreground) 20%, transparent);
+}
+/* The marks the switches do not cover: their own full row under them. */
+.day-timeline .grow-key {
+  flex: 1 1 100%;
+  margin: 0;
+}
 
 .day-timeline .timeline-events {
   flex: none;

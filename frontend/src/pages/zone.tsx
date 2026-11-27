@@ -8,6 +8,7 @@ import { useBrain } from "@/lib/brain";
 import { CameraCard, ClimatePanel, HardwarePanel, RootZonePanel } from "@/components/zone-extras";
 import { UiTip } from "@/components/info-tip";
 import { ZoneDay, type ZoneCompare } from "@/components/day-timeline";
+import { ChartKey, NOW_KEY, type KeyItem } from "@/components/chart-key";
 import { NeedsIntegration } from "@/components/needs-integration";
 import { OverlayRows, useOverlays } from "@/components/overlay-row";
 import { Pill } from "@/components/mini-visuals";
@@ -420,6 +421,22 @@ function PoreEcChart({
   const target = band ? `${ecNum(band[0], 1)}–${ecNum(band[1], 1)} ${ecUnit}` : null;
   const latest = today.at(-1) ?? null;
   const abnormal = !!(band && latest && (latest.v < band[0] || latest.v > band[1]));
+  const nowIn = !!day && now >= day.start && now <= day.end;
+  const keyItems: KeyItem[] = [
+    { mark: "line", color: "var(--series-ec)", label: "Pore EC" },
+    ...(band ? [{ mark: "band", color: "var(--band-ec-edge)", label: "Target band", detail: target ?? undefined } as KeyItem] : []),
+    ...(day && day.lightsOff < day.end
+      ? [{ mark: "band", color: "color-mix(in srgb, var(--foreground) 24%, transparent)", label: "Lights off" } as KeyItem]
+      : []),
+    ...(latest
+      ? [
+          abnormal
+            ? ({ mark: "point", color: "var(--warning-mark)", label: "Latest reading, out of target" } as KeyItem)
+            : ({ mark: "point", color: "var(--series-ec)", label: "Latest reading" } as KeyItem),
+        ]
+      : []),
+    ...(nowIn ? [NOW_KEY] : []),
+  ];
   return (
     <section className="panel zone-ec-chart" aria-labelledby="zone-ec-title" data-zone-ec-chart>
       <div className="panel-heading">
@@ -490,7 +507,19 @@ function PoreEcChart({
                   .map((point, index) => `${index ? "L" : "M"}${x(point.t).toFixed(1)} ${y(point.v).toFixed(1)}`)
                   .join("")}
               />
-              <line className="zone-ec-now" x1={x(now)} x2={x(now)} y1={T} y2={T + H} />
+              {nowIn && (
+                <>
+                  <line className="zone-ec-now" x1={x(now)} x2={x(now)} y1={T} y2={T + H} />
+                  <text
+                    className="zone-ec-now-label"
+                    x={x(now) > L + plot - 34 ? x(now) - 4 : x(now) + 4}
+                    y={T + 12}
+                    textAnchor={x(now) > L + plot - 34 ? "end" : "start"}
+                  >
+                    Now
+                  </text>
+                </>
+              )}
               {latest && (
                 <circle
                   className="zone-ec-live"
@@ -503,6 +532,7 @@ function PoreEcChart({
             </svg>
           )
         )}
+        {day && !loading && today.length >= 2 && width > 0 && <ChartKey label="Pore EC chart key" items={keyItems} />}
       </div>
     </section>
   );

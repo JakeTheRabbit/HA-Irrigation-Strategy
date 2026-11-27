@@ -401,12 +401,14 @@
   stroke-opacity: 0.6;
 }
 .explorer-now {
-  stroke: var(--foreground);
-  stroke-width: 1.5;
-}
-.explorer-cross {
   stroke: var(--primary);
+  stroke-width: 2;
+}
+/* The pointer crosshair stays off the Now line's colour, so the two never read alike. */
+.explorer-cross {
+  stroke: var(--foreground);
   stroke-width: 1.2;
+  stroke-opacity: 0.7;
 }
 /* The lanes over the charts share their time axis: they start past the scale's gutter. */
 .explorer-lane > :last-child {
@@ -470,6 +472,9 @@
   font-size: var(--text-xs);
   font-weight: 700;
 }
+.explorer-chart-key {
+  grid-column: 2;
+}
 .explorer-notes-wrap {
   grid-column: 2;
   display: flex;
@@ -531,7 +536,8 @@
 .explorer-now-label {
   bottom: 6px;
   margin-left: 6px;
-  color: var(--foreground);
+  color: var(--primary);
+  font-weight: 600;
 }
 .explorer-pill {
   bottom: 6px;
@@ -591,6 +597,7 @@
   .explorer-lane-note > span:first-child {
     display: none;
   }
+  .explorer-chart-key,
   .explorer-notes-wrap {
     grid-column: 1;
   }
@@ -724,9 +731,6 @@
 }
 .explorer-series[open] > .explorer-chips {
   margin-top: 8px;
-}
-.explorer-phase-legend p {
-  margin: 4px 0 0;
 }
 /* Too narrow even for its P0–P3: the colour and the legend carry it. */
 @container (max-width: 13px) {

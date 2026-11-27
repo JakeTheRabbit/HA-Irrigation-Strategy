@@ -4,7 +4,18 @@ import { Button } from "@/components/ui/button";
 import { Empty, number, time as clock } from "@/components/dashboard";
 import { FeedTankDrawing } from "@/components/zone-slab";
 import { AlertCodeText } from "@/components/alert-code-text";
-import { DayRail, EcLane, ecDomain, TargetTrack, VwcLane, vwcDomain, type SteeringTone } from "@/components/steering-lane";
+import {
+  DayRail,
+  EcLane,
+  ecDomain,
+  laneKeyItems,
+  laneMarks,
+  TargetTrack,
+  VwcLane,
+  vwcDomain,
+  type SteeringTone,
+} from "@/components/steering-lane";
+import { ChartKey } from "@/components/chart-key";
 import { StockBottle } from "@/components/stock-bottle";
 import { NeedsAttention } from "@/components/needs-attention";
 import { STOCK_STATES } from "@/lib/dosing";
@@ -160,6 +171,7 @@ function RoomCard({
       ...(day?.zones?.get(z.zone.id)?.ec.map((point) => point.value) ?? []),
     ]),
   ]);
+  const phases = day ? roomPhases(day.zones, day.day, now) : [];
   return (
     <section
       className="facility-room panel"
@@ -233,11 +245,35 @@ function RoomCard({
       <div className="steer-grid">
         {day && (
           <div className="steer-lane steer-rail">
+            <ChartKey
+              className="steer-key"
+              label={`${room.name} lanes key`}
+              items={laneKeyItems({
+                span: day.span,
+                now,
+                lightsOn: day.day.start,
+                lightsOff: day.day.lightsOff,
+                phases: phases.length > 0,
+                lanes: r.zones.map((z) => {
+                  const lane = day.zones?.get(z.zone.id);
+                  const loading = day.zones ? [] : null;
+                  return laneMarks(
+                    day.span,
+                    lane ? lane.vwc : loading,
+                    lane ? lane.ec : loading,
+                    lane?.shots ?? [],
+                    !z.timer && z.rewater !== null && z.target !== null,
+                    !!r.stage?.poreEc,
+                    z.problem ? (z.problemIsAlert ? "critical" : "warning") : null,
+                  );
+                }),
+              })}
+            />
             <DayRail
               span={day.span}
               lightsOn={day.day.start}
               lightsOff={day.day.lightsOff}
-              phases={roomPhases(day.zones, day.day, now)}
+              phases={phases}
               now={now}
               timeZone={timeZone}
             />

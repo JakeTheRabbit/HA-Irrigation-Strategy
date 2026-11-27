@@ -1,4 +1,5 @@
 import { CodeLink } from "@/components/alert-code-text";
+import { ChartKey, NOW_KEY } from "@/components/chart-key";
 import { NotificationPredictions } from "@/components/notification-predictions";
 import { CanonicalControls } from "@/components/canonical-controls";
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
@@ -77,7 +78,7 @@ import {
   type QuietHours,
   type Span,
 } from "@/lib/notify";
-import { clock, dayEndText, hourClock, wallText } from "@/lib/time";
+import { clock, dayEndText, hourClock, startOfDay, wallText } from "@/lib/time";
 import type { Controller, Room } from "@/lib/types";
 import { UndoError, offerUndo } from "@/lib/undo";
 import { errorText } from "@/lib/utils";
@@ -325,8 +326,15 @@ function AddPhone({
 
 /** One day as a 24-hour strip: the quiet hours of every phone as one band, each room's lights on
  * as a line over it. */
-function DayStrip({ quiet, lights }: { quiet: Span[]; lights: Span[] }) {
+function DayStrip({ quiet, lights, tz }: { quiet: Span[]; lights: Span[]; tz: string }) {
   const pct = (minute: number) => `${(minute / 1440) * 100}%`;
+  // Now on the day's strip, moved on each minute.
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
+  const nowMinute = Math.max(0, Math.min(1440, (now - startOfDay(now, tz)) / 60_000));
   return (
     <div className="notify-strip" data-quiet-strip aria-hidden="true">
       <div className="notify-strip-bar">
@@ -345,6 +353,7 @@ function DayStrip({ quiet, lights }: { quiet: Span[]; lights: Span[] }) {
             style={{ left: pct(a), width: pct(b - a) }}
           />
         ))}
+        <span className="notify-strip-now" style={{ left: pct(nowMinute) }} />
       </div>
       <div className="notify-strip-ticks">
         {["00:00", "06:00", "12:00", "18:00", "24:00"].map((tick) => (
@@ -1042,16 +1051,19 @@ export function Notifications({
                   {fieldError.quiet}
                 </p>
               )}
-              <DayStrip quiet={quiet} lights={lights} />
-              <p className="notify-strip-legend" data-quiet-legend>
-                <span className="notify-key-quiet" aria-hidden="true" />
-                {quiet.length ? `quiet ${hoursText(spanMinutes(quiet))}` : "no quiet hours"}
-                {lightsWords && (
-                  <span>
-                    <span className="notify-key-lights" aria-hidden="true" /> {lightsWords}
-                  </span>
-                )}
-              </p>
+              <DayStrip quiet={quiet} lights={lights} tz={tz} />
+              <div data-quiet-legend>
+                <ChartKey
+                  label="Day strip key"
+                  items={[
+                    quiet.length
+                      ? { mark: "band", color: "var(--quiet)", label: "Quiet hours", detail: hoursText(spanMinutes(quiet)) }
+                      : { mark: "band", color: "var(--muted)", label: "No quiet hours" },
+                    ...(lightsWords ? [{ mark: "line", color: "var(--lights)", label: "Lights on", detail: lightsWords.replace(/^lights on:? (in )?/, "") } as const] : []),
+                    NOW_KEY,
+                  ]}
+                />
+              </div>
               <p className="muted small">
                 {quietNote(
                   shown.recipients.filter((row) => row.digest).map((row) => rowLabel(row, doc.phones).name),

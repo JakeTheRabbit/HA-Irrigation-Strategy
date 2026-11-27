@@ -146,6 +146,16 @@
 .tank-spark[data-tank-spark="ph"] path {
   stroke: var(--tank-ph);
 }
+.tank-spark-now {
+  stroke: var(--primary);
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+}
+/* Under the readings, beside the tank. */
+.tank-spark-key {
+  grid-column: 2;
+  margin: -12px 0 0;
+}
 .tank-equipment {
   grid-column: 1 / -1;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -195,7 +205,8 @@
     min-width: 0;
     text-align: left;
   }
-  .tank-spark {
+  .tank-spark,
+  .tank-spark-key {
     display: none;
   }
 }

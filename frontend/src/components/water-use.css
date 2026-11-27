@@ -24,16 +24,12 @@
 .wu-zone {
   font-weight: 500;
 }
-.wu-zone i,
-.wu-legend i {
+.wu-zone i {
   display: inline-block;
   width: 9px;
   height: 9px;
   border-radius: 50%;
   margin-right: 8px;
-}
-.wu-legend i {
-  margin-right: 0;
 }
 .wu-th {
   display: inline-flex;
@@ -113,8 +109,11 @@
   font-size: var(--text-md);
 }
 .wu-legend.wu-legend {
-  padding: 0;
-  gap: 14px;
+  margin: 0;
+}
+.wu-bars .wu-now-label {
+  fill: var(--primary);
+  font-weight: 600;
 }
 .wu-bars.wu-bars {
   height: 240px;

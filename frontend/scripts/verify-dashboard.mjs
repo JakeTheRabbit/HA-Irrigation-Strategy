@@ -2650,9 +2650,9 @@ try {
     // The previous run at the same grow days: days 8 to 15 of this run (it began 14 days ago at
     // lights-on), so the same days of the previous run, which began 112 days ago.
     await explorer.locator("[data-compare-toggle]").check();
-    const legend = explorer.locator("[data-previous-legend]");
+    const legend = explorer.locator("[data-chart-key] li").filter({ hasText: /^\s*Run / }).first();
     await expectVisible(legend);
-    assert.match(await legend.innerText(), /^Run Demo • previous run — Room A, days 8–15$/);
+    assert.match((await legend.innerText()).trim(), /^Run Demo • previous run — Room A, days 8–15\b/);
     assert.equal(await explorer.getAttribute("data-compare-days"), "8-15");
     // Seven elapsed days can cross DST: in NZ this range starts at 15:00 standard time,
     // although its end is 16:00 daylight time. Compare the selected start's grow-day offset.
@@ -2681,11 +2681,11 @@ try {
     assert.equal(await explorer.locator("[data-compare-note]").count(), 0);
     // The choice is in the address: a reload, light and dark, keeps it.
     await inBothThemes("zone history explorer", async () => {
-      await expectVisible(page.locator("[data-previous-legend]"));
+      await expectVisible(page.locator("[data-history-explorer] [data-chart-key] li").filter({ hasText: /^\s*Run / }).first());
     });
     await page.evaluate(() => localStorage.setItem("irrigation-theme", "dark"));
     await page.reload({ waitUntil: "networkidle" });
-    await expectVisible(page.locator("[data-previous-legend]"));
+    await expectVisible(page.locator("[data-history-explorer] [data-chart-key] li").filter({ hasText: /^\s*Run / }).first());
     await page.locator("[data-history-explorer]").scrollIntoViewIfNeeded();
     await page
       .locator("[data-history-explorer]")
@@ -2693,7 +2693,7 @@ try {
     // A phone: the controls in a sheet, the chart scrolls sideways inside its panel.
     await page.setViewportSize({ width: 390, height: 844 });
     await page.reload({ waitUntil: "networkidle" });
-    await expectVisible(page.locator("[data-previous-legend]"));
+    await expectVisible(page.locator("[data-history-explorer] [data-chart-key] li").filter({ hasText: /^\s*Run / }).first());
     await noOverflow();
     await page.getByRole("button", { name: "Range and sensors" }).click();
     const sheet = page.getByRole("dialog", { name: "Range and sensors" });

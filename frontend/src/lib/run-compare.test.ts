@@ -74,10 +74,10 @@ describe("compare runs legend", () => {
   it("names today only while today's line is drawn", () => {
     const within = page("2026-10-14");
     expect(within).toContain("Today, day 10 of this run");
-    expect(within).toContain("rc-today");
+    expect(within).toContain('data-mark="now"');
     // Day 300 is past the 56-day chart: no line, so no legend entry for it.
     const past = page("2025-12-28");
     expect(past).not.toContain("Today, day");
-    expect(past).not.toContain("rc-today");
+    expect(past).not.toContain('data-mark="now"');
   });
 });

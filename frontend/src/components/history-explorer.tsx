@@ -9,6 +9,7 @@ import {
   ComposedChart,
   Line,
   ReferenceArea,
+  ReferenceLine,
   ResponsiveContainer,
   Scatter,
   Tooltip,
@@ -16,6 +17,7 @@ import {
   YAxis,
 } from "recharts";
 import { Button } from "@/components/ui/button";
+import { ChartKey, NOW_KEY, type KeyItem } from "@/components/chart-key";
 import {
   Sheet,
   SheetContent,
@@ -88,6 +90,13 @@ const PHASE_FILL: Record<string, string> = {
   P1: "var(--phase-p1)",
   P2: "var(--phase-p2)",
   P3: "var(--phase-p3)",
+};
+/** A phase as the chart keys name it. */
+const PHASE_KEY: Record<string, string> = {
+  P0: "P0 morning dryback",
+  P1: "P1 ramp",
+  P2: "P2 maintain",
+  P3: "P3 dryback",
 };
 
 interface Loaded {
@@ -345,6 +354,13 @@ export function HistoryExplorer({ controller, zone }: { controller: Controller; 
   const hasPrevious = data.some((row) =>
     Object.keys(row).some((key) => key[0] === "p" && row[key] !== null),
   );
+  const hasMinMax =
+    comparing &&
+    data.some((row) =>
+      Object.keys(row).some((key) => key.startsWith("pl") && row[key] !== null && row[key] !== undefined),
+    );
+  // A range that reaches the present carries the Now line.
+  const nowShown = !!span && now >= span.start && now <= span.end;
   const format = useMemo(() => tickFormat(span, timeZone), [span?.start, span?.end, timeZone]);
   const controls = (
     <Controls
@@ -432,8 +448,10 @@ export function HistoryExplorer({ controller, zone }: { controller: Controller; 
                       ? `Run ${previous.name}, days ${previousSpan.firstDay}–${previousSpan.lastDay}`
                       : null
                 }
-                shots={shots.length > 0}
-                phases={bands.length > 0}
+                minMax={hasMinMax}
+                shots={shots}
+                phases={[...new Set(bands.map((band) => band.phase))].sort()}
+                now={nowShown}
               />
               {comparisons.rows.size > 0 && (
                 <ul className="history-explorer-sources" aria-label="Compared probe sources">
@@ -608,6 +626,16 @@ export function HistoryExplorer({ controller, zone }: { controller: Controller; 
                                 className="history-explorer-shot"
                               />
                             )}
+                          />
+                        )}
+                        {nowShown && (
+                          <ReferenceLine
+                            yAxisId="events"
+                            x={now}
+                            stroke="var(--primary)"
+                            strokeWidth={2}
+                            ifOverflow="extendDomain"
+                            label={{ value: "Now", position: "insideTopRight", fill: "var(--primary)", fontSize: 12, fontWeight: 600 }}
                           />
                         )}
                         {data.length > 60 && (
@@ -918,42 +946,46 @@ function Legend({
   visible,
   units,
   previous,
+  minMax,
   shots,
   phases,
+  now,
 }: {
   visible: ExplorerSensor[];
   units: Unit[];
   previous: string | null;
-  shots: boolean;
-  phases: boolean;
+  minMax: boolean;
+  shots: { zone: string; color: string }[];
+  phases: string[];
+  now: boolean;
 }) {
   if (!visible.length) return null;
   const sides = (side: number) => units.filter((_, index) => index % 2 === side).join(", ");
+  const items: KeyItem[] = [
+    ...visible.map((sensor) => ({ mark: "line" as const, color: sensor.color, label: sensor.label })),
+    ...(previous
+      ? [{ mark: "dash" as const, color: "var(--muted-foreground)", label: previous, detail: "dashed, in each sensor's colour" }]
+      : []),
+    ...(minMax
+      ? [{ mark: "band" as const, color: "var(--muted-foreground)", label: "Historical min/max", detail: "in each sensor's colour" }]
+      : []),
+    ...[...new Map(shots.map((shot) => [shot.zone, shot])).values()].map((shot) => ({
+      mark: "point" as const,
+      color: shot.color,
+      label: `Shot, ${shot.zone}`,
+      detail: "▲ at the foot",
+    })),
+    ...phases.map((phase) => ({
+      mark: "band" as const,
+      color: PHASE_FILL[phase],
+      label: PHASE_KEY[phase] ?? phase,
+      detail: "shaded, this zone",
+    })),
+    ...(now ? [NOW_KEY] : []),
+  ];
   return (
     <div className="history-explorer-legend">
-      <ul aria-label="Series on the chart">
-        {visible.map((sensor) => (
-          <li key={sensor.entityId}>
-            <i style={{ background: sensor.color }} aria-hidden="true" />
-            {sensor.label}
-          </li>
-        ))}
-        {previous && (
-          <li data-previous-legend>
-            <i className="dashed" aria-hidden="true" />
-            {previous}
-          </li>
-        )}
-        {shots && (
-          <li>
-            <b className="history-explorer-shot-key" aria-hidden="true">
-              ▲
-            </b>
-            Shots
-          </li>
-        )}
-        {phases && <li className="muted">Shaded: P0–P3 of this zone</li>}
-      </ul>
+      <ChartKey items={items} label="Series on the chart" />
       <p className="muted small">
         Left axis {sides(0)}
         {units.length > 1 && ` · right axis ${sides(1)}`}
@@ -1586,10 +1618,26 @@ export function RoomExplorer({ controller, zone }: { controller: Controller; zon
               ))}
             </div>
           </div>
-          {narrow && (
+          {lane.length > 0 && (
             <div className="explorer-row explorer-phase-legend">
               <span />
-              <p className="muted small">P0 morning dryback · P1 ramp · P2 maintain · P3 dryback</p>
+              <ChartKey
+                label="Phase lane key"
+                items={[
+                  ...[...new Set(lane.filter((segment) => !segment.planned).map((segment) => segment.phase))]
+                    .sort()
+                    .map((phase) => ({ mark: "bar" as const, color: PHASE_FILL[phase], label: PHASE_KEY[phase] ?? phase })),
+                  ...(lane.some((segment) => segment.planned)
+                    ? [
+                        {
+                          mark: "bar" as const,
+                          color: "color-mix(in srgb, var(--muted-foreground) 18%, var(--surface))",
+                          label: "Planned, still ahead",
+                        },
+                      ]
+                    : []),
+                ]}
+              />
             </div>
           )}
           <div className="explorer-row explorer-lane">
@@ -1804,6 +1852,31 @@ function ExplorerChart({
     onHover(axis.start + ((event.clientX - box.left) / box.width) * (axis.end - axis.start));
   };
   const nowShown = now > axis.start && now < axis.end;
+  // The marks beside the lines the legend above reads out, each only when it is drawn.
+  const clipped = lines.some(({ values: list }) => list.some((v, i) => v !== null && offScale(v) && times[i] !== undefined));
+  const keyItems: KeyItem[] = [
+    ...(band
+      ? [
+          {
+            mark: "band" as const,
+            color: bandKind === "vwc" ? "var(--band-vwc-edge)" : "var(--band-ec-edge)",
+            label: series[0].chart === "Feed EC" ? "Feed EC limits" : "Saved band",
+          },
+        ]
+      : []),
+    ...(lines.some((line) => line.before)
+      ? [{ mark: "dash" as const, color: "var(--muted-foreground)", label: "Last run, same grow day", detail: "dashed, in each line's colour" }]
+      : []),
+    ...(markers.length ? [{ mark: "tick" as const, color: "var(--muted-foreground)", label: "Phase change" }] : []),
+    ...(clipped
+      ? [{ mark: "point" as const, color: "var(--muted-foreground)", label: "Off the scale", detail: "▲ at the edge, in the line's colour" }]
+      : []),
+    ...(notes.length
+      ? [{ mark: "point" as const, color: "var(--warning-mark)", label: "Numbered note", detail: "listed under the chart" }]
+      : []),
+    ...(axis.end > data.end ? [{ mark: "band" as const, color: "var(--muted-foreground)", label: "Future", detail: "hatched, not yet recorded" }] : []),
+    ...(nowShown ? [NOW_KEY] : []),
+  ];
   // Four labelled levels, the range's ends and two between.
   const ticks = [0, 1, 2, 3].map((k) => low + pad + ((high - low - 2 * pad) * k) / 3);
   return (
@@ -1967,6 +2040,7 @@ function ExplorerChart({
         )}
       </div>
       </div>
+      <ChartKey className="explorer-chart-key" label={`${title} chart key`} items={keyItems} />
       {/* A phone reads one chart at a time: each carries its own few times. */}
       {!last && (
         <div className="explorer-chart-ticks" aria-hidden="true">

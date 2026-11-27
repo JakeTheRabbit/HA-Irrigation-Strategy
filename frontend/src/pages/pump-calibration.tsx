@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { Check, X } from "lucide-react";
+import { ChartKey } from "@/components/chart-key";
 import { Empty, Heading } from "@/components/dashboard";
 import { NeedsIntegration } from "@/components/needs-integration";
 import { PeristalticPump } from "@/components/peristaltic-pump";
@@ -596,7 +597,21 @@ export function PumpCalibration({ controller, navigate, onDirtyChange }: PagePro
               {saved && (
                 <div className="pump-cal-result">
                   <p className="pump-cal-rate">{rateSentence(saved.result.ml_min, nominal)}</p>
-                  {history.length > 1 && <WearSpark history={history} name={pump.name} />}
+                  {history.length > 1 && (
+                    <>
+                      <WearSpark history={history} name={pump.name} />
+                      <ChartKey
+                        items={[
+                          {
+                            mark: "line",
+                            color: "var(--primary)",
+                            label: "Calibrated flow, mL/min",
+                            detail: `last ${history.length} calibrations, oldest to newest`,
+                          },
+                        ]}
+                      />
+                    </>
+                  )}
                   {wear && <p className="pump-cal-wear">{wear}</p>}
                   <Button variant="outline" onClick={restart}>
                     Calibrate another pump

@@ -1,6 +1,7 @@
 import { useId } from "react";
 import { Settings2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ChartKey, NOW_KEY, type KeyItem } from "@/components/chart-key";
 import type { Controller } from "@/lib/types";
 import { tankTelemetry, type TankReading } from "@/lib/tank-telemetry";
 import { TankHistory, TankSparkline, useTankHistory, useTankLines } from "./tank-history";
@@ -111,6 +112,21 @@ export function TankStatus({
             );
           })}
         </dl>
+        <ChartKey
+          className="tank-spark-key"
+          label="Sparkline key"
+          items={(["ec", "ph"] as const)
+            .filter((key) => spark[key]?.lowest && spark[key]?.highest && recent.at !== null)
+            .map(
+              (key): KeyItem => ({
+                mark: "line",
+                color: `var(--tank-${key})`,
+                label: `Tank ${key === "ec" ? "EC" : "pH"}`,
+                detail: "last 24 h",
+              }),
+            )
+            .concat(recent.at !== null && (spark.ec?.lowest || spark.ph?.lowest) ? [NOW_KEY] : [])}
+        />
         <dl className="tank-equipment">
           <div
             className={connected && tank.pump.on ? "is-on" : undefined}
