@@ -159,6 +159,15 @@ function RoomCard({ r, offline, open }: { r: FacilityRoom; offline: boolean; ope
                 </dd>
               </div>
             )}
+            {r.roomAverage && (
+              <div data-facility-room-average>
+                <dt>Zones steer on</dt>
+                <dd>
+                  Room average
+                  {r.roomAverage.vwc !== null && ` · VWC ${number(r.roomAverage.vwc, 1)}%`}
+                </dd>
+              </div>
+            )}
             {air?.value != null && (
               <div>
                 <dt>Air</dt>

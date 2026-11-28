@@ -25,7 +25,7 @@ ZONE_NUMBERS = {  # key: (value it starts at, min, max)
     "p2_end_hours_before_off": (0, 0, 12),
     "p2_dilute_ratio": (1.2, 1, 3),
 }
-ROOM_SWITCHES = ("p0_stall_exit", "use_p2_ec_thresholds")
+ROOM_SWITCHES = ("p0_stall_exit", "use_p2_ec_thresholds", "steer_on_room_average")
 STEP = "setpoint_max_step_per_day"
 SCOPE = "setpoint_step_limit_applies_to"
 
