@@ -19,6 +19,11 @@ for the people who build the system:
 `tests/test_whats_new.py` checks the shape and the plain words, and that the newest section is the
 version being released.
 
+## 3.21.0 - 2026-11-28
+
+- You can steer a whole room on its average reading instead of each zone's own probe. It is off until you turn it on.
+- Bug fixes and improvements.
+
 ## 3.20.1 - 2026-11-11
 
 - Bug fixes and improvements.

@@ -11,6 +11,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.21.0] - 2026-11-28
+
+Pair: **controller 3.21.0**. #281. Released by the owner's decision without a staging soak (approved rehearsal).
+
+### 🌱 In plain English
+
+- **Steer a room on its average.** A new per-room switch, "Steer on room average", makes the controller steer every zone of the room on the room's average moisture and EC instead of each zone's own probe. It is off by default, so nothing changes on update. Turn it on from Settings › Features or the room card.
+
+### 🔧 Technical notes
+
+- #281: `switch.crop_steering_<prefix>steer_on_room_average` (room scope, default off, restores its last state); the controller uses the room's averaged VWC and pore EC for each zone's decision while it is on; registered in `frontend/src/lib/features.json`; room card shows it. No state-file or option change.
+
 ## [3.20.1] - 2026-11-11
 
 3.20.1 — every screenshot, and the Academy's lesson pictures, show the 3.20.0 dashboard.
