@@ -1,3 +1,7 @@
+# 3.21.0
+
+Pair with integration 3.21.0. **C2.** #281: optional room-average steering (switch off by default). No state-file change.
+
 # 3.20.1
 
 Pair with integration 3.20.1. **C0.** Screenshots and Academy stills only; the controller code is unchanged from 3.20.0.
